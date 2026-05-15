@@ -1,4 +1,4 @@
-# 🐷 Bot de Carnitas Don Chuy
+# 🐷 Bot de Carnitas Tacos Javier
 
 Bot de WhatsApp con IA (Groq) que atiende clientes y te notifica cuando hay una venta.
 
