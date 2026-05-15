@@ -17,7 +17,7 @@ function buildCortes() {
 
 // Detectar si el mensaje pregunta por algún corte
 function preguntaCorte(texto) {
-  return /qu[eé]\s+es\s+(el\s+)?(surtido|carner|carne|buche|cuero|lengua)|cu[eé]ntame|c[oó]mo\s+es\s+(el\s+)?(surtido|carner|carne|buche|cuero|lengua)|qu[eé]\s+tiene|de\s+qu[eé]\s+(es|tiene|se\s+trata)/i.test(texto);
+  return /qu[eé]\s+es\s+(el\s+)?(surtido|carne|buche|cuero|lengua)|cu[eé]ntame|c[oó]mo\s+es\s+(el\s+)?(surtido|carne|buche|cuero|lengua)|qu[eé]\s+tiene|de\s+qu[eé]\s+(es|tiene|se\s+trata)/i.test(texto);
 }
 
 module.exports = { buildCortes, preguntaCorte };

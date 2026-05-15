@@ -32,7 +32,6 @@ const {
   datosCompletos,
   pareceFragmentoDatos,
   extraerDatosPedido,
-  persistirEstado,
 } = require("../estado");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -45,6 +44,7 @@ function tieneNombreValido(texto) {
   return palabras.length >= 2;
 }
 
+// ── FIX 2: FORMATEADOR DE HORA CON a.m./p.m. ─────────────────────────────────
 function formatearHora(horaTexto) {
   const match = horaTexto.match(/(\d{1,2})(?::(\d{2}))?/);
   if (!match) return horaTexto;
@@ -54,30 +54,194 @@ function formatearHora(horaTexto) {
   const tienePm = /pm/i.test(horaTexto);
   const tieneAm = /am/i.test(horaTexto);
 
+  // Determinar AM/PM según horario de servicio (7:00-12:30)
+  // Todo entre 7 y 12 es AM, excepto 12:30 que es PM límite
   let sufijo;
-  if (tienePm)       sufijo = "p.m.";
-  else if (tieneAm)  sufijo = "a.m.";
-  else               sufijo = (h === 12) ? "p.m." : "a.m.";
+  if (tienePm) {
+    sufijo = "p.m.";
+  } else if (tieneAm) {
+    sufijo = "a.m.";
+  } else {
+    // Sin indicador — inferir por horario de servicio
+    // 7,8,9,10,11 → a.m. | 12 → p.m. si no hay minutos o minutos <= 30
+    sufijo = (h === 12) ? "p.m." : "a.m.";
+  }
 
   const minStr = m > 0 ? `:${String(m).padStart(2, "0")}` : ":00";
   return `${h}${minStr} ${sufijo}`;
 }
 
+// ── FIX 1: CALCULAR SUBTOTAL LÍNEA POR LÍNEA ─────────────────────────────────
 function calcularSubtotal(texto) {
+  // SIEMPRE recalcular desde las líneas del pedido — nunca confiar en el subtotal de Groq
   const lineas = texto.split("\n").filter(l => l.trim());
   let suma = 0;
+
   for (const linea of lineas) {
+    // Ignorar líneas de subtotal/total — son calculadas por nosotros
     if (/subtotal|💰|total/i.test(linea)) continue;
+
+    // Nx [...] — $XX c/u  →  N × XX
     const mRep = linea.match(/(\d+)x\s*\[.*?\]\s*[—\-]\s*\$(\d+)/i);
     if (mRep) { suma += parseInt(mRep[1]) * parseInt(mRep[2]); continue; }
+
+    // Plato N: ... — $XX
     const mPlato = linea.match(/plato\s*\d+.*?[—\-]\s*\$(\d+)/i);
     if (mPlato) { suma += parseInt(mPlato[1]); continue; }
+
+    // línea normal: ... — $XX  (al final de la línea)
     const mNorm = linea.match(/[—\-]\s*\$(\d+)\s*$/);
     if (mNorm) { suma += parseInt(mNorm[1]); continue; }
   }
   return suma;
 }
 
+// ── MOTOR DE CÁLCULO JSON ────────────────────────────────────────────────────
+function procesarItemJSON(item, precios) {
+  const { pTaco, pTorta, p100g } = precios;
+  const corte = Array.isArray(item.corte)
+    ? item.corte.join(" con ")
+    : (item.corte || "surtido");
+
+  switch (item.presentacion) {
+    case "taco": {
+      const precio = item.cantidad * pTaco;
+      return `🌮 ${item.cantidad} taco${item.cantidad > 1 ? "s" : ""} carnitas ${corte} — $${precio}`;
+    }
+    case "torta": {
+      const precio = item.cantidad * pTorta;
+      return `🥖 ${item.cantidad} torta${item.cantidad > 1 ? "s" : ""} carnitas ${corte} — $${precio}`;
+    }
+    case "gramos": {
+      const precio = Math.round((item.gramos / 100) * p100g);
+      return `⚖️ ${item.gramos}g carnitas ${corte} — $${precio}`;
+    }
+    case "pesos": {
+      const gramos = Math.round((item.monto / p100g) * 100);
+      return `⚖️ ${gramos}g carnitas ${corte} — $${item.monto}`;
+    }
+    case "grupo_repetido": {
+      const lineasGrupo = item.items_por_grupo.map(i => {
+        const c = Array.isArray(i.corte) ? i.corte.join(" con ") : (i.corte || "surtido");
+        if (i.presentacion === "taco")   return `${i.cantidad} taco${i.cantidad > 1 ? "s" : ""} carnitas ${c}`;
+        if (i.presentacion === "torta")  return `${i.cantidad} torta${i.cantidad > 1 ? "s" : ""} carnitas ${c}`;
+        if (i.presentacion === "gramos") return `${i.gramos}g carnitas ${c}`;
+        if (i.presentacion === "pesos")  return `${Math.round((i.monto / p100g) * 100)}g carnitas ${c}`;
+        return "";
+      }).filter(Boolean).join(" + ");
+
+      // Calcular precio por grupo
+      const precioGrupo = item.items_por_grupo.reduce((sum, i) => {
+        if (i.presentacion === "taco")   return sum + i.cantidad * pTaco;
+        if (i.presentacion === "torta")  return sum + i.cantidad * pTorta;
+        if (i.presentacion === "gramos") return sum + Math.round((i.gramos / 100) * p100g);
+        if (i.presentacion === "pesos")  return sum + i.monto;
+        return sum;
+      }, 0);
+
+      return `${item.grupos}x [${lineasGrupo}] — $${precioGrupo} c/u`;
+    }
+    case "plato_separado": {
+      const lineasPlato = item.items.map(i => procesarItemJSON(i, precios)).join(" + ");
+      return `🍽️ Plato ${item.numero}: ${lineasPlato.replace(/^[🌮🥖⚖️]\s*/, "")}`;
+    }
+    default:
+      return "";
+  }
+}
+
+function calcularPrecioItem(item, precios) {
+  const { pTaco, pTorta, p100g } = precios;
+  switch (item.presentacion) {
+    case "taco":    return item.cantidad * pTaco;
+    case "torta":   return item.cantidad * pTorta;
+    case "gramos":  return Math.round((item.gramos / 100) * p100g);
+    case "pesos":   return item.monto;
+    case "grupo_repetido":
+      return item.grupos * item.items_por_grupo.reduce((sum, i) => sum + calcularPrecioItem(i, precios), 0);
+    case "plato_separado":
+      return item.items.reduce((sum, i) => sum + calcularPrecioItem(i, precios), 0);
+    default: return 0;
+  }
+}
+
+function jsonALineas(jsonData, precios) {
+  const lineas = jsonData.items.map(item => procesarItemJSON(item, precios)).filter(Boolean);
+  const subtotal = jsonData.items.reduce((sum, item) => sum + calcularPrecioItem(item, precios), 0);
+  lineas.push(`💰 Subtotal: $${subtotal}`);
+  return { texto: lineas.join("\n"), subtotal };
+}
+
+// ── MOTOR DE CÁLCULO JSON ────────────────────────────────────────────────────
+function getPrecios() {
+  const { getConfig } = require("../db");
+  return {
+    pTaco:  parseInt(getConfig("precio_taco")  || "30"),
+    pTorta: parseInt(getConfig("precio_torta") || "40"),
+    p100g:  parseInt(getConfig("precio_100g")  || "32"),
+  };
+}
+
+function procesarItemJSON(item, precios) {
+  const { pTaco, pTorta, p100g } = precios;
+  const corte = Array.isArray(item.corte) ? item.corte.join(" con ") : (item.corte || "surtido");
+  switch (item.presentacion) {
+    case "taco": {
+      return `🌮 ${item.cantidad} taco${item.cantidad > 1 ? "s" : ""} carnitas ${corte} — $${item.cantidad * pTaco}`;
+    }
+    case "torta": {
+      return `🥖 ${item.cantidad} torta${item.cantidad > 1 ? "s" : ""} carnitas ${corte} — $${item.cantidad * pTorta}`;
+    }
+    case "gramos": {
+      return `⚖️ ${item.gramos}g carnitas ${corte} — $${Math.round((item.gramos / 100) * p100g)}`;
+    }
+    case "pesos": {
+      return `⚖️ ${Math.round((item.monto / p100g) * 100)}g carnitas ${corte} — $${item.monto}`;
+    }
+    case "grupo_repetido": {
+      const lg = item.items_por_grupo.map(i => {
+        const c = Array.isArray(i.corte) ? i.corte.join(" con ") : (i.corte || "surtido");
+        if (i.presentacion === "taco")   return `${i.cantidad} taco${i.cantidad>1?"s":""} carnitas ${c}`;
+        if (i.presentacion === "torta")  return `${i.cantidad} torta${i.cantidad>1?"s":""} carnitas ${c}`;
+        if (i.presentacion === "gramos") return `${i.gramos}g carnitas ${c}`;
+        if (i.presentacion === "pesos")  return `${Math.round((i.monto/p100g)*100)}g carnitas ${c}`;
+        return "";
+      }).filter(Boolean).join(" + ");
+      const pg = item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
+      return `${item.grupos}x [${lg}] — $${pg} c/u`;
+    }
+    case "plato_separado": {
+      const lp = item.items.map(i => procesarItemJSON(i, precios)).join(" + ");
+      return `🍽️ Plato ${item.numero}: ${lp.replace(/^[🌮🥖⚖️]\s*/, "")}`;
+    }
+    default: return "";
+  }
+}
+
+function calcularPrecioItem(item, precios) {
+  const { pTaco, pTorta, p100g } = precios;
+  switch (item.presentacion) {
+    case "taco":    return item.cantidad * pTaco;
+    case "torta":   return item.cantidad * pTorta;
+    case "gramos":  return Math.round((item.gramos / 100) * p100g);
+    case "pesos":   return item.monto;
+    case "grupo_repetido":
+      return item.grupos * item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
+    case "plato_separado":
+      return item.items.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
+    default: return 0;
+  }
+}
+
+function jsonALineas(jsonData) {
+  const precios  = getPrecios();
+  const lineas   = jsonData.items.map(i => procesarItemJSON(i, precios)).filter(Boolean);
+  const subtotal = jsonData.items.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
+  lineas.push(`💰 Subtotal: $${subtotal}`);
+  return { texto: lineas.join("\n"), subtotal };
+}
+
+// ── FIX 3: LISTA ACUMULADA BONITA ────────────────────────────────────────────────
 function formatearListaAcumulada(ordenTexto) {
   const lineas = ordenTexto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l));
   let lista = "📋 *Tu pedido hasta ahora:*\n";
@@ -89,15 +253,18 @@ function formatearListaAcumulada(ordenTexto) {
   return lista;
 }
 
+// ── GENERADOR DE RESUMEN DESDE CÓDIGO ────────────────────────────────────────
 function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   const c        = datosCampos.get(clienteNumero) || {};
   const horaConf = horaEntregaPreventa.get(clienteNumero);
   const esTransf = /transferencia/i.test(c.metodo || "");
   const domCosto = 50;
 
+  // FIX 1: calcular subtotal correctamente
   const subtotal = calcularSubtotal(ordenTexto);
   const total    = esDomicilio ? subtotal + domCosto : subtotal;
 
+  // Limpiar línea de subtotal del texto de orden para no duplicarla
   const ordenLimpia = ordenTexto.split("\n")
     .filter(l => !/subtotal/i.test(l))
     .join("\n")
@@ -123,6 +290,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   resumen += `💰 *TOTAL: $${total}*\n`;
   resumen += `💳 *Pago:* ${c.metodo || "—"}\n`;
 
+  // FIX 2: hora formateada con a.m./p.m.
   if (esPreventa && horaConf) {
     const horaFormateada = formatearHora(horaConf);
     resumen += esDomicilio
@@ -136,7 +304,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   return { texto: resumen, esTransferencia: esTransf, total };
 }
 
-// ── DETECCIÓN DE TIPO DE ENTREGA ──────────────────────────────────────────────
+// ── DETECCIÓN DE TIPO DE ENTREGA — 3 NIVELES ─────────────────────────────────
 const _MOSTRADOR_PATRONES = [
   { re: /\bmostr(ador)?\b/,                          pts: 10 },
   { re: /\brecoger\b/,                                pts: 10 },
@@ -242,10 +410,10 @@ async function detectarTipoEntrega(texto) {
 async function handleMensaje(msg, client) {
   const clienteNumero = msg.from;
 
-  // ── ESPERANDO CAPTURA DE TRANSFERENCIA ───────────────────────────────────
   if (esperandoCaptura.has(clienteNumero) && !msg.hasMedia) {
     if (msg.body && msg.body.trim().length > 0) {
       const textoCap = msg.body.trim();
+      // Si el cliente quiere cancelar mientras espera la captura
       if (/cancelar|cancela|cancel|cancelo|cancelame|cancelado|ya no quiero|ya no/i.test(textoCap)) {
         const datosCaptura = esperandoCaptura.get(clienteNumero);
         esperandoCaptura.delete(clienteNumero);
@@ -256,7 +424,11 @@ async function handleMensaje(msg, client) {
           const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
           try {
             await client.sendMessage(grupoId,
-              `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: (canceló antes de enviar captura)\nTelefono: ${datosCaptura?.telefono || "—"}\nMotivo: Canceló durante espera de transferencia`
+              `Solicitud de Cancelacion
+Hora: ${horaCancel}
+Cliente: (canceló antes de enviar captura)
+Telefono: ${datosCaptura?.telefono || "—"}
+Motivo: Canceló durante espera de transferencia`
             );
           } catch (e) { console.error("Error notificando cancelacion:", e.message); }
         }
@@ -285,7 +457,6 @@ async function handleMensaje(msg, client) {
         return;
       }
       esperandoMotivoCancelacion.set(clienteNumero, { nombre: datosPedido.nombre, telefono: datosPedido.telefono, notificarGrupo: true });
-      persistirEstado(clienteNumero); // ← PUNTO 5
       pedidosConfirmados.delete(clienteNumero);
       clientesNuevos.delete(clienteNumero);
       await msg.reply("Lamento escuchar eso. Podrias indicarme el motivo de tu cancelacion?");
@@ -309,7 +480,7 @@ async function handleMensaje(msg, client) {
     }
     esperandoMotivoCancelacion.delete(clienteNumero);
     clientesNuevos.delete(clienteNumero);
-    limpiarTodo(clienteNumero); // ya llama eliminarSesion internamente
+    limpiarTodo(clienteNumero);
     try { actualizarEstadoPedido(datosCancelacion.telefono, "cancelado"); } catch (e) {}
     await msg.reply("Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!");
     return;
@@ -318,7 +489,6 @@ async function handleMensaje(msg, client) {
   // ── 1. PRIMER MENSAJE ─────────────────────────────────────────────────────
   if (!clientesNuevos.has(clienteNumero)) {
     clientesNuevos.add(clienteNumero);
-    persistirEstado(clienteNumero); // ← PUNTO: primer contacto
     if (!estaEnHorario()) { await msg.reply(mensajeFueraDeHorario()); return; }
     await msg.reply(SALUDO);
     return;
@@ -330,13 +500,11 @@ async function handleMensaje(msg, client) {
     const rechazaPreventa = /^(no|nel|nop|nope)$/i.test(textoOriginal.trim());
     if (aceptaPreventa) {
       clientesPreventa.add(clienteNumero);
-      persistirEstado(clienteNumero); // ← PUNTO 1: preventa aceptada
       await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO);
       return;
     }
     if (rechazaPreventa) {
       clientesNuevos.delete(clienteNumero);
-      limpiarTodo(clienteNumero);
       await msg.reply("Esta bien! Cuando gustes pedir, aqui estaremos. Hasta pronto!");
       return;
     }
@@ -360,7 +528,6 @@ async function handleMensaje(msg, client) {
       historial.push({ role: "user", content: "Mi pedido es a domicilio." });
       historial.push({ role: "assistant", content: "Perfecto, llena el formulario con tus datos." });
     }
-    persistirEstado(clienteNumero); // ← PUNTO: tipo de entrega decidido
     console.log(`Bot: [FORMULARIO - ${tipoEntrega.toUpperCase()}${esPreventa ? " PREVENTA" : ""}]`);
     return;
   }
@@ -368,16 +535,52 @@ async function handleMensaje(msg, client) {
   // ── 2B. CANCELACIÓN DURANTE EL PEDIDO ────────────────────────────────────
   if (quiereCancelar) {
     clientesNuevos.delete(clienteNumero);
-    limpiarTodo(clienteNumero); // ya llama eliminarSesion internamente
+    limpiarTodo(clienteNumero);
     await msg.reply("Tu pedido ha sido cancelado. Cuando gustes ordenar, aqui estaremos. Hasta pronto!");
     return;
+  }
+
+  // ── 2C. CAMBIO DE TIPO DE ENTREGA DURANTE FORMULARIO ────────────────────
+  if (!datosRecibidos.has(clienteNumero)) {
+    const esCambioDomicilio  = /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*domicilio/i.test(textoOriginal)
+      || /quiero\s*(que\s*)?(sea\s*)?a\s*domicilio/i.test(textoOriginal)
+      || /mejor\s*(a\s*)?domicilio/i.test(textoOriginal);
+    const esCambioMostrador  = /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*mostrador/i.test(textoOriginal)
+      || /mejor\s*(al?\s*)?mostrador/i.test(textoOriginal)
+      || /quiero\s*(que\s*)?(sea\s*)?en\s*mostrador/i.test(textoOriginal);
+
+    if (esCambioDomicilio || esCambioMostrador) {
+      // Actualizar el historial con el nuevo tipo de entrega
+      const nuevoTipo = esCambioDomicilio ? "domicilio" : "mostrador";
+      // Reemplazar la entrada del historial que tenía el tipo anterior
+      const idxTipo = historial.findIndex(h => h.content && (h.content.includes("domicilio") || h.content.includes("mostrador")));
+      if (idxTipo !== -1) {
+        historial[idxTipo].content = nuevoTipo === "domicilio"
+          ? "Mi pedido es a domicilio."
+          : "Mi pedido es para recoger en mostrador.";
+      }
+      // Limpiar campos de dirección si cambia a mostrador
+      if (esCambioMostrador) {
+        const camposActuales = datosCampos.get(clienteNumero) || {};
+        camposActuales.calle      = null;
+        camposActuales.colonia    = null;
+        camposActuales.referencia = null;
+        datosCampos.set(clienteNumero, camposActuales);
+      }
+      persistirEstado(clienteNumero);
+      const formActualizado = mostrarFormularioProgresivo(clienteNumero, esCambioDomicilio, esPreventa);
+      const sfaltante = siguienteCampoFaltante(clienteNumero, esCambioDomicilio, esPreventa);
+      await msg.reply(
+        (esCambioDomicilio ? "Perfecto, cambié tu pedido a domicilio!\n\n" : "Perfecto, cambié tu pedido a mostrador!\n\n") +formActualizado +
+        (sfaltante ? "\n\n" + sfaltante.pregunta : ""));
+        return;
+    }
   }
 
   // ── 3. FORMULARIO PROGRESIVO ──────────────────────────────────────────────
   if (!datosRecibidos.has(clienteNumero)) {
     const esOrdenDomicilio = historial.some(h => h.content && h.content.includes("domicilio"));
     const campos = interpretarCampos(clienteNumero, textoOriginal, esOrdenDomicilio, esPreventa);
-    // interpretarCampos ya llama persistirEstado internamente
 
     if (esPreventa && campos._horaFueraRango) {
       const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
@@ -388,17 +591,14 @@ async function handleMensaje(msg, client) {
       await msg.reply(formProgresivo + "\n\n" + msg_hora + "\nA que hora deseas " + tipoPedido + "? (entre 7:00 a.m. y 12:30 p.m.)");
       delete campos._horaFueraRango;
       datosCampos.set(clienteNumero, campos);
-      persistirEstado(clienteNumero);
       return;
     }
 
     const faltante = siguienteCampoFaltante(clienteNumero, esOrdenDomicilio, esPreventa);
     if (faltante && (faltante.campo === "correo" || faltante.campo === "referencia"))
       manejarOpcional(clienteNumero, faltante.campo, textoOriginal);
-    // manejarOpcional ya llama persistirEstado internamente
 
     acumularDatos(clienteNumero, textoOriginal);
-    // acumularDatos ya llama persistirEstado internamente
 
     if (camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
       const camposActuales = datosCampos.get(clienteNumero);
@@ -407,7 +607,6 @@ async function handleMensaje(msg, client) {
       datosRecibidos.add(clienteNumero);
       historial.push({ role: "user", content: textoFinal });
       historial.push({ role: "assistant", content: "Datos recibidos. MENU TACOS JAVIER enviado." });
-      persistirEstado(clienteNumero); // ← PUNTO: formulario completo
       const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
       await msg.reply(formCompleto + "\n\nPerfecto, datos recibidos! Aqui te mando el menu.");
       await new Promise(r => setTimeout(r, 600));
@@ -424,7 +623,61 @@ async function handleMensaje(msg, client) {
   // ── 4. CONFIRMACIÓN FINAL DEL PEDIDO ─────────────────────────────────────
   const palabrasConfirmacion = /^(si|sí|ok|va|dale|listo|sale|andale|adelante|confirmo|confirmado|correcto|asi|si porfavor|sí porfavor|si por favor|sí por favor|claro|perfecto|va bien|dale pues|ándale|órale|va que va)$/i;
 
-  // Cambio de método de pago con resumen pendiente
+  // Si hay resumen pendiente y el cliente cambia a domicilio → pedir dirección
+  if (resumenPendiente.has(clienteNumero) && (
+    /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*domicilio/i.test(textoOriginal)
+    || /mejor\s*(a\s*)?domicilio/i.test(textoOriginal)
+    || /mejor\s*(que\s*)?(me\s*)?(lo\s*)?(env[íi]a|manda|lleva|trae)(melo|me|lo)?/i.test(textoOriginal)
+    || /^(env[íi]amelo|mandamelo|traemelo|llevamelo)$/i.test(textoOriginal.trim())
+  )) {
+    const pendienteActual = resumenPendiente.get(clienteNumero);
+    const matchOrden = pendienteActual.texto.match(/📋 \*Orden:\*\n([\s\S]+?)\n💰/);
+    const ordenExtraida = matchOrden ? matchOrden[1].trim() : "";
+
+    // Actualizar historial a domicilio
+    const idxTipo = historial.findIndex(h => h.content && (h.content.includes("domicilio") || h.content.includes("mostrador")));
+    if (idxTipo !== -1) historial[idxTipo].content = "Mi pedido es a domicilio.";
+
+    // Guardar orden para regenerar resumen después
+    if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
+    resumenPendiente.delete(clienteNumero);
+    datosRecibidos.delete(clienteNumero);
+    persistirEstado(clienteNumero);
+
+    await msg.reply("Perfecto! Para cambiar a domicilio necesito tu dirección.\n¿Cuál es tu calle y número?");
+    return;
+  }
+
+  // Si hay resumen pendiente y el cliente cambia a mostrador → regenerar resumen
+  if (resumenPendiente.has(clienteNumero) && (
+    /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*mostrador/i.test(textoOriginal)
+    || /mejor\s*(al?\s*)?mostrador/i.test(textoOriginal)
+    || /mejor\s*(lo\s*)?(recojo|voy|paso)/i.test(textoOriginal)
+  )) {
+    const pendienteActual = resumenPendiente.get(clienteNumero);
+    const matchOrden = pendienteActual.texto.match(/📋 \*Orden:\*\n([\s\S]+?)\n💰/);
+    const ordenExtraida = matchOrden ? matchOrden[1].trim() : "";
+
+    // Actualizar historial a mostrador
+    const idxTipo = historial.findIndex(h => h.content && (h.content.includes("domicilio") || h.content.includes("mostrador")));
+    if (idxTipo !== -1) historial[idxTipo].content = "Mi pedido es para recoger en mostrador.";
+
+    // Limpiar dirección y regenerar resumen
+    const campos = datosCampos.get(clienteNumero) || {};
+    campos.calle = null; campos.colonia = null; campos.referencia = null;
+    datosCampos.set(clienteNumero, campos);
+    resumenPendiente.delete(clienteNumero);
+
+    if (ordenExtraida) {
+      const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, false, esPreventa);
+      resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
+      persistirEstado(clienteNumero);
+      await msg.reply("Perfecto! Cambié tu pedido a mostrador.\n\n" + resumenNuevo.texto);
+    }
+    return;
+  }
+
+  // Si hay resumen pendiente y el cliente cambia método de pago → regenerar resumen
   if (resumenPendiente.has(clienteNumero) && /transferencia|efectivo|tarjeta/i.test(textoOriginal)) {
     const esCambio = /cambiar|cambio|mejor|voy\s+a\s+pagar|quiero\s+pagar|pagar\s+con|con\s+(efectivo|tarjeta|transferencia)/i.test(textoOriginal)
       || /^(efectivo|tarjeta|transferencia)$/i.test(textoOriginal.trim());
@@ -435,6 +688,7 @@ async function handleMensaje(msg, client) {
       else if (/efectivo/i.test(textoOriginal)) campos.metodo = "efectivo";
       datosCampos.set(clienteNumero, campos);
 
+      // Extraer orden del resumen anterior y regenerar
       const pendienteActual = resumenPendiente.get(clienteNumero);
       const matchOrden = pendienteActual.texto.match(/📋 \*Orden:\*\n([\s\S]+?)\n💰/);
       const ordenExtraida = matchOrden ? matchOrden[1].trim() : "";
@@ -444,7 +698,6 @@ async function handleMensaje(msg, client) {
         const esOrdenDomAux = historial.some(h => h.content && h.content.includes("domicilio"));
         const resumenNuevo  = generarResumen(clienteNumero, ordenExtraida, esOrdenDomAux, esPreventa);
         resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
-        persistirEstado(clienteNumero); // ← PUNTO 2: resumen actualizado
         await msg.reply(resumenNuevo.texto);
         console.log(`Bot: [RESUMEN ACTUALIZADO — método: ${campos.metodo}]`);
         return;
@@ -452,29 +705,27 @@ async function handleMensaje(msg, client) {
     }
   }
 
-  // "no, ..." con texto → corrección/adición
+  // Si hay resumen pendiente y el cliente dice "no" con texto → corrección/adición
   if (resumenPendiente.has(clienteNumero) && /^no[,\s]/i.test(textoOriginal.trim())) {
     const pendienteActual = resumenPendiente.get(clienteNumero);
+    // Extraer las líneas del pedido del resumen para acumularlas
     const matchOrden = pendienteActual.texto.match(/📋 \*Orden:\*\n([\s\S]+?)\n💰/);
     const ordenExtraida = matchOrden ? matchOrden[1].trim() : "";
     resumenPendiente.delete(clienteNumero);
-    if (ordenExtraida) {
-      esperandoAgregarMas.set(clienteNumero, ordenExtraida);
-      persistirEstado(clienteNumero); // ← PUNTO 7
-    }
+    // Acumular la orden anterior para que el nuevo ítem se sume correctamente
+    if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
+    // Dejar que caiga a Groq para procesar la corrección/adición
   }
 
-  // "no" solo → cancelar resumen
+  // Si hay resumen pendiente y el cliente dice "no" solo → cancelar resumen y preguntar
   if (resumenPendiente.has(clienteNumero) && /^(no|nel|nop)$/i.test(textoOriginal.trim())) {
     resumenPendiente.delete(clienteNumero);
-    persistirEstado(clienteNumero);
     await msg.reply("Entendido! ¿Qué te gustaría cambiar o agregar?");
     await new Promise(r => setTimeout(r, 300));
     await msg.reply(MENU_FORMATO);
     return;
   }
 
-  // Confirmación del resumen → enviar pedido
   if (resumenPendiente.has(clienteNumero) && palabrasConfirmacion.test(textoOriginal.trim())) {
     const pendiente  = resumenPendiente.get(clienteNumero);
     const horaVenta  = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
@@ -483,7 +734,6 @@ async function handleMensaje(msg, client) {
     if (pendiente.esTransferencia) {
       esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono });
       resumenPendiente.delete(clienteNumero);
-      persistirEstado(clienteNumero); // ← PUNTO 3: esperando captura
       await msg.reply(DATOS_BANCO);
       return;
     }
@@ -502,23 +752,21 @@ async function handleMensaje(msg, client) {
       const nombreParts    = (infoPedido.nombre || "").split(" ");
       const cliente        = upsertCliente({ nombre: nombreParts[0]||null, apellido: nombreParts.slice(1).join(" ")||null, telefono: telefonoLimpio, correo: null, calle_numero: null, colonia: null, referencia: null });
       const pedidoId       = registrarPedido({
-        cliente_id:   cliente ? cliente.id : null,
-        tipo:         infoPedido.tipo || "mostrador",
-        orden:        pendiente.texto.substring(0, 500),
-        total:        parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0,
-        metodo_pago:  /transferencia/i.test(pendiente.texto) ? "transferencia" : /tarjeta/i.test(pendiente.texto) ? "tarjeta" : "efectivo",
-        estado:       "pendiente",
+        cliente_id:  cliente ? cliente.id : null,
+        tipo:        infoPedido.tipo || "mostrador",
+        orden:       pendiente.texto.substring(0, 500),
+        total:       parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0,
+        metodo_pago: /transferencia/i.test(pendiente.texto) ? "transferencia" : /tarjeta/i.test(pendiente.texto) ? "tarjeta" : "efectivo",
+        estado:      "pendiente",
         hora_entrega: horaEntregaPreventa.get(clienteNumero) || null,
       });
       console.log(`BD: Pedido #${pedidoId} registrado`);
     } catch (e) { console.error("BD Error:", e.message); }
 
     pedidosConfirmados.set(clienteNumero, { nombre: infoPedido.nombre, telefono: infoPedido.telefono, total: infoPedido.total, resumen: pendiente.texto, confirmadoEn: Date.now() });
-    persistirEstado(clienteNumero); // ← PUNTO 4: pedido confirmado por cliente
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
     clientesNuevos.add(clienteNumero);
-    persistirEstado(clienteNumero); // ← conservar clienteNuevo tras limpiar
     await msg.reply("Listo! Tu pedido fue recibido y esta en espera de confirmacion de nuestro equipo.\nEn breve te avisamos. Gracias por tu preferencia!\n\n_Si deseas cancelar tu pedido escribe *cancelar*._");
     return;
   }
@@ -535,13 +783,14 @@ async function handleMensaje(msg, client) {
     const itemData = esperandoConfirmacionItem.get(clienteNumero);
 
     if (esRechazo || /^no$/i.test(textoOriginal.trim())) {
+      // Regla 3: borrar ítem rechazado completamente — NO acumular su precio
       esperandoConfirmacionItem.delete(clienteNumero);
       esperandoAgregarMas.delete(clienteNumero);
+      // Limpiar también la última entrada del historial (la respuesta de Groq con el ítem incorrecto)
       const hist = getHistorial(clienteNumero);
       if (hist.length >= 2 && hist[hist.length - 1].role === "assistant") {
-        hist.splice(hist.length - 2, 2);
+        hist.splice(hist.length - 2, 2); // borrar el par user+assistant del ítem rechazado
       }
-      persistirEstado(clienteNumero); // ← ítem rechazado, limpiar
       await msg.reply("No pasa nada! Dime de nuevo qué deseas ordenar 😊");
       await new Promise(r => setTimeout(r, 400));
       await msg.reply(MENU_FORMATO);
@@ -555,11 +804,11 @@ async function handleMensaje(msg, client) {
       esperandoAgregarMas.set(clienteNumero, nuevaOrden);
       historial.push({ role: "user", content: "si, correcto" });
       historial.push({ role: "assistant", content: itemData.lineas });
-      persistirEstado(clienteNumero); // ← PUNTO 7: orden acumulada actualizada
       await msg.reply("¿Deseas agregar algo más a tu pedido?");
       return;
     }
 
+    // Cualquier otra respuesta → repetir
     await msg.reply(itemData.lineas + "\n\n¿Es correcto?");
     return;
   }
@@ -573,13 +822,13 @@ async function handleMensaje(msg, client) {
       resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
       historial.push({ role: "user", content: textoOriginal });
       historial.push({ role: "assistant", content: resumenGenerado.texto });
-      persistirEstado(clienteNumero); // ← PUNTO 2: resumen listo para confirmar
       await msg.reply(resumenGenerado.texto);
       console.log("Bot: [RESUMEN FINAL GENERADO POR CÓDIGO]");
       return;
     }
 
     if (esAgregarSi) {
+      // FIX 3: mostrar lista acumulada bonita antes del menú
       const ordenActual = esperandoAgregarMas.get(clienteNumero) || "";
       const listaActual = formatearListaAcumulada(ordenActual);
       await msg.reply(listaActual);
@@ -589,6 +838,8 @@ async function handleMensaje(msg, client) {
       await msg.reply("¿Qué más te gustaría agregar de nuestro menú?");
       return;
     }
+
+    // Cliente manda pedido directamente sin responder si/no → procesar como nuevo ítem
   }
 
   // ── LLAMADA A GROQ ────────────────────────────────────────────────────────
@@ -604,31 +855,49 @@ async function handleMensaje(msg, client) {
     });
 
     const respuestaGroq = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      max_tokens: 300,
-      temperature: 0.5,
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 400,
+      temperature: 0.2,
       messages: [{ role: "system", content: systemPrompt }, ...historial],
     });
 
-    let respuestaTexto = respuestaGroq.choices[0]?.message?.content || "Disculpa, no entendi. Me repites tu pedido?";
+    let respuestaTexto = respuestaGroq.choices[0]?.message?.content?.trim() || "";
     historial.push({ role: "assistant", content: respuestaTexto });
-    persistirEstado(clienteNumero); // ← PUNTO 8: historial actualizado tras Groq
 
-    const tieneSubtotal     = /subtotal|💰/i.test(respuestaTexto);
-    const tieneLineasPedido = /taco|torta|gramo|carnita|kilo|\dx\s*\[/i.test(respuestaTexto);
+    // ── Intentar parsear como JSON ────────────────────────────────────────
+    let jsonData = null;
+    try {
+      const clean = respuestaTexto.replace(/```json|```/g, "").trim();
+      jsonData = JSON.parse(clean);
+    } catch (_) {}
 
-    if (tieneSubtotal && tieneLineasPedido) {
-      const lineasOrden = respuestaTexto.split("\n")
-        .filter(l => /taco|torta|gramo|carnita|plato|kilo|\$\d+|\d+g|\d+x|\dx\s*\[/i.test(l))
-        .join("\n");
-      esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasOrden || respuestaTexto.trim() });
-      persistirEstado(clienteNumero); // ← PUNTO 6: esperando confirmación de ítem
-      await msg.reply(respuestaTexto + "\n\n¿Es correcto?");
+    if (jsonData && jsonData.tipo === "pedido" && Array.isArray(jsonData.items)) {
+      // El código calcula todo
+      const resultado = jsonALineas(jsonData);
+      esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
+      await msg.reply(resultado.texto + "\n\n¿Es correcto?");
+      console.log(`Bot: [JSON→LÍNEAS] Subtotal: $${resultado.subtotal}`);
       return;
     }
 
-    await msg.reply(respuestaTexto);
-    console.log(`Bot: ${respuestaTexto.substring(0, 80)}...`);
+    if (jsonData && jsonData.tipo === "pregunta" && jsonData.mensaje) {
+      await msg.reply(jsonData.mensaje);
+      console.log(`Bot: [PREGUNTA] ${jsonData.mensaje.substring(0, 60)}`);
+      return;
+    }
+
+    if (jsonData && jsonData.tipo === "info" && jsonData.mensaje) {
+      await msg.reply(jsonData.mensaje);
+      return;
+    }
+
+    // Respuesta no JSON — conversacional normal
+    if (respuestaTexto) {
+      await msg.reply(respuestaTexto);
+      console.log(`Bot: ${respuestaTexto.substring(0, 80)}...`);
+    } else {
+      await msg.reply("Disculpa, no entendi. Me repites tu pedido?");
+    }
 
   } catch (error) {
     console.error("Error:", error.message);

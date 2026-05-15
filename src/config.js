@@ -62,7 +62,7 @@ function getMenuFormato() {
 }
 
 function _menuDefault() {
-  return `\n🌮 *MENÚ TACOS JAVIER* 🌮\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🌮 *TACOS* — $30 c/u\nSurtido · Carner · Buche · Cuero · Lengua\n\n🥖 *TORTAS* — $40 c/u\n\n⚖️ *POR GRAMOS* — $32 / 100g\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
+  return `\n🌮 *MENÚ TACOS JAVIER* 🌮\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🌮 *TACOS* — $30 c/u\nSurtido · Carne · Buche · Cuero · Lengua\n\n🥖 *TORTAS* — $40 c/u\n\n⚖️ *POR GRAMOS* — $32 / 100g\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
 }
 
 // ── FORMULARIOS ───────────────────────────────────────────────────────────────
