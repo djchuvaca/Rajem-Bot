@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel — Tacos Javier</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--surface3:#222;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --accent:#ff6b2b;--accent2:#ff8c55;--accent-dim:rgba(255,107,43,0.12);
+  --text:#f0ede8;--muted:#666;--muted2:#999;
+  --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;
+  --r:10px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:10}
+.sidebar-logo{padding:24px 20px 16px;border-bottom:1px solid var(--border)}
+.logo-icon{font-size:28px;margin-bottom:6px}
+.logo-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--accent);letter-spacing:-0.3px}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.sidebar-nav{flex:1;padding:12px 0;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;color:var(--muted2);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);background:var(--accent-dim);border-left-color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.nav-sep{height:1px;background:var(--border);margin:8px 16px}
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border)}
+.user-info{font-size:12px;color:var(--muted);margin-bottom:8px}
+.btn-logout{width:100%;background:transparent;border:1px solid var(--border2);color:var(--muted2);border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+.topbar-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.content{padding:28px;flex:1}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:360px}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo .icon{font-size:48px}
+.login-logo h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--accent);margin-top:8px}
+.login-logo p{font-size:13px;color:var(--muted);margin-top:4px}
+.login-error{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none}
+
+/* ── COMPONENTS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.card-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:16px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center}
+.stat-num{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--accent)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:4px}
+.stat-card.green .stat-num{color:var(--green)}
+.stat-card.yellow .stat-num{color:var(--yellow)}
+.stat-card.red .stat-num{color:var(--red)}
+.stat-card.blue .stat-num{color:var(--blue)}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+
+/* ── FORM ── */
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--muted2);margin-bottom:6px;display:block;font-weight:500}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-textarea{resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;border:none;font-weight:500}
+.btn-primary{background:var(--accent);color:white}
+.btn-primary:hover{background:var(--accent2)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+.btn-danger:hover{background:rgba(239,68,68,0.2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ── BADGE ── */
+.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-green{background:rgba(34,197,94,0.12);color:var(--green)}
+.badge-yellow{background:rgba(245,158,11,0.12);color:var(--yellow)}
+.badge-red{background:rgba(239,68,68,0.12);color:var(--red)}
+.badge-blue{background:rgba(59,130,246,0.12);color:var(--blue)}
+.badge-gray{background:var(--surface2);color:var(--muted2)}
+
+/* ── TOGGLE ── */
+.toggle{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--surface3);border-radius:22px;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(18px);background:white}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;z-index:200;transform:translateY(80px);opacity:0;transition:all .25s}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{border-color:rgba(34,197,94,0.4);color:var(--green)}
+#toast.err{border-color:rgba(239,68,68,0.4);color:var(--red)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:20px}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+.section{display:none}.section.active{display:block}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🌮</div>
+      <h1>Panel de Control</h1>
+      <p>Tacos Javier — Administración</p>
+    </div>
+    <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
+    <div class="form-group"><label class="form-label">Usuario</label>
+      <input class="form-input" id="l-user" type="text" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group"><label class="form-label">Contraseña</label>
+      <input class="form-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🌮</div>
+    <div class="logo-name" id="sidebar-negocio">Tacos Javier</div>
+    <div class="logo-sub">Panel de Control</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos</div>
+    <div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
+    <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos</div>
+    <div class="nav-sep"></div>
+    <div class="nav-item" onclick="showSection('horarios')" data-s="horarios"><span class="icon">🕐</span> Horarios</div>
+    <div class="nav-item" onclick="showSection('banco')" data-s="banco"><span class="icon">💳</span> Datos Banco</div>
+    <div class="nav-item" onclick="showSection('mensajes')" data-s="mensajes"><span class="icon">💬</span> Mensajes Bot</div>
+    <div class="nav-item" onclick="showSection('config')" data-s="config"><span class="icon">⚙️</span> Configuración</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">👤 <span id="sidebar-user">admin</span></div>
+    <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div><div class="topbar-title" id="page-title">Dashboard</div><div class="topbar-sub" id="page-sub">Resumen del día</div></div>
+    <div id="topbar-actions"></div>
+  </div>
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="section active" id="s-dashboard">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="card">
+        <div class="card-title">Pedidos de hoy</div>
+        <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS -->
+    <div class="section" id="s-pedidos">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="card-title" style="margin:0">Todos los pedidos</div>
+          <select class="form-select" style="width:160px" id="filtro-estado" onchange="loadPedidos()">
+            <option value="">Todos</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="confirmado">Confirmados</option>
+            <option value="cancelado">Cancelados</option>
+            <option value="rechazado">Rechazados</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="pedidos-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="section" id="s-clientes">
+      <div class="card">
+        <div class="card-title">Clientes registrados</div>
+        <div class="table-wrap"><table id="clientes-table"><thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Dirección</th><th>Pedidos</th><th>Registro</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div class="section" id="s-productos">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="card-title" style="margin:0">Productos del menú</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalProducto()">+ Agregar</button>
+        </div>
+        <div class="table-wrap"><table id="productos-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Taco</th><th>Torta</th><th>$/100g</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- HORARIOS -->
+    <div class="section" id="s-horarios">
+      <div class="card">
+        <div class="card-title">Horario de servicio</div>
+        <div id="horarios-list"></div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="saveHorarios()">Guardar horarios</button>
+      </div>
+    </div>
+
+    <!-- BANCO -->
+    <div class="section" id="s-banco">
+      <div class="card" style="max-width:480px">
+        <div class="card-title">Datos bancarios para transferencia</div>
+        <div class="form-group"><label class="form-label">Banco</label><input class="form-input" id="b-banco" type="text"></div>
+        <div class="form-group"><label class="form-label">Beneficiario</label><input class="form-input" id="b-benef" type="text"></div>
+        <div class="form-group"><label class="form-label">CLABE</label><input class="form-input" id="b-clabe" type="text"></div>
+        <button class="btn btn-primary" onclick="saveBanco()">Guardar</button>
+      </div>
+    </div>
+
+    <!-- MENSAJES -->
+    <div class="section" id="s-mensajes">
+      <div class="card">
+        <div class="card-title">Mensajes del bot</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Variables disponibles: <code style="color:var(--accent)">{negocio}</code> <code style="color:var(--accent)">{hora_inicio}</code> <code style="color:var(--accent)">{hora_fin}</code></p>
+        <div id="mensajes-list"></div>
+        <button class="btn btn-primary" style="margin-top:8px" onclick="saveMensajes()">Guardar mensajes</button>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="section" id="s-config">
+      <div class="card" style="max-width:480px">
+        <div class="card-title">Configuración general</div>
+        <div id="config-list"></div>
+        <button class="btn btn-primary" onclick="saveConfig()">Guardar</button>
+      </div>
+      <div class="card" style="max-width:480px;margin-top:16px">
+        <div class="card-title">Cambiar contraseña</div>
+        <div class="form-group"><label class="form-label">Contraseña actual</label><input class="form-input" id="cp-actual" type="password"></div>
+        <div class="form-group"><label class="form-label">Nueva contraseña</label><input class="form-input" id="cp-nueva" type="password"></div>
+        <button class="btn btn-primary" onclick="cambiarPassword()">Cambiar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-overlay" id="modal-producto">
+  <div class="modal">
+    <div class="modal-title" id="modal-prod-title">Nuevo producto</div>
+    <input type="hidden" id="prod-id">
+    <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="prod-nombre" type="text"></div>
+    <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-textarea" id="prod-desc"></textarea></div>
+    <div class="form-row-3">
+      <div class="form-group"><label class="form-label">Precio taco</label><input class="form-input" id="prod-taco" type="number"></div>
+      <div class="form-group"><label class="form-label">Precio torta</label><input class="form-input" id="prod-torta" type="number"></div>
+      <div class="form-group"><label class="form-label">$/100g</label><input class="form-input" id="prod-100g" type="number"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const api = async (url, method='GET', body=null) => {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+};
+
+const toast = (msg, ok=true) => {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (ok ? 'ok' : 'err');
+  setTimeout(() => el.className = '', 2800);
+};
+
+const badgeEstado = e => {
+  const m = {pendiente:'yellow',confirmado:'green',cancelado:'red',rechazado:'gray'};
+  return `<span class="badge badge-${m[e]||'gray'}">${e}</span>`;
+};
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const usuario  = document.getElementById('l-user').value;
+  const password = document.getElementById('l-pass').value;
+  const r = await api('/api/login', 'POST', { usuario, password });
+  if (r.ok) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('sidebar-user').textContent = usuario;
+    initApp();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+async function doLogout() {
+  await api('/api/logout', 'POST');
+  location.reload();
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+const sections = {
+  dashboard: { title:'Dashboard', sub:'Resumen del día' },
+  pedidos:   { title:'Pedidos', sub:'Historial completo' },
+  clientes:  { title:'Clientes', sub:'Base de clientes' },
+  productos: { title:'Productos', sub:'Menú y precios' },
+  horarios:  { title:'Horarios', sub:'Horario de servicio' },
+  banco:     { title:'Datos Banco', sub:'Información de transferencia' },
+  mensajes:  { title:'Mensajes Bot', sub:'Textos del bot' },
+  config:    { title:'Configuración', sub:'Ajustes generales' },
+};
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('s-'+name).classList.add('active');
+  document.querySelector(`[data-s="${name}"]`).classList.add('active');
+  document.getElementById('page-title').textContent = sections[name].title;
+  document.getElementById('page-sub').textContent   = sections[name].sub;
+  loaders[name]?.();
+}
+
+const loaders = {
+  dashboard: loadDashboard,
+  pedidos:   loadPedidos,
+  clientes:  loadClientes,
+  productos: loadProductos,
+  horarios:  loadHorarios,
+  banco:     loadBanco,
+  mensajes:  loadMensajes,
+  config:    loadConfig,
+};
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const stats = await api('/api/stats');
+  document.getElementById('sidebar-negocio').textContent = stats.negocio;
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${stats.pedidos_hoy}</div><div class="stat-label">Pedidos hoy</div></div>
+    <div class="stat-card yellow"><div class="stat-num">${stats.pendientes}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat-card green"><div class="stat-num">${stats.confirmados}</div><div class="stat-label">Confirmados</div></div>
+    <div class="stat-card red"><div class="stat-num">${stats.cancelados + stats.rechazados}</div><div class="stat-label">Cancelados/Rechazados</div></div>
+    <div class="stat-card blue"><div class="stat-num">$${Math.round(stats.total_ventas_hoy)}</div><div class="stat-label">Ventas hoy</div></div>
+    <div class="stat-card"><div class="stat-num">${stats.total_clientes}</div><div class="stat-label">Clientes totales</div></div>
+  `;
+  const pedidos = await api('/api/pedidos?hoy=1');
+  const tbody = document.querySelector('#pedidos-hoy-table tbody');
+  tbody.innerHTML = pedidos.length ? pedidos.map(p => `
+    <tr>
+      <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
+      <td>${p.nombre||''} ${p.apellido||''}<br><span style="color:var(--muted);font-size:11px">${p.telefono||''}</span></td>
+      <td>${p.tipo==='domicilio'?'🛵':'🏪'} ${p.tipo||''}</td>
+      <td><strong>$${Math.round(p.total||0)}</strong></td>
+      <td>${p.metodo_pago||''}</td>
+      <td>${badgeEstado(p.estado)}</td>
+      <td style="color:var(--muted);font-size:12px">${(p.fecha||'').split(' ')[1]?.substring(0,5)||''}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay pedidos hoy</td></tr>';
+}
+
+// ── PEDIDOS ───────────────────────────────────────────────────────────────────
+async function loadPedidos() {
+  const filtro  = document.getElementById('filtro-estado').value;
+  const pedidos = await api('/api/pedidos');
+  const lista   = filtro ? pedidos.filter(p => p.estado === filtro) : pedidos;
+  const tbody   = document.querySelector('#pedidos-table tbody');
+  tbody.innerHTML = lista.length ? lista.map(p => `
+    <tr>
+      <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
+      <td>${p.nombre||''} ${p.apellido||''}<br><span style="color:var(--muted);font-size:11px">${p.telefono||''}</span></td>
+      <td>${p.tipo==='domicilio'?'🛵':'🏪'} ${p.tipo||''}</td>
+      <td style="max-width:200px;font-size:12px;color:var(--muted2)">${(p.orden||'').substring(0,80)}...</td>
+      <td><strong>$${Math.round(p.total||0)}</strong></td>
+      <td>${p.metodo_pago||''}</td>
+      <td>${badgeEstado(p.estado)}</td>
+      <td style="color:var(--muted);font-size:12px">${(p.fecha||'').substring(0,16)}</td>
+      <td>
+        <select onchange="cambiarEstadoPedido(${p.id},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px;font-size:12px">
+          ${['pendiente','confirmado','cancelado','rechazado'].map(e=>`<option ${p.estado===e?'selected':''}>${e}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="9" class="empty">No hay pedidos</td></tr>';
+}
+
+async function cambiarEstadoPedido(id, estado) {
+  await api(`/api/pedidos/${id}/estado`, 'PUT', { estado });
+  toast('Estado actualizado');
+}
+
+// ── CLIENTES ──────────────────────────────────────────────────────────────────
+async function loadClientes() {
+  const clientes = await api('/api/clientes');
+  const tbody    = document.querySelector('#clientes-table tbody');
+  tbody.innerHTML = clientes.length ? clientes.map(c => `
+    <tr>
+      <td><code style="color:var(--muted);font-size:11px">#${c.id}</code></td>
+      <td>${c.nombre||''} ${c.apellido||''}</td>
+      <td>${c.telefono||''}</td>
+      <td style="color:var(--muted);font-size:12px">${c.correo||'—'}</td>
+      <td style="font-size:12px;color:var(--muted2)">${c.calle_numero||''} ${c.colonia?'Col. '+c.colonia:''}</td>
+      <td style="text-align:center">${c.total_pedidos||0}</td>
+      <td style="color:var(--muted);font-size:12px">${(c.fecha_registro||'').substring(0,10)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteCliente(${c.id})">🗑</button></td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">No hay clientes</td></tr>';
+}
+
+async function deleteCliente(id) {
+  if (!confirm('¿Eliminar cliente?')) return;
+  await api(`/api/clientes/${id}`, 'DELETE');
+  toast('Cliente eliminado');
+  loadClientes();
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────────────────────────────
+async function loadProductos() {
+  const prods = await api('/api/productos');
+  const tbody = document.querySelector('#productos-table tbody');
+  tbody.innerHTML = prods.length ? prods.map(p => `
+    <tr>
+      <td><strong>${p.nombre}</strong></td>
+      <td style="font-size:12px;color:var(--muted2);max-width:200px">${(p.descripcion||'').substring(0,60)}...</td>
+      <td>$${p.precio_taco}</td>
+      <td>$${p.precio_torta}</td>
+      <td>$${p.precio_100g}</td>
+      <td><span class="badge ${p.activo?'badge-green':'badge-red'}">${p.activo?'Activo':'Inactivo'}</span></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openModalProducto(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProducto(${p.id})">🗑</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay productos</td></tr>';
+}
+
+function openModalProducto(p=null) {
+  document.getElementById('modal-prod-title').textContent = p ? 'Editar producto' : 'Nuevo producto';
+  document.getElementById('prod-id').value        = p?.id    || '';
+  document.getElementById('prod-nombre').value    = p?.nombre      || '';
+  document.getElementById('prod-desc').value      = p?.descripcion || '';
+  document.getElementById('prod-taco').value      = p?.precio_taco  || 30;
+  document.getElementById('prod-torta').value     = p?.precio_torta || 40;
+  document.getElementById('prod-100g').value      = p?.precio_100g  || 32;
+  document.getElementById('modal-producto').classList.add('show');
+}
+
+async function saveProducto() {
+  const id    = document.getElementById('prod-id').value;
+  const datos = {
+    nombre:       document.getElementById('prod-nombre').value,
+    descripcion:  document.getElementById('prod-desc').value,
+    precio_taco:  parseFloat(document.getElementById('prod-taco').value),
+    precio_torta: parseFloat(document.getElementById('prod-torta').value),
+    precio_100g:  parseFloat(document.getElementById('prod-100g').value),
+    activo:       1,
+  };
+  if (id) await api(`/api/productos/${id}`, 'PUT', datos);
+  else    await api('/api/productos', 'POST', datos);
+  closeModal('modal-producto');
+  toast('Producto guardado');
+  loadProductos();
+}
+
+async function deleteProducto(id) {
+  if (!confirm('¿Eliminar producto?')) return;
+  await api(`/api/productos/${id}`, 'DELETE');
+  toast('Producto eliminado');
+  loadProductos();
+}
+
+// ── HORARIOS ──────────────────────────────────────────────────────────────────
+async function loadHorarios() {
+  const horarios = await api('/api/horarios');
+  document.getElementById('horarios-list').innerHTML = horarios.map(h => `
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <label class="toggle"><input type="checkbox" id="h-open-${h.dia}" ${h.abierto?'checked':''}><span class="toggle-slider"></span></label>
+      <span style="width:90px;font-size:13px">${h.nombre_dia}</span>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input class="form-input" id="h-ini-${h.dia}" type="time" value="${h.hora_inicio}" style="width:110px">
+        <span style="color:var(--muted)">a</span>
+        <input class="form-input" id="h-fin-${h.dia}" type="time" value="${h.hora_fin}" style="width:110px">
+      </div>
+    </div>`).join('');
+}
+
+async function saveHorarios() {
+  const horarios = await api('/api/horarios');
+  for (const h of horarios) {
+    const abierto    = document.getElementById(`h-open-${h.dia}`)?.checked;
+    const hora_inicio = document.getElementById(`h-ini-${h.dia}`)?.value;
+    const hora_fin    = document.getElementById(`h-fin-${h.dia}`)?.value;
+    await api(`/api/horarios/${h.dia}`, 'POST', { abierto, hora_inicio, hora_fin });
+  }
+  toast('Horarios guardados');
+}
+
+// ── BANCO ─────────────────────────────────────────────────────────────────────
+async function loadBanco() {
+  const b = await api('/api/banco');
+  document.getElementById('b-banco').value = b?.banco        || '';
+  document.getElementById('b-benef').value = b?.beneficiario || '';
+  document.getElementById('b-clabe').value = b?.clabe        || '';
+}
+
+async function saveBanco() {
+  await api('/api/banco', 'POST', {
+    banco:        document.getElementById('b-banco').value,
+    beneficiario: document.getElementById('b-benef').value,
+    clabe:        document.getElementById('b-clabe').value,
+  });
+  toast('Datos bancarios guardados');
+}
+
+// ── MENSAJES ──────────────────────────────────────────────────────────────────
+const mensajeLabels = {
+  saludo:                'Saludo de bienvenida',
+  fuera_horario_lunes:   'Fuera de horario — Lunes',
+  fuera_horario_antes:   'Fuera de horario — Antes de abrir',
+  fuera_horario_despues: 'Fuera de horario — Después de cerrar',
+  confirmacion_pedido:   'Confirmación de pedido',
+  cancelacion_enviada:   'Cancelación enviada',
+};
+
+async function loadMensajes() {
+  const msgs = await api('/api/mensajes');
+  document.getElementById('mensajes-list').innerHTML = msgs.map(m => `
+    <div class="form-group">
+      <label class="form-label">${mensajeLabels[m.clave] || m.clave}</label>
+      <textarea class="form-textarea" id="msg-${m.clave}" style="min-height:60px">${m.valor}</textarea>
+    </div>`).join('');
+}
+
+async function saveMensajes() {
+  const msgs = await api('/api/mensajes');
+  for (const m of msgs) {
+    const el = document.getElementById(`msg-${m.clave}`);
+    if (el) await api('/api/mensajes', 'POST', { clave: m.clave, valor: el.value });
+  }
+  toast('Mensajes guardados');
+}
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const configLabels = {
+  nombre_negocio:  'Nombre del negocio',
+  domicilio_costo: 'Costo de domicilio ($)',
+  moneda:          'Símbolo de moneda',
+  grupo_id:        'ID del grupo de WhatsApp',
+};
+
+async function loadConfig() {
+  const conf = await api('/api/config');
+  document.getElementById('config-list').innerHTML = conf.map(c => `
+    <div class="form-group">
+      <label class="form-label">${configLabels[c.clave] || c.clave}</label>
+      <input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}">
+    </div>`).join('');
+}
+
+async function saveConfig() {
+  const conf = await api('/api/config');
+  for (const c of conf) {
+    const el = document.getElementById(`cfg-${c.clave}`);
+    if (el) await api('/api/config', 'POST', { clave: c.clave, valor: el.value });
+  }
+  toast('Configuración guardada');
+  loadDashboard();
+}
+
+async function cambiarPassword() {
+  const actual = document.getElementById('cp-actual').value;
+  const nueva  = document.getElementById('cp-nueva').value;
+  if (!actual || !nueva) return toast('Completa ambos campos', false);
+  const r = await api('/api/cambiar-password', 'POST', { password_actual: actual, password_nuevo: nueva });
+  if (r.ok) { toast('Contraseña cambiada'); document.getElementById('cp-actual').value=''; document.getElementById('cp-nueva').value=''; }
+  else toast(r.error || 'Error', false);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target===m) m.classList.remove('show'); }));
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function initApp() {
+  const me = await api('/api/me');
+  if (!me.usuario) { document.getElementById('login-screen').style.display='flex'; return; }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('sidebar-user').textContent = me.usuario;
+  loadDashboard();
+}
+
+// Auto-refresh dashboard cada 60s
+setInterval(() => {
+  if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
+}, 60000);
+
+initApp();
+</script>
+</body>
+</html>
