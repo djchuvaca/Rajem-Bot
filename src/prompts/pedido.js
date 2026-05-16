@@ -67,11 +67,25 @@ FRACCIONES Y MEDIDAS:
 - "tres cuartos" / "3/4" / "750g" → {"presentacion":"gramos","gramos":750,"corte":"..."}
 - "un kilo" / "1kg" → {"presentacion":"gramos","gramos":1000,"corte":"..."}
 
-AGRUPACIONES:
+AGRUPACIONES (misma cantidad por grupo, patrón repetido):
 - "6 tacos de 2 en 2" → grupos=3, items_por_grupo=[{taco,2,corte}]
 - "4 tacos de a 2" → grupos=2, items_por_grupo=[{taco,2,corte}]
 - "8 tacos en pares" → grupos=4, items_por_grupo=[{taco,2,corte}]
 - "3 platos de 1 taco y 1 torta" → grupos=3, items_por_grupo=[{taco,1},{torta,1}]
+
+PLATOS SEPARADOS DE DISTINTO TAMAÑO — cuando el cliente da cantidades distintas:
+- "5 tacos 3 y 2" → DOS platos separados: plato 1 con 3 tacos, plato 2 con 2 tacos
+- "5 tacos un plato con 3 y otro con 2" → igual: plato 1=3 tacos, plato 2=2 tacos
+- "quiero 3 y 2 de surtido" → plato 1=3 tacos surtido, plato 2=2 tacos surtido
+- REGLA: cuando las cantidades son DISTINTAS entre platos → usar plato_separado, NO grupo_repetido
+- REGLA: grupo_repetido SOLO cuando TODOS los platos tienen la misma composición
+
+Ejemplos:
+"5 tacos surtido 3 y 2" →
+[plato_separado(1,[taco,3,surtido]), plato_separado(2,[taco,2,surtido])]
+
+"6 tacos surtido de 2 en 2" → (misma cantidad → grupo_repetido)
+[grupo_repetido(grupos=3, items_por_grupo=[taco,2,surtido])]
 
 PLATOS SEPARADOS — palabras: "para mí", "para ella", "y aparte", "separado":
 - "3 tacos surtido para mí y aparte 2 tortas buche" →

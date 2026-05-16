@@ -17,6 +17,7 @@ const esperandoMotivoCancelacion = new Map();
 const pedidosConfirmados         = new Map();
 const esperandoConfirmacionItem  = new Map();
 const esperandoAgregarMas        = new Map();
+const pedidoJSONActual           = new Map(); // JSON del pedido en curso para modificaciones
 const correoPreguntas            = new Set();
 const referenciaPreguntas        = new Set();
 
@@ -40,6 +41,7 @@ function serializarEstado(numero) {
   if (esperandoMotivoCancelacion.has(numero)) estado.esperandoCancelacion = esperandoMotivoCancelacion.get(numero);
   if (esperandoConfirmacionItem.has(numero))  estado.esperandoConfirmItem = esperandoConfirmacionItem.get(numero);
   if (esperandoAgregarMas.has(numero))        estado.esperandoAgregarMas  = esperandoAgregarMas.get(numero);
+  if (pedidoJSONActual.has(numero))         estado.pedidoJSONActual     = pedidoJSONActual.get(numero);
   return estado;
 }
 
@@ -107,6 +109,7 @@ function limpiarTodo(numero) {
   datosCampos.delete(numero);
   esperandoConfirmacionItem.delete(numero);
   esperandoAgregarMas.delete(numero);
+  pedidoJSONActual.delete(numero);
   correoPreguntas.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
@@ -406,7 +409,7 @@ module.exports = {
   clientesPreventa, horaEntregaPreventa, pedidosConfirmados,
   esperandoMotivoCancelacion, conversaciones, resumenPendiente,
   clientesNuevos, esperandoCaptura, datosRecibidos, datosAcumulados,
-  datosCampos, esperandoConfirmacionItem, esperandoAgregarMas,
+  datosCampos, esperandoConfirmacionItem, esperandoAgregarMas, pedidoJSONActual,
   correoPreguntas, referenciaPreguntas, pendientesConfirmacion,
   CARPETA_CAPTURAS,
   getHistorial, limpiarTodo, acumularDatos,

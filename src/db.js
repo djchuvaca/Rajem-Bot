@@ -9,15 +9,11 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
 let db = null;
 
-// ─── INICIALIZAR BD ───────────────────────────────────────────────────────────
 async function initDB() {
   if (db) return db;
-
   const SQL = await initSqlJs();
-
   if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
+    db = new SQL.Database(fs.readFileSync(DB_PATH));
   } else {
     db = new SQL.Database();
   }
@@ -32,7 +28,6 @@ async function initDB() {
       precio_100g    REAL    DEFAULT 32,
       activo         INTEGER DEFAULT 1
     );
-
     CREATE TABLE IF NOT EXISTS clientes (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre         TEXT,
@@ -45,7 +40,6 @@ async function initDB() {
       total_pedidos  INTEGER DEFAULT 0,
       fecha_registro TEXT    DEFAULT (datetime('now', 'localtime'))
     );
-
     CREATE TABLE IF NOT EXISTS pedidos (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       cliente_id   INTEGER REFERENCES clientes(id),
@@ -57,12 +51,10 @@ async function initDB() {
       hora_entrega TEXT,
       fecha        TEXT    DEFAULT (datetime('now', 'localtime'))
     );
-
     CREATE TABLE IF NOT EXISTS configuracion (
       clave TEXT PRIMARY KEY,
       valor TEXT NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS horarios (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       dia         INTEGER NOT NULL,
@@ -71,31 +63,27 @@ async function initDB() {
       hora_inicio TEXT    DEFAULT '07:00',
       hora_fin    TEXT    DEFAULT '12:30'
     );
-
     CREATE TABLE IF NOT EXISTS banco (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      banco       TEXT,
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      banco        TEXT,
       beneficiario TEXT,
-      clabe       TEXT,
-      activo      INTEGER DEFAULT 1
+      clabe        TEXT,
+      activo       INTEGER DEFAULT 1
     );
-
     CREATE TABLE IF NOT EXISTS mensajes_bot (
       clave TEXT PRIMARY KEY,
       valor TEXT NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS usuarios_panel (
       id       INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario  TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS sesiones_activas (
-      numero          TEXT    PRIMARY KEY,
-      estado_json     TEXT    NOT NULL,
-      historial_json  TEXT    DEFAULT '[]',
-      actualizado_en  TEXT    DEFAULT (datetime('now', 'localtime'))
+      numero         TEXT PRIMARY KEY,
+      estado_json    TEXT NOT NULL,
+      historial_json TEXT DEFAULT '[]',
+      actualizado_en TEXT DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -104,7 +92,7 @@ async function initDB() {
   if (countProd === 0) {
     const productos = [
       ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso, delicioso, con ese sabor incomparable de Tacos Javier.", 30, 40, 32],
-      ["carne",  "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light.", 30, 40, 32],
+      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light.", 30, 40, 32],
       ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos, y más si es con la calidad y sabor de Tacos Javier.", 30, 40, 32],
       ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. No te arrepentirás de acompañar tus tacos con una deliciosa botana de cueros — eso sí, si son de Tacos Javier el éxito está garantizado.", 30, 40, 32],
       ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa. Si es de Tacos Javier, ni para qué te cuento.", 30, 40, 32],
@@ -115,9 +103,11 @@ async function initDB() {
     }
     console.log("✅ Productos iniciales insertados");
   } else {
+    // Renombrar carner → carne si existe
+    db.run("UPDATE productos SET nombre = 'carne' WHERE nombre = 'carner'");
     const descripciones = [
       ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso, delicioso, con ese sabor incomparable de Tacos Javier."],
-      ["carne",  "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light."],
+      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light."],
       ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos, y más si es con la calidad y sabor de Tacos Javier."],
       ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. No te arrepentirás de acompañar tus tacos con una deliciosa botana de cueros — eso sí, si son de Tacos Javier el éxito está garantizado."],
       ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa. Si es de Tacos Javier, ni para qué te cuento."],
@@ -131,15 +121,15 @@ async function initDB() {
   const countConf = db.exec("SELECT COUNT(*) as c FROM configuracion")[0]?.values[0][0] || 0;
   if (countConf === 0) {
     const config = [
-      ["nombre_negocio",     "Tacos Javier"],
-      ["domicilio_costo",    "50"],
-      ["moneda",             "$"],
-      ["grupo_id",           process.env.GRUPO_ID || ""],
-      ["precio_taco",        "30"],
-      ["precio_torta",       "40"],
-      ["precio_100g",        "32"],
-      ["metodos_mostrador",  "efectivo, tarjeta o transferencia"],
-      ["metodos_domicilio",  "efectivo o transferencia"],
+      ["nombre_negocio",    "Tacos Javier"],
+      ["domicilio_costo",   "50"],
+      ["moneda",            "$"],
+      ["grupo_id",          process.env.GRUPO_ID || ""],
+      ["precio_taco",       "30"],
+      ["precio_torta",      "40"],
+      ["precio_100g",       "32"],
+      ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
+      ["metodos_domicilio", "efectivo o transferencia"],
     ];
     for (const [clave, valor] of config) {
       db.run("INSERT INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -218,8 +208,7 @@ async function initDB() {
 
 function guardarDB() {
   if (!db) return;
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+  fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
 }
 
 function queryAll(sql, params = []) {
@@ -247,34 +236,22 @@ function getConfig(clave) {
   const row = queryOne("SELECT valor FROM configuracion WHERE clave = ?", [clave]);
   return row ? row.valor : null;
 }
-
 function setConfig(clave, valor) {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
 }
-
 function getAllConfig() {
   return queryAll("SELECT * FROM configuracion");
 }
 
 // ─── HORARIOS ─────────────────────────────────────────────────────────────────
-function getHorarios() {
-  return queryAll("SELECT * FROM horarios ORDER BY dia");
-}
-
-function getHorarioDia(dia) {
-  return queryOne("SELECT * FROM horarios WHERE dia = ?", [dia]);
-}
-
+function getHorarios() { return queryAll("SELECT * FROM horarios ORDER BY dia"); }
+function getHorarioDia(dia) { return queryOne("SELECT * FROM horarios WHERE dia = ?", [dia]); }
 function updateHorario(dia, abierto, hora_inicio, hora_fin) {
-  run("UPDATE horarios SET abierto=?, hora_inicio=?, hora_fin=? WHERE dia=?",
-    [abierto, hora_inicio, hora_fin, dia]);
+  run("UPDATE horarios SET abierto=?, hora_inicio=?, hora_fin=? WHERE dia=?", [abierto, hora_inicio, hora_fin, dia]);
 }
 
 // ─── BANCO ────────────────────────────────────────────────────────────────────
-function getBanco() {
-  return queryOne("SELECT * FROM banco WHERE activo = 1 ORDER BY id DESC");
-}
-
+function getBanco() { return queryOne("SELECT * FROM banco WHERE activo = 1 ORDER BY id DESC"); }
 function updateBanco(banco, beneficiario, clabe) {
   run("UPDATE banco SET banco=?, beneficiario=?, clabe=? WHERE activo=1", [banco, beneficiario, clabe]);
 }
@@ -284,47 +261,33 @@ function getMensaje(clave) {
   const row = queryOne("SELECT valor FROM mensajes_bot WHERE clave = ?", [clave]);
   return row ? row.valor : null;
 }
-
 function setMensaje(clave, valor) {
   run("INSERT OR REPLACE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
 }
-
-function getAllMensajes() {
-  return queryAll("SELECT * FROM mensajes_bot");
-}
+function getAllMensajes() { return queryAll("SELECT * FROM mensajes_bot"); }
 
 // ─── PRODUCTOS ────────────────────────────────────────────────────────────────
-function getProductos() {
-  return queryAll("SELECT * FROM productos WHERE activo = 1");
-}
-
+function getProductos() { return queryAll("SELECT * FROM productos WHERE activo = 1"); }
 function getProducto(nombre) {
   return queryOne("SELECT * FROM productos WHERE nombre = ? AND activo = 1", [nombre.toLowerCase()]);
 }
-
 function updateProducto(id, datos) {
-  run(`UPDATE productos SET nombre=?, descripcion=?, precio_taco=?, precio_torta=?, precio_100g=?, activo=? WHERE id=?`,
+  run("UPDATE productos SET nombre=?, descripcion=?, precio_taco=?, precio_torta=?, precio_100g=?, activo=? WHERE id=?",
     [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.activo, id]);
 }
-
 function createProducto(datos) {
   run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g) VALUES (?,?,?,?,?)",
     [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g]);
 }
-
-function deleteProducto(id) {
-  run("UPDATE productos SET activo = 0 WHERE id = ?", [id]);
-}
+function deleteProducto(id) { run("UPDATE productos SET activo = 0 WHERE id = ?", [id]); }
 
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
 function getCliente(telefono) {
   return queryOne("SELECT * FROM clientes WHERE telefono = ?", [telefono]);
 }
-
 function getAllClientes() {
   return queryAll("SELECT * FROM clientes ORDER BY fecha_registro DESC");
 }
-
 function upsertCliente(datos) {
   const existe = getCliente(datos.telefono);
   if (existe) {
@@ -343,78 +306,45 @@ function upsertCliente(datos) {
   }
   return getCliente(datos.telefono);
 }
+function deleteCliente(id) { run("DELETE FROM clientes WHERE id = ?", [id]); }
 
-function deleteCliente(id) {
-  run("DELETE FROM clientes WHERE id = ?", [id]);
-}
-
-// ─── PEDIDOS ─────────────────────────────────────────────────────────────────
+// ─── PEDIDOS ──────────────────────────────────────────────────────────────────
 function registrarPedido(datos) {
-  run(`INSERT INTO pedidos (cliente_id, tipo, orden, total, metodo_pago, estado, hora_entrega)
-       VALUES (?,?,?,?,?,?,?)`,
+  run(`INSERT INTO pedidos (cliente_id, tipo, orden, total, metodo_pago, estado, hora_entrega) VALUES (?,?,?,?,?,?,?)`,
     [datos.cliente_id, datos.tipo, datos.orden, datos.total, datos.metodo_pago, datos.estado || "pendiente", datos.hora_entrega]);
-
-  if (datos.cliente_id) {
+  if (datos.cliente_id)
     run("UPDATE clientes SET total_pedidos = total_pedidos + 1 WHERE id = ?", [datos.cliente_id]);
-  }
-
   const ultimo = queryOne("SELECT last_insert_rowid() as id");
   return ultimo ? ultimo.id : null;
 }
-
 function actualizarEstadoPedido(telefono, estado) {
-  run(`UPDATE pedidos SET estado = ?
-       WHERE id = (
-         SELECT p.id FROM pedidos p
-         INNER JOIN clientes c ON p.cliente_id = c.id
-         WHERE c.telefono = ? AND p.estado = 'pendiente'
-         ORDER BY p.fecha DESC LIMIT 1
-       )`, [estado, telefono]);
+  run(`UPDATE pedidos SET estado = ? WHERE id = (
+    SELECT p.id FROM pedidos p
+    INNER JOIN clientes c ON p.cliente_id = c.id
+    WHERE c.telefono = ? AND p.estado = 'pendiente'
+    ORDER BY p.fecha DESC LIMIT 1)`, [estado, telefono]);
 }
-
 function getPedidosHoy() {
-  return queryAll(`
-    SELECT p.*, c.nombre, c.apellido, c.telefono
-    FROM pedidos p
+  return queryAll(`SELECT p.*, c.nombre, c.apellido, c.telefono FROM pedidos p
     LEFT JOIN clientes c ON p.cliente_id = c.id
-    WHERE date(p.fecha) = date('now', 'localtime')
-    ORDER BY p.fecha DESC
-  `);
+    WHERE date(p.fecha) = date('now', 'localtime') ORDER BY p.fecha DESC`);
 }
-
 function getAllPedidos() {
-  return queryAll(`
-    SELECT p.*, c.nombre, c.apellido, c.telefono
-    FROM pedidos p
-    LEFT JOIN clientes c ON p.cliente_id = c.id
-    ORDER BY p.fecha DESC
-    LIMIT 200
-  `);
+  return queryAll(`SELECT p.*, c.nombre, c.apellido, c.telefono FROM pedidos p
+    LEFT JOIN clientes c ON p.cliente_id = c.id ORDER BY p.fecha DESC LIMIT 200`);
 }
-
-function updatePedidoEstado(id, estado) {
-  run("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, id]);
-}
-
-function deletePedido(id) {
-  run("DELETE FROM pedidos WHERE id = ?", [id]);
-}
+function updatePedidoEstado(id, estado) { run("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, id]); }
+function deletePedido(id) { run("DELETE FROM pedidos WHERE id = ?", [id]); }
 
 // ─── USUARIOS PANEL ───────────────────────────────────────────────────────────
 function getUsuarioPanel(usuario) {
   return queryOne("SELECT * FROM usuarios_panel WHERE usuario = ?", [usuario]);
 }
-
 function updatePasswordPanel(usuario, hash) {
   run("UPDATE usuarios_panel SET password = ? WHERE usuario = ?", [hash, usuario]);
 }
 
-// ─── SESIONES ACTIVAS (persistencia de estado en memoria) ────────────────────
-
-/**
- * Guarda el estado completo de un cliente en la BD.
- * Llamado automáticamente desde estado.js después de cada cambio relevante.
- */
+// ─── SESIONES ACTIVAS ─────────────────────────────────────────────────────────
 function guardarSesion(numero, estadoObj, historial = []) {
   if (!db) return;
   try {
@@ -424,58 +354,45 @@ function guardarSesion(numero, estadoObj, historial = []) {
       [numero, JSON.stringify(estadoObj), JSON.stringify(historial)]
     );
     guardarDB();
-  } catch (e) {
-    console.error("[SESION] Error guardando sesión:", e.message);
-  }
+  } catch (e) { console.error("[SESION] Error guardando sesión:", e.message); }
 }
 
-/**
- * Elimina la sesión de un cliente (al confirmar, cancelar o limpiar).
- */
 function eliminarSesion(numero) {
   if (!db) return;
   try {
     db.run("DELETE FROM sesiones_activas WHERE numero = ?", [numero]);
     guardarDB();
-  } catch (e) {
-    console.error("[SESION] Error eliminando sesión:", e.message);
-  }
+  } catch (e) { console.error("[SESION] Error eliminando sesión:", e.message); }
 }
 
-/**
- * Carga todas las sesiones activas al arrancar el bot.
- * Retorna array de { numero, estado, historial }
- */
 function cargarTodasLasSesiones() {
   if (!db) return [];
   try {
-    const rows = queryAll("SELECT numero, estado_json, historial_json FROM sesiones_activas");
-    return rows.map(r => ({
+    return queryAll("SELECT numero, estado_json, historial_json FROM sesiones_activas").map(r => ({
       numero:    r.numero,
-      estado:    JSON.parse(r.estado_json  || "{}"),
+      estado:    JSON.parse(r.estado_json   || "{}"),
       historial: JSON.parse(r.historial_json || "[]"),
     }));
-  } catch (e) {
-    console.error("[SESION] Error cargando sesiones:", e.message);
-    return [];
-  }
+  } catch (e) { console.error("[SESION] Error cargando sesiones:", e.message); return []; }
 }
 
-/**
- * Limpia sesiones antiguas (más de N horas sin actividad).
- * Se llama al iniciar el bot para no restaurar conversaciones obsoletas.
- */
 function limpiarSesionesAntiguas(horas = 6) {
   if (!db) return;
   try {
-    db.run(
-      `DELETE FROM sesiones_activas
-       WHERE actualizado_en < datetime('now', 'localtime', '-${horas} hours')`
-    );
+    db.run(`DELETE FROM sesiones_activas WHERE actualizado_en < datetime('now', 'localtime', '-${horas} hours')`);
     guardarDB();
-  } catch (e) {
-    console.error("[SESION] Error limpiando sesiones antiguas:", e.message);
-  }
+  } catch (e) { console.error("[SESION] Error limpiando sesiones:", e.message); }
+}
+
+// ─── TELÉFONOS REALES ─────────────────────────────────────────────────────────
+function guardarTelefonoReal(numeroWhatsApp, telefonoReal) {
+  run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
+    [`tel_real_${numeroWhatsApp}`, telefonoReal]);
+}
+
+function getTelefonoReal(numeroWhatsApp) {
+  const row = queryOne("SELECT valor FROM configuracion WHERE clave = ?", [`tel_real_${numeroWhatsApp}`]);
+  return row ? row.valor : null;
 }
 
 module.exports = {
@@ -489,4 +406,5 @@ module.exports = {
   registrarPedido, actualizarEstadoPedido, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
   getUsuarioPanel, updatePasswordPanel,
   guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas,
+  guardarTelefonoReal, getTelefonoReal,
 };
