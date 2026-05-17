@@ -20,6 +20,7 @@ const esperandoAgregarMas        = new Map();
 const pedidoJSONActual           = new Map(); // JSON del pedido en curso para modificaciones
 const correoPreguntas            = new Set();
 const referenciaPreguntas        = new Set();
+const esperandoConfirmacionDatos = new Map(); // cliente frecuente confirmando sus datos precargados
 
 const CARPETA_CAPTURAS = path.join(__dirname, "../capturas");
 if (!fs.existsSync(CARPETA_CAPTURAS)) fs.mkdirSync(CARPETA_CAPTURAS);
@@ -41,7 +42,8 @@ function serializarEstado(numero) {
   if (esperandoMotivoCancelacion.has(numero)) estado.esperandoCancelacion = esperandoMotivoCancelacion.get(numero);
   if (esperandoConfirmacionItem.has(numero))  estado.esperandoConfirmItem = esperandoConfirmacionItem.get(numero);
   if (esperandoAgregarMas.has(numero))        estado.esperandoAgregarMas  = esperandoAgregarMas.get(numero);
-  if (pedidoJSONActual.has(numero))         estado.pedidoJSONActual     = pedidoJSONActual.get(numero);
+  if (pedidoJSONActual.has(numero))           estado.pedidoJSONActual      = pedidoJSONActual.get(numero);
+  if (esperandoConfirmacionDatos.has(numero)) estado.esperandoConfirmDatos = esperandoConfirmacionDatos.get(numero);
   return estado;
 }
 
@@ -61,6 +63,7 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.esperandoCancelacion) esperandoMotivoCancelacion.set(numero, estado.esperandoCancelacion);
   if (estado.esperandoConfirmItem) esperandoConfirmacionItem.set(numero, estado.esperandoConfirmItem);
   if (estado.esperandoAgregarMas)  esperandoAgregarMas.set(numero, estado.esperandoAgregarMas);
+  if (estado.esperandoConfirmDatos) esperandoConfirmacionDatos.set(numero, estado.esperandoConfirmDatos);
   if (historial.length > 0)        conversaciones.set(numero, historial);
 }
 
@@ -110,6 +113,7 @@ function limpiarTodo(numero) {
   esperandoConfirmacionItem.delete(numero);
   esperandoAgregarMas.delete(numero);
   pedidoJSONActual.delete(numero);
+  esperandoConfirmacionDatos.delete(numero);
   correoPreguntas.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
@@ -297,27 +301,27 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
 function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false) {
   const campos = datosCampos.get(numero) || {};
 
-  if (!campos.nombre)   return { campo: "nombre",   pregunta: "¿Cuál es tu nombre completo (nombre y apellido)?" };
-  if (!campos.telefono) return { campo: "telefono", pregunta: "¿Cuál es tu número de teléfono a 10 dígitos?" };
+  if (!campos.nombre)   return { campo: "nombre",   pregunta: "*¿Cuál es tu nombre completo (nombre y apellido)?*" };
+  if (!campos.telefono) return { campo: "telefono", pregunta: "*¿Cuál es tu número de teléfono a 10 dígitos?*" };
 
   if (!campos.correo && !correoPreguntas.has(numero)) {
     correoPreguntas.add(numero);
     persistirEstado(numero);
-    return { campo: "correo", pregunta: "¿Tienes correo electrónico? _(opcional, escribe 'no' si no quieres proporcionarlo)_" };
+    return { campo: "correo", pregunta: "*¿Tienes correo electrónico?* _(opcional, escribe 'no' si no quieres proporcionarlo)_" };
   }
 
   if (esDomicilio) {
-    if (!campos.calle)   return { campo: "calle",   pregunta: "¿Cuál es tu calle y número?" };
-    if (!campos.colonia) return { campo: "colonia", pregunta: "¿En qué colonia?" };
+    if (!campos.calle)   return { campo: "calle",   pregunta: "*¿Cuál es tu calle y número?*" };
+    if (!campos.colonia) return { campo: "colonia", pregunta: "*¿En qué colonia?*" };
     if (!campos.referencia && !referenciaPreguntas.has(numero)) {
       referenciaPreguntas.add(numero);
       persistirEstado(numero);
-      return { campo: "referencia", pregunta: "¿Alguna referencia para ubicarte? _(opcional, escribe 'no' si no tienes)_" };
+      return { campo: "referencia", pregunta: "*¿Alguna referencia para ubicarte?* _(opcional, escribe 'no' si no tienes)_" };
     }
   }
 
-  if (!campos.metodo) return { campo: "metodo", pregunta: esDomicilio ? "¿Cómo vas a pagar? Efectivo o transferencia." : "¿Cómo vas a pagar? Efectivo, tarjeta o transferencia." };
-  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}? (entre 7:00 a.m. y 12:30 p.m.)` };
+  if (!campos.metodo) return { campo: "metodo", pregunta: esDomicilio ? "*¿Cómo vas a pagar?* Efectivo o transferencia." : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia." };
+  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre 7:00 a.m. y 12:30 p.m.)` };
 
   return null;
 }
@@ -411,6 +415,7 @@ module.exports = {
   clientesNuevos, esperandoCaptura, datosRecibidos, datosAcumulados,
   datosCampos, esperandoConfirmacionItem, esperandoAgregarMas, pedidoJSONActual,
   correoPreguntas, referenciaPreguntas, pendientesConfirmacion,
+  esperandoConfirmacionDatos,
   CARPETA_CAPTURAS,
   getHistorial, limpiarTodo, acumularDatos,
   interpretarCampos, mostrarFormularioProgresivo, siguienteCampoFaltante,

@@ -42,10 +42,8 @@ function getMenuFormato() {
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
       `🌮 *TACOS* — $${p.precio_taco} c/u\n` +
-      `${nombres}\n` +
       `_(combinaciones al gusto)_\n\n` +
       `🥖 *TORTAS* — $${p.precio_torta} c/u\n` +
-      `${nombres}\n` +
       `_(combinaciones al gusto)_\n\n` +
       `⚖️ *POR GRAMOS* — $${p.precio_100g} / 100g\n` +
       `Cualquier pieza o combinación\n` +
@@ -53,10 +51,11 @@ function getMenuFormato() {
       `💵 *POR CANTIDAD EN $*\n` +
       `Tú decides cuánto gastar, nosotros pesamos\n` +
       `_Incluye tortillas y salsas_\n\n` +
+      `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🟢 Todos los tacos y tortas incluyen salsas\n` +
       `🛵 Domicilio: $${domCosto} extra\n\n` +
-      `¿Qué te vamos a preparar? 😊\n`
+      `*¿Qué te vamos a preparar?* 😊\n`
     );
   } catch (e) { return _menuDefault(); }
 }
@@ -129,7 +128,7 @@ function getFormPreventaDomicilio() {
 function getSaludo() {
   try {
     const negocio = getConfig("nombre_negocio") || "Tacos Javier";
-    const msg     = getMensaje("saludo") || "¡Bienvenido a *{negocio}*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?";
+    const msg     = getMensaje("saludo") || "¡Bienvenido a *{negocio}*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪";
     return msg.replace(/{negocio}/g, negocio);
   } catch (e) {
     return "¡Bienvenido a *Tacos Javier*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?";

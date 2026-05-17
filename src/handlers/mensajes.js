@@ -36,6 +36,7 @@ const {
   pareceFragmentoDatos,
   extraerDatosPedido,
   persistirEstado,
+  esperandoConfirmacionDatos,
 } = require("../estado");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -43,7 +44,6 @@ const { parsearPedidoSimple } = require("./pedidoParser");
 const { upsertCliente, registrarPedido, actualizarEstadoPedido, getCliente, guardarTelefonoReal, getTelefonoReal } = require("../db");
 
 // Clientes frecuentes
-const esperandoConfirmacionDatos = new Map();
 const telefonosReales            = new Map();
 
 const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale)$/i;
@@ -182,7 +182,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     resumen += esDomicilio ? `🕖 *Hora de entrega:* ${hf}\n` : `🕖 *Recolección:* ${hf}\n`;
   }
   resumen += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-  resumen += "¿Confirmas tu pedido?";
+  resumen += "*¿Confirmas tu pedido?*";
   return { texto: resumen, esTransferencia: esTransf, total };
 }
 
@@ -337,7 +337,7 @@ async function handleMensaje(msg, client) {
       esperandoMotivoCancelacion.set(clienteNumero, { nombre: datosPedido.nombre, telefono: datosPedido.telefono, notificarGrupo: true });
       pedidosConfirmados.delete(clienteNumero);
       clientesNuevos.delete(clienteNumero);
-      await msg.reply("Lamento escuchar eso. Podrias indicarme el motivo de tu cancelacion?");
+      await msg.reply("Lamento escuchar eso. *¿Podrías indicarme el motivo de tu cancelación?*");
       return;
     }
     const minRestantes = Math.max(0, Math.ceil(15 - minutosTranscurridos));
@@ -374,8 +374,8 @@ async function handleMensaje(msg, client) {
 
   // ── 1B. FUERA DE HORARIO ──────────────────────────────────────────────────
   if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
-    const aceptaPreventa  = /^(si|ok|va|dale|quiero|claro|adelante|sale|andale)$/i.test(textoOriginal.trim());
-    const rechazaPreventa = /^(no|nel|nop|nope)$/i.test(textoOriginal.trim());
+    const aceptaPreventa  = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|quiero|claro|adelante|sale|andale|ándale|órale|orale|de\s+una|venga|eso|perfecto|listo|con\s+gusto|me\s+apunto|apuntame|ponme|anotame|anota(me)?|por\s+fa(vor)?|please|plis|sip|sep|simón|simon|chido|chale\s+va|esta\s+bien|está\s+bien|bueno|bien|ah\s+si|ah\s+sí)$/i.test(textoOriginal.trim());
+    const rechazaPreventa = /^(no|nel|nop|nope|nah|naa|para\s+nada|nones|negativo|nei|nein|no\s+gracias|no\s+gra(s|cias)?|no\s+por\s+fa(vor)?|mejor\s+no|al\s+rato|luego|despues|después|ahorita\s+no|otro\s+dia|otro\s+día|mañana)$/i.test(textoOriginal.trim());
     if (aceptaPreventa) {
       clientesPreventa.add(clienteNumero);
       await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO);
@@ -397,8 +397,8 @@ async function handleMensaje(msg, client) {
   if (esperandoConfirmacionDatos.has(clienteNumero)) {
     const { tipoEntrega, esPreventa: esPreventaDatos } = esperandoConfirmacionDatos.get(clienteNumero);
     const esOrdenDom = tipoEntrega === "domicilio";
-    const confirma = /^(si|sí|ok|va|dale|claro|correcto|sale|andale|perfecto|exacto)$/i.test(textoOriginal.trim());
-    const niega    = /^(no|nel|nop|nope|cambiar|cambio)$/i.test(textoOriginal.trim());
+    const confirma = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|claro|correcto|sale|andale|ándale|órale|orale|perfecto|exacto|listo|así\s+es|asi\s+es|de\s+una|eso\s+es|correcto|afirmativo|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|me\s+late|nel\s+az|efectivamente|positivo)$/i.test(textoOriginal.trim());
+    const niega    = /^(no|nel|nop|nope|nah|incorrecto|cambia(r|me)?|cambio|error|no\s+es\s+correcto|no\s+est[aá]\s+bien|está\s+mal|esta\s+mal|hay\s+un\s+error|modifica(r|me)?|corrige|corr[íi]gelo|actualiza)$/i.test(textoOriginal.trim());
 
     if (confirma) {
       esperandoConfirmacionDatos.delete(clienteNumero);
@@ -425,19 +425,19 @@ async function handleMensaje(msg, client) {
       esperandoConfirmacionDatos.delete(clienteNumero);
       const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
       const faltante = siguienteCampoFaltante(clienteNumero, esOrdenDom, esPreventaDatos);
-      await msg.reply(formProgresivo + "\n\n" + (faltante ? faltante.pregunta : "¿Qué datos deseas corregir?"));
+      await msg.reply(formProgresivo + "\n\n" + (faltante ? faltante.pregunta : "*¿Qué datos deseas corregir?*"));
       return;
     }
 
     const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
-    await msg.reply(formCompleto + "\n\n¿Son correctos los datos?");
+    await msg.reply(formCompleto + "\n\n*¿Son correctos los datos?*");
     return;
   }
 
   // ── 2. TIPO DE ENTREGA ────────────────────────────────────────────────────
   if (historial.length === 0) {
     const tipoEntrega = await detectarTipoEntrega(textoOriginal);
-    if (tipoEntrega === "ninguno") { await msg.reply("Tu pedido sera para domicilio o pasas a recoger al mostrador?"); return; }
+    if (tipoEntrega === "ninguno") { await msg.reply("*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*"); return; }
 
     // Buscar cliente frecuente
     const telGuardado   = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero);
@@ -463,7 +463,7 @@ async function handleMensaje(msg, client) {
       historial.push({ role: "assistant", content: "Perfecto, verificando tus datos." });
       esperandoConfirmacionDatos.set(clienteNumero, { tipoEntrega, esPreventa });
       const formPrecargado = mostrarFormularioProgresivo(clienteNumero, tipoEntrega === "domicilio", esPreventa);
-      await msg.reply(`Hola de nuevo *${campos.nombre.split(" ")[0]}*! 😊 Encontramos tus datos:\n\n${formPrecargado}\n\n¿Son correctos los datos?`);
+      await msg.reply(`Hola de nuevo *${campos.nombre.split(" ")[0]}*! 😊 Encontramos tus datos:\n\n${formPrecargado}\n\n*¿Son correctos los datos?*`);
       console.log(`Bot: [CLIENTE FRECUENTE — datos precargados]`);
       return;
     }
@@ -543,7 +543,7 @@ async function handleMensaje(msg, client) {
       const msgHora = campos._horaFueraRango === "antes"
         ? "Aun no iniciamos labores a esa hora. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*"
         : "A esa hora ya estamos fuera de servicio. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*";
-      await msg.reply(formProgresivo + "\n\n" + msgHora + "\nA que hora deseas " + tipoPedido + "? (entre 7:00 a.m. y 12:30 p.m.)");
+      await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre 7:00 a.m. y 12:30 p.m.)");
       delete campos._horaFueraRango;
       datosCampos.set(clienteNumero, campos);
       return;
@@ -576,7 +576,7 @@ async function handleMensaje(msg, client) {
   }
 
   // ── 4. CONFIRMACIÓN FINAL DEL PEDIDO ─────────────────────────────────────
-  const palabrasConfirmacion = /^(si|sí|ok|va|dale|listo|sale|andale|adelante|confirmo|confirmado|correcto|asi|si porfavor|sí porfavor|si por favor|sí por favor|claro|perfecto|va bien|dale pues|ándale|órale|va que va)$/i;
+  const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az)$/i;
 
   if (resumenPendiente.has(clienteNumero) && (
     /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*domicilio/i.test(textoOriginal)
@@ -593,7 +593,7 @@ async function handleMensaje(msg, client) {
     resumenPendiente.delete(clienteNumero);
     datosRecibidos.delete(clienteNumero);
     persistirEstado(clienteNumero);
-    await msg.reply("Perfecto! Para cambiar a domicilio necesito tu dirección.\n¿Cuál es tu calle y número?");
+    await msg.reply("Perfecto! Para cambiar a domicilio necesito tu dirección.\n*¿Cuál es tu calle y número?*");
     return;
   }
 
@@ -644,11 +644,26 @@ async function handleMensaje(msg, client) {
   }
 
   if (resumenPendiente.has(clienteNumero) && (
-    /agrega(me|r|nos)?|añade|también\s+quiero|y\s+también|y\s+además|suma(me)?|ponme\s+(también|además)/i.test(textoOriginal)
+    /agrega(me|r|nos)?|añade|también\s+quiero|y\s+también|y\s+además|suma(me)?|ponme\s+(también|además)|quiero\s+también|también\s+dame|y\s+dame/i.test(textoOriginal)
   )) {
     const pendienteActual = resumenPendiente.get(clienteNumero);
     const matchOrden = pendienteActual.texto.match(/📋 \*Orden:\*\n([\s\S]+?)\n💰/);
     const ordenExtraida = matchOrden ? matchOrden[1].trim() : "";
+
+    // Intentar parsear el ítem nuevo directamente del mensaje
+    const jsonNuevo = parsearPedidoSimple(textoOriginal);
+    if (jsonNuevo && jsonNuevo.tipo === "pedido" && Array.isArray(jsonNuevo.items) && jsonNuevo.items.length > 0) {
+      // Hay ítem parseable: mostrar para confirmación sin borrar el resumen aún
+      const resultadoNuevo = jsonALineas(jsonNuevo);
+      pedidoJSONActual.set(clienteNumero, { _esModificacionResumen: true, ordenBase: ordenExtraida, jsonNuevo });
+      esperandoConfirmacionItem.set(clienteNumero, { lineas: resultadoNuevo.texto, _esModificacionResumen: true, ordenBase: ordenExtraida, jsonNuevo });
+      resumenPendiente.delete(clienteNumero);
+      persistirEstado(clienteNumero);
+      await msg.reply(resultadoNuevo.texto + "\n\n*¿Agrego esto a tu pedido?*");
+      return;
+    }
+
+    // No se pudo parsear: flujo original (mostrar menú)
     resumenPendiente.delete(clienteNumero);
     if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
   }
@@ -661,9 +676,9 @@ async function handleMensaje(msg, client) {
     if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
   }
 
-  if (resumenPendiente.has(clienteNumero) && /^(no|nel|nop)$/i.test(textoOriginal.trim())) {
+  if (resumenPendiente.has(clienteNumero) && /^(no|nel|nop|nope|nah|negativo)$/i.test(textoOriginal.trim())) {
     resumenPendiente.delete(clienteNumero);
-    await msg.reply("Entendido! ¿Qué te gustaría cambiar o agregar?");
+    await msg.reply("Entendido! *¿Qué te gustaría cambiar o agregar?*");
     await new Promise(r => setTimeout(r, 300));
     await msg.reply(MENU_FORMATO);
     return;
@@ -746,7 +761,7 @@ async function handleMensaje(msg, client) {
       esperandoConfirmacionItem.delete(clienteNumero);
       historial.push({ role: "user", content: textoOriginal });
       historial.push({ role: "system", content: `El pedido actual en JSON es: ${JSON.stringify(jsonActual)}. El cliente quiere modificarlo. Devuelve el JSON actualizado con los cambios solicitados.` });
-      if (historial.length > 15) historial.splice(0, 2);
+      if (historial.length > 15) historial.splice(2, 2); // preserva el par [0,1] con tipo de entrega
       try {
         const systemPrompt = buildPrompt({ tomandoPedido: true, textoCliente: textoOriginal, horaConfirmada: horaEntregaPreventa.get(clienteNumero) || null, esPreventa });
         const respMod = await groq.chat.completions.create({
@@ -761,7 +776,7 @@ async function handleMensaje(msg, client) {
           const resultado = jsonALineas(jsonMod);
           esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
           historial.push({ role: "assistant", content: textoMod });
-          await msg.reply(resultado.texto + "\n\n¿Es correcto?");
+          await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
           return;
         }
       } catch (e) { console.error("Error modificando JSON:", e.message); }
@@ -773,7 +788,7 @@ async function handleMensaje(msg, client) {
       const hist = getHistorial(clienteNumero);
       if (hist.length >= 2 && hist[hist.length - 1].role === "assistant")
         hist.splice(hist.length - 2, 2);
-      await msg.reply("No pasa nada! Dime de nuevo qué deseas ordenar 😊");
+      await msg.reply("No pasa nada! *¿Qué deseas ordenar?* 😊");
       await new Promise(r => setTimeout(r, 400));
       await msg.reply(MENU_FORMATO);
       return;
@@ -781,6 +796,25 @@ async function handleMensaje(msg, client) {
 
     if (esConfirmacion) {
       esperandoConfirmacionItem.delete(clienteNumero);
+
+      // Caso especial: modificación directa desde el resumen final
+      if (itemData._esModificacionResumen) {
+        const ordenBase  = itemData.ordenBase || "";
+        const jsonNuevo  = itemData.jsonNuevo;
+        const { texto: lineasNuevas } = jsonALineas(jsonNuevo);
+        const lineasFiltradas = lineasNuevas.split("\n")
+          .filter(l => l.trim() && !/subtotal/i.test(l) && !ordenBase.includes(l.trim()))
+          .join("\n");
+        const ordenCombinada = ordenBase ? ordenBase + "\n" + lineasFiltradas : lineasFiltradas;
+        const resumenNuevo   = generarResumen(clienteNumero, ordenCombinada, esOrdenDom, esPreventa);
+        resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
+        historial.push({ role: "user", content: "si, agrega" });
+        historial.push({ role: "assistant", content: resumenNuevo.texto });
+        persistirEstado(clienteNumero);
+        await msg.reply(resumenNuevo.texto);
+        return;
+      }
+
       const ordenActual = esperandoAgregarMas.get(clienteNumero) || "";
       const lineasNuevas = itemData.lineas.split("\n")
         .filter(l => l.trim() && !ordenActual.includes(l.trim()))
@@ -790,11 +824,11 @@ async function handleMensaje(msg, client) {
       historial.push({ role: "user", content: "si, correcto" });
       historial.push({ role: "assistant", content: itemData.lineas });
       persistirEstado(clienteNumero);
-      await msg.reply("¿Deseas agregar algo más a tu pedido?");
+      await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
       return;
     }
 
-    await msg.reply(itemData.lineas + "\n\n¿Es correcto?");
+    await msg.reply(itemData.lineas + "\n\n*¿Es correcto?*");
     return;
   }
 
@@ -818,7 +852,7 @@ async function handleMensaje(msg, client) {
       await new Promise(r => setTimeout(r, 400));
       await msg.reply(MENU_FORMATO);
       await new Promise(r => setTimeout(r, 400));
-      await msg.reply("¿Qué más te gustaría agregar de nuestro menú?");
+      await msg.reply("*¿Qué más te gustaría agregar de nuestro menú?*");
       return;
     }
   }
@@ -832,14 +866,14 @@ async function handleMensaje(msg, client) {
     esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
     historial.push({ role: "user", content: textoOriginal });
     historial.push({ role: "assistant", content: resultado.texto });
-    await msg.reply(resultado.texto + "\n\n¿Es correcto?");
+    await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
     console.log(`Bot: [PARSER LOCAL] Subtotal: $${resultado.subtotal} — sin llamar a Groq`);
     return;
   }
 
   // ── LLAMADA A GROQ ────────────────────────────────────────────────────────
   historial.push({ role: "user", content: textoOriginal });
-  if (historial.length > 15) historial.splice(0, 2);
+  if (historial.length > 15) historial.splice(2, 2); // preserva el par [0,1] con tipo de entrega
 
   try {
     const systemPrompt = buildPrompt({
@@ -870,7 +904,7 @@ async function handleMensaje(msg, client) {
       persistirEstado(clienteNumero);
       const resultado = jsonALineas(jsonData);
       esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
-      await msg.reply(resultado.texto + "\n\n¿Es correcto?");
+      await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
       console.log(`Bot: [JSON→LÍNEAS] Subtotal: $${resultado.subtotal}`);
       return;
     }
