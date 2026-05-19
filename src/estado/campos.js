@@ -1,100 +1,24 @@
-const fs   = require("fs");
-const path = require("path");
-const { guardarSesion, eliminarSesion } = require("./db");
+﻿/**
+ * estado/campos.js
+ * Lógica de interpretación de campos del formulario, formulario progresivo,
+ * campos completos, y funciones de utilidad del estado.
+ */
 
-// ─── ESTRUCTURAS EN MEMORIA ───────────────────────────────────────────────────
-const conversaciones             = new Map();
-const resumenPendiente           = new Map();
-const clientesNuevos             = new Set();
-const esperandoCaptura           = new Map();
-const datosRecibidos             = new Set();
-const datosAcumulados            = new Map();
-const datosCampos                = new Map();
-const pendientesConfirmacion     = new Map();
-const clientesPreventa           = new Set();
-const horaEntregaPreventa        = new Map();
-const esperandoMotivoCancelacion = new Map();
-const pedidosConfirmados         = new Map();
-const esperandoConfirmacionItem  = new Map();
-const esperandoAgregarMas        = new Map();
-const pedidoJSONActual           = new Map(); // JSON del pedido en curso para modificaciones
-const correoPreguntas            = new Set();
-const referenciaPreguntas        = new Set();
-const esperandoConfirmacionDatos = new Map(); // cliente frecuente confirmando sus datos precargados
+const {
+  conversaciones, datosAcumulados, datosCampos,
+  correoPreguntas, referenciaPreguntas, clientesPreventa,
+  horaEntregaPreventa, esperandoMotivoCancelacion, resumenPendiente,
+  esperandoCaptura, datosRecibidos, esperandoConfirmacionItem,
+  esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
+  tipoEntregaCliente,
+} = require("./maps");
+const { persistirEstado } = require("./sesiones");
+const { eliminarSesion }  = require("../db");
 
-const CARPETA_CAPTURAS = path.join(__dirname, "../capturas");
-if (!fs.existsSync(CARPETA_CAPTURAS)) fs.mkdirSync(CARPETA_CAPTURAS);
+// ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
+const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale)$/i;
 
-// ─── SERIALIZACIÓN DEL ESTADO ─────────────────────────────────────────────────
-function serializarEstado(numero) {
-  const estado = {};
-  if (clientesNuevos.has(numero))             estado.clienteNuevo         = true;
-  if (clientesPreventa.has(numero))           estado.preventa             = true;
-  if (datosRecibidos.has(numero))             estado.datosRecibidos       = true;
-  if (correoPreguntas.has(numero))            estado.correoPreguntas      = true;
-  if (referenciaPreguntas.has(numero))        estado.referenciaPreguntas  = true;
-  if (horaEntregaPreventa.has(numero))        estado.horaEntrega          = horaEntregaPreventa.get(numero);
-  if (resumenPendiente.has(numero))           estado.resumenPendiente     = resumenPendiente.get(numero);
-  if (esperandoCaptura.has(numero))           estado.esperandoCaptura     = esperandoCaptura.get(numero);
-  if (datosAcumulados.has(numero))            estado.datosAcumulados      = datosAcumulados.get(numero);
-  if (datosCampos.has(numero))                estado.datosCampos          = datosCampos.get(numero);
-  if (pedidosConfirmados.has(numero))         estado.pedidoConfirmado     = pedidosConfirmados.get(numero);
-  if (esperandoMotivoCancelacion.has(numero)) estado.esperandoCancelacion = esperandoMotivoCancelacion.get(numero);
-  if (esperandoConfirmacionItem.has(numero))  estado.esperandoConfirmItem = esperandoConfirmacionItem.get(numero);
-  if (esperandoAgregarMas.has(numero))        estado.esperandoAgregarMas  = esperandoAgregarMas.get(numero);
-  if (pedidoJSONActual.has(numero))           estado.pedidoJSONActual      = pedidoJSONActual.get(numero);
-  if (esperandoConfirmacionDatos.has(numero)) estado.esperandoConfirmDatos = esperandoConfirmacionDatos.get(numero);
-  return estado;
-}
-
-function restaurarEstado(numero, estado, historial = []) {
-  if (!estado || Object.keys(estado).length === 0) return;
-  if (estado.clienteNuevo)         clientesNuevos.add(numero);
-  if (estado.preventa)             clientesPreventa.add(numero);
-  if (estado.datosRecibidos)       datosRecibidos.add(numero);
-  if (estado.correoPreguntas)      correoPreguntas.add(numero);
-  if (estado.referenciaPreguntas)  referenciaPreguntas.add(numero);
-  if (estado.horaEntrega)          horaEntregaPreventa.set(numero, estado.horaEntrega);
-  if (estado.resumenPendiente)     resumenPendiente.set(numero, estado.resumenPendiente);
-  if (estado.esperandoCaptura)     esperandoCaptura.set(numero, estado.esperandoCaptura);
-  if (estado.datosAcumulados)      datosAcumulados.set(numero, estado.datosAcumulados);
-  if (estado.datosCampos)          datosCampos.set(numero, estado.datosCampos);
-  if (estado.pedidoConfirmado)     pedidosConfirmados.set(numero, estado.pedidoConfirmado);
-  if (estado.esperandoCancelacion) esperandoMotivoCancelacion.set(numero, estado.esperandoCancelacion);
-  if (estado.esperandoConfirmItem) esperandoConfirmacionItem.set(numero, estado.esperandoConfirmItem);
-  if (estado.esperandoAgregarMas)  esperandoAgregarMas.set(numero, estado.esperandoAgregarMas);
-  if (estado.esperandoConfirmDatos) esperandoConfirmacionDatos.set(numero, estado.esperandoConfirmDatos);
-  if (historial.length > 0)        conversaciones.set(numero, historial);
-}
-
-function persistirEstado(numero) {
-  const estado    = serializarEstado(numero);
-  const historial = conversaciones.get(numero) || [];
-  if (Object.keys(estado).length === 0) {
-    eliminarSesion(numero);
-    return;
-  }
-  guardarSesion(numero, estado, historial);
-}
-
-function restaurarTodasLasSesiones() {
-  const { cargarTodasLasSesiones, limpiarSesionesAntiguas } = require("./db");
-  limpiarSesionesAntiguas(6);
-  const sesiones = cargarTodasLasSesiones();
-  let restauradas = 0;
-  for (const { numero, estado, historial } of sesiones) {
-    try {
-      restaurarEstado(numero, estado, historial);
-      restauradas++;
-    } catch (e) {
-      console.error(`[SESION] Error restaurando ${numero}:`, e.message);
-    }
-  }
-  if (restauradas > 0)
-    console.log(`♻️  ${restauradas} sesión(es) activa(s) restaurada(s) desde la BD`);
-}
-
-// ─── FUNCIONES BASE ───────────────────────────────────────────────────────────
+// ── FUNCIONES BASE ────────────────────────────────────────────────────────────
 function getHistorial(numero) {
   if (!conversaciones.has(numero)) conversaciones.set(numero, []);
   return conversaciones.get(numero);
@@ -114,6 +38,7 @@ function limpiarTodo(numero) {
   esperandoAgregarMas.delete(numero);
   pedidoJSONActual.delete(numero);
   esperandoConfirmacionDatos.delete(numero);
+  tipoEntregaCliente.delete(numero);
   correoPreguntas.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
@@ -127,25 +52,25 @@ function acumularDatos(numero, texto) {
   return nuevo;
 }
 
-// ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
-const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale)$/i;
-
 // ── INTERPRETACIÓN DE CAMPOS ──────────────────────────────────────────────────
 function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa = false) {
   const campos = datosCampos.get(numero) || {
     nombre: null, telefono: null, correo: null, metodo: null,
-    calle: null, colonia: null, referencia: null, hora: null,
+    calle: null, colonia: null, referencia: null, hora: null, tipoEntrega: null,
   };
+
+  if (esDomicilio) campos.tipoEntrega = "domicilio";
+  else if (campos.tipoEntrega !== "domicilio") campos.tipoEntrega = "mostrador";
 
   const textoCompleto = textoNuevo;
 
-  // ── Teléfono ─────────────────────────────────────────────────────────────
+  // ── Teléfono ──────────────────────────────────────────────────────────────
   if (!campos.telefono) {
     const m = textoCompleto.match(/\b(\d{10})\b/);
     if (m) campos.telefono = m[1];
   }
 
-  // ── Correo ───────────────────────────────────────────────────────────────
+  // ── Correo ────────────────────────────────────────────────────────────────
   if (!campos.correo) {
     const m = textoCompleto.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
     if (m) campos.correo = m[0];
@@ -191,7 +116,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
     }
   }
 
-  // ── Dirección desde texto completo (todo en una línea con col.) ───────────
+  // ── Dirección en una línea con col. ───────────────────────────────────────
   if (esDomicilio && (!campos.calle || !campos.colonia)) {
     const matchCol = textoCompleto.match(/(.+?)\s+col\.?\s+(.+?)(?:\s+(?:efectivo|tarjeta|transferencia|a\s+las?|\d{1,2}\s*(?:am|pm)).*)?$/i);
     if (matchCol) {
@@ -222,28 +147,44 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
     }
   }
 
-  // ── Nombre: remover todos los datos antes de extraer ─────────────────────
+  // ── Nombre ────────────────────────────────────────────────────────────────
   if (!campos.nombre) {
-    let textoSinDatos = textoCompleto
+    const primeraLinea  = textoNuevo.split(/\n/)[0].trim();
+    const primeraLimpia = primeraLinea
       .replace(/\b\d{10}\b/g, "")
       .replace(/efectivo|tarjeta|transferencia/gi, "")
       .replace(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi, "")
-      .replace(/\b(?:paso|voy|llego|recojo|vengo)\s+a\s+las?\s+\d{1,2}(?::\d{2})?(?:\s*(?:am|pm))?/gi, "")
-      .replace(/\ba\s+las?\s+\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?/gi, "")
-      .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)/gi, "")
-      .replace(/\b(paso|voy|llego|recojo|vengo|mostrador|domicilio|recoger)\b/gi, "")
       .replace(/col\.?\s+[\w\s]{2,40}/gi, "")
       .replace(/art[ií]culo\s+\d+[^\s]*/gi, "")
       .replace(/#\s*\d+/gi, "")
       .replace(/\b\d+\b/g, "")
       .replace(/\s{2,}/g, " ")
       .trim();
-
-    const palabrasValidas = (textoSinDatos.match(/[a-záéíóúüñ]{2,}/gi) || [])
+    const palabrasPrimera = (primeraLimpia.match(/[a-záéíóúüñ]{2,}/gi) || [])
       .filter(p => !PALABRAS_NO_NOMBRE.test(p));
-
-    if (palabrasValidas.length >= 2)
-      campos.nombre = palabrasValidas.slice(0, 4).join(" ");
+    if (palabrasPrimera.length >= 2) {
+      campos.nombre = palabrasPrimera.slice(0, 4).join(" ");
+    } else {
+      let textoSinDatos = textoNuevo
+        .replace(/\b\d{10}\b/g, "")
+        .replace(/efectivo|tarjeta|transferencia/gi, "")
+        .replace(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi, "")
+        .replace(/\b(?:paso|voy|llego|recojo|vengo)\s+a\s+las?\s+\d{1,2}(?::\d{2})?(?:\s*(?:am|pm))?/gi, "")
+        .replace(/\ba\s+las?\s+\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?/gi, "")
+        .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)/gi, "")
+        .replace(/\b(paso|voy|llego|recojo|vengo|mostrador|domicilio|recoger)\b/gi, "")
+        .replace(/referencia:?\s*[^\n]*/gi, "")
+        .replace(/col\.?\s+[\w\s]{2,40}/gi, "")
+        .replace(/art[ií]culo\s+\d+[^\s]*/gi, "")
+        .replace(/#\s*\d+/gi, "")
+        .replace(/\b\d+\b/g, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      const palabrasValidas = (textoSinDatos.match(/[a-záéíóúüñ]{2,}/gi) || [])
+        .filter(p => !PALABRAS_NO_NOMBRE.test(p));
+      if (palabrasValidas.length >= 2)
+        campos.nombre = palabrasValidas.slice(0, 4).join(" ");
+    }
   }
 
   // ── Dirección por líneas separadas ────────────────────────────────────────
@@ -257,7 +198,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
       if (!campos.colonia && /col\.|colonia\s+\w|^col\s/i.test(l)) {
         campos.colonia = l.replace(/^col\.?\s*/i, "").trim(); continue;
       }
-      if (!campos.referencia && /referencia|entre\s+calle|cerca\s+de|a\s+un\s+lado|frente\s+a/i.test(l)) {
+      if (!campos.referencia && /referencia|entre\s+calle|cerca\s+de|a\s+un\s+lado|frente\s+a|casa\s+de|edificio|piso\s+\d|depto|departamento|local\s+\d/i.test(l)) {
         campos.referencia = l.replace(/^referencia:?\s*/i, "").trim(); continue;
       }
       if (campos.calle && !campos.colonia && /^[a-záéíóúüñ0-9\s]{3,40}$/i.test(l) && !PALABRAS_NO_NOMBRE.test(l)) {
@@ -277,8 +218,9 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
   const lleno  = v => v ? `${v} ✅` : "___";
   const opc    = v => v ? `${v} ✅` : "___ *(opcional)*";
 
-  let msg = `📋 *Datos para tu pedido${esPreventa ? " (PREVENTA)" : ""}*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  const SEP = `━━━━━━━━━━━━━━━━━━`;
+  let msg = `📋 *Datos para tu pedido${esPreventa ? " — Preventa" : ""}*\n`;
+  msg += `${SEP}\n`;
   msg += `👤 *Nombre y apellido:* ${lleno(campos.nombre)}\n`;
   msg += `📱 *Teléfono:* ${lleno(campos.telefono)}\n`;
   msg += `📧 *Correo:* ${opc(campos.correo)}\n`;
@@ -292,8 +234,7 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
   msg += `💳 *Método de pago:* ${lleno(campos.metodo)}`;
   if (esPreventa)
     msg += `\n🕖 *Hora de ${esDomicilio ? "entrega" : "recolección"}:* ${lleno(campos.hora)}`;
-
-  msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+  msg += `\n${SEP}`;
   return msg;
 }
 
@@ -309,6 +250,10 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
     persistirEstado(numero);
     return { campo: "correo", pregunta: "*¿Tienes correo electrónico?* _(opcional, escribe 'no' si no quieres proporcionarlo)_" };
   }
+  if (campos.correo && !correoPreguntas.has(numero)) {
+    correoPreguntas.add(numero);
+    persistirEstado(numero);
+  }
 
   if (esDomicilio) {
     if (!campos.calle)   return { campo: "calle",   pregunta: "*¿Cuál es tu calle y número?*" };
@@ -317,6 +262,10 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
       referenciaPreguntas.add(numero);
       persistirEstado(numero);
       return { campo: "referencia", pregunta: "*¿Alguna referencia para ubicarte?* _(opcional, escribe 'no' si no tienes)_" };
+    }
+    if (campos.referencia && !referenciaPreguntas.has(numero)) {
+      referenciaPreguntas.add(numero);
+      persistirEstado(numero);
     }
   }
 
@@ -330,7 +279,6 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
 function manejarOpcional(numero, campo, texto) {
   const rechazo = /^(no|nel|nop|nope|sin|no\s+tengo|no\s+quiero|no\s+proporciono|omitir|ninguna|ninguno)$/i.test(texto.trim());
   if (!rechazo) return false;
-
   const campos = datosCampos.get(numero) || {};
   if (campo === "correo")     { campos.correo     = "no proporcionó"; datosCampos.set(numero, campos); persistirEstado(numero); return true; }
   if (campo === "referencia") { campos.referencia = "sin referencia"; datosCampos.set(numero, campos); persistirEstado(numero); return true; }
@@ -343,8 +291,8 @@ function camposCompletos(numero, esDomicilio = false, esPreventa = false) {
   if (!campos.nombre || !campos.telefono || !campos.metodo) return false;
   if (esDomicilio && (!campos.calle || !campos.colonia))    return false;
   if (esPreventa  && !campos.hora)                          return false;
-  if (!correoPreguntas.has(numero))                         return false;
-  if (esDomicilio && !referenciaPreguntas.has(numero))      return false;
+  if (!correoPreguntas.has(numero) && !campos.correo)       return false;
+  if (esDomicilio && !referenciaPreguntas.has(numero) && !campos.referencia) return false;
   return true;
 }
 
@@ -355,13 +303,12 @@ function camposATexto(numero) {
     .filter(Boolean).join("\n");
 }
 
-// ── FUNCIONES ORIGINALES ──────────────────────────────────────────────────────
+// ── FUNCIONES DE UTILIDAD ─────────────────────────────────────────────────────
 function datosCompletos(texto, esPreventa = false, esDomicilio = false) {
   const tieneNumeroTelefono = /\b\d{10}\b/.test(texto);
   const tieneNombre = (() => {
     const palabras = texto.match(/[a-záéíóúüñ]{2,}/gi) || [];
-    const validas  = palabras.filter(p => !PALABRAS_NO_NOMBRE.test(p));
-    return validas.length >= 2;
+    return palabras.filter(p => !PALABRAS_NO_NOMBRE.test(p)).length >= 2;
   })();
   const tieneMetodoPago = /efectivo|tarjeta|transferencia/i.test(texto);
   const tieneHora = /\b([1-9]|1[0-2])(:[0-5][0-9])?\s*(am|pm|a\.m\.|p\.m\.)/i.test(texto)
@@ -409,17 +356,113 @@ function extraerDatosPedido(resumenTexto) {
   };
 }
 
+// ── DETECTAR EDICIÓN ─────────────────────────────────────────────────────────
+function detectarEdicion(texto) {
+  const t = texto.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  // NOMBRE con valor
+  const mNombreVal = texto.match(/cambia(?:r|me)?\s+(?:mi\s+)?nombre(?:\s+y\s+apellido)?\s+(?:a|por)\s+(.+)/i);
+  if (mNombreVal) {
+    const partes = mNombreVal[1].trim().split(/\s+/);
+    return { campo: "nombre", valor: { nombre: partes[0], apellido: partes.slice(1).join(" ") || null }, preguntar: false };
+  }
+  if (/cambia(?:r|me)?\s+(?:mi\s+)?nombre(?:\s+y\s+apellido)?$/i.test(t))
+    return { campo: "nombre", preguntar: true, pregunta: "*¿Cuál es tu nuevo nombre completo (nombre y apellido)?*" };
+
+  // TELÉFONO con valor
+  const mTelVal = texto.match(/cambia(?:r|me)?\s+(?:mi\s+)?tel[eé]fono\s+(?:a|por)\s+(\d{10})/i);
+  if (mTelVal) return { campo: "telefono", valor: mTelVal[1], preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:mi\s+)?tel[eé]fono$/i.test(t))
+    return { campo: "telefono", preguntar: true, pregunta: "*¿Cuál es tu nuevo número de teléfono a 10 dígitos?*" };
+
+  // CORREO con valor
+  const mCorreoVal = texto.match(/cambia(?:r|me)?\s+(?:mi\s+)?correo(?:\s+electr[oó]nico)?\s+(?:a|por)\s+(\S+@\S+)/i);
+  if (mCorreoVal) return { campo: "correo", valor: mCorreoVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:mi\s+)?correo(?:\s+electr[oó]nico)?$/i.test(t))
+    return { campo: "correo", preguntar: true, pregunta: "*¿Cuál es tu nuevo correo electrónico?*" };
+
+  // MÉTODO con valor directo
+  const mMetVal = texto.match(/cambia(?:r|me)?\s+(?:el\s+)?(?:m[eé]todo|pago)(?:\s+de\s+pago)?\s+(?:a|por)\s+(efectivo|tarjeta|transferencia)/i);
+  if (mMetVal) return { campo: "metodo", valor: mMetVal[1].toLowerCase(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:el\s+)?(?:m[eé]todo|pago)(?:\s+de\s+pago)?$/i.test(t))
+    return { campo: "metodo", preguntar: true, pregunta: null };
+
+  // HORA con valor
+  const mHoraVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?hora\s+(?:a|por)\s+(.+)/i);
+  if (mHoraVal) return { campo: "hora", valor: mHoraVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:la\s+)?hora$/i.test(t))
+    return { campo: "hora", preguntar: true, pregunta: "*¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)" };
+
+  // CALLE con valor
+  const mCalleVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?calle\s+(?:a|por)\s+(.+)/i);
+  if (mCalleVal) return { campo: "calle", valor: mCalleVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:la\s+)?calle$/i.test(t))
+    return { campo: "calle", preguntar: true, pregunta: "*¿Cuál es tu nueva calle?*" };
+
+  // NÚMERO DE DIRECCIÓN con valor (antes que teléfono para no confundir)
+  const mNumVal = texto.match(/cambia(?:r|me)?\s+(?:el\s+)?n[uú]mero(?:\s+de\s+(?:(?:mi|la|el)\s+)?(?:direcci[oó]n|casa|domicilio|calle))?\s+(?:a|por)\s+(.+)/i);
+  if (mNumVal) return { campo: "numero", valor: mNumVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:el\s+)?n[uú]mero(?:\s+de\s+(?:(?:mi|la|el)\s+)?(?:direcci[oó]n|casa|domicilio|calle))?$/i.test(t))
+    return { campo: "numero", preguntar: true, pregunta: "*¿Cuál es tu nuevo número de dirección?*" };
+
+  // COLONIA con valor
+  const mColVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?colonia\s+(?:a|por)\s+(.+)/i);
+  if (mColVal) return { campo: "colonia", valor: mColVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:la\s+)?colonia$/i.test(t))
+    return { campo: "colonia", preguntar: true, pregunta: "*¿Cuál es tu nueva colonia?*" };
+
+  // REFERENCIA con valor
+  const mRefVal = texto.match(/(?:ponle?(?:me)?\s+(?:de\s+)?referencia|cambia(?:r|me)?\s+(?:la\s+)?referencia|la\s+referencia\s+es|de\s+referencia)\s+(?:que\s+(?:es|sea)\s+)?(.+)/i);
+  if (mRefVal) return { campo: "referencia", valor: mRefVal[1].trim(), preguntar: false };
+  if (/cambia(?:r|me)?\s+(?:la\s+)?referencia$/i.test(t))
+    return { campo: "referencia", preguntar: true, pregunta: "*¿Cuál es la referencia de tu dirección?* (ej: casa azul, edificio, entre calles...)" };
+
+  // QUITAR ÍTEM
+  if (/quit(?:a|ar|ame|amelo|amelos)\s+/i.test(texto) || /elimina(?:r|me)?\s+/i.test(texto) || /borra(?:r|me)?\s+/i.test(texto))
+    return { campo: "quitar_item", texto, preguntar: false };
+
+  return null;
+}
+
+// ── APLICAR EDICIÓN ───────────────────────────────────────────────────────────
+function aplicarEdicion(clienteNumero, edicion) {
+  const campos = datosCampos.get(clienteNumero) || {};
+  switch (edicion.campo) {
+    case "nombre":
+      if (edicion.valor?.nombre) {
+        campos.nombre = edicion.valor.apellido
+          ? `${edicion.valor.nombre} ${edicion.valor.apellido}`
+          : edicion.valor.nombre;
+      }
+      break;
+    case "telefono":  campos.telefono  = edicion.valor; break;
+    case "correo":    campos.correo    = edicion.valor; break;
+    case "metodo":    campos.metodo    = edicion.valor; break;
+    case "hora":      campos.hora      = edicion.valor; break;
+    case "calle": {
+      const calleActual = campos.calle || "";
+      const numMatch = calleActual.match(/\s*#?\s*\d+\s*$/);
+      const numActual = numMatch ? numMatch[0].trim() : "";
+      campos.calle = numActual ? `${edicion.valor} ${numActual}` : edicion.valor;
+      break;
+    }
+    case "numero": {
+      const calleBase = (campos.calle || "").replace(/\s*#?\s*\d+\s*$/, "").trim();
+      campos.calle = calleBase ? `${calleBase} #${edicion.valor}` : `#${edicion.valor}`;
+      break;
+    }
+    case "colonia":   campos.colonia   = edicion.valor; break;
+    case "referencia": campos.referencia = edicion.valor; break;
+  }
+  datosCampos.set(clienteNumero, campos);
+  persistirEstado(clienteNumero);
+}
+
 module.exports = {
-  clientesPreventa, horaEntregaPreventa, pedidosConfirmados,
-  esperandoMotivoCancelacion, conversaciones, resumenPendiente,
-  clientesNuevos, esperandoCaptura, datosRecibidos, datosAcumulados,
-  datosCampos, esperandoConfirmacionItem, esperandoAgregarMas, pedidoJSONActual,
-  correoPreguntas, referenciaPreguntas, pendientesConfirmacion,
-  esperandoConfirmacionDatos,
-  CARPETA_CAPTURAS,
+  PALABRAS_NO_NOMBRE,
   getHistorial, limpiarTodo, acumularDatos,
   interpretarCampos, mostrarFormularioProgresivo, siguienteCampoFaltante,
   manejarOpcional, camposCompletos, camposATexto,
   datosCompletos, pareceFragmentoDatos, extraerDatosPedido,
-  persistirEstado, restaurarTodasLasSesiones,
+  detectarEdicion, aplicarEdicion,
 };

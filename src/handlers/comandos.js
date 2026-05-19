@@ -49,12 +49,12 @@ async function handleComandos(msg, client) {
       rechazado:   todos.filter(p => p.estado === "rechazado"),
     };
 
-    let msg_text = `📊 *PEDIDOS DEL DÍA — Tacos Javier*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let msg_text = `📊 *PEDIDOS DEL DÍA — Tacos Javier*\n━━━━━━━━━━━━━━━━━━\n`;
     msg_text += `🟡 Pendientes: ${porEstado.pendiente.length}   `;
     msg_text += `✅ Confirmados: ${porEstado.confirmado.length}\n`;
     msg_text += `❌ Cancelados: ${porEstado.cancelado.length}   `;
     msg_text += `⛔ Rechazados: ${porEstado.rechazado.length}\n`;
-    msg_text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg_text += `━━━━━━━━━━━━━━━━━━\n`;
     msg_text += `📦 *Total: ${todos.length} pedido${todos.length !== 1 ? "s" : ""}*\n\n`;
 
     const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔" };
@@ -81,7 +81,7 @@ async function handleComandos(msg, client) {
       await msg.reply("✅ No hay pedidos confirmados hoy.");
       return;
     }
-    let out = `✅ *Pedidos confirmados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let out = `✅ *Pedidos confirmados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     lista.forEach((p, i) => { out += formatearPedido(p, i + 1); });
     await msg.reply(out.trim());
     return;
@@ -98,7 +98,7 @@ async function handleComandos(msg, client) {
       return;
     }
 
-    let out = `🟡 *Pedidos pendientes de confirmación (${enBD.length + enMemoria.length}):*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let out = `🟡 *Pedidos pendientes de confirmación (${enBD.length + enMemoria.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     enBD.forEach((p, i) => { out += formatearPedido(p, i + 1); });
 
     // Los de memoria que aún no están en BD confirmados
@@ -120,7 +120,7 @@ async function handleComandos(msg, client) {
       await msg.reply("❌ No hay pedidos cancelados hoy.");
       return;
     }
-    let out = `❌ *Pedidos cancelados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let out = `❌ *Pedidos cancelados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     lista.forEach((p, i) => { out += formatearPedido(p, i + 1); });
     await msg.reply(out.trim());
     return;
@@ -133,7 +133,7 @@ async function handleComandos(msg, client) {
       await msg.reply("⛔ No hay pedidos rechazados hoy.");
       return;
     }
-    let out = `⛔ *Pedidos rechazados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let out = `⛔ *Pedidos rechazados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     lista.forEach((p, i) => { out += formatearPedido(p, i + 1); });
     await msg.reply(out.trim());
     return;
