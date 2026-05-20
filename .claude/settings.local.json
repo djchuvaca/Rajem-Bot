@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node index.js)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(exit 0)",
+      "Bash(taskkill /F /IM chrome.exe)",
+      "Bash(taskkill /F /IM chromium.exe)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(npm start *)",
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Usuario-Desktop-Bot-Tacos-Javier-carnitas-bot-1-4\\\\be881ad8-698c-4380-a008-152b5e188948\\\\tasks\\\\bufl7y4rx.output\" -Wait)",
+      "Bash(Select-String -Pattern \"QR|listo|conectado|ready|Client|error|Error|ERRO\" --SimpleMatch)",
+      "Bash(Get-Process -Name \"chrome\",\"chromium\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Name, Id, StartTime)",
+      "Bash(git checkout *)",
+      "PowerShell(cd \"C:\\\\Users\\\\Usuario\\\\Desktop\\\\Bot Tacos Javier\\\\carnitas-bot 1.4\"; $content = [System.IO.File]::ReadAllText\\(\"src\\\\handlers\\\\mensajes.js\", [System.Text.Encoding]::UTF8\\); $mojibake = \\([regex]::Matches\\($content, '[Ã][-¿]|[Â][-¿]'\\)\\).Count; Write-Host \"Remaining mojibake sequences: $mojibake\")",
+      "PowerShell(cd \"C:\\\\Users\\\\Usuario\\\\Desktop\\\\Bot Tacos Javier\\\\carnitas-bot 1.4\"; $bytes = [System.IO.File]::ReadAllBytes\\(\"src\\\\handlers\\\\mensajes.js\"\\); $line = 0; $i = 0; while \\($i -lt $bytes.Length -and $line -lt 214\\) { if \\($bytes[$i] -eq 10\\) { $line++ }; $i++ }; $start = $i; while \\($i -lt $bytes.Length -and $bytes[$i] -ne 10\\) { $i++ }; $lineBytes = $bytes[$start..\\($i-1\\)]; Write-Host \"Line 215 bytes:\"; $lineBytes | ForEach-Object { \"{0:X2}\" -f $_ } | Write-Host)",
+      "Bash(node -c src/handlers/mensajes.js)",
+      "Bash(node -c src/pedido/resumen.js)",
+      "Bash(node -c src/pedido/precios.js)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(echo \"resumen: $?\")",
+      "Bash(echo \"precios: $?\")"
+    ]
+  }
+}

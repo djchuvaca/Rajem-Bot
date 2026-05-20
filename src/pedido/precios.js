@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pedido/precios.js
  * Funciones puras de cálculo de precios — sin estado, sin BD directa.
  * Lee precios desde la BD solo cuando se llama getPrecios().
@@ -37,6 +37,8 @@ function calcularSubtotal(texto) {
     if (mRep) { suma += parseInt(mRep[1]) * parseInt(mRep[2]); continue; }
     const mPlato = linea.match(/plato\s*\d+.*?[—\-]\s*\$(\d+)/i);
     if (mPlato) { suma += parseInt(mPlato[1]); continue; }
+    const mPesos = linea.match(/\$(\d+).*\(~\d+g\)$/);
+    if (mPesos) { suma += parseInt(mPesos[1]); continue; }
     const mNorm = linea.match(/[—\-]\s*\$(\d+)\s*$/);
     if (mNorm) { suma += parseInt(mNorm[1]); continue; }
   }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pedido/resumen.js
  * Funciones puras de formateo y generación de resumen de pedido.
  * Generalizado para cualquier negocio — lee config desde BD.
@@ -75,7 +75,7 @@ function procesarItemJSON(item, precios) {
       return `${emojiPresentacion("gramos", tipo)} ${item.gramos}g${corteStr} — $${Math.round((item.gramos / 100) * p100g)}`;
 
     case "pesos":
-      return `${emojiPresentacion("pesos", tipo)} $${item.monto}${corteStr} — (~${Math.round((item.monto / p100g) * 100)}g)`;
+      return `${emojiPresentacion("pesos", tipo)} ~${Math.round((item.monto / p100g) * 100)}g${corteStr} — $${item.monto}`;
 
     case "grupo_repetido": {
       const lg = item.items_por_grupo.map(i => {

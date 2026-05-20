@@ -1,5 +1,41 @@
-.wwebjs_auth
-.wwebjs_cache
-node_modules
-data/
+# Dependencias
+node_modules/
+
+# Variables sensibles
+.env
+
+# WhatsApp Web JS
 .wwebjs_auth/
+.wwebjs_cache/
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Archivos temporales
+tmp/
+temp/
+.cache/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# VSCode opcional
+.vscode/
+
+# Capturas privadas
+analisis/capturas/
+
+# Archivos de respaldo
+*.bak
+*.old
+
+# Package lock opcional
+# package-lock.json

@@ -60,7 +60,7 @@ const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?
 // ── PREGUNTAS FRECUENTES ──────────────────────────────────────────────────────
 const PREGUNTAS_PRECIO      = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es)|precio\s+(?:del?|de\s+los?)|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?)/i;
 const PREGUNTAS_HORARIO     = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora/i;
-const PREGUNTAS_DOMICILIO   = /(?:hacen?|tienen?|mandan?|llevan?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:por\s+)?domicilio/i;
+const PREGUNTAS_DOMICILIO   = /(?:hacen?|tienen?|mandan?|llevan?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:(?:por|de)\s+)?domicilio|cu[aá]nto\s+(?:\w+\s+){0,3}(?:domicilio|env[ií]o)|domicilio\s+(?:gratis|incluido|cuesta|vale)|se\s+tarda|en\s+cu[aá]nto\s+tiempo|cu[aá]nto\s+tiempo/i;
 const PREGUNTAS_MENU        = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]/i;
 const PREGUNTAS_UBICACION   = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ubicaci[oó]n|c[oó]mo\s+llegar/i;
 const PREGUNTAS_PAGO        = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
@@ -169,6 +169,7 @@ function detectarSinCorte(texto) {
 // ── DETECTAR PREGUNTA FRECUENTE ───────────────────────────────────────────────
 function detectarPreguntaFrecuente(texto) {
   const t = normalizar(texto);
+  if (PREGUNTAS_DOMICILIO.test(t)) return { tipo: "domicilio" };
   if (PREGUNTAS_PRECIO.test(t)) {
     const cortes = getCortes();
     const palabras = Object.keys(cortes).join("|");
@@ -176,7 +177,6 @@ function detectarPreguntaFrecuente(texto) {
     return { tipo: "precio", producto: m ? cortes[m[1].toLowerCase()] : null };
   }
   if (PREGUNTAS_HORARIO.test(t))   return { tipo: "horario" };
-  if (PREGUNTAS_DOMICILIO.test(t)) return { tipo: "domicilio" };
   if (PREGUNTAS_MENU.test(t))      return { tipo: "menu" };
   if (PREGUNTAS_UBICACION.test(t)) return { tipo: "ubicacion" };
   if (PREGUNTAS_PAGO.test(t))      return { tipo: "metodos_pago" };

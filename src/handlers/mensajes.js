@@ -164,7 +164,10 @@ async function handleMensaje(msg, client) {
   const clienteNumero = msg.from;
   // Deshabilitar link previews en todas las respuestas de este handler
   const _origReply = msg.reply.bind(msg);
-  msg.reply = (content, chatId, opts = {}) => _origReply(content, chatId, { linkPreview: false, ...opts });
+  msg.reply = (content, chatId, opts = {}) => {
+    if (typeof content === 'string') console.log('[Bot]: ' + content.substring(0, 200) + (content.length > 200 ? '...' : ''));
+    return _origReply(content, chatId, { linkPreview: false, ...opts });
+  };
 
   // â”€â”€ ESPERANDO CAPTURA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoCaptura.has(clienteNumero) && !msg.hasMedia) {
@@ -180,7 +183,7 @@ async function handleMensaje(msg, client) {
           const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
           try {
             await client.sendMessage(grupoId,
-              `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: (cancelÃ³ antes de enviar captura)\nTelefono: ${datosCaptura?.telefono || "â€”"}\nMotivo: CancelÃ³ durante espera de transferencia`
+              `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: (canceló antes de enviar captura)\nTelefono: ${datosCaptura?.telefono || "â€”"}\nMotivo: Canceló durante espera de transferencia`
             );
           } catch (e) { console.error("Error notificando cancelacion:", e.message); }
         }
@@ -191,7 +194,7 @@ async function handleMensaje(msg, client) {
       if (_pregFaqCap) {
         const _respFaqCap = generarRespuestaAutomatica(_pregFaqCap, { esDomicilio: true });
         if (_respFaqCap) {
-          console.log(`Bot: [RESPUESTA AUTOMÃTICA] tipo: ${_pregFaqCap.tipo}`);
+          console.log(`Bot: [RESPUESTA AUTOMÁTICA] tipo: ${_pregFaqCap.tipo}`);
           await replyConTyping(msg, _respFaqCap);
           await replyConTyping(msg, "Recuerda que seguimos esperando tu captura de transferencia para confirmar tu pedido. ðŸ“¸");
           return;
@@ -206,16 +209,16 @@ async function handleMensaje(msg, client) {
   const textoOriginal = msg.body.trim();
   if (textoOriginal.length < 2) return;
 
-  // Ignorar previews automÃ¡ticos de WhatsApp
+  // Ignorar previews automáticos de WhatsApp
   if (/^[\w.-]+\.[a-z]{2,}$/i.test(textoOriginal)) return;
   if (/^https?:\/\//i.test(textoOriginal)) return;
   if (/^[\w.+-]+@[\w-]+\.[a-z]{2,}$/i.test(textoOriginal) && datosRecibidos.has(clienteNumero)) return;
   if (/^[a-z0-9.-]+\.[a-z]{2,}(\n[\w.+-]+@[\w-]+\.[a-z]{2,})?(\n[a-z0-9.-]+\.[a-z]{2,})?$/i.test(textoOriginal.trim())) return;
 
-  console.log(`\nðŸ“¨ [${clienteNumero}]: ${textoOriginal}`);
+  console.log(`\n[Usuario ${clienteNumero}]: ${textoOriginal}`);
 
-  // â”€â”€ PREGUNTAS FRECUENTES â€” disponibles en toda la conversaciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Se omite si el cliente estÃ¡ en un flujo activo para evitar colisiones de palabras clave
+  // â”€â”€ PREGUNTAS FRECUENTES â€” disponibles en toda la conversación â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Se omite si el cliente está en un flujo activo para evitar colisiones de palabras clave
   {
     const _pregFaq = !enFlujoActivo(clienteNumero) ? detectarPreguntaFrecuente(textoOriginal) : null;
     if (_pregFaq) {
@@ -224,7 +227,7 @@ async function handleMensaje(msg, client) {
       const _respFaq = generarRespuestaAutomatica(_pregFaq, { esDomicilio: _esDomFaq });
       if (_respFaq) {
         if (!clientesNuevos.has(clienteNumero)) clientesNuevos.add(clienteNumero);
-        console.log(`Bot: [RESPUESTA AUTOMÃTICA] tipo: ${_pregFaq.tipo}`);
+        console.log(`Bot: [RESPUESTA AUTOMÁTICA] tipo: ${_pregFaq.tipo}`);
         await replyConTyping(msg, _respFaq);
         if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
           await replyConTyping(msg, mensajeFueraDeHorario());
@@ -238,28 +241,28 @@ async function handleMensaje(msg, client) {
 
   const quiereCancelar = /cancelar|cancela|cancel|cancelo|cancelame|cancelado|ya no quiero|ya no/i.test(textoOriginal);
 
-  // â”€â”€ CANCELACIÃ“N DE PEDIDO CONFIRMADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ CANCELACIÓN DE PEDIDO CONFIRMADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (pedidosConfirmados.has(clienteNumero)) {
     const datosPedido = pedidosConfirmados.get(clienteNumero);
     const minutosTranscurridos = (Date.now() - (datosPedido.confirmadoEn || 0)) / 60000;
     if (quiereCancelar) {
       if (minutosTranscurridos > 15) {
-        await msg.reply("Lo sentimos, el tiempo para cancelar tu pedido ya venciÃ³ (15 minutos).\nSi tienes algÃºn problema, comunÃ­cate directamente con nosotros. Gracias por tu comprensiÃ³n!");
+        await msg.reply("Lo sentimos, el tiempo para cancelar tu pedido ya venció (15 minutos).\nSi tienes algún problema, comunícate directamente con nosotros. Gracias por tu comprensión!");
         return;
       }
       esperandoMotivoCancelacion.set(clienteNumero, { nombre: datosPedido.nombre, telefono: datosPedido.telefono, notificarGrupo: true });
       pedidosConfirmados.delete(clienteNumero);
       clientesNuevos.delete(clienteNumero);
-      await msg.reply("Lamento escuchar eso. *Â¿PodrÃ­as indicarme el motivo de tu cancelaciÃ³n?*");
+      await msg.reply("Lamento escuchar eso. *¿Podrías indicarme el motivo de tu cancelación?*");
       return;
     }
     const minRestantes = Math.max(0, Math.ceil(15 - minutosTranscurridos));
     await msg.reply("Tu pedido ya fue recibido y esta en espera de confirmacion de nuestro equipo.\n" +
-      (minRestantes > 0 ? `Si deseas cancelarlo tienes ${minRestantes} minuto${minRestantes !== 1 ? "s" : ""} para escribir *cancelar*.` : "El tiempo para cancelar ya venciÃ³."));
+      (minRestantes > 0 ? `Si deseas cancelarlo tienes ${minRestantes} minuto${minRestantes !== 1 ? "s" : ""} para escribir *cancelar*.` : "El tiempo para cancelar ya venció."));
     return;
   }
 
-  // â”€â”€ MOTIVO DE CANCELACIÃ“N â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ MOTIVO DE CANCELACIÓN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoMotivoCancelacion.has(clienteNumero)) {
     const datosCancelacion = esperandoMotivoCancelacion.get(clienteNumero);
     const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
@@ -287,8 +290,8 @@ async function handleMensaje(msg, client) {
 
   // â”€â”€ 1B. FUERA DE HORARIO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
-    const aceptaPreventa  = /^(si|sÃ­|s[iÃ­]\s+por\s+fa(vor)?|ok|okey|va|dale|quiero|claro|adelante|sale|andale|Ã¡ndale|Ã³rale|orale|de\s+una|venga|eso|perfecto|listo|con\s+gusto|me\s+apunto|apuntame|ponme|anotame|anota(me)?|por\s+fa(vor)?|please|plis|sip|sep|simÃ³n|simon|chido|chale\s+va|esta\s+bien|estÃ¡\s+bien|bueno|bien|ah\s+si|ah\s+sÃ­)$/i.test(textoOriginal.trim());
-    const rechazaPreventa = /^(no|nel|nop|nope|nah|naa|para\s+nada|nones|negativo|nei|nein|no\s+gracias|no\s+gra(s|cias)?|no\s+por\s+fa(vor)?|mejor\s+no|al\s+rato|luego|despues|despuÃ©s|ahorita\s+no|otro\s+dia|otro\s+dÃ­a|maÃ±ana)$/i.test(textoOriginal.trim());
+    const aceptaPreventa  = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|quiero|claro|adelante|sale|andale|ándale|órale|orale|de\s+una|venga|eso|perfecto|listo|con\s+gusto|me\s+apunto|apuntame|ponme|anotame|anota(me)?|por\s+fa(vor)?|please|plis|sip|sep|simón|simon|chido|chale\s+va|esta\s+bien|está\s+bien|bueno|bien|ah\s+si|ah\s+sí)$/i.test(textoOriginal.trim());
+    const rechazaPreventa = /^(no|nel|nop|nope|nah|naa|para\s+nada|nones|negativo|nei|nein|no\s+gracias|no\s+gra(s|cias)?|no\s+por\s+fa(vor)?|mejor\s+no|al\s+rato|luego|despues|después|ahorita\s+no|otro\s+dia|otro\s+día|mañana)$/i.test(textoOriginal.trim());
     if (aceptaPreventa) {
       clientesPreventa.add(clienteNumero);
       await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO);
@@ -306,7 +309,7 @@ async function handleMensaje(msg, client) {
   const historial  = getHistorial(clienteNumero);
   const esPreventa = clientesPreventa.has(clienteNumero);
 
-  // â”€â”€ RESPUESTA A EDICIÃ“N PENDIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ RESPUESTA A EDICIÓN PENDIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoEdicion.has(clienteNumero)) {
     const edicionPendiente = esperandoEdicion.get(clienteNumero);
     const esOrdenDomEdit = historial.some(h => h.content && h.content.includes("domicilio"));
@@ -314,7 +317,7 @@ async function handleMensaje(msg, client) {
 
     if (edicionPendiente.campo === "telefono") {
       if (!/^\d{10}$/.test(valorNuevo)) {
-        await msg.reply("El nÃºmero debe tener exactamente 10 dÃ­gitos. *Â¿CuÃ¡l es tu nuevo telÃ©fono?*");
+        await msg.reply("El número debe tener exactamente 10 dígitos. *¿Cuál es tu nuevo teléfono?*");
         return;
       }
     }
@@ -324,13 +327,13 @@ async function handleMensaje(msg, client) {
       const metodoValido = /^(efectivo|tarjeta|transferencia)$/.test(vNorm);
       if (!metodoValido) {
         const pregMetodo = esOrdenDomEdit
-          ? "*Â¿CÃ³mo vas a pagar?* Efectivo o transferencia."
-          : "*Â¿CÃ³mo vas a pagar?* Efectivo, tarjeta o transferencia.";
-        await msg.reply("OpciÃ³n no vÃ¡lida. " + pregMetodo);
+          ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
+          : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
+        await msg.reply("Opción no válida. " + pregMetodo);
         return;
       }
       if (esOrdenDomEdit && /tarjeta/i.test(valorNuevo)) {
-        await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *Â¿CuÃ¡l prefieres?*");
+        await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
         return;
       }
       valorNuevo = vNorm;
@@ -339,7 +342,7 @@ async function handleMensaje(msg, client) {
     if (edicionPendiente.campo === "hora") {
       const horaValida = validarHora(valorNuevo);
       if (!horaValida) {
-        await msg.reply("Esa hora estÃ¡ fuera de nuestro horario. *Â¿A quÃ© hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
+        await msg.reply("Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
         return;
       }
       valorNuevo = horaValida;
@@ -360,47 +363,52 @@ async function handleMensaje(msg, client) {
       const resumenNuevo = generarResumen(clienteNumero, edicionPendiente.ordenTexto, esOrdenDomEdit, esPreventa);
       resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
       persistirEstado(clienteNumero);
-      await msg.reply("Perfecto! AquÃ­ estÃ¡ tu pedido actualizado:\n\n" + resumenNuevo.texto);
+      await msg.reply("Perfecto! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
+    } else if (edicionPendiente.contexto === 'agregarMas') {
+      if (edicionPendiente.ordenTexto !== undefined)
+        esperandoAgregarMas.set(clienteNumero, edicionPendiente.ordenTexto);
+      const _formEdAg = mostrarFormularioProgresivo(clienteNumero, esOrdenDomEdit, esPreventa);
+      await msg.reply('Perfecto! Datos actualizados:\n\n' + _formEdAg + '\n\n*¿Qué deseas ordenar?*');
     } else if (edicionPendiente.contexto === "formulario") {
       const camposAct = datosCampos.get(clienteNumero) || {};
       const esDomForm = camposAct.tipoEntrega === "domicilio";
       const formActualizado = mostrarFormularioProgresivo(clienteNumero, esDomForm, esPreventa);
-      await msg.reply("Perfecto! Datos actualizados:\n\n" + formActualizado + "\n\n*Â¿Son correctos los datos?*");
+      await msg.reply("Perfecto! Datos actualizados:\n\n" + formActualizado + "\n\n*¿Son correctos los datos?*");
     }
     return;
   }
 
-  // â”€â”€ 1C. CONFIRMACIÃ“N DE DATOS PRECARGADOS (cliente frecuente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ 1C. CONFIRMACIÓN DE DATOS PRECARGADOS (cliente frecuente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoConfirmacionDatos.has(clienteNumero)) {
     const { tipoEntrega, esPreventa: esPreventaDatos } = esperandoConfirmacionDatos.get(clienteNumero);
     const esOrdenDom = tipoEntrega === "domicilio";
-    const confirma = /^(si|sÃ­|s[iÃ­]\s+por\s+fa(vor)?|ok|okey|va|dale|claro|correcto|sale|andale|Ã¡ndale|Ã³rale|orale|perfecto|exacto|listo|asÃ­\s+es|asi\s+es|de\s+una|eso\s+es|correcto|afirmativo|todo\s+bien|estÃ¡\s+bien|esta\s+bien|sip|sep|simÃ³n|simon|chido|bueno|bien|me\s+late|nel\s+az|efectivamente|positivo)$/i.test(textoOriginal.trim());
-    const niega    = /^(no|nel|nop|nope|nah|incorrecto|cambia(r|me)?|cambio|error|no\s+es\s+correcto|no\s+est[aÃ¡]\s+bien|estÃ¡\s+mal|esta\s+mal|hay\s+un\s+error|modifica(r|me)?|corrige|corr[Ã­i]gelo|actualiza)$/i.test(textoOriginal.trim());
+    const confirma = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|claro|correcto|sale|andale|ándale|órale|orale|perfecto|exacto|listo|así\s+es|asi\s+es|de\s+una|eso\s+es|correcto|afirmativo|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|me\s+late|nel\s+az|efectivamente|positivo)$/i.test(textoOriginal.trim());
+    const niega    = /^(no|nel|nop|nope|nah|incorrecto|cambia(r|me)?|cambio|error|no\s+es\s+correcto|no\s+est[aá]\s+bien|está\s+mal|esta\s+mal|hay\s+un\s+error|modifica(r|me)?|corrige|corr[íi]gelo|actualiza)$/i.test(textoOriginal.trim());
 
-    // â”€â”€ EDICIÃ“N DESDE FORMULARIO (cliente frecuente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€ EDICIÓN DESDE FORMULARIO (cliente frecuente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const edicionForm = detectarEdicion(textoOriginal);
     if (edicionForm && !confirma && !niega) {
       if (edicionForm.campo === "metodo" && edicionForm.preguntar) {
         const pregMetodo = esOrdenDom
-          ? "*Â¿CÃ³mo vas a pagar?* Efectivo o transferencia."
-          : "*Â¿CÃ³mo vas a pagar?* Efectivo, tarjeta o transferencia.";
+          ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
+          : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
         esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "formulario" });
         await msg.reply(pregMetodo);
         return;
       }
       if (edicionForm.campo === "metodo" && !edicionForm.preguntar) {
         if (esOrdenDom && /tarjeta/i.test(edicionForm.valor)) {
-          await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *Â¿CuÃ¡l prefieres?*");
+          await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
           esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "formulario" });
           return;
         }
         aplicarEdicion(clienteNumero, edicionForm);
         const formAct = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
-        await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n*Â¿Son correctos los datos?*");
+        await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n*¿Son correctos los datos?*");
         return;
       }
       if (edicionForm.campo === "quitar_item") {
-        await msg.reply("Solo puedes quitar productos desde el resumen final. *Â¿Son correctos los datos?*");
+        await msg.reply("Solo puedes quitar productos desde el resumen final. *¿Son correctos los datos?*");
         return;
       }
       if (edicionForm.preguntar) {
@@ -410,7 +418,7 @@ async function handleMensaje(msg, client) {
       }
       aplicarEdicion(clienteNumero, edicionForm);
       const formAct = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
-      await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n*Â¿Son correctos los datos?*");
+      await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n*¿Son correctos los datos?*");
       return;
     }
 
@@ -422,7 +430,7 @@ async function handleMensaje(msg, client) {
       if (!faltante) {
         datosRecibidos.add(clienteNumero);
         historial.push({ role: "user", content: "Mi pedido es " + (esOrdenDom ? "a domicilio" : "para mostrador") });
-        historial.push({ role: "assistant", content: "Datos confirmados. MenÃº enviado." });
+        historial.push({ role: "assistant", content: "Datos confirmados. Menú enviado." });
         persistirEstado(clienteNumero);
         const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
         await msg.reply(formCompleto + "\n\nPerfecto! Aqui te mando el menu.");
@@ -439,21 +447,21 @@ async function handleMensaje(msg, client) {
       const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
       await msg.reply(
         formProgresivo +
-        "\n\n*Â¿QuÃ© dato deseas corregir?*\n" +
-        "_Dime cuÃ¡l, por ejemplo: \"cambia mi nombre\", \"cambia mi telÃ©fono\", \"cambia mi mÃ©todo de pago\"._"
+        "\n\n*¿Qué dato deseas corregir?*\n" +
+        "_Dime cuál, por ejemplo: \"cambia mi nombre\", \"cambia mi teléfono\", \"cambia mi método de pago\"._"
       );
       return;
     }
 
     const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
-    await msg.reply(formCompleto + "\n\n*Â¿Son correctos los datos?*");
+    await msg.reply(formCompleto + "\n\n*¿Son correctos los datos?*");
     return;
   }
 
   // â”€â”€ 2. TIPO DE ENTREGA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (historial.length === 0) {
     const tipoEntrega = await detectarTipoEntrega(textoOriginal);
-    if (tipoEntrega === "ninguno") { await msg.reply("*Â¿Tu pedido serÃ¡ para domicilio o pasas a recoger al mostrador?*"); return; }
+    if (tipoEntrega === "ninguno") { await msg.reply("*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*"); return; }
 
     const telGuardado   = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero);
     const telFormulario = datosCampos.get(clienteNumero)?.telefono;
@@ -466,7 +474,7 @@ async function handleMensaje(msg, client) {
       const campos = {
         nombre:      [clienteBD.nombre, clienteBD.apellido].filter(Boolean).join(" "),
         telefono:    clienteBD.telefono,
-        correo:      clienteBD.correo || "no proporcionÃ³",
+        correo:      clienteBD.correo || "no proporcionó",
         metodo:      null,
         calle:       tipoEntrega === "domicilio" ? (clienteBD.calle_numero || null) : null,
         colonia:     tipoEntrega === "domicilio" ? (clienteBD.colonia || null) : null,
@@ -479,7 +487,7 @@ async function handleMensaje(msg, client) {
       historial.push({ role: "assistant", content: "Perfecto, verificando tus datos." });
       esperandoConfirmacionDatos.set(clienteNumero, { tipoEntrega, esPreventa });
       const formPrecargado = mostrarFormularioProgresivo(clienteNumero, tipoEntrega === "domicilio", esPreventa);
-      await msg.reply(`Hola de nuevo *${campos.nombre.split(" ")[0]}*! ðŸ˜Š Encontramos tus datos:\n\n${formPrecargado}\n\n*Â¿Son correctos los datos?*`);
+      await msg.reply(`Hola de nuevo *${campos.nombre.split(" ")[0]}*! ðŸ˜Š Encontramos tus datos:\n\n${formPrecargado}\n\n*¿Son correctos los datos?*`);
       console.log(`Bot: [CLIENTE FRECUENTE â€” datos precargados]`);
       return;
     }
@@ -516,7 +524,7 @@ async function handleMensaje(msg, client) {
     return;
   }
 
-  // â”€â”€ 2B. CANCELACIÃ“N DURANTE EL PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ 2B. CANCELACIÓN DURANTE EL PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (quiereCancelar) {
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
@@ -531,8 +539,8 @@ async function handleMensaje(msg, client) {
       || /mejor\s*(a\s*)?domicilio/i.test(textoOriginal)
       || /que\s+sea\s+(a\s+)?domicilio/i.test(textoOriginal)
       || /para\s+domicilio/i.test(textoOriginal)
-      || /mejor\s*(que\s*)?(me\s*)?(lo\s*)?(env[Ã­i]a|manda|lleva|trae)(melo|me|lo)?/i.test(textoOriginal)
-      || /^(env[Ã­i]amelo|mandamelo|traemelo|llevamelo|mandalos|traelos)$/i.test(textoOriginal.trim());
+      || /mejor\s*(que\s*)?(me\s*)?(lo\s*)?(env[íi]a|manda|lleva|trae)(melo|me|lo)?/i.test(textoOriginal)
+      || /^(env[íi]amelo|mandamelo|traemelo|llevamelo|mandalos|traelos)$/i.test(textoOriginal.trim());
     const esCambioMostrador = /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*mostrador/i.test(textoOriginal)
       || /mejor\s*(al?\s*)?mostrador/i.test(textoOriginal)
       || /quiero\s*(que\s*)?(sea\s*)?en\s*mostrador/i.test(textoOriginal)
@@ -567,7 +575,7 @@ async function handleMensaje(msg, client) {
       const formActualizado = mostrarFormularioProgresivo(clienteNumero, esCambioDomicilio, esPreventa);
       const sfaltante = siguienteCampoFaltante(clienteNumero, esCambioDomicilio, esPreventa);
       await msg.reply(
-        (esCambioDomicilio ? "Perfecto, cambiÃ© tu pedido a domicilio!\n\n" : "Perfecto, cambiÃ© tu pedido a mostrador!\n\n") +
+        (esCambioDomicilio ? "Perfecto, cambié tu pedido a domicilio!\n\n" : "Perfecto, cambié tu pedido a mostrador!\n\n") +
         formActualizado +
         (sfaltante ? "\n\n" + sfaltante.pregunta : "")
       );
@@ -581,7 +589,7 @@ async function handleMensaje(msg, client) {
     const esOrdenDomicilio = camposActualesFormulario.tipoEntrega === "domicilio"
       || (camposActualesFormulario.tipoEntrega == null && tipoEntregaCliente.get(clienteNumero) === "domicilio");
 
-    const esConfirmacionDatos = /^(si|sÃ­|ok|okey|va|dale|claro|correcto|listo|sip|sep|exacto|perfecto|todo\s+bien|estÃ¡\s+bien|esta\s+bien|asÃ­\s+es|asi\s+es|afirmativo|bueno|bien)$/i.test(textoOriginal.trim());
+    const esConfirmacionDatos = /^(si|sí|ok|okey|va|dale|claro|correcto|listo|sip|sep|exacto|perfecto|todo\s+bien|está\s+bien|esta\s+bien|así\s+es|asi\s+es|afirmativo|bueno|bien)$/i.test(textoOriginal.trim());
     if (esConfirmacionDatos && camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
       const camposActuales = datosCampos.get(clienteNumero);
       if (esPreventa && camposActuales.hora) horaEntregaPreventa.set(clienteNumero, camposActuales.hora);
@@ -598,14 +606,14 @@ async function handleMensaje(msg, client) {
       return;
     }
 
-    // Si el cliente manda un comando de ediciÃ³n durante el llenado, redirigir al checkpoint de confirmaciÃ³n
+    // Si el cliente manda un comando de edición durante el llenado, redirigir al checkpoint de confirmación
     if (detectarEdicion(textoOriginal)) {
       const faltanteActual = siguienteCampoFaltante(clienteNumero, esOrdenDomicilio, esPreventa);
       const formActual = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
       await msg.reply(
         "Puedes corregir tus datos cuando te muestre el resumen completo y te pregunte si son correctos. ðŸ˜Š\n\n" +
         formActual +
-        (faltanteActual ? "\n\n" + faltanteActual.pregunta : "\n\n*Â¿Son correctos los datos?*")
+        (faltanteActual ? "\n\n" + faltanteActual.pregunta : "\n\n*¿Son correctos los datos?*")
       );
       return;
     }
@@ -618,7 +626,7 @@ async function handleMensaje(msg, client) {
       const msgHora = campos._horaFueraRango === "antes"
         ? "Aun no iniciamos labores a esa hora. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*"
         : "A esa hora ya estamos fuera de servicio. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*";
-      await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*Â¿A quÃ© hora deseas " + tipoPedido + "?* (entre 7:00 a.m. y 12:30 p.m.)");
+      await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre 7:00 a.m. y 12:30 p.m.)");
       delete campos._horaFueraRango;
       datosCampos.set(clienteNumero, campos);
       return;
@@ -635,7 +643,7 @@ async function handleMensaje(msg, client) {
       }
       if (!fueMarcado && faltante.campo === "correo") {
   const camposActuales = datosCampos.get(clienteNumero) || {};
-  // Solo guardar si parece un correo vÃ¡lido
+  // Solo guardar si parece un correo válido
   if (/[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(textoOriginal.trim())) {
     camposActuales.correo = textoOriginal.trim();
     datosCampos.set(clienteNumero, camposActuales);
@@ -668,20 +676,20 @@ async function handleMensaje(msg, client) {
       await msg.reply(formProgresivo + "\n\n" + siguienteFaltante.pregunta);
     } else {
       const camposActuales = datosCampos.get(clienteNumero) || {};
-      if (!camposActuales.correo) { camposActuales.correo = "no proporcionÃ³"; correoPreguntas.add(clienteNumero); }
+      if (!camposActuales.correo) { camposActuales.correo = "no proporcionó"; correoPreguntas.add(clienteNumero); }
       if (esOrdenDomicilio && !camposActuales.referencia) { camposActuales.referencia = "sin referencia"; referenciaPreguntas.add(clienteNumero); }
       datosCampos.set(clienteNumero, camposActuales);
       persistirEstado(clienteNumero);
       const formActualizado = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
-      await msg.reply(formActualizado + "\n\n*Â¿Son correctos los datos?*");
+      await msg.reply(formActualizado + "\n\n*¿Son correctos los datos?*");
     }
     return;
   }
 
-  // â”€â”€ 4. CONFIRMACIÃ“N FINAL DEL PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const palabrasConfirmacion = /^(si|sÃ­|s[iÃ­]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|Ã¡ndale|adelante|confirmo|confirmado|correcto|asi|asÃ­|si\s+porfavor|sÃ­\s+porfavor|si\s+por\s+favor|sÃ­\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|Ã¡ndale|Ã³rale|orale|va\s+que\s+va|de\s+una|eso\s+es|asÃ­\s+es|asi\s+es|todo\s+bien|estÃ¡\s+bien|esta\s+bien|sip|sep|simÃ³n|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az)$/i;
+  // â”€â”€ 4. CONFIRMACIÓN FINAL DEL PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az)$/i;
 
-  // â”€â”€ EDICIÃ“N DESDE RESUMEN PENDIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ EDICIÓN DESDE RESUMEN PENDIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (resumenPendiente.has(clienteNumero)) {
     const edicion = detectarEdicion(textoOriginal);
     if (edicion) {
@@ -689,40 +697,40 @@ async function handleMensaje(msg, client) {
       const ordenExtraida = extraerOrdenDeResumen(pendienteActual.texto);
       const esOrdenDomEdit = historial.some(h => h.content && h.content.includes("domicilio"));
 
-      // QUITAR ÃTEM
+      // QUITAR ÍTEM
       if (edicion.campo === "quitar_item") {
         const resultado = quitarItemDeOrden(ordenExtraida, textoOriginal);
         if (resultado.exito) {
           const resumenNuevo = generarResumen(clienteNumero, resultado.nuevaOrden, esOrdenDomEdit, esPreventa);
           resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
           persistirEstado(clienteNumero);
-          await msg.reply("Listo! AquÃ­ estÃ¡ tu pedido actualizado:\n\n" + resumenNuevo.texto);
+          await msg.reply("Listo! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
         } else if (resultado.razon === "ambiguo") {
-          await msg.reply(`Tengo varios productos similares. Â¿CuÃ¡l deseas quitar?\n\n${resultado.opciones}\n\nEscrÃ­beme cuÃ¡l exactamente.`);
+          await msg.reply(`Tengo varios productos similares. ¿Cuál deseas quitar?\n\n${resultado.opciones}\n\nEscríbeme cuál exactamente.`);
         } else if (resultado.razon === "quedaria_vacio") {
-          await msg.reply("No puedo quitar ese producto porque quedarÃ­a tu pedido vacÃ­o. *Â¿Deseas cancelar el pedido o cambiarlo?*");
+          await msg.reply("No puedo quitar ese producto porque quedaría tu pedido vacío. *¿Deseas cancelar el pedido o cambiarlo?*");
         } else if (resultado.razon === "solo_un_item") {
           await msg.reply("Solo tienes un producto en tu pedido. Si deseas cancelarlo escribe *cancelar*.");
         } else {
-          await msg.reply("No encontrÃ© ese producto en tu pedido. *Â¿QuÃ© deseas quitar?*");
+          await msg.reply("No encontré ese producto en tu pedido. *¿Qué deseas quitar?*");
         }
         return;
       }
 
-      // MÃ‰TODO â€” preguntar
+      // MÉTODO â€” preguntar
       if (edicion.campo === "metodo" && edicion.preguntar) {
         const pregMetodo = esOrdenDomEdit
-          ? "*Â¿CÃ³mo vas a pagar?* Efectivo o transferencia."
-          : "*Â¿CÃ³mo vas a pagar?* Efectivo, tarjeta o transferencia.";
+          ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
+          : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
         esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "resumen", ordenTexto: ordenExtraida });
         await msg.reply(pregMetodo);
         return;
       }
 
-      // MÃ‰TODO â€” valor directo, validar tarjeta en domicilio
+      // MÉTODO â€” valor directo, validar tarjeta en domicilio
       if (edicion.campo === "metodo" && !edicion.preguntar) {
         if (esOrdenDomEdit && /tarjeta/i.test(edicion.valor)) {
-          await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *Â¿CuÃ¡l prefieres?*");
+          await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
           esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "resumen", ordenTexto: ordenExtraida });
           return;
         }
@@ -730,7 +738,7 @@ async function handleMensaje(msg, client) {
         const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, esOrdenDomEdit, esPreventa);
         resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
         persistirEstado(clienteNumero);
-        await msg.reply("Perfecto! AquÃ­ estÃ¡ tu pedido actualizado:\n\n" + resumenNuevo.texto);
+        await msg.reply("Perfecto! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
         return;
       }
 
@@ -738,7 +746,7 @@ async function handleMensaje(msg, client) {
       if (edicion.campo === "hora" && !edicion.preguntar) {
         const horaValida = validarHora(edicion.valor);
         if (!horaValida) {
-          await msg.reply("Esa hora estÃ¡ fuera de nuestro horario. *Â¿A quÃ© hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
+          await msg.reply("Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
           esperandoEdicion.set(clienteNumero, { campo: "hora", contexto: "resumen", ordenTexto: ordenExtraida });
           return;
         }
@@ -748,7 +756,7 @@ async function handleMensaje(msg, client) {
         const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, esOrdenDomEdit, esPreventa);
         resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
         persistirEstado(clienteNumero);
-        await msg.reply("Perfecto! AquÃ­ estÃ¡ tu pedido actualizado:\n\n" + resumenNuevo.texto);
+        await msg.reply("Perfecto! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
         return;
       }
 
@@ -764,7 +772,7 @@ async function handleMensaje(msg, client) {
       const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, esOrdenDomEdit, esPreventa);
       resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
       persistirEstado(clienteNumero);
-      await msg.reply("Perfecto! AquÃ­ estÃ¡ tu pedido actualizado:\n\n" + resumenNuevo.texto);
+      await msg.reply("Perfecto! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
       return;
     }
   }
@@ -776,8 +784,8 @@ async function handleMensaje(msg, client) {
     || /que\s+sea\s+(a\s+)?domicilio/i.test(textoOriginal)
     || /para\s+domicilio/i.test(textoOriginal)
     || /a\s+domicilio/i.test(textoOriginal)
-    || /mejor\s*(que\s*)?(me\s*)?(lo\s*)?(env[Ã­i]a|manda|lleva|trae)(melo|me|lo)?/i.test(textoOriginal)
-    || /^(env[Ã­i]amelo|mandamelo|traemelo|llevamelo)$/i.test(textoOriginal.trim())
+    || /mejor\s*(que\s*)?(me\s*)?(lo\s*)?(env[íi]a|manda|lleva|trae)(melo|me|lo)?/i.test(textoOriginal)
+    || /^(env[íi]amelo|mandamelo|traemelo|llevamelo)$/i.test(textoOriginal.trim())
   )) {
     const pendienteActual = resumenPendiente.get(clienteNumero);
     const ordenExtraida = extraerOrdenDeResumen(pendienteActual.texto);
@@ -804,13 +812,13 @@ async function handleMensaje(msg, client) {
       const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, true, esPreventa);
       resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
       persistirEstado(clienteNumero);
-      await msg.reply("Perfecto! CambiÃ© tu pedido a domicilio.\n\n" + resumenNuevo.texto);
+      await msg.reply("Perfecto! Cambié tu pedido a domicilio.\n\n" + resumenNuevo.texto);
     } else {
       if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
       resumenPendiente.delete(clienteNumero);
       datosRecibidos.delete(clienteNumero);
       persistirEstado(clienteNumero);
-      await msg.reply("Perfecto! Para cambiar a domicilio necesito tu direcciÃ³n.\n*Â¿CuÃ¡l es tu calle y nÃºmero?*");
+      await msg.reply("Perfecto! Para cambiar a domicilio necesito tu dirección.\n*¿Cuál es tu calle y número?*");
     }
     return;
   }
@@ -840,7 +848,7 @@ async function handleMensaje(msg, client) {
       const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, false, esPreventa);
       resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
       persistirEstado(clienteNumero);
-      await msg.reply("Perfecto! CambiÃ© tu pedido a mostrador.\n\n" + resumenNuevo.texto);
+      await msg.reply("Perfecto! Cambié tu pedido a mostrador.\n\n" + resumenNuevo.texto);
     }
     return;
   }
@@ -868,7 +876,7 @@ async function handleMensaje(msg, client) {
   }
 
   if (resumenPendiente.has(clienteNumero) && (
-    /agrega(me|r|nos)?|agra[gq]a|aÃ±ade|tambiÃ©n\s+quiero|y\s+tambiÃ©n|y\s+ademÃ¡s|suma(me)?|ponme\s+(tambiÃ©n|ademÃ¡s)|quiero\s+tambiÃ©n|tambiÃ©n\s+dame|y\s+dame/i.test(textoOriginal)
+    /agrega(me|r|nos)?|agra[gq]a|añade|también\s+quiero|y\s+también|y\s+además|suma(me)?|ponme\s+(también|además)|quiero\s+también|también\s+dame|y\s+dame/i.test(textoOriginal)
   )) {
     const pendienteActual = resumenPendiente.get(clienteNumero);
     const ordenExtraida = extraerOrdenDeResumen(pendienteActual.texto);
@@ -879,7 +887,7 @@ async function handleMensaje(msg, client) {
       esperandoConfirmacionItem.set(clienteNumero, { lineas: resultadoNuevo.texto, _esModificacionResumen: true, ordenBase: ordenExtraida, jsonNuevo });
       resumenPendiente.delete(clienteNumero);
       persistirEstado(clienteNumero);
-      await msg.reply(resultadoNuevo.texto + "\n\n*Â¿Agrego esto a tu pedido?*");
+      await msg.reply(resultadoNuevo.texto + "\n\n*¿Agrego esto a tu pedido?*");
       return;
     }
     const pedidoParcialAgregar = parsearSinCorteItems(textoOriginal);
@@ -894,7 +902,7 @@ async function handleMensaje(msg, client) {
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*Â¿De quÃ© tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
       return;
     }
     resumenPendiente.delete(clienteNumero);
@@ -916,7 +924,7 @@ async function handleMensaje(msg, client) {
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*Â¿De quÃ© tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
       return;
     }
     resumenPendiente.delete(clienteNumero);
@@ -924,12 +932,16 @@ async function handleMensaje(msg, client) {
   }
 
   if (resumenPendiente.has(clienteNumero) && /^(no|nel|nop|nope|nah|negativo)$/i.test(textoOriginal.trim())) {
+    const _pendNo = resumenPendiente.get(clienteNumero);
+    const _ordNo  = extraerOrdenDeResumen(_pendNo.texto);
     resumenPendiente.delete(clienteNumero);
-    await msg.reply("Entendido! *Â¿QuÃ© te gustarÃ­a cambiar o agregar?*");
+    if (_ordNo) esperandoAgregarMas.set(clienteNumero, _ordNo);
+    await msg.reply('Entendido! *¿Qué te gustaría cambiar o agregar?*');
     await new Promise(r => setTimeout(r, 300));
     await msg.reply(MENU_FORMATO);
     return;
   }
+
 
   if (resumenPendiente.has(clienteNumero) && palabrasConfirmacion.test(textoOriginal.trim())) {
     const pendiente  = resumenPendiente.get(clienteNumero);
@@ -960,7 +972,7 @@ async function handleMensaje(msg, client) {
       const camposCliente = datosCampos.get(clienteNumero) || {};
 
       const apellido     = nombreParts.slice(1).join(" ") || null;
-      const correo       = (camposCliente.correo && camposCliente.correo !== "no proporcionÃ³")
+      const correo       = (camposCliente.correo && camposCliente.correo !== "no proporcionó")
                              ? camposCliente.correo : null;
       const calle_numero = camposCliente.calle      || null;
       const colonia      = camposCliente.colonia    || null;
@@ -1013,7 +1025,7 @@ async function handleMensaje(msg, client) {
 
   // â”€â”€ CATCH-ALL RESUMEN PENDIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Si el cliente manda cualquier mensaje mientras hay resumen pendiente y no
-  // coincidiÃ³ con ninguna acciÃ³n, re-enviamos el resumen para no perder el hilo.
+  // coincidió con ninguna acción, re-enviamos el resumen para no perder el hilo.
   if (resumenPendiente.has(clienteNumero)) {
     const _pendiente = resumenPendiente.get(clienteNumero);
     await replyConTyping(msg, "Tienes un pedido pendiente de confirmar ðŸ‘‡\n\n" + _pendiente.texto);
@@ -1022,10 +1034,10 @@ async function handleMensaje(msg, client) {
 
   // â”€â”€ 4B. TOMA DE PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const esOrdenDom     = historial.some(h => h.content && h.content.includes("domicilio"));
-  const esConfirmacion = /^(si|sÃ­|ok|va|dale|correcto|exacto|claro|perfecto|sale|andale|Ã³rale|Ã¡ndale)$/i.test(textoOriginal.trim());
-  const esRechazo      = /^(nel|nop|nope|incorrecto|cambia|error|no\s+es\s+correcto|no\s+est[aÃ¡]\s+bien)$/i.test(textoOriginal.trim());
-  const esAgregarSi    = /^(si|sÃ­|ok|va|dale|claro|sale|andale|quiero|agrega|mÃ¡s|mas)$/i.test(textoOriginal.trim());
-  const esAgregarNo    = /^(no|nel|nop|nada\s*m[aÃ¡]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[iÃ­]\s*est[aÃ¡](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
+  const esConfirmacion = /^(si|sí|ok|va|dale|correcto|exacto|claro|perfecto|sale|andale|órale|ándale)$/i.test(textoOriginal.trim());
+  const esRechazo      = /^(nel|nop|nope|incorrecto|cambia|error|no\s+es\s+correcto|no\s+est[aá]\s+bien)$/i.test(textoOriginal.trim());
+  const esAgregarSi    = /^(si|sí|ok|va|dale|claro|sale|andale|quiero|agrega|más|mas)$/i.test(textoOriginal.trim());
+  const esAgregarNo    = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
 
   // â”€â”€ CAMBIO DE TIPO DURANTE TOMA DE PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const esCambioAMostrador = /cambi(a|ar|ame)\s*(a|al)?\s*mostrador|que\s+sea\s+(a\s+|en\s+)?mostrador|para\s+mostrador|mejor\s+mostrador|voy\s+a\s+recoger|paso\s+a\s+recoger|yo\s+recojo/i.test(textoOriginal);
@@ -1053,13 +1065,13 @@ async function handleMensaje(msg, client) {
     datosCampos.set(clienteNumero, camposActuales);
     const idxTipo = historial.findIndex(h => h.content && (h.content.includes("domicilio") || h.content.includes("mostrador")));
     if (idxTipo !== -1) historial[idxTipo].content = nuevoTipo === "mostrador" ? "Mi pedido es para recoger en mostrador." : "Mi pedido es a domicilio.";
-    await msg.reply(`Perfecto! CambiÃ© tu pedido a ${nuevoTipo}. *Â¿QuÃ© deseas ordenar?*`);
+    await msg.reply(`Perfecto! Cambié tu pedido a ${nuevoTipo}. *¿Qué deseas ordenar?*`);
     await new Promise(r => setTimeout(r, 300));
     await msg.reply(MENU_FORMATO);
     return;
   }
 
-  // â”€â”€ CONFIRMACIÃ“N DEL ÃTEM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ CONFIRMACIÓN DEL ÍTEM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoConfirmacionItem.has(clienteNumero)) {
     const itemData = esperandoConfirmacionItem.get(clienteNumero);
 
@@ -1084,7 +1096,7 @@ async function handleMensaje(msg, client) {
           const resultado = jsonALineas(jsonMod);
           esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
           historial.push({ role: "assistant", content: textoMod });
-          await msg.reply(resultado.texto + "\n\n*Â¿Es correcto?*");
+          await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
           return;
         }
       } catch (e) { console.error("Error modificando JSON:", e.message); }
@@ -1096,7 +1108,7 @@ async function handleMensaje(msg, client) {
       const hist = getHistorial(clienteNumero);
       if (hist.length >= 2 && hist[hist.length - 1].role === "assistant")
         hist.splice(hist.length - 2, 2);
-      await msg.reply("No pasa nada! *Â¿QuÃ© deseas ordenar?* ðŸ˜Š");
+      await msg.reply("No pasa nada! *¿Qué deseas ordenar?* ðŸ˜Š");
       await new Promise(r => setTimeout(r, 400));
       await msg.reply(MENU_FORMATO);
       return;
@@ -1111,7 +1123,7 @@ async function handleMensaje(msg, client) {
             const t = l.trim();
             if (!t) return false;
             if (/^ðŸ“|^ðŸ“Œ|^ðŸ›µ|^ðŸ’µ|^ðŸ’°|^ðŸ’³|^ðŸ•–/u.test(t)) return false;
-            if (/direcci[oÃ³]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
+            if (/direcci[oó]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
             return true;
           }).join("\n");
         const jsonNuevo = itemData.jsonNuevo;
@@ -1121,7 +1133,7 @@ async function handleMensaje(msg, client) {
             const t = l.trim();
             if (!t) return false;
             if (/^ðŸ“|^ðŸ“Œ|^ðŸ›µ|^ðŸ’µ|^ðŸ’°|^ðŸ’³|^ðŸ•–/u.test(t)) return false;
-            if (/subtotal|tarifa|domicilio:\s*\$|direcci[oÃ³]n|referencia|total:/i.test(t)) return false;
+            if (/subtotal|tarifa|domicilio:\s*\$|direcci[oó]n|referencia|total:/i.test(t)) return false;
             if (ordenBase.includes(t)) return false;
             return true;
           }).join("\n");
@@ -1142,7 +1154,7 @@ async function handleMensaje(msg, client) {
           const t = l.trim();
           if (!t) return false;
           if (/^ðŸ“|^ðŸ“Œ|^ðŸ›µ|^ðŸ’µ|^ðŸ’°|^ðŸ’³|^ðŸ•–/u.test(t)) return false;
-          if (/subtotal|tarifa|direcci[oÃ³]n|referencia|total:/i.test(t)) return false;
+          if (/subtotal|tarifa|direcci[oó]n|referencia|total:/i.test(t)) return false;
           if (ordenActual.includes(t)) return false;
           return true;
         }).join("\n");
@@ -1151,16 +1163,34 @@ async function handleMensaje(msg, client) {
       historial.push({ role: "user", content: "si, correcto" });
       historial.push({ role: "assistant", content: itemData.lineas });
       persistirEstado(clienteNumero);
-      await msg.reply("*Â¿Deseas agregar algo mÃ¡s a tu pedido?*");
+      await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
       return;
     }
 
-    await msg.reply(itemData.lineas + "\n\n*Â¿Es correcto?*");
+    await msg.reply(itemData.lineas + "\n\n*¿Es correcto?*");
     return;
   }
 
-  // â”€â”€ ESPERANDO SI AGREGA MÃS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ ESPERANDO SI AGREGA MÁS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoAgregarMas.has(clienteNumero)) {
+    const _edAgMas = !esAgregarNo && !esAgregarSi ? detectarEdicion(textoOriginal) : null;
+    if (_edAgMas) {
+      const _ordAgMas = esperandoAgregarMas.get(clienteNumero);
+      if (_edAgMas.preguntar) {
+        esperandoEdicion.set(clienteNumero, { campo: _edAgMas.campo, contexto: 'agregarMas', ordenTexto: _ordAgMas });
+        await msg.reply(_edAgMas.pregunta);
+        return;
+      }
+      aplicarEdicion(clienteNumero, _edAgMas);
+      const _formAgMas = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+      await msg.reply('Perfecto! Datos actualizados:\n\n' + _formAgMas + '\n\n*¿Qué deseas ordenar?*');
+      return;
+    }
+    if (/^(no|nel|nop|nope|nah)$/i.test(textoOriginal.trim())) {
+      const _formNo = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+      await msg.reply(_formNo + '\n\n*¿Qué dato deseas corregir?*\n_Dime cuál, por ejemplo: "cambia mi nombre", "cambia mi teléfono", "cambia mi método de pago"._');
+      return;
+    }
     if (esAgregarNo) {
       const ordenRaw = esperandoAgregarMas.get(clienteNumero);
       const ordenCompleta = ordenRaw.split("\n")
@@ -1168,7 +1198,7 @@ async function handleMensaje(msg, client) {
           const t = l.trim();
           if (!t) return false;
           if (/^ðŸ“|^ðŸ“Œ|^ðŸ›µ|^ðŸ’µ|^ðŸ’°|^ðŸ’³|^ðŸ•–/u.test(t)) return false;
-          if (/direcci[oÃ³]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
+          if (/direcci[oó]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
           return true;
         }).join("\n");
       esperandoAgregarMas.delete(clienteNumero);
@@ -1187,7 +1217,7 @@ async function handleMensaje(msg, client) {
       await new Promise(r => setTimeout(r, 400));
       await msg.reply(MENU_FORMATO);
       await new Promise(r => setTimeout(r, 400));
-      await msg.reply("*Â¿QuÃ© mÃ¡s te gustarÃ­a agregar de nuestro menÃº?*");
+      await msg.reply("*¿Qué más te gustaría agregar de nuestro menú?*");
       return;
     }
   }
@@ -1203,8 +1233,24 @@ async function handleMensaje(msg, client) {
       esperandoConfirmacionItem.set(clienteNumero, { lineas: resultadoNuevo.texto, _esModificacionResumen: true, ordenBase: ordenExtraida, jsonNuevo });
       resumenPendiente.delete(clienteNumero);
       persistirEstado(clienteNumero);
-      await msg.reply(resultadoNuevo.texto + "\n\n*Â¿Agrego esto a tu pedido?*");
+      await msg.reply(resultadoNuevo.texto + "\n\n*¿Agrego esto a tu pedido?*");
       return;
+    }
+  }
+
+  // FAQ check: precio/menu/domicilio disponible al tomar pedido
+  {
+    const _faqP = detectarPreguntaFrecuente(textoOriginal);
+    const _tipoP = _faqP ? _faqP.tipo : null;
+    if (_tipoP === 'precio' || _tipoP === 'menu' || _tipoP === 'domicilio') {
+      const _rP = generarRespuestaAutomatica(_faqP, { esDomicilio: esOrdenDom });
+      if (_rP) {
+        console.log('Bot: [FAQ pedido] tipo: ' + _tipoP);
+        await msg.reply(_rP);
+        const _fu = esperandoAgregarMas.has(clienteNumero) ? '*¿Qué más deseas agregar?*' : '*¿Qué deseas ordenar?*';
+        await msg.reply(_fu);
+        return;
+      }
     }
   }
 
@@ -1217,7 +1263,7 @@ async function handleMensaje(msg, client) {
     esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
     historial.push({ role: "user", content: textoOriginal });
     historial.push({ role: "assistant", content: resultado.texto });
-    await msg.reply(resultado.texto + "\n\n*Â¿Es correcto?*");
+    await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
     console.log(`Bot: [PARSER LOCAL] Subtotal: $${resultado.subtotal} â€” sin llamar a Groq`);
     return;
   }
@@ -1247,7 +1293,7 @@ async function handleMensaje(msg, client) {
                    : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
                    : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
                    : `los $${sigItem.monto}`;
-        await msg.reply(`*Â¿De quÃ© tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+        await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
         return;
       }
 
@@ -1259,7 +1305,7 @@ async function handleMensaje(msg, client) {
         esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedidoParcial._ordenBase, jsonNuevo: jsonCompletoCorte });
         historial.push({ role: "user", content: textoOriginal });
         historial.push({ role: "assistant", content: lineasNuevas });
-        await msg.reply(lineasNuevas + "\n\n*Â¿Agrego esto a tu pedido?*");
+        await msg.reply(lineasNuevas + "\n\n*¿Agrego esto a tu pedido?*");
         return;
       }
 
@@ -1270,13 +1316,13 @@ async function handleMensaje(msg, client) {
       esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
       historial.push({ role: "user", content: textoOriginal });
       historial.push({ role: "assistant", content: resultado.texto });
-      await msg.reply(resultado.texto + "\n\n*Â¿Es correcto?*");
+      await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
       console.log(`Bot: [CORTE COMPLETADO] Subtotal: $${resultado.subtotal}`);
       return;
     }
   }
 
-  // â”€â”€ DETECCIÃ“N SIN CORTE â€” preguntar antes de llamar a Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ DETECCIÓN SIN CORTE â€” preguntar antes de llamar a Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const tipoPedidoSinCorte = detectarSinCorte(textoOriginal);
   if (tipoPedidoSinCorte) {
     const pedidoParcial = parsearSinCorteItems(textoOriginal);
@@ -1288,14 +1334,14 @@ async function handleMensaje(msg, client) {
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*Â¿De quÃ© tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
     } else {
-      await msg.reply("*Â¿De quÃ© tipo de carne lo quieres?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua");
+      await msg.reply("*¿De qué tipo de carne lo quieres?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua");
     }
     return;
   }
 
-  // â”€â”€ MODIFICACIONES SOBRE ÃTEM ACTUAL â€” sin Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ MODIFICACIONES SOBRE ÍTEM ACTUAL â€” sin Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (esperandoAgregarMas.has(clienteNumero)) {
     const modificacion = detectarModificacion(textoOriginal);
     if (modificacion) {
@@ -1306,8 +1352,8 @@ async function handleMensaje(msg, client) {
         const { calcularSubtotal } = require("../pedido/precios");
         const subtotal = calcularSubtotal(ordenModificada);
         const lineas = ordenModificada.split("\n").filter(l => l.trim());
-        await msg.reply(lineas.join("\n") + `\nðŸ’° Subtotal: $${subtotal}\n\n*Â¿Es correcto?*`);
-        console.log(`Bot: [MODIFICACIÃ“N LOCAL] tipo: ${modificacion.tipo}`);
+        await msg.reply(lineas.join("\n") + `\nðŸ’° Subtotal: $${subtotal}\n\n*¿Es correcto?*`);
+        console.log(`Bot: [MODIFICACIÓN LOCAL] tipo: ${modificacion.tipo}`);
         return;
       }
     }
@@ -1346,8 +1392,8 @@ async function handleMensaje(msg, client) {
       persistirEstado(clienteNumero);
       const resultado = jsonALineas(jsonData);
       esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
-      await replyConTyping(msg, resultado.texto + "\n\n*Â¿Es correcto?*");
-      console.log(`Bot: [JSONâ†’LÃNEAS] Subtotal: $${resultado.subtotal}`);
+      await replyConTyping(msg, resultado.texto + "\n\n*¿Es correcto?*");
+      console.log(`Bot: [JSONâ†’LÍNEAS] Subtotal: $${resultado.subtotal}`);
       return;
     }
 

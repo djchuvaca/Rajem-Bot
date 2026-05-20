@@ -4,9 +4,6 @@
  * Sin estado, sin BD — función pura + consulta IA como fallback.
  */
 
-const Groq = require("groq-sdk");
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 // ── PATRONES DE SCORING ───────────────────────────────────────────────────────
 const _MOSTRADOR_PATRONES = [
   { re: /\bmostr(ador)?\b/,                          pts: 10 },
@@ -78,7 +75,7 @@ function _calcularScore(t, patrones) {
 }
 
 // ── DETECTAR TIPO DE ENTREGA ──────────────────────────────────────────────────
-async function detectarTipoEntrega(texto) {
+function detectarTipoEntrega(texto) {
   const t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const scoreMostrador = _calcularScore(t, _MOSTRADOR_PATRONES);
   const scoreDomicilio = _calcularScore(t, _DOMICILIO_PATRONES);
@@ -95,23 +92,8 @@ async function detectarTipoEntrega(texto) {
     return ganador;
   }
 
-  console.log(`[ENTREGA] ambiguo (diff:${diff}) — consultando IA`);
-  try {
-    const res = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant", max_tokens: 10, temperature: 0,
-      messages: [
-        { role: "system", content: `Responde SOLO con una palabra: "mostrador", "domicilio" o "ninguno". El usuario está ordenando tacos en México. ¿Quiere recoger en mostrador (ir al local) o pedir a domicilio (que se lo lleven)? Si no queda claro, responde "ninguno".` },
-        { role: "user", content: texto },
-      ],
-    });
-    const r = res.choices[0]?.message?.content?.trim().toLowerCase() || "";
-    if (r.includes("mostrador")) return "mostrador";
-    if (r.includes("domicilio")) return "domicilio";
-    return "ninguno";
-  } catch (e) {
-    console.error("[ENTREGA] IA falló:", e.message);
-    return "ninguno";
-  }
+  console.log(`[ENTREGA] ambiguo (diff:${diff}) — re-preguntando tipo de entrega`);
+  return "ninguno";
 }
 
 module.exports = { detectarTipoEntrega };
