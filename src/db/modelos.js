@@ -55,6 +55,15 @@ function upsertCliente(datos) {
 function deleteCliente(id) {
   run("DELETE FROM clientes WHERE id = ?", [id]);
 }
+function guardarUltimoPedido(telefono, jsonObj) {
+  try { run("UPDATE clientes SET ultimo_pedido_json = ? WHERE telefono = ?", [JSON.stringify(jsonObj), telefono]); } catch (_) {}
+}
+function getUltimoPedido(telefono) {
+  try {
+    const row = queryOne("SELECT ultimo_pedido_json FROM clientes WHERE telefono = ?", [telefono]);
+    return row?.ultimo_pedido_json ? JSON.parse(row.ultimo_pedido_json) : null;
+  } catch (_) { return null; }
+}
 
 // ─── PEDIDOS ──────────────────────────────────────────────────────────────────
 function registrarPedido(datos) {
@@ -105,6 +114,6 @@ function deletePedido(id) {
 
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
-  getCliente, getAllClientes, upsertCliente, deleteCliente,
+  getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
 };

@@ -26,8 +26,9 @@ const correoPreguntas            = new Set();
 const referenciaPreguntas        = new Set();
 const esperandoConfirmacionDatos = new Map();
 const tipoEntregaCliente         = new Map();
-const esperandoCorte = new Map(); // guarda pedido parcial mientras se pregunta el corte
-const esperandoEdicion = new Map(); // guarda qué campo está esperando editar el cliente
+const esperandoCorte    = new Map();
+const esperandoEdicion  = new Map();
+const esperandoTipoItem = new Map();
 
 const CARPETA_CAPTURAS = path.join(__dirname, "../../capturas");
 if (!fs.existsSync(CARPETA_CAPTURAS)) fs.mkdirSync(CARPETA_CAPTURAS);
@@ -38,5 +39,5 @@ module.exports = {
   clientesPreventa, horaEntregaPreventa, esperandoMotivoCancelacion,
   pedidosConfirmados, esperandoConfirmacionItem, esperandoAgregarMas,
   pedidoJSONActual, correoPreguntas, referenciaPreguntas,
-  esperandoConfirmacionDatos, tipoEntregaCliente,esperandoCorte,esperandoEdicion, CARPETA_CAPTURAS,
+  esperandoConfirmacionDatos, tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, CARPETA_CAPTURAS,
 };

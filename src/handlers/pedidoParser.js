@@ -5,7 +5,13 @@
 const { getConfig, getProductos } = require("../db");
 
 // ── CARGAR CORTES DESDE BD (con fallback) ────────────────────────────────────
+let _cortesCache = null;
+let _cortesCacheTs = 0;
+const _CORTES_TTL = 60 * 1000;
+
 function getCortes() {
+  const ahora = Date.now();
+  if (_cortesCache && ahora - _cortesCacheTs < _CORTES_TTL) return _cortesCache;
   try {
     const productos = getProductos();
     if (!productos || !productos.length) return _cortesDefault();
@@ -19,6 +25,8 @@ function getCortes() {
       if (nombre === "lengua")  { mapa.lenguita = "lengua"; mapa.lenguitas = "lengua"; }
       if (nombre === "surtido") { mapa.surtida = "surtido"; mapa.mixto = "surtido"; mapa.mixta = "surtido"; }
     }
+    _cortesCache = mapa;
+    _cortesCacheTs = Date.now();
     return mapa;
   } catch (e) { return _cortesDefault(); }
 }
@@ -41,33 +49,97 @@ function getRegexCortes() {
 
 // ── FRACCIONES Y MEDIDAS CONOCIDAS ────────────────────────────────────────────
 const MEDIDAS = [
-  { re: /\bun\s+cuarto\b|\b1\/4\b|\b250\s*g/i,                           gramos: 250  },
+  { re: /\bun\s+cuarto\b|\b1\/4\b|\b250\s*g/i,                            gramos: 250  },
   { re: /\bmedio\s+kilo\b|\bmedio\b|\b1\/2\s*(?:de\s*)?\w*\b|\b500\s*g/i, gramos: 500  },
-  { re: /\btres\s+cuartos\b|\b3\/4\b|\b750\s*g/i,                        gramos: 750  },
-  { re: /\bun\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,                          gramos: 1000 },
+  { re: /\btres\s+cuartos\b|\b3\/4\b|\b750\s*g/i,                         gramos: 750  },
+  { re: /\bun\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,                           gramos: 1000 },
 ];
 
 // ── SEÑALES DE COMPLEJIDAD → GROQ ─────────────────────────────────────────────
-const SEÑALES_GROQ       = /y\s+aparte|para\s+m[ií]|para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada|y\s+tambi[eé]n|\+/i;
+const SEÑALES_GROQ        = /y\s+aparte|para\s+m[ií]|para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada|\+/i;
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
-const PATRON_MITAD        = /mitad\s+(?:y\s+mitad|de\s+cada)|la\s+mitad\s+(?:de|en)|mitad\s+\w+\s+(?:y|mitad)/i;
 
 // ── PATRONES DE MODIFICACIÓN ──────────────────────────────────────────────────
-const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+uno|menos\s+uno|un\s+(?:taco|torta)\s+menos/i;
-const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)|(\d+)\s+m[aá]s/i;
+const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+uno|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos|menos\s+uno|un\s+(?:taco|torta)\s+menos|reduce\s+uno/i;
+const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?|(\d+)\s+m[aá]s(?:\s+(?:de\s+)?(\w+))?/i;
 const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?:por|a)\s+(\w+)|(?:sin|quita)\s+(\w+)\s+(?:y\s+)?(?:pon|agrega)\s+(\w+)/i;
 
 // ── PREGUNTAS FRECUENTES ──────────────────────────────────────────────────────
-const PREGUNTAS_PRECIO      = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es)|precio\s+(?:del?|de\s+los?)|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?)/i;
-const PREGUNTAS_HORARIO     = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora/i;
-const PREGUNTAS_DOMICILIO   = /(?:hacen?|tienen?|mandan?|llevan?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:(?:por|de)\s+)?domicilio|cu[aá]nto\s+(?:\w+\s+){0,3}(?:domicilio|env[ií]o)|domicilio\s+(?:gratis|incluido|cuesta|vale)|se\s+tarda|en\s+cu[aá]nto\s+tiempo|cu[aá]nto\s+tiempo/i;
-const PREGUNTAS_MENU        = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]/i;
-const PREGUNTAS_UBICACION   = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ubicaci[oó]n|c[oó]mo\s+llegar/i;
-const PREGUNTAS_PAGO        = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
+const PREGUNTAS_PRECIO    = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es)|precio\s+(?:del?|de\s+los?)|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?)/i;
+const PREGUNTAS_HORARIO   = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?|llegan?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora|trabajan?\s+hoy|ya\s+(?:cerraron?|abrieron?|est[aá]n?\s+abiertos?|est[aá]n?\s+listos?)|abren?\s+(?:hoy|ma[nñ]ana|los\s+\w+|el\s+\w+)|siguen?\s+abiertos?/i;
+const PREGUNTAS_DOMICILIO = /(?:hacen?|tienen?|mandan?|llevan?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:(?:por|de)\s+)?domicilio|cu[aá]nto\s+(?:\w+\s+){0,3}(?:domicilio|env[ií]o)|domicilio\s+(?:gratis|incluido|cuesta|vale)|se\s+tarda|en\s+cu[aá]nto\s+tiempo|cu[aá]nto\s+tiempo/i;
+const PREGUNTAS_MENU      = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]/i;
+const PREGUNTAS_UBICACION = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ubicaci[oó]n|c[oó]mo\s+llegar/i;
+const PREGUNTAS_PAGO      = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
+
+// Detecta preguntas sobre qué es un corte específico ("¿qué es el buche?")
+const PREGUNTAS_DESCRIPCION_CORTE = /qu[eé]\s+(?:es|son|tiene|lleva|contiene)|c[oó]mo\s+(?:es|est[aá]|sabe|queda|se\s+come)|de\s+qu[eé]\s+(?:es|est[aá]\s+hecho|parte)|qu[eé]\s+parte\s+es/i;
 
 // ── NORMALIZAR ────────────────────────────────────────────────────────────────
 function normalizar(texto) {
-  return texto.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return texto.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+// ── MEJORA 3: PREPROCESAR CANTIDADES INFORMALES ───────────────────────────────
+function preprocesarCantidades(texto) {
+  return texto
+    .replace(/\bunos?\s+(?=\d)/gi, "")
+    .replace(/\bcomo\s+(?=\d)/gi, "")
+    .replace(/\bnada\s+m[aá]s\s+(?=\d)/gi, "")
+    .replace(/\bsolo?\s+(?=\d)/gi, "")
+    .replace(/\btan\s+solo\s+(?=\d)/gi, "");
+}
+
+// ── MEJORA 5 (nueva): CONVERSIÓN DE NÚMEROS EN TEXTO A DÍGITOS ───────────────
+// Permite que "tres tacos de carne" funcione igual que "3 tacos de carne".
+function textoANumero(texto) {
+  return texto
+    .replace(/\buna?\s+docena\s+(?:de\s+)?/gi, "12 ")
+    .replace(/\bmedia\s+docena\s+(?:de\s+)?/gi,  "6 ")
+    .replace(/\bun\s+par\s+(?:de\s+)?/gi,         "2 ")
+    .replace(/\bveinte\b/gi,   "20")
+    .replace(/\bquince\b/gi,   "15")
+    .replace(/\bdoce\b/gi,     "12")
+    .replace(/\bonce\b/gi,     "11")
+    .replace(/\bdiez\b/gi,     "10")
+    .replace(/\bnueve\b/gi,     "9")
+    .replace(/\bocho\b/gi,      "8")
+    .replace(/\bsiete\b/gi,     "7")
+    .replace(/\bseis\b/gi,      "6")
+    .replace(/\bcinco\b/gi,     "5")
+    .replace(/\bcuatro\b/gi,    "4")
+    .replace(/\btres\b/gi,      "3")
+    .replace(/\bdos\b/gi,       "2")
+    .replace(/\buno\b/gi,       "1")
+    .replace(/\bun[ao]?\s+(?=taco|torta|buche|carne|cuero|lengua|surtido|kilo|cuarto|medio)/gi, "1 ");
+}
+
+// ── MEJORA 2: FUZZY MATCHING PARA CORTES ─────────────────────────────────────
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  return dp[m][n];
+}
+
+function buscarCorteFuzzy(palabra) {
+  const cortes = getCortes();
+  if (cortes[palabra]) return cortes[palabra];
+  if (palabra.length < 4) return null;
+  let mejorCorte = null, mejorDist = Infinity, empate = false;
+  for (const [key, val] of Object.entries(cortes)) {
+    if (Math.abs(key.length - palabra.length) > 2) continue;
+    const dist = levenshtein(palabra, key);
+    if (dist < mejorDist) { mejorCorte = val; mejorDist = dist; empate = false; }
+    else if (dist === mejorDist && val !== mejorCorte) empate = true;
+  }
+  return mejorDist <= 2 && !empate ? mejorCorte : null;
 }
 
 // ── SISTEMA DE SCORE ──────────────────────────────────────────────────────────
@@ -77,7 +149,6 @@ function calcularScore(texto) {
 
   if (SEÑALES_GROQ.test(t))            score -= 10;
   if (PATRON_DISTRIBUCION.test(texto)) score -= 10;
-  if (PATRON_MITAD.test(texto))        score -= 5;
 
   if (/\b\d+\b/.test(t))                          score += 2;
   if (/\b(tacos?|tortas?)\b/.test(t))              score += 2;
@@ -86,7 +157,12 @@ function calcularScore(texto) {
 
   const cortes = getCortes();
   const palabrasCorte = Object.keys(cortes).join("|");
-  if (new RegExp(`\\b(${palabrasCorte})\\b`, "i").test(t)) score += 2;
+  const DESCARTAR_SCORE = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
+  if (new RegExp(`\\b(${palabrasCorte})\\b`, "i").test(t)) {
+    score += 2;
+  } else if (t.split(/\s+/).some(p => p.length >= 4 && !DESCARTAR_SCORE.test(p) && buscarCorteFuzzy(p))) {
+    score += 2;
+  }
 
   const partes = dividirEnItems(texto);
   if (partes.length > 1) {
@@ -101,18 +177,42 @@ function calcularScore(texto) {
 function extraerCorte(fragmento) {
   const regex = getRegexCortes();
   const matches = [...fragmento.matchAll(regex)];
-  if (!matches.length) return null;
   const cortes = getCortes();
-  const cortesDetectados = [...new Set(matches.map(m => cortes[m[1].toLowerCase()]).filter(Boolean))];
-  if (!cortesDetectados.length) return null;
-  return cortesDetectados.length === 1 ? cortesDetectados[0] : cortesDetectados.join(", ");
+
+  if (matches.length) {
+    const cortesDetectados = [...new Set(matches.map(m => cortes[m[1].toLowerCase()]).filter(Boolean))];
+    if (cortesDetectados.length > 0)
+      return cortesDetectados.length === 1 ? cortesDetectados[0] : cortesDetectados.join(", ");
+  }
+
+  const DESCARTAR = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
+  for (const palabra of normalizar(fragmento).split(/\s+/)) {
+    if (palabra.length < 4 || DESCARTAR.test(palabra)) continue;
+    const corte = buscarCorteFuzzy(palabra);
+    if (corte) return corte;
+  }
+
+  return null;
 }
 
 // ── DIVIDIR EN ÍTEMS ──────────────────────────────────────────────────────────
 function dividirEnItems(texto) {
-  const partes = texto.split(/\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
-    .map(p => p.trim()).filter(Boolean);
+  const partes = texto
+    .split(/,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
+    .map(p => p.trim().replace(/^y\s+/i, ""))
+    .filter(Boolean);
   return partes.length > 1 ? partes : [texto];
+}
+
+function parsearItemHeredado(fragmento, tipoPrevio) {
+  const t = normalizar(fragmento);
+  const corte = extraerCorte(fragmento);
+  if (!corte) return null;
+  const matchNum = t.match(/\b(\d+)\b/);
+  if (!matchNum) return null;
+  const cantidad = parseInt(matchNum[1]);
+  if (cantidad > 40) return { presentacion: "pesos", monto: cantidad, corte };
+  return { presentacion: tipoPrevio, cantidad, corte };
 }
 
 // ── PARSEAR UN ÍTEM ───────────────────────────────────────────────────────────
@@ -145,7 +245,7 @@ function parsearItem(fragmento) {
   const matchMonto = t.match(/\b(\d+)\b/);
   if (matchMonto) {
     const num = parseInt(matchMonto[1]);
-    if (num > 100) {
+    if (num > 40) {
       if (!corte) return { _sinCorte: true, presentacion: "pesos", monto: num };
       return { presentacion: "pesos", monto: num, corte };
     }
@@ -156,6 +256,7 @@ function parsearItem(fragmento) {
 
 // ── DETECTAR SIN CORTE ────────────────────────────────────────────────────────
 function detectarSinCorte(texto) {
+  texto = textoANumero(texto);
   const t = normalizar(texto);
   if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
@@ -176,6 +277,23 @@ function detectarPreguntaFrecuente(texto) {
     const m = t.match(new RegExp(`\\b(${palabras})\\b`, "i"));
     return { tipo: "precio", producto: m ? cortes[m[1].toLowerCase()] : null };
   }
+  // Descripción de corte debe ir antes de menú para que "¿qué es el buche?" no sea capturado como menú
+  if (PREGUNTAS_DESCRIPCION_CORTE.test(t)) {
+    const cortes = getCortes();
+    const palabras = Object.keys(cortes).join("|");
+    const m = t.match(new RegExp(`\\b(${palabras})\\b`, "i"));
+    if (m) return { tipo: "descripcion_corte", producto: cortes[m[1].toLowerCase()] };
+  }
+  // "¿Tienen buche?", "¿Manejan lengua?", "¿Hay cuero?" con corte conocido
+  {
+    const _mTienen = t.match(/\b(?:tienen?|manejan?|hay\s+de|venden?|ofrecen?|cuentan?\s+con)\s+(\w+)/i);
+    if (_mTienen) {
+      const _cortesTienen = getCortes();
+      const _word = _mTienen[1].toLowerCase();
+      const _corteTienen = _cortesTienen[_word] || buscarCorteFuzzy(_word);
+      if (_corteTienen) return { tipo: "descripcion_corte", producto: _corteTienen };
+    }
+  }
   if (PREGUNTAS_HORARIO.test(t))   return { tipo: "horario" };
   if (PREGUNTAS_MENU.test(t))      return { tipo: "menu" };
   if (PREGUNTAS_UBICACION.test(t)) return { tipo: "ubicacion" };
@@ -189,32 +307,131 @@ function detectarModificacion(texto) {
   if (PATRON_QUITAR_UNO.test(t)) return { tipo: "quitar_uno" };
   if (PATRON_AGREGAR_MAS.test(t)) {
     const m = texto.match(PATRON_AGREGAR_MAS);
-    return { tipo: "agregar_mas", cantidad: parseInt(m[1] || m[2] || "1") };
+    const cantidad = parseInt(m[1] || m[3] || "1");
+    const _corteRaw = (m[2] || m[4] || "").toLowerCase();
+    const _corte = _corteRaw ? (getCortes()[_corteRaw] || buscarCorteFuzzy(_corteRaw) || null) : null;
+    return { tipo: "agregar_mas", cantidad, corte: _corte };
   }
   if (PATRON_CAMBIAR_CORTE.test(t)) {
     const m = texto.match(PATRON_CAMBIAR_CORTE);
     const cortes = getCortes();
-    const de  = cortes[(normalizar(m[1] || m[3] || ""))] || null;
-    const por = cortes[(normalizar(m[2] || m[4] || ""))] || null;
+    const rawDe  = normalizar(m[1] || m[3] || "");
+    const rawPor = normalizar(m[2] || m[4] || "");
+    const de  = cortes[rawDe]  || buscarCorteFuzzy(rawDe)  || null;
+    const por = cortes[rawPor] || buscarCorteFuzzy(rawPor) || null;
     if (de && por) return { tipo: "cambiar_corte", de, por };
   }
   return null;
 }
 
+// ── MEJORA 1 (sesión anterior): PARSEAR MITAD/MITAD ──────────────────────────
+const PATRON_MITAD_CAPTURA = /(?:la\s+)?mitad\s+(?:de\s+)?(\w+)\s+(?:y\s+)?(?:la\s+otra\s+)?mitad\s+(?:de\s+)?(\w+)|medio\s+(\w+)\s+y\s+medio\s+(\w+)/i;
+
+function parsearMitadMitad(texto) {
+  const t = normalizar(texto);
+  const m = t.match(PATRON_MITAD_CAPTURA);
+  if (!m) return null;
+  const corte1 = buscarCorteFuzzy(m[1] || m[3]);
+  const corte2 = buscarCorteFuzzy(m[2] || m[4]);
+  if (!corte1 || !corte2) return null;
+  const corteStr = `${corte1}, ${corte2}`;
+
+  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
+  if (matchPieza)
+    return { tipo: "pedido", items: [{ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr }] };
+
+  for (const medida of MEDIDAS)
+    if (medida.re.test(t))
+      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, corte: corteStr }] };
+
+  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  if (matchGramos)
+    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr }] };
+
+  return null;
+}
+
+// ── MEJORA 4 (sesión anterior): PARSEAR "DE TODO MENOS X" ────────────────────
+const PATRON_TODO_MENOS = /(?:de\s+todo|de\s+todos?\s+(?:los\s+)?cortes?)\s+(?:menos|excepto|sin)\s+(\w+)|surtido\s+(?:pero\s+)?sin\s+(\w+)/i;
+
+function parsearTodoMenosCorte(texto) {
+  const t = normalizar(texto);
+  const m = t.match(PATRON_TODO_MENOS);
+  if (!m) return null;
+  const excluido = buscarCorteFuzzy(m[1] || m[2]);
+  if (!excluido) return null;
+  const todosCortes = [...new Set(Object.values(getCortes()))];
+  const cortesResultantes = todosCortes.filter(c => c !== excluido);
+  if (!cortesResultantes.length) return null;
+  const corteStr = cortesResultantes.join(", ");
+
+  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
+  if (matchPieza)
+    return { tipo: "pedido", items: [{ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr }] };
+
+  for (const medida of MEDIDAS)
+    if (medida.re.test(t))
+      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, corte: corteStr }] };
+
+  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  if (matchGramos)
+    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr }] };
+
+  return null;
+}
+
+// ── MEJORA: PEDIDO MULTI-LÍNEA ────────────────────────────────────────────────
+// Cada línea se parsea de forma independiente y se combinan los ítems.
+function parsearPedidoMultiLinea(texto) {
+  const lineas = texto.split(/\n+/).map(l => l.trim()).filter(l => l.length > 2);
+  if (lineas.length < 2) return null;
+  const items = [];
+  for (const linea of lineas) {
+    const res = parsearPedidoSimple(linea);
+    if (!res || res.tipo !== "pedido" || !Array.isArray(res.items) || !res.items.length) return null;
+    items.push(...res.items);
+  }
+  return items.length >= 2 ? { tipo: "pedido", items } : null;
+}
+
+// ── MEJORA: REPETIR PEDIDO ANTERIOR ──────────────────────────────────────────
+const PATRON_LO_MISMO = /\b(lo\s+mismo(?:\s+de\s+(?:siempre|antes))?|igual\s+que\s+(?:la\s+)?vez\s+pasada|repite?\s+(?:mi\s+)?pedido|lo\s+de\s+siempre|lo\s+mismo\s+de\s+antes|lo\s+anterior)\b/i;
+
+function detectarRepetirPedido(texto) {
+  return PATRON_LO_MISMO.test(normalizar(texto));
+}
+
 // ── PARSER PRINCIPAL ──────────────────────────────────────────────────────────
 function parsearPedidoSimple(texto) {
-  const t = normalizar(texto);
-  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  const mitad = parsearMitadMitad(texto);
+  if (mitad) return mitad;
 
+  const todoMenos = parsearTodoMenosCorte(texto);
+  if (todoMenos) return todoMenos;
+
+  // Multi-línea: si el texto tiene saltos de línea, intentar parsear línea por línea
+  if (/\n/.test(texto)) {
+    const multiLinea = parsearPedidoMultiLinea(texto);
+    if (multiLinea) return multiLinea;
+  }
+
+  // Normalizar texto antes del score
+  texto = textoANumero(preprocesarCantidades(texto));
+  const t = normalizar(texto);
+
+  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 
   const partes = dividirEnItems(texto);
 
   if (partes.length > 1) {
     const items = [];
+    let ultimoTipo = null;
     for (const parte of partes) {
-      const item = parsearItem(parte);
+      let item = parsearItem(parte);
+      if (!item && ultimoTipo) item = parsearItemHeredado(parte, ultimoTipo);
       if (!item || item._sinCorte) return null;
+      if (item.presentacion === "taco" || item.presentacion === "torta") ultimoTipo = item.presentacion;
       items.push(item);
     }
     if (items.length > 0) return { tipo: "pedido", items };
@@ -248,18 +465,40 @@ function parsearPedidoSimple(texto) {
   const matchMonto = t.match(/\b(\d+)\b/);
   if (matchMonto) {
     const num = parseInt(matchMonto[1]);
-    if (num > 100 && corte) return { tipo: "pedido", items: [{ presentacion: "pesos", monto: num, corte }] };
+    if (num > 40 && corte) return { tipo: "pedido", items: [{ presentacion: "pesos", monto: num, corte }] };
     if (num <= 100) return null;
   }
 
   return null;
 }
 
+// ── DETECTAR SIN TIPO ────────────────────────────────────────────────────────
+function detectarSinTipo(texto) {
+  texto = textoANumero(texto);
+  const t = normalizar(texto);
+  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  const partes = dividirEnItems(texto);
+  if (partes.length > 1) return null;
+  if (/\b(tacos?|tortas?)\b/i.test(t)) return null;
+  if (MEDIDAS.some(m => m.re.test(t))) return null;
+  if (/\b\d+\s*g(?:ramos?)?\b/.test(t)) return null;
+  const corte = extraerCorte(texto);
+  if (!corte) return null;
+  const matchNum = t.match(/\b(\d+)\b/);
+  if (!matchNum) return null;
+  const cantidad = parseInt(matchNum[1]);
+  if (cantidad > 40) return null;
+  return { cantidad, corte };
+}
+
 module.exports = {
   parsearPedidoSimple,
   detectarSinCorte,
+  detectarSinTipo,
   detectarPreguntaFrecuente,
   detectarModificacion,
+  detectarRepetirPedido,
   calcularScore,
   getCortes,
+  normalizar,
 };

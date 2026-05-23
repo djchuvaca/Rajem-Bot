@@ -10,7 +10,7 @@ const {
   horaEntregaPreventa, esperandoMotivoCancelacion, resumenPendiente,
   esperandoCaptura, datosRecibidos, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
-  tipoEntregaCliente,
+  tipoEntregaCliente, esperandoCorte, esperandoEdicion,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
@@ -39,6 +39,8 @@ function limpiarTodo(numero) {
   pedidoJSONActual.delete(numero);
   esperandoConfirmacionDatos.delete(numero);
   tipoEntregaCliente.delete(numero);
+  esperandoCorte.delete(numero);
+  esperandoEdicion.delete(numero);
   correoPreguntas.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
@@ -66,8 +68,8 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
   // ── Teléfono ──────────────────────────────────────────────────────────────
   if (!campos.telefono) {
-    const m = textoCompleto.match(/\b(\d{10})\b/);
-    if (m) campos.telefono = m[1];
+    const m = textoCompleto.match(/\+?52(\d{10})\b|\b(\d{10})\b/);
+    if (m) campos.telefono = m[1] || m[2];
   }
 
   // ── Correo ────────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ module.exports = {
   tipoEntregaCliente:         maps.tipoEntregaCliente,
   esperandoCorte:             maps.esperandoCorte,
   esperandoEdicion:           maps.esperandoEdicion,
+  esperandoTipoItem:          maps.esperandoTipoItem,
   CARPETA_CAPTURAS:           maps.CARPETA_CAPTURAS,
 
   // ── Sesiones ───────────────────────────────────────────────────────────────

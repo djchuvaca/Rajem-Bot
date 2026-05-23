@@ -43,8 +43,7 @@ function mensajeFueraDeHorario() {
     // Buscar próximo día abierto
     let proximoDia = null;
     for (let i = 1; i <= 7; i++) {
-      const { getHorarioDia: gH } = require("./db");
-      const sig = gH((dia + i) % 7);
+      const sig = getHorarioDia((dia + i) % 7);
       if (sig && sig.abierto) { proximoDia = sig; break; }
     }
 

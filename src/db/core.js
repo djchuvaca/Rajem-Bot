@@ -8,6 +8,7 @@ const DB_PATH  = path.join(DATA_DIR, "tacos_javier.db");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
 let db = null;
+let _guardarTimer = null;
 
 async function initDB() {
   if (db) return db;
@@ -22,7 +23,10 @@ async function initDB() {
 
 function guardarDB() {
   if (!db) return;
-  fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
+  clearTimeout(_guardarTimer);
+  _guardarTimer = setTimeout(() => {
+    if (db) fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
+  }, 500);
 }
 
 function getDB() {

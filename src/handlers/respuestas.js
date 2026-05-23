@@ -4,6 +4,7 @@
 
 const { getConfig, getProductos, getHorarios, getBanco } = require("../db");
 const { getPrecios } = require("../pedido/precios");
+const { estaEnHorario } = require("../horario");
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function getNegocio() {
@@ -96,14 +97,18 @@ function respuestaPrecio(producto = null) {
 function respuestaHorario() {
   const negocio = getNegocio();
   const horario = formatearHorario();
+  const abiertosAhora = estaEnHorario();
+  const estadoActual  = abiertosAhora
+    ? "✅ *En este momento estamos abiertos.*\n\n"
+    : "🔴 *En este momento estamos cerrados.*\n\n";
 
   if (!horario) {
     const horaInicio = getConfig("hora_inicio") || "7:00";
     const horaFin    = getConfig("hora_fin")    || "12:30";
-    return `🕖 *Horario de ${negocio}:*\n\nLunes a Sábado de ${horaInicio} a.m. a ${horaFin} p.m.\n\n_¡Te esperamos!_ 😊`;
+    return `🕖 *Horario de ${negocio}:*\n\n${estadoActual}Lunes a Sábado de ${horaInicio} a.m. a ${horaFin} p.m.\n\n_¡Te esperamos!_ 😊`;
   }
 
-  return `🕖 *Horario de ${negocio}:*\n\n${horario}\n\n_¡Te esperamos!_ 😊`;
+  return `🕖 *Horario de ${negocio}:*\n\n${estadoActual}${horario}\n\n_¡Te esperamos!_ 😊`;
 }
 
 // ── RESPUESTA: DOMICILIO ──────────────────────────────────────────────────────
@@ -192,8 +197,8 @@ function aplicarQuitarUno(ordenTexto) {
   const lineas = ordenTexto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l));
   if (!lineas.length) return null;
 
-  // Buscar tacos o tortas para reducir en 1
-  for (let i = 0; i < lineas.length; i++) {
+  // Buscar desde el último ítem (el más reciente del pedido)
+  for (let i = lineas.length - 1; i >= 0; i--) {
     const m = lineas[i].match(/(\d+)\s+(tacos?|tortas?)/i);
     if (m) {
       const cantActual = parseInt(m[1]);
@@ -216,6 +221,23 @@ function aplicarCambiarCorte(ordenTexto, de, por) {
   const regex = new RegExp(de, "gi");
   if (!regex.test(ordenTexto)) return null;
   return ordenTexto.replace(new RegExp(de, "gi"), por);
+}
+
+// ── RESPUESTA: DESCRIPCIÓN DE CORTE ──────────────────────────────────────────
+const DESCRIPCIONES_CORTE = {
+  surtido: "Es una mezcla de todas las piezas: carne, buche, cuero y lengua. Ideal para probar de todo en un solo taco.",
+  carne:   "Es carne de cerdo cocida, también conocida como carnitas. Suave, jugosa y la más tradicional.",
+  buche:   "Es el estómago de cerdo. Muy tierno y de sabor suave, uno de los favoritos.",
+  cuero:   "Es la piel de cerdo cocida. Textura única, suave por dentro con sabor intenso y característico.",
+  lengua:  "Es lengua de res o cerdo cocida. Muy suave al morder y con un sabor profundo.",
+};
+
+function respuestaDescripcionCorte(corte) {
+  const negocio = getNegocio();
+  const desc = DESCRIPCIONES_CORTE[corte?.toLowerCase()];
+  if (!desc) return `En *${negocio}* tenemos: Surtido, Carne, Buche, Cuero y Lengua. ¿Cuál te llama la atención? 😊`;
+  const nombre = corte ? corte.charAt(0).toUpperCase() + corte.slice(1) : corte;
+  return `🥩 *${nombre}:* ${desc}\n\n_¿Te lo preparamos?_ 😊`;
 }
 
 // ── FUNCIÓN PRINCIPAL: GENERAR RESPUESTA AUTOMÁTICA ──────────────────────────
@@ -244,6 +266,9 @@ function generarRespuestaAutomatica(pregunta, opciones = {}) {
 
     case "metodos_pago":
       return respuestaMetodosPago(esDomicilio);
+
+    case "descripcion_corte":
+      return respuestaDescripcionCorte(pregunta.producto);
 
     default:
       return null;
@@ -282,4 +307,5 @@ module.exports = {
   respuestaMenu,
   respuestaUbicacion,
   respuestaMetodosPago,
+  respuestaDescripcionCorte,
 };

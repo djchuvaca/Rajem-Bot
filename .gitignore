@@ -1,41 +1,51 @@
-# Dependencias
+# ── Dependencias ───────────────────────────────────────────────
 node_modules/
 
-# Variables sensibles
+# ── Variables de entorno y secretos ────────────────────────────
 .env
+.env.local
+.env.*.local
 
-# WhatsApp Web JS
+# ── WhatsApp Web JS ─────────────────────────────────────────────
 .wwebjs_auth/
 .wwebjs_cache/
 
-# Bases de datos locales
-*.db
-*.sqlite
-*.sqlite3
+# ── Base de datos (contiene datos personales de clientes) ──────
+data/*.db
+data/*.sqlite
+data/*.sqlite3
 
-# Logs
+# ── Capturas enviadas por clientes (imágenes privadas) ─────────
+capturas/
+analisis/capturas/
+
+# ── Claude Code (configuración local del IDE) ──────────────────
+.claude/
+
+# ── Scripts temporales ─────────────────────────────────────────
+apply_fixes.js
+
+# ── Logs ────────────────────────────────────────────────────────
 logs/
 *.log
 npm-debug.log*
 
-# Archivos temporales
+# ── Archivos temporales ─────────────────────────────────────────
 tmp/
 temp/
 .cache/
 
-# Sistema operativo
+# ── Sistema operativo ───────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# VSCode opcional
+# ── Editor ──────────────────────────────────────────────────────
 .vscode/
+*.swp
+*.swo
+*~
 
-# Capturas privadas
-analisis/capturas/
-
-# Archivos de respaldo
+# ── Archivos de respaldo ────────────────────────────────────────
 *.bak
 *.old
-
-# Package lock opcional
-# package-lock.json

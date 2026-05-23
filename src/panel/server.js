@@ -11,8 +11,14 @@ const {
   getProductos, updateProducto, createProducto, deleteProducto,
   getAllClientes, getCliente, upsertCliente, deleteCliente,
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
-  getConfig, guardarTelefonoReal,
+  getConfig, guardarTelefonoReal, getJIDReal,
 } = require("../db");
+const { queryOne } = require("../db/core");
+
+const { getWhatsappClient } = require("./whatsapp-bridge");
+
+// Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
+const _loginAttempts = new Map();
 
 const app = express();
 
@@ -33,10 +39,22 @@ function requireAuth(req, res, next) {
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post("/api/login", (req, res) => {
+  const ip  = req.ip || req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const att = _loginAttempts.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > att.resetAt) { att.count = 0; att.resetAt = now + 60_000; }
+  if (att.count >= 5)
+    return res.status(429).json({ error: "Demasiados intentos. Espera 1 minuto." });
+  att.count++;
+  _loginAttempts.set(ip, att);
+
   const { usuario, password } = req.body;
   const user = getUsuarioPanel(usuario);
   if (!user || !bcrypt.compareSync(password, user.password))
     return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+
+  att.count = 0;
+  _loginAttempts.set(ip, att);
   req.session.usuario = usuario;
   res.json({ ok: true });
 });
@@ -125,9 +143,30 @@ app.delete("/api/clientes/:id", requireAuth, (req, res) => {
 app.get("/api/pedidos", requireAuth, (req, res) => {
   res.json(req.query.hoy ? getPedidosHoy() : getAllPedidos());
 });
+const MSGS_ESTADO = {
+  confirmado: "✅ Tu pedido ha sido *confirmado*. ¡Pronto estará listo!",
+  rechazado:  "❌ Tu pedido fue *rechazado*. Contáctanos si tienes dudas.",
+  en_camino:  "🛵 Tu pedido ya va *en camino*. ¡Prepárate para recibirlo!",
+};
+
 app.put("/api/pedidos/:id/estado", requireAuth, (req, res) => {
-  updatePedidoEstado(parseInt(req.params.id), req.body.estado);
+  const { estado } = req.body;
+  updatePedidoEstado(parseInt(req.params.id), estado);
   res.json({ ok: true });
+
+  if (MSGS_ESTADO[estado]) {
+    const waClient = getWhatsappClient();
+    if (waClient) {
+      const row = queryOne(
+        `SELECT c.telefono FROM pedidos p LEFT JOIN clientes c ON p.cliente_id = c.id WHERE p.id = ?`,
+        [parseInt(req.params.id)]
+      );
+      if (row?.telefono) {
+        const jid = getJIDReal(row.telefono) || `521${row.telefono}@c.us`;
+        waClient.sendMessage(jid, MSGS_ESTADO[estado]).catch(() => {});
+      }
+    }
+  }
 });
 app.delete("/api/pedidos/:id", requireAuth, (req, res) => {
   deletePedido(parseInt(req.params.id));
@@ -136,18 +175,57 @@ app.delete("/api/pedidos/:id", requireAuth, (req, res) => {
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
 app.get("/api/stats", requireAuth, (req, res) => {
-  const pedidosHoy = getPedidosHoy();
-  const clientes   = getAllClientes();
+  const pedidosHoy  = getPedidosHoy();
+  const confirmados = pedidosHoy.filter(p => p.estado === "confirmado");
+  const totalVentas = confirmados.reduce((a, p) => a + (p.total || 0), 0);
+  const ticket      = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
+
+  // Corte más pedido hoy (busca en texto de la orden)
+  const conteoCortes = {};
+  const CORTES_STAT  = ["surtido", "carne", "buche", "cuero", "lengua"];
+  for (const p of pedidosHoy) {
+    const orden = (p.orden || "").toLowerCase();
+    for (const c of CORTES_STAT) if (orden.includes(c)) conteoCortes[c] = (conteoCortes[c] || 0) + 1;
+  }
+  const corteMasPedido = Object.entries(conteoCortes).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
   res.json({
     pedidos_hoy:      pedidosHoy.length,
     pendientes:       pedidosHoy.filter(p => p.estado === "pendiente").length,
-    confirmados:      pedidosHoy.filter(p => p.estado === "confirmado").length,
+    confirmados:      confirmados.length,
     cancelados:       pedidosHoy.filter(p => p.estado === "cancelado").length,
     rechazados:       pedidosHoy.filter(p => p.estado === "rechazado").length,
-    total_ventas_hoy: pedidosHoy.filter(p => p.estado === "confirmado").reduce((a, p) => a + (p.total || 0), 0),
-    total_clientes:   clientes.length,
+    total_ventas_hoy: totalVentas,
+    ticket_promedio:  ticket,
+    corte_mas_pedido: corteMasPedido,
+    conteo_cortes:    conteoCortes,
+    total_clientes:   queryOne("SELECT COUNT(*) as n FROM clientes")?.n || 0,
     negocio:          getConfig("nombre_negocio") || "Tacos Javier",
   });
+});
+
+// ── NOTIFICACIÓN AL CLIENTE ───────────────────────────────────────────────────
+// POST /api/pedidos/:id/notificar  { mensaje: "Tu pedido va en camino 🛵" }
+app.post("/api/pedidos/:id/notificar", requireAuth, async (req, res) => {
+  const { mensaje } = req.body;
+  if (!mensaje) return res.status(400).json({ error: "Falta el campo 'mensaje'" });
+
+  const waClient = getWhatsappClient();
+  if (!waClient) return res.status(503).json({ error: "Bot de WhatsApp no conectado aún" });
+
+  const row = queryOne(
+    `SELECT c.telefono FROM pedidos p LEFT JOIN clientes c ON p.cliente_id = c.id WHERE p.id = ?`,
+    [parseInt(req.params.id)]
+  );
+  if (!row?.telefono) return res.status(404).json({ error: "No se encontró teléfono para ese pedido" });
+
+  const chatId = getJIDReal(row.telefono) || `521${row.telefono}@c.us`;
+  try {
+    await waClient.sendMessage(chatId, mensaje);
+    res.json({ ok: true, enviado_a: row.telefono });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 function startPanel(port = 3000) {

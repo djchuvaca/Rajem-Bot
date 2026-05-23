@@ -15,16 +15,17 @@ async function seedDB() {
       activo         INTEGER DEFAULT 1
     );
     CREATE TABLE IF NOT EXISTS clientes (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre         TEXT,
-      apellido       TEXT,
-      telefono       TEXT    UNIQUE NOT NULL,
-      correo         TEXT,
-      calle_numero   TEXT,
-      colonia        TEXT,
-      referencia     TEXT,
-      total_pedidos  INTEGER DEFAULT 0,
-      fecha_registro TEXT    DEFAULT (datetime('now', 'localtime'))
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre             TEXT,
+      apellido           TEXT,
+      telefono           TEXT    UNIQUE NOT NULL,
+      correo             TEXT,
+      calle_numero       TEXT,
+      colonia            TEXT,
+      referencia         TEXT,
+      total_pedidos      INTEGER DEFAULT 0,
+      ultimo_pedido_json TEXT,
+      fecha_registro     TEXT    DEFAULT (datetime('now', 'localtime'))
     );
     CREATE TABLE IF NOT EXISTS pedidos (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,6 +73,9 @@ async function seedDB() {
       actualizado_en TEXT DEFAULT (datetime('now', 'localtime'))
     );
   `);
+
+  // ── MIGRACIONES (columnas nuevas en tablas existentes) ─────────────────────
+  try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
 
   // ── SEED PRODUCTOS ─────────────────────────────────────────────────────────
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;

@@ -53,6 +53,8 @@ module.exports = {
   // teléfonos reales
   guardarTelefonoReal: config.guardarTelefonoReal,
   getTelefonoReal:     config.getTelefonoReal,
+  guardarJIDReal:      config.guardarJIDReal,
+  getJIDReal:          config.getJIDReal,
 
   // productos
   getProductos:   modelos.getProductos,
@@ -62,10 +64,12 @@ module.exports = {
   deleteProducto: modelos.deleteProducto,
 
   // clientes
-  getCliente:    modelos.getCliente,
-  getAllClientes: modelos.getAllClientes,
-  upsertCliente: modelos.upsertCliente,
-  deleteCliente: modelos.deleteCliente,
+  getCliente:          modelos.getCliente,
+  getAllClientes:       modelos.getAllClientes,
+  upsertCliente:       modelos.upsertCliente,
+  deleteCliente:       modelos.deleteCliente,
+  guardarUltimoPedido: modelos.guardarUltimoPedido,
+  getUltimoPedido:     modelos.getUltimoPedido,
 
   // pedidos
   registrarPedido:       modelos.registrarPedido,

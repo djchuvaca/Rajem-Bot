@@ -7,6 +7,7 @@ const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
 const { initDB }         = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
+const { setWhatsappClient } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
 
 const client = new Client({
@@ -31,6 +32,7 @@ client.on("qr", (qr) => {
 });
 
 client.on("ready", () => {
+  setWhatsappClient(client);
   console.log("✅ Bot de Tacos Javier conectado y listo!");
   console.log("─────────────────────────────────────────────");
   console.log("Comandos disponibles en el grupo:");

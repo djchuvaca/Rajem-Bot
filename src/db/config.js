@@ -111,6 +111,16 @@ function getTelefonoReal(numeroWhatsApp) {
   return row ? row.valor : null;
 }
 
+function guardarJIDReal(telefono, jid) {
+  run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
+    [`jid_real_${telefono}`, jid]);
+}
+function getJIDReal(telefono) {
+  const row = queryOne("SELECT valor FROM configuracion WHERE clave = ?",
+    [`jid_real_${telefono}`]);
+  return row ? row.valor : null;
+}
+
 module.exports = {
   getConfig, setConfig, getAllConfig,
   getHorarios, getHorarioDia, updateHorario,
@@ -119,4 +129,5 @@ module.exports = {
   getUsuarioPanel, updatePasswordPanel,
   guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas,
   guardarTelefonoReal, getTelefonoReal,
+  guardarJIDReal, getJIDReal,
 };
