@@ -54,10 +54,10 @@ function getRegexCortes() {
 
 // ── FRACCIONES Y MEDIDAS CONOCIDAS ────────────────────────────────────────────
 const MEDIDAS = [
-  { re: /\bun\s+cuarto\b|\b1\/4\b|\b250\s*g/i,                            gramos: 250  },
-  { re: /\bmedio\s+kilo\b|\bmedio\b|\b1\/2\s*(?:de\s*)?\w*\b|\b500\s*g/i, gramos: 500  },
-  { re: /\btres\s+cuartos\b|\b3\/4\b|\b750\s*g/i,                         gramos: 750  },
-  { re: /\bun\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,                           gramos: 1000 },
+  { re: /\bun\s+cuarto\b|\b1\s+cuarto\b|\b1\/4\b|\b250\s*g/i,                            gramos: 250  },
+  { re: /\bmedio\s+kilo\b|\bmedio\b|\b1\/2\s*(?:de\s*)?\w*\b|\b500\s*g/i,                gramos: 500  },
+  { re: /\btres\s+cuartos?\b|\b3\s+cuartos?\b|\b3\/4\b|\b750\s*g/i,                      gramos: 750  },
+  { re: /\bun\s+kilo\b|\b1\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,                            gramos: 1000 },
 ];
 
 // ── SEÑALES DE COMPLEJIDAD → GROQ ─────────────────────────────────────────────
@@ -311,14 +311,14 @@ function detectarModificacion(texto) {
   const t = normalizar(texto);
   if (PATRON_QUITAR_UNO.test(t)) return { tipo: "quitar_uno" };
   if (PATRON_AGREGAR_MAS.test(t)) {
-    const m = texto.match(PATRON_AGREGAR_MAS);
+    const m = t.match(PATRON_AGREGAR_MAS);
     const cantidad = parseInt(m[1] || m[3] || "1");
     const _corteRaw = (m[2] || m[4] || "").toLowerCase();
     const _corte = _corteRaw ? (getCortes()[_corteRaw] || buscarCorteFuzzy(_corteRaw) || null) : null;
     return { tipo: "agregar_mas", cantidad, corte: _corte };
   }
   if (PATRON_CAMBIAR_CORTE.test(t)) {
-    const m = texto.match(PATRON_CAMBIAR_CORTE);
+    const m = t.match(PATRON_CAMBIAR_CORTE);
     const cortes = getCortes();
     const rawDe  = normalizar(m[1] || m[3] || "");
     const rawPor = normalizar(m[2] || m[4] || "");
