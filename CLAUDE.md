@@ -21,7 +21,7 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 - `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. No contiene lógica de negocio.
 - `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Tiene caché `_cortesCache` (TTL 60s, invalidable con `invalidarCacheCortes()`).
 - `src/handlers/respuestas.js` — respuestas FAQ sin Groq (precios, horarios, domicilio, banco)
-- `src/handlers/comandos.js` — comandos de grupo (`!pedidos`, `!confirmar`, `!rechazar`, etc.)
+- `src/handlers/comandos.js` — comandos de grupo (`!pedidos`, `!confirmar`, `!rechazar`, `!stats`, `!cliente`, etc.)
 - `src/handlers/imagenes.js` — recibe comprobantes de transferencia vía imagen
 
 #### Flujos (`src/handlers/flujos/`)

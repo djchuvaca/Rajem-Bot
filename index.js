@@ -58,6 +58,8 @@ client.on("ready", () => {
   console.log("  !rechazados       — pedidos rechazados hoy");
   console.log("  !confirmar [tel]  — confirmar pedido de un cliente");
   console.log("  !rechazar [tel]   — rechazar pedido de un cliente");
+  console.log("  !stats            — resumen del día (ventas, tickets, top cortes)");
+  console.log("  !cliente [tel]    — ver datos completos de un cliente");
   console.log("─────────────────────────────────────────────");
 });
 
