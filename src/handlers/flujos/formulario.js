@@ -10,7 +10,7 @@ const {
 } = require("../../estado");
 const { getCliente, getTelefonoReal } = require("../../db");
 const { SALUDO, MENU_FORMATO } = require("../../config");
-const { estaEnHorario, mensajeFueraDeHorario } = require("../../horario");
+const { estaEnHorario, mensajeFueraDeHorario, getRangoHorario } = require("../../horario");
 const { detectarPreguntaFrecuente } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 const { telefonosReales, replyConTyping } = require("./utils");
@@ -247,10 +247,11 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   if (esPreventa && campos._horaFueraRango) {
     const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
     const tipoPedido     = esOrdenDomicilio ? "recibirlo" : "pasar a recoger";
-    const msgHora = campos._horaFueraRango === "antes"
-      ? "Aun no iniciamos labores a esa hora. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*"
-      : "A esa hora ya estamos fuera de servicio. Nuestro horario es de *7:00 a.m. a 12:30 p.m.*";
-    await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre 7:00 a.m. y 12:30 p.m.)");
+    const rango    = getRangoHorario();
+    const msgHora  = campos._horaFueraRango === "antes"
+      ? `Aun no iniciamos labores a esa hora. Nuestro horario es de *${rango}*`
+      : `A esa hora ya estamos fuera de servicio. Nuestro horario es de *${rango}*`;
+    await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre " + rango + ")");
     delete campos._horaFueraRango;
     datosCampos.set(clienteNumero, campos);
     return true;

@@ -13,6 +13,7 @@ const {
   guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje,
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
+const { getRangoHorario } = require("../../horario");
 const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems,
@@ -79,7 +80,7 @@ async function handleEdicionResumen(msg, textoOriginal, clienteNumero, historial
   if (edicion.campo === "hora" && !edicion.preguntar) {
     const horaValida = validarHora(edicion.valor);
     if (!horaValida) {
-      await msg.reply("Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
+      await msg.reply(`Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre ${getRangoHorario()})`);
       esperandoEdicion.set(clienteNumero, { campo: "hora", contexto: "resumen", ordenTexto: ordenExtraida });
       return true;
     }

@@ -66,4 +66,25 @@ function esPreventa() {
   return !estaEnHorario();
 }
 
-module.exports = { estaEnHorario, mensajeFueraDeHorario, esPreventa };
+function _fmt12h(hora24) {
+  const [h, m] = hora24.split(":").map(Number);
+  const ampm = h < 12 ? "a.m." : "p.m.";
+  const h12  = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function getRangoHorario() {
+  try {
+    const dia = new Date().getDay();
+    const h   = getHorarioDia(dia);
+    if (h && h.abierto && h.hora_inicio && h.hora_fin)
+      return `${_fmt12h(h.hora_inicio)} a ${_fmt12h(h.hora_fin)}`;
+    for (let i = 1; i <= 7; i++) {
+      const sig = getHorarioDia((dia + i) % 7);
+      if (sig && sig.abierto) return `${_fmt12h(sig.hora_inicio)} a ${_fmt12h(sig.hora_fin)}`;
+    }
+  } catch (_) {}
+  return "7:00 a.m. a 12:30 p.m.";
+}
+
+module.exports = { estaEnHorario, mensajeFueraDeHorario, esPreventa, getRangoHorario };

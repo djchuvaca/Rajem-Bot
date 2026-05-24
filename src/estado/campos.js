@@ -14,6 +14,7 @@ const {
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
+const { getRangoHorario } = require("../horario");
 
 // ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
 const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|interior|entre|junto|frente|cerca)$/i;
@@ -305,7 +306,7 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
   }
 
   if (!campos.metodo) return { campo: "metodo", pregunta: esDomicilio ? "*¿Cómo vas a pagar?* Efectivo o transferencia." : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia." };
-  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre 7:00 a.m. y 12:30 p.m.)` };
+  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre ${getRangoHorario()})` };
 
   return null;
 }
@@ -426,7 +427,7 @@ function detectarEdicion(texto) {
   const mHoraVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?hora\s+(?:a|por)\s+(.+)/i);
   if (mHoraVal) return { campo: "hora", valor: mHoraVal[1].trim(), preguntar: false };
   if (/cambia(?:r|me)?\s+(?:la\s+)?hora$/i.test(t))
-    return { campo: "hora", preguntar: true, pregunta: "*¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)" };
+    return { campo: "hora", preguntar: true, pregunta: `*¿A qué hora deseas tu pedido?* (entre ${getRangoHorario()})` };
 
   // CALLE con valor
   const mCalleVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?calle\s+(?:a|por)\s+(.+)/i);

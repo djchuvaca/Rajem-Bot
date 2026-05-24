@@ -1,4 +1,5 @@
 const { getConfig, getBanco, getMensaje, getProductos } = require("./db");
+const { getRangoHorario } = require("./horario");
 
 // ── DATOS BANCO ───────────────────────────────────────────────────────────────
 function getDatosBanco() {
@@ -98,7 +99,7 @@ function getFormPreventaMostrador(tel = "") {
     `📱 *Teléfono:* ${tel ? tel + " ✅" : ""}\n` +
     `📧 *Correo (opcional):*\n` +
     `💳 *Método de pago:* efectivo · tarjeta · transferencia\n` +
-    `🕖 *Hora de recolección:* (entre 7:00 a.m. y 12:30 p.m.)\n` +
+    `🕖 *Hora de recolección:* (entre ${getRangoHorario()})\n` +
     `${SEP}\n` +
     `_Puedes mandarlos todos juntos_ 😊`
   );
@@ -115,7 +116,7 @@ function getFormPreventaDomicilio(tel = "") {
     `🏘️ *Colonia:*\n` +
     `📌 *Referencia (opcional):*\n` +
     `💳 *Método de pago:* efectivo · transferencia\n` +
-    `🕖 *Hora de entrega:* (entre 7:00 a.m. y 12:30 p.m.)\n` +
+    `🕖 *Hora de entrega:* (entre ${getRangoHorario()})\n` +
     `${SEP}\n` +
     `_Puedes mandarlos todos juntos_ 😊`
   );

@@ -10,6 +10,7 @@ const {
 const { generarResumen } = require("../../pedido/resumen");
 const { MENU_FORMATO } = require("../../config");
 const { validarHora } = require("./utils");
+const { getRangoHorario } = require("../../horario");
 const { detectarPreguntaFrecuente } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 
@@ -50,7 +51,7 @@ async function handleEdicionPendiente(msg, textoOriginal, clienteNumero, histori
   if (edicionPendiente.campo === "hora") {
     const horaValida = validarHora(valorNuevo);
     if (!horaValida) {
-      await msg.reply("Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre 7:00 a.m. y 12:30 p.m.)");
+      await msg.reply(`Esa hora está fuera de nuestro horario. *¿A qué hora deseas tu pedido?* (entre ${getRangoHorario()})`);
       return true;
     }
     valorNuevo = horaValida;
