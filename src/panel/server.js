@@ -16,7 +16,7 @@ const {
 const { queryOne } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 
-const { getWhatsappClient } = require("./whatsapp-bridge");
+const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
@@ -224,6 +224,9 @@ app.get("/api/stats/historico", requireAuth, (req, res) => {
   );
   res.json(filas);
 });
+
+// ── STATUS DEL BOT ────────────────────────────────────────────────────────────
+app.get("/api/status", requireAuth, (req, res) => res.json(getStatusInfo()));
 
 // ── NOTIFICACIÓN AL CLIENTE ───────────────────────────────────────────────────
 // POST /api/pedidos/:id/notificar  { mensaje: "Tu pedido va en camino 🛵" }

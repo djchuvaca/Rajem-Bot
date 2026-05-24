@@ -22,11 +22,11 @@ const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
 const { initDB }         = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
-const { setWhatsappClient } = require("./src/panel/whatsapp-bridge");
+const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
 
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "carnitas-bot" }),
+  authStrategy: new LocalAuth({ clientId: process.env.TENANT_ID || "carnitas-bot" }),
   puppeteer: {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
@@ -64,10 +64,12 @@ client.on("ready", () => {
 });
 
 client.on("auth_failure", () => {
+  setWaEstado("desconectado");
   console.error("❌ Error de autenticación. Borra .wwebjs_auth y reintenta.");
 });
 
 client.on("disconnected", (reason) => {
+  setWaEstado("desconectado");
   console.log("⚠️  Bot desconectado:", reason);
 });
 

@@ -10,7 +10,7 @@
 module.exports = {
   apps: [
     {
-      name: "carnitas-bot",
+      name: process.env.TENANT_ID || "carnitas-bot",
       script: "index.js",
 
       // Reiniciar automáticamente si el proceso muere

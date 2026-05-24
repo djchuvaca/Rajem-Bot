@@ -98,6 +98,10 @@ tr:hover td{background:var(--surface2)}
 .section{display:none}.section.active{display:block}
 .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
 .hint{font-size:11px;color:var(--muted);margin-top:4px}
+@keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
+.dot-conectado{background:var(--green)!important;animation:pulse-green 2s infinite}
+.dot-iniciando{background:var(--yellow)!important}
+.dot-desconectado{background:var(--red)!important}
 </style>
 </head>
 <body>
@@ -146,7 +150,13 @@ tr:hover td{background:var(--surface2)}
 <div class="main">
   <div class="topbar">
     <div><div class="topbar-title" id="page-title">Dashboard</div><div class="topbar-sub" id="page-sub">Resumen del día</div></div>
-    <div id="topbar-actions"></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div id="wa-status-badge" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)" title="Estado del bot de WhatsApp">
+        <span id="wa-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0"></span>
+        <span id="wa-label">Verificando...</span>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
   </div>
   <div class="content">
 
@@ -733,12 +743,33 @@ async function cambiarPassword() {
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target===m) m.classList.remove('show'); }));
 
+// ── STATUS WA ─────────────────────────────────────────────────────────────────
+async function checkWaStatus() {
+  const dot   = document.getElementById('wa-dot');
+  const label = document.getElementById('wa-label');
+  try {
+    const s = await api('/api/status');
+    const estado = s.wa_estado || 'desconectado';
+    dot.className = `dot-${estado}`;
+    label.textContent = estado === 'conectado'    ? 'WhatsApp conectado'
+                      : estado === 'iniciando'    ? 'WhatsApp iniciando…'
+                      : 'WhatsApp desconectado';
+    const mins = Math.floor((s.uptime_segundos || 0) / 60);
+    document.getElementById('wa-status-badge').title =
+      `Tenant: ${s.tenant} · Uptime: ${mins} min`;
+  } catch (_) {
+    dot.className = 'dot-desconectado';
+    label.textContent = 'Sin conexión';
+  }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function initApp() {
   const me = await api('/api/me');
   if (!me.usuario) { document.getElementById('login-screen').style.display='flex'; return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('sidebar-user').textContent = me.usuario;
+  checkWaStatus();
   loadDashboard();
 }
 
@@ -746,6 +777,8 @@ setInterval(() => {
   if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
   if (document.querySelector('[data-s="pedidos"]').classList.contains('active')) loadPedidos();
 }, 20000);
+
+setInterval(checkWaStatus, 30000);
 
 initApp();
 </script>
