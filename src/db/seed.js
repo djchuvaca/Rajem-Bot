@@ -130,7 +130,8 @@ async function seedDB() {
       ["precio_100g",       "32"],
       ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
       ["metodos_domicilio", "efectivo o transferencia"],
-      ["tipo_negocio",      "carnitas de puerco"],
+      ["tipo_negocio",       "carnitas de puerco"],
+      ["tiempo_cancelacion", "15"],
     ];
     for (const [clave, valor] of config) {
       db.run("INSERT INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -143,7 +144,8 @@ async function seedDB() {
       ["precio_100g",       "32"],
       ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
       ["metodos_domicilio", "efectivo o transferencia"],
-      ["tipo_negocio",      "carnitas de puerco"],
+      ["tipo_negocio",        "carnitas de puerco"],
+      ["tiempo_cancelacion",  "15"],
     ];
     for (const [clave, valor] of nuevos) {
       db.run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -181,7 +183,7 @@ async function seedDB() {
   const countMsg = db.exec("SELECT COUNT(*) as c FROM mensajes_bot")[0]?.values[0][0] || 0;
   if (countMsg === 0) {
     const mensajes = [
-      ["saludo",                "¡Bienvenido a *{negocio}*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?"],
+      ["saludo",                "¡Bienvenido a *{negocio}*! 🌮🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?"],
       ["fuera_horario_lunes",   "⏰ Por el momento nos encontramos fuera de servicio.\nLos lunes descansamos 😴\n\nRetomamos el servicio el *martes a las {hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
       ["fuera_horario_antes",   "⏰ Por el momento nos encontramos fuera de servicio.\nIniciamos atención a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
       ["fuera_horario_despues", "⏰ Por el momento nos encontramos fuera de servicio.\nNuestro horario es de *Martes a Domingo de {hora_inicio} a {hora_fin}* 🌮\n\nMañana iniciamos a las *{hora_inicio}*\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
@@ -192,6 +194,13 @@ async function seedDB() {
       db.run("INSERT INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
     }
     console.log("✅ Mensajes del bot insertados");
+  }
+  // Migración: claves nuevas en mensajes_bot (INSERT OR IGNORE para instancias existentes)
+  const nuevosMsgs = [
+    ["comprobante_recibido", "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏"],
+  ];
+  for (const [clave, valor] of nuevosMsgs) {
+    db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
   }
 
   // ── SEED USUARIO PANEL ─────────────────────────────────────────────────────

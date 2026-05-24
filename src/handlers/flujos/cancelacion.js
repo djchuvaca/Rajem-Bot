@@ -3,7 +3,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
   esperandoTipoItem, limpiarTodo,
 } = require("../../estado");
-const { actualizarEstadoPedido, getMensaje } = require("../../db");
+const { actualizarEstadoPedido, getMensaje, getConfig } = require("../../db");
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo } = require("./utils");
 
@@ -19,9 +19,11 @@ async function handleCancelacionConfirmada(msg, client, textoOriginal, clienteNu
   const quiereCancelar       = RE_CANCELAR.test(textoOriginal);
   const quiereEmpezarDeNuevo = RE_NUEVO.test(textoOriginal);
 
+  const tiempoCancelacion = parseInt(getConfig("tiempo_cancelacion") || "15");
+
   if (quiereCancelar) {
-    if (minutosTranscurridos > 15) {
-      await msg.reply("Lo sentimos, el tiempo para cancelar tu pedido ya venció (15 minutos).\nSi tienes algún problema, comunícate directamente con nosotros. Gracias por tu comprensión!");
+    if (minutosTranscurridos > tiempoCancelacion) {
+      await msg.reply(`Lo sentimos, el tiempo para cancelar tu pedido ya venció (${tiempoCancelacion} minutos).\nSi tienes algún problema, comunícate directamente con nosotros. Gracias por tu comprensión!`);
       return true;
     }
     esperandoMotivoCancelacion.set(clienteNumero, { nombre: datosPedido.nombre, telefono: datosPedido.telefono, notificarGrupo: true });
@@ -31,7 +33,7 @@ async function handleCancelacionConfirmada(msg, client, textoOriginal, clienteNu
     return true;
   }
 
-  const minRestantes = Math.max(0, Math.ceil(15 - minutosTranscurridos));
+  const minRestantes = Math.max(0, Math.ceil(tiempoCancelacion - minutosTranscurridos));
   await msg.reply(
     "Tu pedido ya fue recibido y esta en espera de confirmacion de nuestro equipo.\n" +
     (minRestantes > 0

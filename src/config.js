@@ -123,12 +123,12 @@ function getFormPreventaDomicilio(tel = "") {
 }
 
 function getSaludo() {
+  const negocio = getConfig("nombre_negocio") || "el negocio";
   try {
-    const negocio = getConfig("nombre_negocio") || "Tacos Javier";
-    const msg     = getMensaje("saludo") || "¡Bienvenido a *{negocio}*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪";
+    const msg = getMensaje("saludo") || `¡Bienvenido a *${negocio}*! 🌮🔥\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪`;
     return msg.replace(/{negocio}/g, negocio);
   } catch (e) {
-    return "¡Bienvenido a *Tacos Javier*! 🌮🔥\nLas mejores carnitas de puerco de la ciudad 😄\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?";
+    return `¡Bienvenido a *${negocio}*! 🌮🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
   }
 }
 

@@ -8,6 +8,7 @@ const {
   datosCampos, limpiarTodo,
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
+const { getProductos } = require("../../db");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
 const telefonosReales    = new Map();
@@ -38,7 +39,8 @@ function _textoRecordatorio(numero) {
                : item.presentacion === "torta"  ? `las ${item.cantidad} tortas`
                : item.presentacion === "gramos" ? `los ${item.gramos}g`
                : `los $${item.monto}`;
-    return `Hola! 👋 Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* Surtido, Carne, Buche, Cuero o Lengua`;
+    const listaCortes = getProductos().map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
+    return `Hola! 👋 Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
   }
   if (esperandoTipoItem.has(numero)) {
     const d = esperandoTipoItem.get(numero);

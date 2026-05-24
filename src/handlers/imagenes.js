@@ -1,6 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
-const { upsertCliente, registrarPedido } = require("../db");
+const { upsertCliente, registrarPedido, getMensaje } = require("../db");
 const {
   esperandoCaptura,
   clientesNuevos,
@@ -49,11 +49,9 @@ async function handleImagen(msg, client) {
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
 
-    await msg.reply(
-      "¡Gracias! Recibimos tu comprobante 📸\n" +
-      "Tu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\n" +
-      "En breve te avisamos 🙏"
-    );
+    const msgComprobante = getMensaje("comprobante_recibido")
+      || "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏";
+    await msg.reply(msgComprobante);
   } catch (e) {
     console.error("❌ Error al procesar captura:", e.message);
     await msg.reply("Disculpa, tuve un problema al recibir tu comprobante. ¿Puedes mandarlo de nuevo? 🙏");
