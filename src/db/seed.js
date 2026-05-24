@@ -76,20 +76,21 @@ async function seedDB() {
 
   // ── MIGRACIONES (columnas nuevas en tablas existentes) ─────────────────────
   try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
+  try { db.run("ALTER TABLE productos ADD COLUMN sinonimos TEXT DEFAULT ''"); } catch (_) {}
 
   // ── SEED PRODUCTOS ─────────────────────────────────────────────────────────
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
     const productos = [
-      ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso, delicioso, con ese sabor incomparable de Tacos Javier.", 30, 40, 32],
-      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light.", 30, 40, 32],
-      ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos, y más si es con la calidad y sabor de Tacos Javier.", 30, 40, 32],
-      ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. No te arrepentirás de acompañar tus tacos con una deliciosa botana de cueros — eso sí, si son de Tacos Javier el éxito está garantizado.", 30, 40, 32],
-      ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa. Si es de Tacos Javier, ni para qué te cuento.", 30, 40, 32],
+      ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso, delicioso, con ese sabor incomparable de Tacos Javier.", 30, 40, 32, "surtida,mixto,mixta"],
+      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light.", 30, 40, 32, "carnitas,carnita,carner,maciza,masiza"],
+      ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos, y más si es con la calidad y sabor de Tacos Javier.", 30, 40, 32, "buchito,buchon,buchones"],
+      ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. No te arrepentirás de acompañar tus tacos con una deliciosa botana de cueros — eso sí, si son de Tacos Javier el éxito está garantizado.", 30, 40, 32, "cueros,cueritos,cuerito"],
+      ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa. Si es de Tacos Javier, ni para qué te cuento.", 30, 40, 32, "lenguita,lenguitas"],
     ];
-    for (const [nombre, desc, taco, torta, g100] of productos) {
-      db.run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g) VALUES (?,?,?,?,?)",
-        [nombre, desc, taco, torta, g100]);
+    for (const [nombre, desc, taco, torta, g100, sins] of productos) {
+      db.run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?)",
+        [nombre, desc, taco, torta, g100, sins]);
     }
     console.log("✅ Productos iniciales insertados");
   } else {
@@ -103,6 +104,16 @@ async function seedDB() {
     ];
     for (const [nombre, desc] of descripciones) {
       db.run("UPDATE productos SET descripcion = ? WHERE nombre = ?", [desc, nombre]);
+    }
+    const sinonimosDefault = [
+      ["surtido", "surtida,mixto,mixta"],
+      ["carne",   "carnitas,carnita,carner,maciza,masiza"],
+      ["buche",   "buchito,buchon,buchones"],
+      ["cuero",   "cueros,cueritos,cuerito"],
+      ["lengua",  "lenguita,lenguitas"],
+    ];
+    for (const [nombre, sins] of sinonimosDefault) {
+      db.run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [sins, nombre]);
     }
   }
 
@@ -160,7 +171,7 @@ async function seedDB() {
   const countBanco = db.exec("SELECT COUNT(*) as c FROM banco")[0]?.values[0][0] || 0;
   if (countBanco === 0) {
     db.run("INSERT INTO banco (banco, beneficiario, clabe) VALUES (?,?,?)",
-      ["Mercado Pago", "Aline Dominike Ortiz Arguelles", "722969020338079487"]);
+      ["", "", ""]);
     console.log("✅ Datos bancarios iniciales insertados");
   }
 

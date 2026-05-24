@@ -309,6 +309,11 @@ tr:hover td{background:var(--surface2)}
     <input type="hidden" id="prod-id">
     <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="prod-nombre" type="text"></div>
     <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-textarea" id="prod-desc"></textarea></div>
+    <div class="form-group">
+      <label class="form-label">Sinónimos</label>
+      <input class="form-input" id="prod-sinonimos" type="text" placeholder="carnitas,carnita,maciza">
+      <div class="hint">Palabras que el bot reconoce como este producto. Separadas por coma, sin espacios.</div>
+    </div>
     <div class="form-row-3">
       <div class="form-group"><label class="form-label">Precio taco</label><input class="form-input" id="prod-taco" type="number"></div>
       <div class="form-group"><label class="form-label">Precio torta</label><input class="form-input" id="prod-torta" type="number"></div>
@@ -581,12 +586,13 @@ async function loadProductos() {
 
 function openModalProducto(p=null) {
   document.getElementById('modal-prod-title').textContent = p ? 'Editar producto' : 'Nuevo producto';
-  document.getElementById('prod-id').value     = p?.id          || '';
-  document.getElementById('prod-nombre').value = p?.nombre      || '';
-  document.getElementById('prod-desc').value   = p?.descripcion || '';
-  document.getElementById('prod-taco').value   = p?.precio_taco  || 30;
-  document.getElementById('prod-torta').value  = p?.precio_torta || 40;
-  document.getElementById('prod-100g').value   = p?.precio_100g  || 32;
+  document.getElementById('prod-id').value        = p?.id          || '';
+  document.getElementById('prod-nombre').value    = p?.nombre      || '';
+  document.getElementById('prod-desc').value      = p?.descripcion || '';
+  document.getElementById('prod-sinonimos').value = p?.sinonimos   || '';
+  document.getElementById('prod-taco').value      = p?.precio_taco  || 30;
+  document.getElementById('prod-torta').value     = p?.precio_torta || 40;
+  document.getElementById('prod-100g').value      = p?.precio_100g  || 32;
   document.getElementById('modal-producto').classList.add('show');
 }
 
@@ -595,6 +601,7 @@ async function saveProducto() {
   const datos = {
     nombre:       document.getElementById('prod-nombre').value,
     descripcion:  document.getElementById('prod-desc').value,
+    sinonimos:    document.getElementById('prod-sinonimos').value.trim().toLowerCase(),
     precio_taco:  parseFloat(document.getElementById('prod-taco').value),
     precio_torta: parseFloat(document.getElementById('prod-torta').value),
     precio_100g:  parseFloat(document.getElementById('prod-100g').value),

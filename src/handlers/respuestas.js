@@ -219,18 +219,17 @@ function aplicarCambiarCorte(ordenTexto, de, por) {
 }
 
 // ── RESPUESTA: DESCRIPCIÓN DE CORTE ──────────────────────────────────────────
-const DESCRIPCIONES_CORTE = {
-  surtido: "Es una mezcla de todas las piezas: carne, buche, cuero y lengua. Ideal para probar de todo en un solo taco.",
-  carne:   "Es carne de cerdo cocida, también conocida como carnitas. Suave, jugosa y la más tradicional.",
-  buche:   "Es el estómago de cerdo. Muy tierno y de sabor suave, uno de los favoritos.",
-  cuero:   "Es la piel de cerdo cocida. Textura única, suave por dentro con sabor intenso y característico.",
-  lengua:  "Es lengua de res o cerdo cocida. Muy suave al morder y con un sabor profundo.",
-};
-
 function respuestaDescripcionCorte(corte) {
-  const negocio = getNegocio();
-  const desc = DESCRIPCIONES_CORTE[corte?.toLowerCase()];
-  if (!desc) return `En *${negocio}* tenemos: Surtido, Carne, Buche, Cuero y Lengua. ¿Cuál te llama la atención? 😊`;
+  const negocio  = getNegocio();
+  const productos = getProductos();
+  const prod = productos.find(p => p.nombre.toLowerCase() === corte?.toLowerCase());
+  const desc = prod?.descripcion;
+  if (!desc) {
+    const nombres = productos.length
+      ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
+      : "nuestros cortes disponibles";
+    return `En *${negocio}* tenemos: ${nombres}. ¿Cuál te llama la atención? 😊`;
+  }
   const nombre = corte ? corte.charAt(0).toUpperCase() + corte.slice(1) : corte;
   return `🥩 *${nombre}:* ${desc}\n\n_¿Te lo preparamos?_ 😊`;
 }

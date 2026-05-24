@@ -18,15 +18,7 @@ function getDatosBanco() {
 }
 
 function _datosBancoDefault() {
-  return (
-    `💳 *Datos para transferencia:*\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `🏦 *Banco:* Mercado Pago\n` +
-    `👤 *Beneficiario:* Aline Dominike Ortiz Arguelles\n` +
-    `🔢 *CLABE:* 722969020338079487\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `Una vez realizada, mándanos la captura de pantalla como comprobante 📸`
-  );
+  return `💳 Los datos bancarios aún no están configurados.\nPor favor contacta al negocio directamente.`;
 }
 
 // ── MENÚ FORMATO ──────────────────────────────────────────────────────────────

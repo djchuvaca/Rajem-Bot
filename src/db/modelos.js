@@ -9,14 +9,14 @@ function getProducto(nombre) {
 }
 function updateProducto(id, datos) {
   run(
-    "UPDATE productos SET nombre=?, descripcion=?, precio_taco=?, precio_torta=?, precio_100g=?, activo=? WHERE id=?",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.activo, id]
+    "UPDATE productos SET nombre=?, descripcion=?, precio_taco=?, precio_torta=?, precio_100g=?, activo=?, sinonimos=? WHERE id=?",
+    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.activo, datos.sinonimos || '', id]
   );
 }
 function createProducto(datos) {
   run(
-    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g) VALUES (?,?,?,?,?)",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g]
+    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?)",
+    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '']
   );
 }
 function deleteProducto(id) {

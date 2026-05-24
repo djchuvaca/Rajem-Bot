@@ -24,11 +24,11 @@ function getCortes() {
     for (const p of productos) {
       const nombre = p.nombre.toLowerCase().trim();
       mapa[nombre] = nombre;
-      if (nombre === "carne")   { mapa.carner = "carne"; mapa.masiza = "carne"; mapa.maciza = "carne"; mapa.carnita = "carne"; mapa.carnitas = "carne"; }
-      if (nombre === "buche")   { mapa.buchito = "buche"; mapa.buchon = "buche"; mapa.buchones = "buche"; }
-      if (nombre === "cuero")   { mapa.cueros = "cuero"; mapa.cueritos = "cuero"; mapa.cuerito = "cuero"; }
-      if (nombre === "lengua")  { mapa.lenguita = "lengua"; mapa.lenguitas = "lengua"; }
-      if (nombre === "surtido") { mapa.surtida = "surtido"; mapa.mixto = "surtido"; mapa.mixta = "surtido"; }
+      if (p.sinonimos) {
+        for (const s of p.sinonimos.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)) {
+          mapa[s] = nombre;
+        }
+      }
     }
     _cortesCache = mapa;
     _cortesCacheTs = Date.now();
@@ -116,7 +116,7 @@ function textoANumero(texto) {
     .replace(/\btres\b/gi,      "3")
     .replace(/\bdos\b/gi,       "2")
     .replace(/\buno\b/gi,       "1")
-    .replace(/\bun[ao]?\s+(?=taco|torta|buche|carne|cuero|lengua|surtido|kilo|cuarto|medio)/gi, "1 ");
+    .replace(new RegExp(`\\bun[ao]?\\s+(?=taco|torta|kilo|cuarto|medio|${[...new Set(Object.values(getCortes()))].join("|")})`, "gi"), "1 ");
 }
 
 // ── MEJORA 2: FUZZY MATCHING PARA CORTES ─────────────────────────────────────
