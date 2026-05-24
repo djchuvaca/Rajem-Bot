@@ -74,7 +74,7 @@ async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
-  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
+  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
   if (!esComando) return;
 
   // ── !ayuda — lista de comandos ─────────────────────────────────────────────
@@ -116,6 +116,7 @@ async function handleComandos(msg, client) {
       `!reanudar — reactivar el bot\n` +
       `!sesiones — ver sesiones activas de clientes\n` +
       `!resetear [tel] — limpiar sesión de un cliente\n` +
+      `!limpiar — eliminar TODAS las sesiones activas\n` +
       `!estado — estado del bot (uptime, sesiones, etc.)\n` +
       `━━━━━━━━━━━━━━━━━━`;
     await msg.reply(out);
@@ -962,6 +963,40 @@ async function handleComandos(msg, client) {
     clientesNuevos.delete(jid);
 
     await msg.reply(`🗑️ Sesión de *${telRaw}* eliminada. El cliente puede iniciar de nuevo cuando escriba.`);
+    return;
+  }
+
+  // ── !limpiar — eliminar todas las sesiones activas ───────────────────────
+  if (/^!limpiar/i.test(texto)) {
+    const jidsActivos = new Set();
+    for (const jid of clientesNuevos)              jidsActivos.add(jid);
+    for (const [jid] of datosCampos)               jidsActivos.add(jid);
+    for (const [jid] of resumenPendiente)           jidsActivos.add(jid);
+    for (const [jid] of esperandoConfirmacionItem)  jidsActivos.add(jid);
+    for (const [jid] of esperandoAgregarMas)        jidsActivos.add(jid);
+    for (const [jid] of esperandoCorte)             jidsActivos.add(jid);
+    for (const [jid] of esperandoTipoItem)          jidsActivos.add(jid);
+    for (const [jid] of esperandoCaptura)           jidsActivos.add(jid);
+
+    if (!/^!limpiar\s+confirmar$/i.test(texto)) {
+      if (jidsActivos.size === 0) {
+        await msg.reply("📭 No hay sesiones activas en este momento.");
+        return;
+      }
+      await msg.reply(
+        `⚠️ *¿Eliminar TODAS las sesiones?*\n\n` +
+        `Esto borrará *${jidsActivos.size} sesión(es) activa(s)*.\n` +
+        `Los clientes en medio de un pedido perderán su progreso y tendrán que empezar de nuevo.\n\n` +
+        `Si estás seguro, escribe:\n*!limpiar confirmar*`
+      );
+      return;
+    }
+
+    for (const jid of jidsActivos) {
+      limpiarTodo(jid);
+      clientesNuevos.delete(jid);
+    }
+    await msg.reply(`🗑️ Listo. Se eliminaron *${jidsActivos.size} sesión(es)* activa(s).`);
     return;
   }
 

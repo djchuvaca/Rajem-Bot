@@ -17,6 +17,8 @@ const { queryOne } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
+const { actualizarEstadoPorId } = require("../db");
+const mpPagos = require("../pagos/mercadopago");
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
@@ -223,6 +225,71 @@ app.get("/api/stats/historico", requireAuth, (req, res) => {
     [`-${dias}`]
   );
   res.json(filas);
+});
+
+// ── WEBHOOK MERCADOPAGO (público) ─────────────────────────────────────────────
+app.post("/webhook/mercadopago", async (req, res) => {
+  res.sendStatus(200); // responder inmediato para que MP no reintente
+
+  const { type, data } = req.body || {};
+  if (type !== "payment" || !data?.id) return;
+
+  try {
+    const resultado = await mpPagos.procesarPago(data.id);
+    if (!resultado?.aprobado) return;
+
+    // Actualizar estado en BD
+    try { actualizarEstadoPorId(resultado.pedidoId, "confirmado"); } catch (_) {}
+
+    const waClient = getWhatsappClient();
+    if (!waClient) return;
+
+    // Notificar al cliente
+    if (resultado.jid) {
+      try {
+        await waClient.sendMessage(resultado.jid,
+          `✅ *¡Pago confirmado!*\n\nTu pedido está en proceso 🌮🔥\nEn breve te avisamos cuando esté listo. ¡Gracias por tu preferencia! 😊`
+        );
+      } catch (_) {}
+    }
+
+    // Notificar al grupo
+    const grupoId = process.env.GRUPO_ID;
+    if (grupoId && resultado.resumen) {
+      try {
+        const nombre = resultado.nombre || resultado.telefono || "Cliente";
+        await waClient.sendMessage(grupoId,
+          `✅ *PAGO CONFIRMADO — MercadoPago*\n\n` +
+          `👤 ${nombre}\n` +
+          `📦 Pedido #${resultado.pedidoId}\n\n` +
+          `${resultado.resumen}`
+        );
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.error("[Webhook MP] Error:", e.message);
+  }
+});
+
+// ── HEALTH CHECK (público, para monitoreo externo) ───────────────────────────
+app.get("/health", (req, res) => {
+  const { wa_estado, uptime_segundos, tenant } = getStatusInfo();
+
+  let dbOk = false;
+  try {
+    dbOk = !!queryOne("SELECT 1 AS ok");
+  } catch (_) {}
+
+  const saludable = wa_estado === "conectado" && dbOk;
+
+  res.status(saludable ? 200 : 503).json({
+    status:    saludable ? "ok" : "degraded",
+    whatsapp:  wa_estado,
+    db:        dbOk ? "ok" : "error",
+    uptime_s:  uptime_segundos,
+    tenant,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ── STATUS DEL BOT ────────────────────────────────────────────────────────────

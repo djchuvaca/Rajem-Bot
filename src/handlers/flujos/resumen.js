@@ -14,6 +14,7 @@ const {
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
 const { getRangoHorario } = require("../../horario");
+const mpPagos = require("../../pagos/mercadopago");
 const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems,
@@ -302,7 +303,73 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   const horaVenta  = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
   const infoPedido = extraerDatosPedido(pendiente.texto);
 
+  if (pendiente.esTransferencia && mpPagos.estaConfigurado()) {
+    // ── Pago en línea con MercadoPago ────────────────────────────────────────
+    let pedidoMpId = null;
+    try {
+      const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
+      const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
+      const partes = nombreCompleto.split(/\s+/);
+      let nombre, apellido;
+      if (partes.length === 1)      { nombre = partes[0];                    apellido = null; }
+      else if (partes.length === 2) { nombre = partes[0];                    apellido = partes[1]; }
+      else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
+      const camposCliente = datosCampos.get(clienteNumero) || {};
+      const cliente = upsertCliente({
+        nombre, apellido, telefono: telefonoLimpio,
+        correo:      (camposCliente.correo && camposCliente.correo !== "no proporcionó") ? camposCliente.correo : null,
+        calle_numero: camposCliente.calle    || null,
+        colonia:      camposCliente.colonia  || null,
+        referencia:   (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null,
+      });
+      const total       = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
+      const hora_entrega = horaEntregaPreventa.get(clienteNumero) || null;
+      pedidoMpId = registrarPedido({
+        cliente_id: cliente ? cliente.id : null,
+        tipo:        infoPedido.tipo || "mostrador",
+        orden:       (pendiente.texto || "").substring(0, 500),
+        total, metodo_pago: "transferencia", estado: "pendiente", hora_entrega,
+      });
+      if (infoPedido.telefono) {
+        telefonosReales.set(clienteNumero, infoPedido.telefono);
+        try { guardarTelefonoReal(clienteNumero, infoPedido.telefono); } catch (_) {}
+        try { guardarJIDReal(infoPedido.telefono, clienteNumero); } catch (_) {}
+      }
+    } catch (e) {
+      console.error("[MP] Error al guardar pedido:", e.message);
+    }
+
+    if (pedidoMpId) {
+      try {
+        const { getConfig } = require("../../db");
+        const total  = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
+        const enlace = await mpPagos.crearEnlacePago({
+          pedidoId: pedidoMpId,
+          total,
+          negocio:  getConfig("nombre_negocio"),
+          jid:      clienteNumero,
+          telefono: infoPedido.telefono,
+          resumen:  pendiente.texto,
+          nombre:   infoPedido.nombre,
+        });
+        resumenPendiente.delete(clienteNumero);
+        limpiarTodo(clienteNumero);
+        clientesNuevos.delete(clienteNumero);
+        await msg.reply(
+          `✅ ¡Pedido recibido! Para confirmar tu lugar, realiza el pago aquí:\n\n` +
+          `💳 ${enlace}\n\n` +
+          `_Tienes 30 minutos. En cuanto se confirme el pago, te avisamos de inmediato 🙏_`
+        );
+        return true;
+      } catch (e) {
+        console.error("[MP] Error al crear enlace de pago:", e.message);
+        // Fallback a transferencia tradicional si MP falla
+      }
+    }
+  }
+
   if (pendiente.esTransferencia) {
+    // Transferencia tradicional (MP no configurado o falló)
     esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono });
     resumenPendiente.delete(clienteNumero);
     await msg.reply(DATOS_BANCO);

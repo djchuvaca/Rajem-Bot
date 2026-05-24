@@ -77,6 +77,7 @@ module.exports = {
   // pedidos
   registrarPedido:            modelos.registrarPedido,
   actualizarEstadoPedido:     modelos.actualizarEstadoPedido,
+  actualizarEstadoPorId:      modelos.actualizarEstadoPorId,
   actualizarEstadoConfirmado: modelos.actualizarEstadoConfirmado,
   getPedidosHoy:              modelos.getPedidosHoy,
   getAllPedidos:               modelos.getAllPedidos,

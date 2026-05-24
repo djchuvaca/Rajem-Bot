@@ -82,6 +82,10 @@ function registrarPedido(datos) {
   return resultado[0]?.values[0][0] || null;
 }
 
+function actualizarEstadoPorId(pedidoId, estado) {
+  run("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, pedidoId]);
+}
+
 function actualizarEstadoPedido(telefono, estado) {
   run(
     `UPDATE pedidos SET estado = ? WHERE id = (
@@ -170,7 +174,7 @@ function getPedidosPorFecha(fechaInicio, fechaFin) {
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
-  registrarPedido, actualizarEstadoPedido, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
+  registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha,
   setProductoActivo, updateProductoPrecio, getTopClientes,
 };

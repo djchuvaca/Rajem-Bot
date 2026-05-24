@@ -1,56 +1,69 @@
-const initSqlJs = require("sql.js");
+const Database = require("better-sqlite3");
 const fs        = require("fs");
 const path      = require("path");
 
 const DATA_DIR = path.join(__dirname, "../../data");
 const DB_PATH  = path.join(DATA_DIR, "tacos_javier.db");
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-let db = null;
-let _guardarTimer = null;
+let _bsdb = null; // instancia real de better-sqlite3
+let db    = null; // objeto de compatibilidad expuesto vía getDB()
+
+// Shim que replica la API de sql.js que usan seed.js, modelos.js y config.js
+// directamente sobre el objeto db (db.run / db.exec).
+function _makeCompatDB(bsdb) {
+  return {
+    run(sql, params) {
+      if (!params || params.length === 0) {
+        bsdb.exec(sql);
+      } else {
+        bsdb.prepare(sql).run(...params);
+      }
+    },
+    exec(sql) {
+      try {
+        const rows = bsdb.prepare(sql.trim()).all();
+        if (!rows.length) return [];
+        const columns = Object.keys(rows[0]);
+        return [{ columns, values: rows.map(r => columns.map(c => r[c])) }];
+      } catch (_) { return []; }
+    },
+    prepare: bsdb.prepare.bind(bsdb),
+  };
+}
 
 async function initDB() {
-  if (db) return db;
-  const SQL = await initSqlJs();
-  if (fs.existsSync(DB_PATH)) {
-    db = new SQL.Database(fs.readFileSync(DB_PATH));
-  } else {
-    db = new SQL.Database();
-  }
-  return db;
+  if (_bsdb) return _bsdb;
+  _bsdb = new Database(DB_PATH);
+  // DELETE es más simple para el backup (sin archivos -wal/-shm)
+  _bsdb.pragma("journal_mode = DELETE");
+  db = _makeCompatDB(_bsdb);
+  return _bsdb;
 }
 
-function guardarDB() {
-  if (!db) return;
-  clearTimeout(_guardarTimer);
-  _guardarTimer = setTimeout(() => {
-    if (db) fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
-  }, 500);
-}
+// better-sqlite3 escribe en cada operación — no hace falta flush manual
+function guardarDB() {}
 
-function getDB() {
-  return db;
-}
+function getDB() { return db; }
 
 function queryAll(sql, params = []) {
-  if (!db) return [];
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
+  if (!_bsdb) return [];
+  return _bsdb.prepare(sql).all(...params);
 }
 
 function queryOne(sql, params = []) {
-  return queryAll(sql, params)[0] || null;
+  if (!_bsdb) return null;
+  return _bsdb.prepare(sql).get(...params) || null;
 }
 
 function run(sql, params = []) {
-  if (!db) return;
-  db.run(sql, params);
-  guardarDB();
+  if (!_bsdb) return;
+  if (params.length === 0) {
+    _bsdb.exec(sql);
+  } else {
+    _bsdb.prepare(sql).run(...params);
+  }
 }
 
 module.exports = { initDB, guardarDB, getDB, queryAll, queryOne, run };

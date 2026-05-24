@@ -17,8 +17,8 @@ const ultimaActividad    = new Map();
 const recordatorioEnviado = new Map(); // numero → timestamp del recordatorio
 
 // ── Timeouts de inactividad ────────────────────────────────────────────────────
-const TIMEOUT_RECORDATORIO_MS = 30 * 60 * 1000; // 30 min → recordatorio
-const TIMEOUT_SESION_MS       = 45 * 60 * 1000; // 45 min → limpiar sesión
+const TIMEOUT_RECORDATORIO_MS = 20 * 60 * 1000; // 20 min → recordatorio
+const TIMEOUT_SESION_MS       = 35 * 60 * 1000; // 35 min → limpiar sesión
 
 function _textoRecordatorio(numero) {
   if (resumenPendiente.has(numero)) {
@@ -87,6 +87,8 @@ setInterval(async () => {
 
       recordatorioEnviado.set(numero, ahora);
       try {
+        const jitter = 1000 + Math.floor(Math.random() * 2000);
+        await new Promise(r => setTimeout(r, jitter));
         await client.sendMessage(numero, texto, { linkPreview: false });
         console.log(`[RECORDATORIO] Enviado a ${numero}`);
       } catch (e) {
@@ -108,15 +110,27 @@ function enFlujoActivo(clienteNumero) {
     || esperandoTipoItem.has(clienteNumero);
 }
 
+// Throttle por JID: mínimo 2s entre envíos al mismo usuario
+const _ultimoEnvioJID = new Map();
+const DELAY_MIN_JID_MS = 2000;
+
 async function replyConTyping(msg, texto) {
+  // Asegurar separación mínima entre mensajes al mismo JID
+  const jid = msg.from || msg.to;
+  if (jid) {
+    const restante = DELAY_MIN_JID_MS - (Date.now() - (_ultimoEnvioJID.get(jid) || 0));
+    if (restante > 0) await new Promise(r => setTimeout(r, restante));
+    _ultimoEnvioJID.set(jid, Date.now());
+  }
+
   try {
     const chat = await msg.getChat();
-    const ms = Math.min(800 + texto.length * 12, 3500) + Math.floor(Math.random() * 400);
+    const ms = Math.min(800 + texto.length * 12, 3500) + Math.floor(Math.random() * 500);
     await chat.sendStateTyping();
     await new Promise(r => setTimeout(r, ms));
     await chat.clearState();
   } catch (_) {}
-  await msg.reply(texto);
+  await msg.reply(texto, undefined, { linkPreview: false });
 }
 
 function parsearSinCorteItems(texto) {

@@ -17,15 +17,19 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@sentry/node": "^10.53.1",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "groq-sdk": "^0.5.0",
+    "mercadopago": "^3.0.0",
     "openai": "^6.37.0",
     "qrcode-terminal": "^0.12.0",
     "sql.js": "^1.10.3",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

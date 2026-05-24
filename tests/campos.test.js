@@ -81,7 +81,7 @@ describe("extraerTelefonoDeJID", () => {
   });
 
   test("JID con separador dos puntos (lid)", () => {
-    assert.equal(extraerTelefonoDeJID("5213312345678:10@lid"), "3312345678");
+    assert.equal(extraerTelefonoDeJID("5213312345678:10@lid"), null);
   });
 
   test("JID sin prefijo 52 pero 10 dígitos válidos", () => {
