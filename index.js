@@ -54,9 +54,19 @@ client.on("disconnected", (reason) => {
   console.log("⚠️  Bot desconectado:", reason);
 });
 
+const _msgProcesados = new Set();
+
 client.on("message", async (msg) => {
   if (msg.from === "status@broadcast") return;
   if (msg.from.endsWith("@broadcast")) return;
+
+  // Deduplicación: ignorar si ya procesamos este mensaje (reentregas de WA)
+  const _msgId = msg.id?._serialized;
+  if (_msgId) {
+    if (_msgProcesados.has(_msgId)) return;
+    _msgProcesados.add(_msgId);
+    if (_msgProcesados.size > 200) _msgProcesados.delete(_msgProcesados.values().next().value);
+  }
 
   if (msg.from.endsWith("@g.us")) {
     await handleComandos(msg, client);

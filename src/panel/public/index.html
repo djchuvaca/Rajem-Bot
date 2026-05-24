@@ -681,7 +681,8 @@ async function initApp() {
 
 setInterval(() => {
   if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
-}, 60000);
+  if (document.querySelector('[data-s="pedidos"]').classList.contains('active')) loadPedidos();
+}, 20000);
 
 initApp();
 </script>

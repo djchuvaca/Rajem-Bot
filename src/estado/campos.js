@@ -10,13 +10,45 @@ const {
   horaEntregaPreventa, esperandoMotivoCancelacion, resumenPendiente,
   esperandoCaptura, datosRecibidos, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
-  tipoEntregaCliente, esperandoCorte, esperandoEdicion,
+  tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
 
 // ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
-const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale)$/i;
+const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|interior|entre|junto|frente|cerca)$/i;
+
+// ── EXTRACCIÓN DE TELÉFONO ────────────────────────────────────────────────────
+function extraerTelefono(texto) {
+  // Con código de país: +523312345678 o 52 331 234 5678
+  let m = texto.match(/\+?52\s*(\d{3}[\s.-]?\d{3}[\s.-]?\d{4}|\d{10})/);
+  if (m) {
+    const t = m[1].replace(/[\s.-]/g, "");
+    if (t.length === 10 && /^[2-9]/.test(t)) return t;
+  }
+  // Con separadores: 331-234-5678 o 331 234 5678
+  m = texto.match(/\b(\d{3})[\s.-](\d{3})[\s.-](\d{4})\b/);
+  if (m) {
+    const t = m[1] + m[2] + m[3];
+    if (/^[2-9]/.test(t)) return t;
+  }
+  // 10 dígitos consecutivos válidos (primer dígito 2-9 = LADA mexicano)
+  m = texto.match(/\b(\d{10})\b/);
+  if (m && /^[2-9]/.test(m[1])) return m[1];
+  return null;
+}
+
+function extraerTelefonoDeJID(jid) {
+  if (!jid) return null;
+  const jidRaw = jid.replace(/@.+/, "").split(":")[0];
+  const soloDigitos = jidRaw.replace(/\D/g, "");
+  if (soloDigitos.length >= 12) {
+    const tel = soloDigitos.slice(-10);
+    if (/^[2-9]\d{9}$/.test(tel)) return tel;
+  }
+  if (soloDigitos.length === 10 && /^[2-9]\d{9}$/.test(soloDigitos)) return soloDigitos;
+  return null;
+}
 
 // ── FUNCIONES BASE ────────────────────────────────────────────────────────────
 function getHistorial(numero) {
@@ -41,6 +73,7 @@ function limpiarTodo(numero) {
   tipoEntregaCliente.delete(numero);
   esperandoCorte.delete(numero);
   esperandoEdicion.delete(numero);
+  esperandoTipoItem.delete(numero);
   correoPreguntas.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
@@ -67,9 +100,9 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
   const textoCompleto = textoNuevo;
 
   // ── Teléfono ──────────────────────────────────────────────────────────────
-  if (!campos.telefono) {
-    const m = textoCompleto.match(/\+?52(\d{10})\b|\b(\d{10})\b/);
-    if (m) campos.telefono = m[1] || m[2];
+  {
+    const tel = extraerTelefono(textoCompleto);
+    if (tel) campos.telefono = tel;
   }
 
   // ── Correo ────────────────────────────────────────────────────────────────
@@ -80,9 +113,9 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
   // ── Método de pago ────────────────────────────────────────────────────────
   if (!campos.metodo) {
-    if (/transferencia/i.test(textoCompleto))      campos.metodo = "transferencia";
-    else if (/tarjeta/i.test(textoCompleto))       campos.metodo = "tarjeta";
-    else if (/efectivo/i.test(textoCompleto))      campos.metodo = "efectivo";
+    if (/transferencia/i.test(textoCompleto))                 campos.metodo = "transferencia";
+    else if (!esDomicilio && /tarjeta/i.test(textoCompleto)) campos.metodo = "tarjeta";
+    else if (/efectivo/i.test(textoCompleto))                campos.metodo = "efectivo";
   }
 
   // ── Hora (preventa) ───────────────────────────────────────────────────────
@@ -307,7 +340,7 @@ function camposATexto(numero) {
 
 // ── FUNCIONES DE UTILIDAD ─────────────────────────────────────────────────────
 function datosCompletos(texto, esPreventa = false, esDomicilio = false) {
-  const tieneNumeroTelefono = /\b\d{10}\b/.test(texto);
+  const tieneNumeroTelefono = extraerTelefono(texto) !== null;
   const tieneNombre = (() => {
     const palabras = texto.match(/[a-záéíóúüñ]{2,}/gi) || [];
     return palabras.filter(p => !PALABRAS_NO_NOMBRE.test(p)).length >= 2;
@@ -467,4 +500,5 @@ module.exports = {
   manejarOpcional, camposCompletos, camposATexto,
   datosCompletos, pareceFragmentoDatos, extraerDatosPedido,
   detectarEdicion, aplicarEdicion,
+  extraerTelefono, extraerTelefonoDeJID,
 };

@@ -1,6 +1,6 @@
 # Detección de Intención en Lenguaje Natural — Bot Tacos Javier
-**Fecha:** 21 Mayo 2026  
-**Archivos fuente:** `src/handlers/mensajes.js` · `src/handlers/pedidoParser.js` · `src/handlers/entrega.js` · `src/estado/campos.js`
+**Fecha:** 23 Mayo 2026  
+**Archivos fuente:** `src/handlers/mensajes.js` · `src/handlers/flujos/*.js` · `src/handlers/pedidoParser.js` · `src/estado/campos.js`
 
 ---
 
@@ -48,7 +48,7 @@ Salida:   "cuanto cuesta el tacooo?"
 
 Antes de cualquier detección de intención, el bot verifica **en qué estado está el cliente**. Si el cliente está en medio de un flujo activo (llenando datos, eligiendo corte, esperando confirmación), muchas intenciones se bloquean para evitar colisiones.
 
-**Función:** `enFlujoActivo(clienteNumero)` en `mensajes.js`
+**Función:** `enFlujoActivo(clienteNumero)` en `src/handlers/flujos/utils.js`
 
 ```
 Retorna TRUE si el cliente está en alguno de estos estados:
@@ -61,6 +61,8 @@ Retorna TRUE si el cliente está en alguno de estos estados:
   - esperandoConfirmacionDatos → cliente frecuente confirmando
   - esperandoTipoItem       → eligiendo taco vs torta
 ```
+
+**Nota:** Para el timeout de sesiones el criterio es más amplio — también considera clientes en `clientesNuevos` o `datosCampos` (a medio formulario sin ningún flujo activo).
 
 **Efecto:** Si `enFlujoActivo()` devuelve `true`, las preguntas frecuentes (FAQs) se saltan. El bot prioriza terminar el flujo de compra.
 
@@ -483,7 +485,9 @@ Mientras el cliente llena sus datos de pedido, el bot extrae información del te
 |---|---|---|
 | "me llamo Juan López" | `nombre: "Juan", apellido: "López"` | >= 2 caracteres, no es palabra reservada |
 | "Juan" | `nombre: "Juan"` | Solo nombre |
-| "3312345678" | `telefono: "3312345678"` | Exactamente 10 dígitos |
+| "3312345678" | `telefono: "3312345678"` | 10 dígitos, primer dígito 2-9 (LADA mexicano) |
+| "+523312345678" | `telefono: "3312345678"` | Detecta prefijo +52/52, extrae últimos 10 |
+| "331-234-5678" | `telefono: "3312345678"` | Detecta separadores - . y espacio |
 | "juan@correo.com" | `correo: "juan@correo.com"` | Formato email válido |
 | "efectivo" | `metodo: "efectivo"` | efectivo / tarjeta / transferencia |
 | "con transferencia" | `metodo: "transferencia"` | idem |

@@ -21,12 +21,8 @@ function getUbicacion() {
 
 function getMetodosPago(esDomicilio = false) {
   try {
-    const metodos = getConfig("metodos_pago") || "efectivo, tarjeta, transferencia";
-    if (esDomicilio) {
-      // En domicilio no se acepta tarjeta generalmente
-      return metodos.replace(/,?\s*tarjeta/i, "").trim();
-    }
-    return metodos;
+    if (esDomicilio) return getConfig("metodos_domicilio") || "efectivo y transferencia";
+    return getConfig("metodos_mostrador") || "efectivo, tarjeta y transferencia";
   } catch (e) {
     return esDomicilio ? "efectivo y transferencia" : "efectivo, tarjeta y transferencia";
   }
@@ -187,7 +183,6 @@ function respuestaMetodosPago(esDomicilio = false) {
   return (
     `💳 *Métodos de pago en ${negocio}:*\n\n` +
     `Aceptamos: *${metodos}*\n\n` +
-    (esDomicilio ? "_Para pedidos a domicilio: efectivo o transferencia_\n\n" : "") +
     `_¿Te hacemos un pedido?_ 😊`
   );
 }

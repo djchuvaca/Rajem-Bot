@@ -1,6 +1,6 @@
 # Mapeo de FAQs — Bot Tacos Javier
-**Fecha:** 05 Mayo 2026  
-**Archivo fuente:** `src/handlers/pedidoParser.js` + `src/handlers/respuestas.js`
+**Fecha:** 23 Mayo 2026  
+**Archivo fuente:** `src/handlers/pedidoParser.js` + `src/handlers/respuestas.js` + `src/handlers/flujos/orden.js`
 
 ---
 

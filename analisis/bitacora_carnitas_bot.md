@@ -1,6 +1,6 @@
 # Bitácora del Proyecto: Bot WhatsApp Tacos Javier
 **Versión actual:** carnitas-bot 1.4  
-**Fecha:** 22 Mayo 2026 (último commit: 3033601 — 20 May 2026 | cambios sin commit: 22 May 2026)  
+**Fecha:** 23 Mayo 2026 (último commit: 0d27f0c — 23 May 2026)  
 **Stack:** Node.js, whatsapp-web.js, Groq (llama-3.3-70b), sql.js (SQLite), Express panel admin
 
 ---
@@ -16,12 +16,18 @@ Bot de WhatsApp para una taquería (Tacos Javier, Culiacán Sinaloa) que toma pe
 ```
 src/
 ├── handlers/
-│   ├── mensajes.js       ← orquestador principal (~1400 líneas)
+│   ├── mensajes.js       ← router delgado (~178 líneas): encadena sub-handlers, sin lógica de negocio
 │   ├── pedidoParser.js   ← parser local con sistema de score
 │   ├── respuestas.js     ← respuestas automáticas sin Groq
-│   ├── entrega.js        ← detecta tipo de entrega
 │   ├── imagenes.js
-│   └── comandos.js
+│   ├── comandos.js
+│   └── flujos/
+│       ├── formulario.js ← primer mensaje, tipo de entrega, formulario progresivo
+│       ├── orden.js      ← toma de pedido: corte, tipo, confirmación, agregar más, Groq
+│       ├── edicion.js    ← edición de campos en formulario y resumen
+│       ├── resumen.js    ← resumen final, confirmación, cambios, catch-all
+│       ├── cancelacion.js← flujo de cancelación
+│       └── utils.js      ← helpers: replyConTyping, parsearSinCorteItems, timeout bifásico
 ├── pedido/
 │   ├── resumen.js        ← genera resumen final del pedido
 │   └── precios.js        ← cálculo de precios
@@ -80,8 +86,10 @@ Todos los Maps de flujo principal viven en `estado/maps.js` y se serializan/rest
 | `esperandoCaptura` | maps.js | esperando captura de transferencia |
 | `clientesPreventa` | maps.js | clientes en flujo de preventa |
 | `esperandoTipoItem` | maps.js ← **movido** | ítem con corte pero sin tipo (taco/torta/gramos); ahora serializado en sesiones |
-| `ultimoPedido` | mensajes.js | último JSON de pedido (para "lo mismo de siempre"); solo en memoria |
-| `ultimaActividad` | mensajes.js | timestamp del último mensaje (para timeout de sesiones zombi) |
+| `ultimoPedido` | flujos/utils.js | último JSON de pedido (para "lo mismo de siempre"); solo en memoria |
+| `ultimaActividad` | flujos/utils.js | timestamp del último mensaje; alimenta el timeout bifásico |
+| `telefonosReales` | flujos/utils.js | teléfono real del cliente por JID; solo en memoria |
+| `recordatorioEnviado` | flujos/utils.js | timestamp del recordatorio enviado por inactividad; se borra al responder |
 
 ---
 
@@ -101,7 +109,7 @@ Todos los Maps de flujo principal viven en `estado/maps.js` y se serializan/rest
 
 **Guard FAQs:** `enFlujoActivo()` bloquea FAQs cuando el cliente está en un flujo activo. Ahora también incluye `esperandoTipoItem` en el guard.
 
-**Timeout de sesiones zombi:** `setInterval` cada 10 min limpia clientes inactivos > 45 min que siguen en `enFlujoActivo()`. Evita sesiones colgadas indefinidamente.
+**Timeout de sesiones (bifásico):** `setInterval` cada 10 min. Fase 1 (30 min de inactividad): envía un recordatorio contextual según el estado del cliente (`resumenPendiente`, `esperandoCorte`, formulario, etc.) via `client.sendMessage`. Solo se envía una vez por sesión (`recordatorioEnviado` Map). Fase 2 (45 min): limpia la sesión con `limpiarTodo()`. Limpia también clientes en `clientesNuevos` o `datosCampos` aunque no estén en `enFlujoActivo()`.
 
 ---
 
@@ -285,6 +293,15 @@ Todas las respuestas del bot usan `replyConTyping(msg, texto)` en lugar de `msg.
 45. `cambiar_corte` en `detectarModificacion()` fallaba si el usuario escribía con typo ("cambia la carne por buch") → ahora usa `buscarCorteFuzzy` como fallback tras match exacto
 46. `aplicarQuitarUno()` reducía el primer ítem del resumen en lugar del último añadido → iterar desde el final (`i = lineas.length - 1` hacia 0)
 47. Panel admin sin protección contra brute force → rate limiting en `/api/login`: 5 intentos/min/IP con bloqueo de 60s
+48. Teléfono del cliente no se detectaba cuando venía del JID precargado — guard `if (!campos.telefono)` en `interpretarCampos` bloqueaba el número tipado → guard eliminado; siempre sobreescribe con número tipado por el cliente
+49. Regex de teléfono solo detectaba `\b\d{10}\b` — no validaba LADA mexicano ni prefijo `+52` → `extraerTelefono()` unificada: valida primer dígito 2-9, detecta `+52`/`52` prefijo y separadores (331-234-5678)
+50. Extracción de JID inconsistente entre `formulario.js` y `resumen.js` → `extraerTelefonoDeJID()` unificada: maneja @c.us, @lid, separador ":"
+51. `PALABRAS_NO_NOMBRE` no incluía palabras geográficas — "norte", "reforma", "centro", etc. se capturaban como nombres → ampliado con vocabulario geográfico/postal
+52. `datosCompletos()` usaba `/\b\d{10}\b/` — aceptaba cualquier 10 dígitos incluyendo `0XXXXXXXXX` (LADA inválida) → ahora usa `extraerTelefono(texto) !== null`
+53. Nombre compuesto mal spliteado en BD — "María José Pérez" guardaba `nombre="María"`, `apellido="José Pérez"` → nueva lógica: 1 palabra→nombre, 2→nombre+apellido, 3+→dos primeras palabras=nombre, resto=apellido
+54. Fallo silencioso en BD durante confirmación — si `upsertCliente`/`registrarPedido` lanzaba error, el cliente recibía "pedido recibido" aunque no se guardó → BD se guarda primero; si falla, cliente recibe mensaje de error y la función regresa sin confirmar
+55. Timeout no limpiaba clientes a medio formulario — clientes en `clientesNuevos`/`datosCampos` pero no en `enFlujoActivo()` nunca se limpiaban → timeout verifica adicionalmente `clientesNuevos.has()` y `datosCampos.has()`
+56. Sin mecanismo de re-engagement — clientes que dejaban de contestar perdían su pedido sin aviso → timeout bifásico: 30 min → recordatorio contextual (muestra estado actual), 45 min → limpiar sesión
 
 ---
 
@@ -342,10 +359,44 @@ Pendiente:
 
 ## Último estado — desde aquí debes continuar
 
-### Último commit: `3033601` (20 May 2026)
-**"Actualiza gitignore"** (commit previo relevante: `89bafe5` — "Mejoras de UX, corrección de bugs y refactor de arquitectura")
+### Último commit: `0d27f0c` (23 May 2026)
+**"Mejoras de robustez, parser y panel admin (ronda 1 y 2)"**
 
-### Cambios post-commit (22 May 2026, sin commit aún) — dos rondas de mejoras:
+### Cambios post-commit (23 May 2026) — ronda 3 de mejoras:
+
+---
+
+#### Ronda 3 (23 May 2026 — 10 fixes y features):
+
+**`src/estado/campos.js`**:
+- `extraerTelefono(texto)` — función unificada. Detecta +52 prefijo, formatos con separadores (331-234-5678), valida primer dígito 2-9 (LADA mexicano válida)
+- `extraerTelefonoDeJID(jid)` — función unificada. Maneja `@c.us`, `@lid`, separador `:` en JIDs de WA
+- `PALABRAS_NO_NOMBRE` ampliado con vocabulario geográfico y postal
+- Guard `if (!campos.telefono)` en `interpretarCampos` eliminado — ahora el teléfono tipado por el cliente siempre sobreescribe el pre-llenado del JID
+- `datosCompletos()` — regex `/\b\d{10}\b/` reemplazado por `extraerTelefono(texto) !== null`
+- Exporta `extraerTelefono` y `extraerTelefonoDeJID`
+
+**`src/estado/index.js`**:
+- Re-exporta `extraerTelefono` y `extraerTelefonoDeJID`
+
+**`src/handlers/flujos/formulario.js`**:
+- Usa `extraerTelefonoDeJID` para pre-llenado del teléfono en primer mensaje
+- Llama `interpretarCampos` sobre el texto del primer mensaje para capturar datos enviados de una sola vez
+
+**`src/handlers/flujos/resumen.js`**:
+- Usa `extraerTelefonoDeJID` en `handleConfirmacionFinal`
+- La BD se guarda **primero** (`upsertCliente` + `registrarPedido`); si falla → cliente recibe mensaje de error y la función retorna sin confirmar ni notificar al grupo
+- Nombre compuesto corregido: 1 palabra→nombre solo, 2→nombre+apellido, 3+→primeras dos=nombre, resto=apellido
+
+**`src/handlers/flujos/utils.js`**:
+- Importa `datosCampos` desde estado
+- Timeout bifásico: **Fase 1** (30 min) → `_textoRecordatorio()` construye mensaje contextual según estado del cliente y lo envía via `getWhatsappClient()`. **Fase 2** (45 min) → `limpiarTodo()` como antes
+- Timeout ahora también limpia clientes en `clientesNuevos` o `datosCampos` (antes solo limpiaba `enFlujoActivo()`)
+- Exporta `recordatorioEnviado` Map
+
+**`src/handlers/mensajes.js`**:
+- Importa `recordatorioEnviado` desde utils
+- Llama `recordatorioEnviado.delete(clienteNumero)` al recibir cualquier mensaje (reinicia el ciclo del recordatorio)
 
 ---
 
@@ -452,25 +503,26 @@ Pendiente:
 
 ### Archivos clave actuales:
 
-1. **`src/handlers/mensajes.js`** — Orquestador principal (~1700 líneas). Bloques de FAQs, modificaciones, `esperandoTipoItem` (importado), `quiereEmpezarDeNuevo`, timeout de sesiones, antes de Groq.
-2. **`src/handlers/pedidoParser.js`** — Parser con score, fuzzy matching, `textoANumero`, `parsearMitadMitad` ("mitad" y "medio"), `dividirEnItems` con "y también", `detectarSinTipo`, `detectarRepetirPedido`, cortes dinámicos.
-3. **`src/handlers/respuestas.js`** — Respuestas automáticas a FAQs incluyendo `descripcion_corte`; `aplicarQuitarUno` desde el último ítem.
-4. **`src/estado/campos.js`** — Formulario progresivo + `detectarEdicion`/`aplicarEdicion` + `limpiarTodo` + regex de teléfono con +52.
-5. **`src/estado/maps.js`** — Todos los Maps/Sets incluyendo `esperandoTipoItem`. Única fuente de verdad del estado en memoria.
-6. **`src/estado/sesiones.js`** — Serialización y restauración completa; TTL 48h; `esperandoTipoItem` incluido.
-7. **`src/db/core.js`** — `guardarDB()` con debounce 500ms.
-8. **`src/db/config.js`** — Incluye `guardarJIDReal`/`getJIDReal` junto a `guardarTelefonoReal`/`getTelefonoReal`.
-9. **`src/panel/server.js`** — Panel admin con rate limiting, stats eficiente, auto-notify al cliente.
-10. **`src/panel/whatsapp-bridge.js`** — Singleton WA client.
+1. **`src/handlers/mensajes.js`** — Router delgado (~178 líneas). Encadena sub-handlers en orden de prioridad. Registra `ultimaActividad` y limpia `recordatorioEnviado` en cada mensaje.
+2. **`src/handlers/flujos/utils.js`** — Helpers compartidos + timeout bifásico (30 min recordatorio, 45 min limpiar). Maps auxiliares: `telefonosReales`, `ultimoPedido`, `ultimaActividad`, `recordatorioEnviado`.
+3. **`src/handlers/flujos/resumen.js`** — Confirmación de pedido: BD se guarda primero, nombre compuesto correcto, fallo de BD notifica al cliente.
+4. **`src/handlers/pedidoParser.js`** — Parser con score, fuzzy matching, `textoANumero`, `parsearMitadMitad`, `detectarSinTipo`, `detectarRepetirPedido`, cortes dinámicos.
+5. **`src/handlers/respuestas.js`** — Respuestas automáticas a FAQs incluyendo `descripcion_corte`; `aplicarQuitarUno` desde el último ítem.
+6. **`src/estado/campos.js`** — Formulario progresivo + `extraerTelefono()` + `extraerTelefonoDeJID()` + `detectarEdicion`/`aplicarEdicion` + `limpiarTodo`. `datosCompletos()` usa `extraerTelefono`.
+7. **`src/estado/maps.js`** — Todos los Maps/Sets incluyendo `esperandoTipoItem`. Única fuente de verdad del estado en memoria.
+8. **`src/estado/sesiones.js`** — Serialización y restauración completa; TTL 48h.
+9. **`src/db/core.js`** — `guardarDB()` con debounce 500ms.
+10. **`src/panel/server.js`** — Panel admin con rate limiting, stats eficiente, auto-notify al cliente.
+11. **`src/panel/whatsapp-bridge.js`** — Singleton WA client; usado por `utils.js` para enviar recordatorios proactivos.
 
 ### Siguiente paso sugerido:
 
-Hacer commit de todos los cambios (dos rondas de mejoras sin commitear) y probar en producción:
-1. Conectar WhatsApp y enviar "5 de carne" → verificar `esperandoTipoItem` (ahora sobrevive reinicios)
-2. Enviar "medio carne y medio buche" → verificar alias de `parsearMitadMitad`
-3. Enviar "+521234567890" como teléfono en el formulario → verificar regex
-4. Cambiar estado de pedido desde el panel → verificar auto-notificación por WA
-5. Intentar login incorrecto 6 veces → verificar rate limiting 429
+Probar en producción:
+1. Dejar una conversación a medio formulario sin contestar 30 min → verificar que llega el recordatorio contextual
+2. No contestar después del recordatorio (otros 15 min) → verificar que la sesión se limpia
+3. Completar un pedido como "María José Pérez" → verificar que BD guarda `nombre="María José"`, `apellido="Pérez"`
+4. Simular fallo de BD (bd.run = null) → verificar que cliente recibe error en lugar de confirmación falsa
+5. Enviar "+5213312345678" como teléfono → verificar que se extrae `3312345678`
 
 ---
 

@@ -9,6 +9,11 @@ let _cortesCache = null;
 let _cortesCacheTs = 0;
 const _CORTES_TTL = 60 * 1000;
 
+function invalidarCacheCortes() {
+  _cortesCache = null;
+  _cortesCacheTs = 0;
+}
+
 function getCortes() {
   const ahora = Date.now();
   if (_cortesCache && ahora - _cortesCacheTs < _CORTES_TTL) return _cortesCache;
@@ -198,7 +203,7 @@ function extraerCorte(fragmento) {
 // ── DIVIDIR EN ÍTEMS ──────────────────────────────────────────────────────────
 function dividirEnItems(texto) {
   const partes = texto
-    .split(/,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
+    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
     .map(p => p.trim().replace(/^y\s+/i, ""))
     .filter(Boolean);
   return partes.length > 1 ? partes : [texto];
@@ -500,5 +505,6 @@ module.exports = {
   detectarRepetirPedido,
   calcularScore,
   getCortes,
+  invalidarCacheCortes,
   normalizar,
 };

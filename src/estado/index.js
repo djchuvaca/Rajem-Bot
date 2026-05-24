@@ -53,4 +53,6 @@ module.exports = {
   extraerDatosPedido:         campos.extraerDatosPedido,
   detectarEdicion:            campos.detectarEdicion,
   aplicarEdicion:             campos.aplicarEdicion,
+  extraerTelefono:            campos.extraerTelefono,
+  extraerTelefonoDeJID:       campos.extraerTelefonoDeJID,
 };

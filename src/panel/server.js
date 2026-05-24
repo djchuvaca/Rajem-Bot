@@ -14,6 +14,7 @@ const {
   getConfig, guardarTelefonoReal, getJIDReal,
 } = require("../db");
 const { queryOne } = require("../db/core");
+const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 
 const { getWhatsappClient } = require("./whatsapp-bridge");
 
@@ -102,9 +103,9 @@ app.post("/api/mensajes", requireAuth, (req, res) => {
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
 app.get("/api/productos", requireAuth, (req, res) => res.json(getProductos()));
-app.post("/api/productos", requireAuth, (req, res) => { createProducto(req.body); res.json({ ok: true }); });
-app.put("/api/productos/:id", requireAuth, (req, res) => { updateProducto(parseInt(req.params.id), req.body); res.json({ ok: true }); });
-app.delete("/api/productos/:id", requireAuth, (req, res) => { deleteProducto(parseInt(req.params.id)); res.json({ ok: true }); });
+app.post("/api/productos", requireAuth, (req, res) => { createProducto(req.body); invalidarCacheCortes(); res.json({ ok: true }); });
+app.put("/api/productos/:id", requireAuth, (req, res) => { updateProducto(parseInt(req.params.id), req.body); invalidarCacheCortes(); res.json({ ok: true }); });
+app.delete("/api/productos/:id", requireAuth, (req, res) => { deleteProducto(parseInt(req.params.id)); invalidarCacheCortes(); res.json({ ok: true }); });
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
 app.get("/api/clientes", requireAuth, (req, res) => res.json(getAllClientes()));

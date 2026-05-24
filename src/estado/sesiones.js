@@ -9,7 +9,7 @@ const {
   resumenPendiente, esperandoCaptura, datosAcumulados, datosCampos,
   pedidosConfirmados, esperandoMotivoCancelacion, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
-  tipoEntregaCliente, esperandoEdicion, esperandoTipoItem,
+  tipoEntregaCliente, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
 } = require("./maps");
 
 function serializarEstado(numero) {
@@ -33,6 +33,7 @@ function serializarEstado(numero) {
   if (tipoEntregaCliente.has(numero))         estado.tipoEntregaCliente   = tipoEntregaCliente.get(numero);
   if (esperandoEdicion.has(numero))           estado.esperandoEdicion     = esperandoEdicion.get(numero);
   if (esperandoTipoItem.has(numero))          estado.esperandoTipoItem    = esperandoTipoItem.get(numero);
+  if (pendientesConfirmacion.has(numero))     estado.pendienteConfirmacion = pendientesConfirmacion.get(numero);
   return estado;
 }
 
@@ -56,8 +57,9 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.esperandoConfirmDatos) esperandoConfirmacionDatos.set(numero, estado.esperandoConfirmDatos);
   if (estado.tipoEntregaCliente)    tipoEntregaCliente.set(numero, estado.tipoEntregaCliente);
   if (estado.esperandoEdicion)      esperandoEdicion.set(numero, estado.esperandoEdicion);
-  if (estado.esperandoTipoItem)     esperandoTipoItem.set(numero, estado.esperandoTipoItem);
-  if (historial.length > 0)         conversaciones.set(numero, historial);
+  if (estado.esperandoTipoItem)       esperandoTipoItem.set(numero, estado.esperandoTipoItem);
+  if (estado.pendienteConfirmacion)   pendientesConfirmacion.set(numero, estado.pendienteConfirmacion);
+  if (historial.length > 0)           conversaciones.set(numero, historial);
 }
 
 function persistirEstado(numero) {
