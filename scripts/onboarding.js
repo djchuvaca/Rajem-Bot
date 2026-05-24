@@ -7,10 +7,8 @@ require("dotenv").config();
 const readline = require("readline");
 const { initDB }       = require("../src/db");
 const { setConfig, updateBanco, updateHorario, getProductos, updateProducto } = require("../src/db");
-const { run, getDB }   = require("../src/db/core");
+const { run }          = require("../src/db/core");
 const bcrypt           = require("bcryptjs");
-const fs               = require("fs");
-const path             = require("path");
 
 const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
 const ask = (q, def) => new Promise(res =>
@@ -24,13 +22,6 @@ function sep(titulo) {
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   if (titulo) console.log(`  ${titulo}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-}
-
-function guardarDisco() {
-  const db   = getDB();
-  const data = db.export();
-  const p    = path.join(__dirname, "../data/tacos_javier.db");
-  fs.writeFileSync(p, Buffer.from(data));
 }
 
 async function main() {
@@ -128,8 +119,7 @@ async function main() {
     }
   }
 
-  // ── Guardar y cerrar ────────────────────────────────────────────────────────
-  guardarDisco();
+  // ── Cerrar ──────────────────────────────────────────────────────────────────
   rl.close();
 
   sep("¡Configuración completada!");
