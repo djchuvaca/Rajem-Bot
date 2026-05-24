@@ -1,4 +1,19 @@
 require("dotenv").config();
+
+// ── VALIDACIÓN DE VARIABLES DE ENTORNO ───────────────────────────────────────
+(function validarEnv() {
+  const requeridas = ["GROQ_API_KEY", "GRUPO_ID"];
+  const faltantes  = requeridas.filter(k => !process.env[k]);
+  if (faltantes.length) {
+    console.error("❌ Faltan variables de entorno requeridas:", faltantes.join(", "));
+    console.error("   Copia .env.example como .env y completa los valores.");
+    process.exit(1);
+  }
+  if (!process.env.PANEL_SECRET) {
+    console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto por defecto (inseguro en producción).");
+  }
+})();
+
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 

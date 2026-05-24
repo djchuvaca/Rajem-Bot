@@ -26,7 +26,8 @@ analisis/capturas/
 apply_fixes.js
 
 # ── Logs ────────────────────────────────────────────────────────
-logs/
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 
@@ -45,6 +46,10 @@ desktop.ini
 *.swp
 *.swo
 *~
+
+# ── Backups de BD ───────────────────────────────────────────────
+backups/*
+!backups/.gitkeep
 
 # ── Archivos de respaldo ────────────────────────────────────────
 *.bak
