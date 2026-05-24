@@ -130,6 +130,7 @@ async function seedDB() {
       ["precio_100g",       "32"],
       ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
       ["metodos_domicilio", "efectivo o transferencia"],
+      ["tipo_negocio",      "carnitas de puerco"],
     ];
     for (const [clave, valor] of config) {
       db.run("INSERT INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -142,6 +143,7 @@ async function seedDB() {
       ["precio_100g",       "32"],
       ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
       ["metodos_domicilio", "efectivo o transferencia"],
+      ["tipo_negocio",      "carnitas de puerco"],
     ];
     for (const [clave, valor] of nuevos) {
       db.run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
