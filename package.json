@@ -10,7 +10,8 @@
     "backup": "node scripts/backup-db.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop carnitas-bot",
-    "pm2:logs": "pm2 logs carnitas-bot"
+    "pm2:logs": "pm2 logs carnitas-bot",
+    "reset-password": "node scripts/reset-password.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

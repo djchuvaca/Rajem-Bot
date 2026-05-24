@@ -157,20 +157,38 @@ tr:hover td{background:var(--surface2)}
         <div class="card-title">Pedidos de hoy</div>
         <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th></tr></thead><tbody></tbody></table></div>
       </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="card-title" style="margin:0">Estadísticas históricas</div>
+          <select class="form-select" style="width:150px" id="historico-periodo" onchange="loadHistorico()">
+            <option value="semana">Últimos 7 días</option>
+            <option value="mes">Últimos 30 días</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="historico-table">
+          <thead><tr><th>Día</th><th>Total pedidos</th><th>Confirmados</th><th>Cancelados</th><th>Ventas</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- PEDIDOS -->
     <div class="section" id="s-pedidos">
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
           <div class="card-title" style="margin:0">Todos los pedidos</div>
-          <select class="form-select" style="width:160px" id="filtro-estado" onchange="loadPedidos()">
-            <option value="">Todos</option>
-            <option value="pendiente">Pendientes</option>
-            <option value="confirmado">Confirmados</option>
-            <option value="cancelado">Cancelados</option>
-            <option value="rechazado">Rechazados</option>
-          </select>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="form-select" style="width:150px" id="filtro-estado" onchange="loadPedidos()">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="confirmado">Confirmados</option>
+              <option value="cancelado">Cancelados</option>
+              <option value="rechazado">Rechazados</option>
+            </select>
+            <input type="date" class="form-input" id="filtro-desde" style="width:145px" onchange="loadPedidos()" title="Desde">
+            <input type="date" class="form-input" id="filtro-hasta" style="width:145px" onchange="loadPedidos()" title="Hasta">
+            <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">⬇ CSV</button>
+          </div>
         </div>
         <!-- ↓ CAMBIO 1: se agregó columna "Eliminar" -->
         <div class="table-wrap"><table id="pedidos-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th><th>Cambiar estado</th><th>Eliminar</th></tr></thead><tbody></tbody></table></div>
@@ -381,6 +399,7 @@ async function loadDashboard() {
     <div class="stat-card blue"><div class="stat-num">$${Math.round(stats.total_ventas_hoy)}</div><div class="stat-label">Ventas hoy</div></div>
     <div class="stat-card"><div class="stat-num">${stats.total_clientes}</div><div class="stat-label">Clientes totales</div></div>
   `;
+  loadHistorico();
   const pedidos = await api('/api/pedidos?hoy=1');
   const tbody = document.querySelector('#pedidos-hoy-table tbody');
   tbody.innerHTML = pedidos.length ? pedidos.map(p => `
@@ -398,8 +417,13 @@ async function loadDashboard() {
 // ── PEDIDOS ───────────────────────────────────────────────────────────────────
 async function loadPedidos() {
   const filtro  = document.getElementById('filtro-estado').value;
+  const desde   = document.getElementById('filtro-desde').value;
+  const hasta   = document.getElementById('filtro-hasta').value;
   const pedidos = await api('/api/pedidos');
-  const lista   = filtro ? pedidos.filter(p => p.estado === filtro) : pedidos;
+  let lista = filtro ? pedidos.filter(p => p.estado === filtro) : pedidos;
+  if (desde) lista = lista.filter(p => (p.fecha || '') >= desde);
+  if (hasta) lista = lista.filter(p => (p.fecha || '') <= hasta + ' 23:59:59');
+  window._pedidosData = lista;
   const tbody   = document.querySelector('#pedidos-table tbody');
   tbody.innerHTML = lista.length ? lista.map(p => `
     <tr>
@@ -422,6 +446,19 @@ async function loadPedidos() {
     </tr>`).join('') : '<tr><td colspan="10" class="empty">No hay pedidos</td></tr>';
 }
 
+function exportarCSV() {
+  const datos = window._pedidosData || [];
+  if (!datos.length) return toast('No hay pedidos para exportar', false);
+  const cols = ['id','nombre','apellido','telefono','tipo','orden','total','metodo_pago','estado','fecha'];
+  const enc  = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [cols.join(','), ...datos.map(p => cols.map(c => enc(p[c])).join(','))];
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pedidos_${new Date().toISOString().substring(0, 10)}.csv`;
+  a.click();
+}
+
 async function cambiarEstadoPedido(id, estado) {
   await api(`/api/pedidos/${id}/estado`, 'PUT', { estado });
   toast('Estado actualizado');
@@ -437,6 +474,24 @@ async function deletePedido(id) {
   } else {
     toast('Error al eliminar el pedido', false);
   }
+}
+
+async function loadHistorico() {
+  const periodo = document.getElementById('historico-periodo')?.value || 'semana';
+  const filas   = await api(`/api/stats/historico?periodo=${periodo}`);
+  const tbody   = document.querySelector('#historico-table tbody');
+  if (!filas.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin datos en el período</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filas.map(f => `
+    <tr>
+      <td>${f.dia}</td>
+      <td>${f.total}</td>
+      <td style="color:var(--green)">${f.confirmados}</td>
+      <td style="color:var(--red)">${f.cancelados}</td>
+      <td><strong>$${Math.round(f.ventas || 0)}</strong></td>
+    </tr>`).join('');
 }
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────

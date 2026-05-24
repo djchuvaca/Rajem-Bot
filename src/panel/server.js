@@ -205,6 +205,26 @@ app.get("/api/stats", requireAuth, (req, res) => {
   });
 });
 
+// ── STATS HISTÓRICO ───────────────────────────────────────────────────────────
+app.get("/api/stats/historico", requireAuth, (req, res) => {
+  const dias  = req.query.periodo === "mes" ? 30 : 7;
+  const { queryAll } = require("../db/core");
+  const filas = queryAll(
+    `SELECT date(fecha, 'localtime') AS dia,
+            COUNT(*)                                                   AS total,
+            SUM(CASE WHEN estado = 'confirmado' THEN 1 ELSE 0 END)    AS confirmados,
+            SUM(CASE WHEN estado = 'cancelado'
+                      OR estado  = 'rechazado' THEN 1 ELSE 0 END)     AS cancelados,
+            ROUND(SUM(CASE WHEN estado = 'confirmado'
+                           THEN total ELSE 0 END), 2)                 AS ventas
+     FROM pedidos
+     WHERE fecha >= date('now', 'localtime', ? || ' days')
+     GROUP BY dia ORDER BY dia ASC`,
+    [`-${dias}`]
+  );
+  res.json(filas);
+});
+
 // ── NOTIFICACIÓN AL CLIENTE ───────────────────────────────────────────────────
 // POST /api/pedidos/:id/notificar  { mensaje: "Tu pedido va en camino 🛵" }
 app.post("/api/pedidos/:id/notificar", requireAuth, async (req, res) => {
