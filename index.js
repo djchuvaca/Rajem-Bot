@@ -51,15 +51,31 @@ client.on("ready", () => {
   console.log("✅ Bot de Tacos Javier conectado y listo!");
   console.log("─────────────────────────────────────────────");
   console.log("Comandos disponibles en el grupo:");
-  console.log("  !pedidos          — todos los pedidos del día");
-  console.log("  !pendientes       — pedidos esperando confirmación");
-  console.log("  !confirmados      — pedidos confirmados hoy");
-  console.log("  !cancelados       — pedidos cancelados hoy");
-  console.log("  !rechazados       — pedidos rechazados hoy");
-  console.log("  !confirmar [tel]  — confirmar pedido de un cliente");
-  console.log("  !rechazar [tel]   — rechazar pedido de un cliente");
-  console.log("  !stats            — resumen del día (ventas, tickets, top cortes)");
-  console.log("  !cliente [tel]    — ver datos completos de un cliente");
+  console.log("  !ayuda                      — lista de comandos");
+  console.log("  !pedidos                    — todos los pedidos del día");
+  console.log("  !pendientes / !confirmados  — filtrar por estado");
+  console.log("  !domicilios / !mostradores  — filtrar por tipo");
+  console.log("  !confirmar [tel]            — confirmar pedido");
+  console.log("  !listo [tel]                — avisar listo/en camino");
+  console.log("  !cancelar [tel]             — cancelar con aviso al cliente");
+  console.log("  !rechazar [tel]             — rechazar pedido");
+  console.log("  !cliente [tel]              — datos del cliente");
+  console.log("  !buscar [nombre]            — buscar cliente por nombre");
+  console.log("  !historial [tel]            — historial de pedidos");
+  console.log("  !mensaje [tel] [texto]      — mensaje directo al cliente");
+  console.log("  !stats                      — resumen del día");
+  console.log("  !reporte ayer / semana      — reporte de fechas anteriores");
+  console.log("  !pausar / !reanudar         — pausar/activar el bot");
+  console.log("  !sesiones                   — ver sesiones activas de clientes");
+  console.log("  !resetear [tel]             — limpiar sesión de un cliente");
+  console.log("  !pedido [tel]               — detalle completo de un pedido");
+  console.log("  !precios                    — ver precios del menú");
+  console.log("  !precio [corte] [t] [to]   — actualizar precio de un corte");
+  console.log("  !agotado / !disponible      — marcar corte agotado o disponible");
+  console.log("  !cerrar / !abrir            — cerrar o abrir el negocio hoy");
+  console.log("  !top                        — top 10 clientes por pedidos");
+  console.log("  !editar [tel] [campo] [v]  — editar datos de un cliente");
+  console.log("  !estado                     — uptime, sesiones y estado del bot");
   console.log("─────────────────────────────────────────────");
 });
 
@@ -85,6 +101,16 @@ client.on("message", async (msg) => {
     if (_msgProcesados.has(_msgId)) return;
     _msgProcesados.add(_msgId);
     if (_msgProcesados.size > 200) _msgProcesados.delete(_msgProcesados.values().next().value);
+  }
+
+  // Resolver LID a JID real — WhatsApp envía @lid en lugar de @c.us en algunos dispositivos
+  if (msg.from.endsWith("@lid")) {
+    try {
+      const resultados = await client.getContactLidAndPhone([msg.from]);
+      if (resultados && resultados[0] && resultados[0].pn) {
+        msg.from = resultados[0].pn;
+      }
+    } catch (_) {}
   }
 
   if (msg.from.endsWith("@g.us")) {

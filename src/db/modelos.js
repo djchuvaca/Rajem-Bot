@@ -112,8 +112,65 @@ function deletePedido(id) {
   run("DELETE FROM pedidos WHERE id = ?", [id]);
 }
 
+function setProductoActivo(nombre, activo) {
+  run("UPDATE productos SET activo = ? WHERE LOWER(nombre) = LOWER(?)", [activo ? 1 : 0, nombre]);
+}
+
+function updateProductoPrecio(nombre, precioTaco, precioTorta) {
+  run(
+    "UPDATE productos SET precio_taco = ?, precio_torta = ? WHERE LOWER(nombre) = LOWER(?)",
+    [precioTaco, precioTorta, nombre]
+  );
+}
+
+function getTopClientes(limit = 10) {
+  return queryAll(
+    `SELECT c.*,
+       COALESCE(SUM(CASE WHEN p.estado IN ('confirmado','listo','en_camino') THEN p.total ELSE 0 END), 0) AS gasto_total
+     FROM clientes c
+     LEFT JOIN pedidos p ON p.cliente_id = c.id
+     WHERE c.total_pedidos > 0
+     GROUP BY c.id
+     ORDER BY c.total_pedidos DESC
+     LIMIT ?`,
+    [limit]
+  );
+}
+
+function getPedidosPorCliente(telefono) {
+  return queryAll(
+    `SELECT p.* FROM pedidos p
+     INNER JOIN clientes c ON p.cliente_id = c.id
+     WHERE c.telefono = ? ORDER BY p.fecha DESC LIMIT 15`,
+    [telefono]
+  );
+}
+
+function actualizarEstadoConfirmado(telefono, nuevoEstado) {
+  run(
+    `UPDATE pedidos SET estado = ? WHERE id = (
+      SELECT p.id FROM pedidos p
+      INNER JOIN clientes c ON p.cliente_id = c.id
+      WHERE c.telefono = ? AND p.estado = 'confirmado'
+      ORDER BY p.fecha DESC LIMIT 1)`,
+    [nuevoEstado, telefono]
+  );
+}
+
+function getPedidosPorFecha(fechaInicio, fechaFin) {
+  return queryAll(
+    `SELECT p.*, c.nombre, c.apellido, c.telefono FROM pedidos p
+     LEFT JOIN clientes c ON p.cliente_id = c.id
+     WHERE date(p.fecha) >= date(?) AND date(p.fecha) <= date(?)
+     ORDER BY p.fecha DESC`,
+    [fechaInicio, fechaFin]
+  );
+}
+
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
+  getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha,
+  setProductoActivo, updateProductoPrecio, getTopClientes,
 };

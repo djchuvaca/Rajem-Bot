@@ -2,7 +2,7 @@
 
 **Versión:** carnitas-bot 1.4  
 **Stack:** Node.js · whatsapp-web.js · Groq · sql.js · Express  
-**Fecha documento:** 23 Mayo 2026
+**Fecha documento:** 24 Mayo 2026
 
 ---
 
@@ -86,6 +86,7 @@ carnitas-bot 1.4/
 │   │   ├── maps.js             ← Todos los Maps de estado en memoria
 │   │   ├── campos.js           ← Interpretación de campos + utilidades de teléfono
 │   │   ├── sesiones.js         ← Serialización y restauración de sesiones
+│   │   ├── bot-pausado.js      ← Estado global de pausa del bot (singleton)
 │   │   └── index.js            ← Re-exporta todo (usar require("../estado"))
 │   │
 │   ├── db/
@@ -163,7 +164,12 @@ Cliente WhatsApp
  whatsapp-web.js (Puppeteer/Chromium)
       │  evento "message"
       ▼
- index.js → handleMensaje()
+ index.js
+      │  si msg.from termina en @lid:
+      │  → client.getContactLidAndPhone() → obtiene JID real (@c.us)
+      │  → reemplaza msg.from con el JID real
+      ▼
+ handleMensaje()
       │
       ├─► Parser local (pedidoParser.js)    ← 95% de los casos
       │         │ si no puede parsear

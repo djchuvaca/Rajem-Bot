@@ -164,33 +164,45 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 
 ---
 
-## Estado actual del proyecto (Mayo 2026)
+## Estado actual del proyecto (24 Mayo 2026)
 
 ### Lo que está implementado y funcionando
 
-- Flujo conversacional completo de extremo a extremo
-- Parser NLU local con fuzzy matching y sistema de score
+**Flujo conversacional:**
+- Flujo completo de extremo a extremo para pedidos de domicilio y mostrador
+- Parser NLU local con fuzzy matching y sistema de score (~95% sin IA)
 - Formulario progresivo inteligente (captura múltiples campos en un mensaje)
 - Reconocimiento de clientes frecuentes con datos pre-llenados
 - Pedidos de preventa fuera de horario
-- Resumen final con opción de editar antes de confirmar
-- Confirmación con notificación al grupo admin de WhatsApp
-- Panel web con todas las operaciones CRUD
-- Comandos del grupo admin (`!confirmar`, `!rechazar`, etc.)
-- Persistencia de sesiones a través de reinicios
-- Timeout bifásico (recordatorio a 30 min + limpieza a 45 min)
-- Notificación proactiva de estado del pedido al cliente
+- Resumen final con edición antes de confirmar
+- Timeout bifásico: recordatorio contextual a 30 min, limpieza a 45 min
+
+**Administración por grupo de WhatsApp (sin PC):**
+- Ver y filtrar pedidos del día por estado y tipo de entrega
+- Confirmar, marcar listo/en camino, cancelar y rechazar pedidos con notificación al cliente
+- Ver detalle completo de un pedido (ítems, dirección, método de pago)
+- Buscar y editar datos de clientes directamente desde el chat
+- Historial de pedidos por cliente y top clientes por gasto
+- Enviar mensajes directos a clientes desde el grupo
+- Actualizar precios y disponibilidad de cortes en tiempo real
+- Cierre manual del negocio (sin alterar horario permanente)
+- Pausar/reanudar el bot completamente
+- Ver y limpiar sesiones activas de clientes
+- Reportes de ventas: día, ayer, semana, mes
+
+**Infraestructura:**
+- Persistencia de sesiones a través de reinicios del proceso
+- Panel web con CRUD completo para configuración del negocio
+- Notificación proactiva al cliente al cambiar estado del pedido
 
 ### Pendiente (oportunidades de mejora)
 
 - Tests automatizados (unitarios y de integración)
-- FAQs durante estados bloqueantes (esperandoCorte, esperandoConfirmacionItem) — parcialmente implementado
 - Soporte de botones/listas interactivas de WhatsApp (requiere API oficial)
-- Dashboard con historial/tendencias (actualmente solo muestra el día actual)
 - Export de pedidos a CSV/Excel desde el panel
-- Sistema de notificaciones de tiempo estimado de entrega
-- Soporte de múltiples métodos de entrega (recoger en local vs domicilio) con diferentes configuraciones
+- Dashboard con historial y tendencias por semana/mes en el panel web
 - Validación de zona de cobertura geográfica
+- Soporte de horarios partidos (ej. 7:00-12:00 y 16:00-20:00)
 
 ---
 

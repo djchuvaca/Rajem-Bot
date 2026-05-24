@@ -94,7 +94,7 @@ setInterval(async () => {
       }
     }
   }
-}, 10 * 60 * 1000);
+}, 10 * 60 * 1000).unref(); // unref: no bloquea la salida del proceso si no hay más trabajo
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function enFlujoActivo(clienteNumero) {

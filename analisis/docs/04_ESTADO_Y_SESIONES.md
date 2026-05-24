@@ -303,8 +303,11 @@ Acepta todos los formatos mexicanos comunes:
 
 Extrae los últimos 10 dígitos del JID de WhatsApp:
 ```
-"5213312345678@c.us" → jid.slice(0, jid.indexOf("@")).slice(-10) → "3312345678"
+"5213312345678@c.us" → quita sufijo @c.us → "5213312345678" → últimos 10 → "3312345678"
+"521XXXXXXXXXX:12@c.us" → quita sufijo → divide en ":" → "521XXXXXXXXXX" → últimos 10
 ```
+
+**Guard de LID:** Si el JID termina en `@lid` (formato nuevo de WhatsApp), la función devuelve `null` inmediatamente sin intentar extraer dígitos. Esto evita que el identificador de dispositivo (ej. `3310000001:12@lid`) sea tratado como un número de teléfono real. La resolución del LID al JID real ocurre en `index.js` antes de que cualquier handler reciba el mensaje.
 
 ### División de nombre compuesto
 

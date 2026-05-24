@@ -90,7 +90,17 @@ CREATE TABLE productos (
 | cuero | $30 | $40 | $32 |
 | lengua | $30 | $40 | $32 |
 
-**Nota:** Cuando se modifica un producto desde el panel, se llama `invalidarCacheCortes()` en `pedidoParser.js` para que el bot refleje los cambios inmediatamente.
+**CRUD en `modelos.js`:**
+
+- `getProductos()` → todos los productos activos
+- `getProducto(nombre)` → un producto por nombre o null
+- `updateProducto(id, datos)` → UPDATE completo por ID
+- `createProducto(datos)` → INSERT
+- `deleteProducto(id)` → soft delete (activo=0)
+- `setProductoActivo(nombre, activo)` → activa o desactiva por nombre (comandos `!agotado` / `!disponible`)
+- `updateProductoPrecio(nombre, precioTaco, precioTorta)` → actualiza precios por nombre (comando `!precio`)
+
+**Nota:** Cualquier cambio en productos debe ir seguido de `invalidarCacheCortes()` en `pedidoParser.js` para que el bot refleje los cambios inmediatamente sin reiniciar.
 
 ---
 
@@ -127,6 +137,7 @@ CREATE TABLE clientes (
 
 - `getCliente(telefono)` → un cliente o null
 - `getAllClientes()` → todos ordenados por fecha DESC
+- `getTopClientes(limit)` → top N clientes ordenados por `total_pedidos` DESC, con `gasto_total` calculado de pedidos confirmados/listo/en_camino
 - `upsertCliente(datos)` → INSERT si no existe, UPDATE si ya existe (con COALESCE para no pisar datos existentes)
 - `deleteCliente(id)` → DELETE real (no soft delete)
 - `guardarUltimoPedido(telefono, jsonObj)` → actualiza `ultimo_pedido_json`
@@ -160,16 +171,27 @@ CREATE TABLE pedidos (
 | `orden` | texto libre | Descripción en texto del pedido ("3 tacos de surtido — $90") |
 | `total` | número decimal | Total en pesos incluyendo domicilio si aplica |
 | `metodo_pago` | "efectivo", "tarjeta", "transferencia" | |
-| `estado` | "pendiente", "confirmado", "rechazado", "cancelado", "en_camino" | Estado del ciclo de vida |
+| `estado` | "pendiente", "confirmado", "rechazado", "cancelado", "listo", "en_camino" | Estado del ciclo de vida |
 | `hora_entrega` | string o null | Solo para preventa ("09:00") |
+
+**Ciclo de vida del estado:**
+
+```
+pendiente → confirmado → listo (mostrador) | en_camino (domicilio)
+pendiente → cancelado | rechazado
+confirmado → cancelado
+```
 
 **CRUD en `modelos.js`:**
 
 - `registrarPedido(datos)` → INSERT + incrementa `total_pedidos` del cliente + llama `guardarDB()`
 - `getPedidosHoy()` → pedidos del día actual con JOIN a clientes
 - `getAllPedidos()` → últimos 200 pedidos con JOIN a clientes
+- `getPedidosPorCliente(telefono)` → últimos 15 pedidos de un cliente
+- `getPedidosPorFecha(fechaInicio, fechaFin)` → pedidos en rango de fechas con JOIN a clientes
 - `updatePedidoEstado(id, estado)` → actualiza el estado por ID
-- `actualizarEstadoPedido(telefono, estado)` → busca el pedido pendiente más reciente del cliente y lo actualiza (usado por comandos del grupo admin)
+- `actualizarEstadoPedido(telefono, estado)` → busca el pedido con estado "pendiente" más reciente y lo actualiza
+- `actualizarEstadoConfirmado(telefono, estado)` → busca el pedido con estado "confirmado" más reciente y lo actualiza (para `!listo` y `!cancelar` sobre pedidos ya confirmados)
 - `deletePedido(id)` → DELETE real
 
 **Advertencia:** `actualizarEstadoPedido()` busca por teléfono, no por ID. Si el teléfono registrado difiere del JID de WA (ej. número corto vs número con LADA), puede no encontrar el pedido. Ver `guardarTelefonoReal()` y `getJIDReal()`.
@@ -200,6 +222,7 @@ CREATE TABLE configuracion (
 | `precio_100g` | "32" | Precio base por 100g |
 | `metodos_mostrador` | "efectivo, tarjeta o transferencia" | Texto para FAQs de pago en mostrador |
 | `metodos_domicilio` | "efectivo o transferencia" | Texto para FAQs de pago a domicilio |
+| `cierre_manual` | "0" / "1" | Cierre manual del negocio vía `!cerrar`. Cuando es "1", `estaEnHorario()` retorna false independientemente del horario configurado |
 
 **CRUD en `config.js`:**
 - `getConfig(clave)` → valor o null

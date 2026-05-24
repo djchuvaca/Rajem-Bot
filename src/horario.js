@@ -2,6 +2,8 @@ const { getHorarioDia, getMensaje, getConfig } = require("./db");
 
 function estaEnHorario() {
   try {
+    if (getConfig("cierre_manual") === "1") return false;
+
     const ahora       = new Date();
     const dia         = ahora.getDay();
     const hora        = ahora.getHours();

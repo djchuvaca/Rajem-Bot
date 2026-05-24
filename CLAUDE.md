@@ -15,13 +15,13 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 ## Mapa de archivos clave
 
 ### Entrada
-- `index.js` — arranque, cliente WA, deduplicación de mensajes (Set de 200 IDs), router principal
+- `index.js` — arranque, cliente WA, deduplicación de mensajes (Set de 200 IDs), **resolución de LIDs** (si `msg.from` termina en `@lid`, llama a `client.getContactLidAndPhone()` y reemplaza `msg.from` con el JID real antes de enrutar), router principal
 
 ### Handlers
 - `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. No contiene lógica de negocio.
 - `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Tiene caché `_cortesCache` (TTL 60s, invalidable con `invalidarCacheCortes()`).
 - `src/handlers/respuestas.js` — respuestas FAQ sin Groq (precios, horarios, domicilio, banco)
-- `src/handlers/comandos.js` — comandos de grupo (`!pedidos`, `!confirmar`, `!rechazar`, `!stats`, `!cliente`, etc.)
+- `src/handlers/comandos.js` — comandos de grupo: ver pedidos (!pedidos, !pendientes, !confirmados, !cancelados, !rechazados, !domicilios, !mostradores, !pedido), gestionar (!confirmar, !listo, !cancelar, !rechazar), clientes (!cliente, !buscar, !historial, !top, !editar, !mensaje), reportes (!stats, !reporte ayer/semana/mes), menú (!precios, !precio, !agotado, !disponible), control (!cerrar, !abrir, !pausar, !reanudar, !sesiones, !resetear, !estado, !ayuda)
 - `src/handlers/imagenes.js` — recibe comprobantes de transferencia vía imagen
 
 #### Flujos (`src/handlers/flujos/`)
@@ -34,14 +34,15 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 
 ### Estado (Maps en memoria)
 - `src/estado/maps.js` — **todos los Maps**: `clientesNuevos`, `pendientesConfirmacion`, `tipoEntregaCliente`, `esperandoTipoItem`, `datosCampos`, `pedidoJSONActual`, etc.
-- `src/estado/campos.js` — interpretación de campos del formulario progresivo, `limpiarTodo()`, `interpretarCampos()`, `siguienteCampoFaltante()`. También contiene `extraerTelefono()` (regex unificada con validación LADA `^[2-9]`) y `extraerTelefonoDeJID()` (extrae teléfono de JID WA manejando @c.us/@lid/:). `PALABRAS_NO_NOMBRE` incluye palabras geográficas.
+- `src/estado/bot-pausado.js` — singleton `{ pausado: false }`. Chequeado al inicio de `handleMensaje`; si es `true`, el bot no procesa ningún mensaje de cliente. Los comandos `!pausar` y `!reanudar` del grupo lo modifican.
+- `src/estado/campos.js` — interpretación de campos del formulario progresivo, `limpiarTodo()`, `interpretarCampos()`, `siguienteCampoFaltante()`. También contiene `extraerTelefono()` (regex unificada con validación LADA `^[2-9]`) y `extraerTelefonoDeJID()` (extrae teléfono de JID @c.us; devuelve `null` para `@lid` — la resolución real ocurre en `index.js`). `PALABRAS_NO_NOMBRE` incluye palabras geográficas.
 - `src/estado/sesiones.js` — serialización/restauración de sesiones a BD. TTL: 48h. Todos los Maps críticos incluyendo `pendientesConfirmacion` se serializan.
 - `src/estado/index.js` — re-exporta todo el estado incluyendo `extraerTelefono` y `extraerTelefonoDeJID`
 
 ### Base de datos (sql.js)
 - `src/db/core.js` — `getDB()`, `run()`, `queryOne()`, `queryAll()`. `guardarDB()` está **debounced 500ms**.
 - `src/db/seed.js` — crea tablas y datos iniciales. Migraciones inline con `ALTER TABLE ... ADD COLUMN`.
-- `src/db/modelos.js` — CRUD de productos, clientes, pedidos. `actualizarEstadoPedido()` busca por teléfono (fragile si el teléfono está mal).
+- `src/db/modelos.js` — CRUD de productos, clientes, pedidos. `actualizarEstadoPedido()` busca por teléfono (fragile si el teléfono está mal). Funciones adicionales: `setProductoActivo(nombre, activo)`, `updateProductoPrecio(nombre, taco, torta)`, `getTopClientes(limit)`, `getPedidosPorCliente(telefono)`, `actualizarEstadoConfirmado(telefono, estado)`, `getPedidosPorFecha(inicio, fin)`.
 - `src/db/config.js` — configuración, horarios, banco, mensajes_bot, `guardarTelefonoReal()`, `getJIDReal()`, `guardarJIDReal()`
 - `src/db/index.js` — re-exporta todo el módulo db
 
@@ -103,7 +104,8 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 
 ## Notas de implementación importantes
 - `extraerTelefono(texto)` — usar siempre esta función para extraer teléfonos de texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52 prefijo y separadores (331-234-5678, 331 234 5678).
-- `extraerTelefonoDeJID(jid)` — usar siempre esta función para extraer teléfono de un JID de WhatsApp. Maneja @c.us, @lid y separador ":".
+- `extraerTelefonoDeJID(jid)` — usar siempre esta función para extraer teléfono de un JID de WhatsApp. Devuelve `null` para JIDs en formato `@lid` (identificadores de dispositivo, no son teléfonos reales). Para `@c.us` y `@lid:` maneja el separador ":" correctamente.
+- **Resolución de LIDs en `index.js`:** WhatsApp envía `msg.from` en formato `3310000001:12@lid` en ciertos dispositivos. El handler de `"message"` detecta el sufijo `@lid` y llama a `client.getContactLidAndPhone([msg.from])` para obtener el JID real (`pn` field). El `msg.from` se reemplaza antes de enrutar, así todos los handlers downstream siempre trabajan con JIDs de teléfono real.
 - En `handleConfirmacionFinal` (resumen.js): la BD se guarda **antes** de notificar al grupo y confirmar al cliente. Si falla, retorna sin confirmar.
 - El timeout de sesiones tiene **dos fases**: 30 min → `_textoRecordatorio()` envía mensaje contextual según estado del cliente, 45 min → `limpiarTodo()`. `recordatorioEnviado` se borra en `mensajes.js` cuando el cliente responde.
 - Nombre compuesto en BD: 1 palabra→solo nombre, 2→nombre+apellido, 3+→primeras dos palabras como nombre, resto como apellido.

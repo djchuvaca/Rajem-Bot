@@ -1,6 +1,17 @@
-const { pendientesConfirmacion } = require("../estado");
-const { actualizarEstadoPedido, getPedidosHoy, getCliente } = require("../db");
-const { getConfig } = require("../db");
+const {
+  pendientesConfirmacion, clientesNuevos, datosCampos, resumenPendiente,
+  esperandoConfirmacionItem, esperandoAgregarMas, esperandoCorte,
+  esperandoTipoItem, esperandoCaptura, limpiarTodo, extraerTelefonoDeJID,
+} = require("../estado");
+const {
+  actualizarEstadoPedido, actualizarEstadoConfirmado,
+  getPedidosHoy, getPedidosPorCliente, getPedidosPorFecha,
+  getCliente, getAllClientes, getTopClientes,
+  getProductos, getProducto, setProductoActivo, updateProductoPrecio,
+  upsertCliente, getConfig, setConfig, getJIDReal,
+} = require("../db");
+const { invalidarCacheCortes } = require("./pedidoParser");
+const botPausado = require("../estado/bot-pausado");
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function buscarCliente(numBuscar) {
@@ -27,13 +38,101 @@ function filtrarPedidos(estado) {
   return getPedidosHoy().filter(p => p.estado === estado);
 }
 
+function construirJID(telefono) {
+  const tel = telefono.replace(/\D/g, "").slice(-10);
+  return getJIDReal(tel) || `521${tel}@c.us`;
+}
+
+function buscarJIDActivo(telRaw) {
+  const mapas = [datosCampos, resumenPendiente, esperandoConfirmacionItem,
+                 esperandoAgregarMas, esperandoCorte, esperandoTipoItem, esperandoCaptura];
+  for (const mapa of mapas) {
+    for (const jid of mapa.keys()) {
+      if (jid.includes(telRaw)) return jid;
+    }
+  }
+  for (const jid of clientesNuevos) {
+    if (jid.includes(telRaw)) return jid;
+  }
+  return null;
+}
+
+function descripcionEstado(jid) {
+  if (esperandoCaptura.has(jid))            return "esperando captura de pago 📸";
+  if (resumenPendiente.has(jid))            return "confirmando resumen del pedido";
+  if (esperandoConfirmacionItem.has(jid))   return "confirmando ítem del pedido";
+  if (esperandoAgregarMas.has(jid))         return "decidiendo si agrega más";
+  if (esperandoCorte.has(jid))              return "eligiendo corte de carne";
+  if (esperandoTipoItem.has(jid))           return "eligiendo taco o torta";
+  if (datosCampos.has(jid))                 return "llenando formulario";
+  if (clientesNuevos.has(jid))              return "inicio del flujo";
+  return "activo";
+}
+
 // ── HANDLER PRINCIPAL ─────────────────────────────────────────────────────────
 async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
-  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente)/i.test(texto);
+  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
   if (!esComando) return;
+
+  // ── !ayuda — lista de comandos ─────────────────────────────────────────────
+  if (/^!ayuda$/i.test(texto)) {
+    const out =
+      `🤖 *COMANDOS DISPONIBLES*\n━━━━━━━━━━━━━━━━━━\n` +
+      `*Ver pedidos:*\n` +
+      `!pedidos — todos los pedidos del día\n` +
+      `!pendientes — esperando confirmación\n` +
+      `!confirmados — pedidos confirmados\n` +
+      `!domicilios — solo pedidos a domicilio\n` +
+      `!mostradores — solo pedidos de mostrador\n` +
+      `!cancelados / !rechazados\n\n` +
+      `*Gestionar pedidos:*\n` +
+      `!confirmar [tel] — confirmar pedido\n` +
+      `!listo [tel] — avisar listo/en camino\n` +
+      `!cancelar [tel] — cancelar con aviso\n` +
+      `!rechazar [tel] — rechazar pedido\n\n` +
+      `*Clientes:*\n` +
+      `!cliente [tel] — datos del cliente\n` +
+      `!buscar [nombre] — buscar por nombre\n` +
+      `!historial [tel] — historial de pedidos\n` +
+      `!mensaje [tel] [texto] — mensaje directo\n\n` +
+      `*Reportes:*\n` +
+      `!stats — resumen del día\n` +
+      `!reporte ayer — resumen de ayer\n` +
+      `!reporte semana — últimos 7 días\n\n` +
+      `*Menú y productos:*\n` +
+      `!precios — ver precios del menú\n` +
+      `!precio [corte] [taco] [torta] — actualizar precio\n` +
+      `!agotado [corte] — marcar corte como agotado\n` +
+      `!disponible [corte] — marcar corte disponible\n\n` +
+      `*Negocio:*\n` +
+      `!cerrar — cerrar el negocio manualmente hoy\n` +
+      `!abrir — reabrir el negocio\n` +
+      `!top — top clientes por número de pedidos\n\n` +
+      `*Bot:*\n` +
+      `!pausar — pausar respuestas automáticas\n` +
+      `!reanudar — reactivar el bot\n` +
+      `!sesiones — ver sesiones activas de clientes\n` +
+      `!resetear [tel] — limpiar sesión de un cliente\n` +
+      `!estado — estado del bot (uptime, sesiones, etc.)\n` +
+      `━━━━━━━━━━━━━━━━━━`;
+    await msg.reply(out);
+    return;
+  }
+
+  // ── !pausar / !reanudar ────────────────────────────────────────────────────
+  if (/^!pausar$/i.test(texto)) {
+    botPausado.pausado = true;
+    await msg.reply("⏸️ Bot en pausa. Los clientes no recibirán respuestas automáticas.\nUsa *!reanudar* para activarlo de nuevo.");
+    return;
+  }
+  if (/^!reanudar$/i.test(texto)) {
+    botPausado.pausado = false;
+    await msg.reply("▶️ Bot reactivado. Volviendo a responder mensajes normalmente.");
+    return;
+  }
 
   // ── !pedidos — todos los pedidos del día con estado ──────────────────────
   if (/^!pedidos$/i.test(texto)) {
@@ -58,7 +157,7 @@ async function handleComandos(msg, client) {
     msg_text += `━━━━━━━━━━━━━━━━━━\n`;
     msg_text += `📦 *Total: ${todos.length} pedido${todos.length !== 1 ? "s" : ""}*\n\n`;
 
-    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔" };
+    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔", listo: "🏪", en_camino: "🛵" };
     let i = 1;
     for (const p of todos) {
       const nombre   = [p.nombre, p.apellido].filter(Boolean).join(" ") || "Sin nombre";
@@ -90,8 +189,7 @@ async function handleComandos(msg, client) {
 
   // ── !pendientes ───────────────────────────────────────────────────────────
   if (/^!pendientes$/i.test(texto)) {
-    // Combina los de la BD (estado pendiente) con los que están en memoria esperando confirmación
-    const enBD     = filtrarPedidos("pendiente");
+    const enBD      = filtrarPedidos("pendiente");
     const enMemoria = [...pendientesConfirmacion.values()];
 
     if (enBD.length === 0 && enMemoria.length === 0) {
@@ -102,7 +200,6 @@ async function handleComandos(msg, client) {
     let out = `🟡 *Pedidos pendientes de confirmación (${enBD.length + enMemoria.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     enBD.forEach((p, i) => { out += formatearPedido(p, i + 1); });
 
-    // Los de memoria que aún no están en BD confirmados
     enMemoria.forEach((datos, i) => {
       const tipoIcon = datos.tipo === "domicilio" ? "🛵" : "🏪";
       out += `${enBD.length + i + 1}. *${datos.nombre || "—"}* — ${datos.telefono || "—"}\n`;
@@ -136,6 +233,46 @@ async function handleComandos(msg, client) {
     }
     let out = `⛔ *Pedidos rechazados hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
     lista.forEach((p, i) => { out += formatearPedido(p, i + 1); });
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !domicilios — solo pedidos a domicilio ────────────────────────────────
+  if (/^!domicilios$/i.test(texto)) {
+    const lista = getPedidosHoy().filter(p => p.tipo === "domicilio");
+    if (lista.length === 0) {
+      await msg.reply("🛵 No hay pedidos a domicilio hoy.");
+      return;
+    }
+    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔", listo: "🏪", en_camino: "🛵" };
+    let out = `🛵 *Domicilios hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
+    lista.forEach((p, i) => {
+      const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ") || "Sin nombre";
+      const total  = p.total ? `$${Math.round(p.total)}` : "—";
+      const hora   = p.fecha ? p.fecha.split(" ")[1]?.substring(0, 5) : "—";
+      out += `${iconEstado[p.estado] || "⚪"} ${i + 1}. *${nombre}* — ${p.telefono || "—"}\n`;
+      out += `   💰 ${total} | 🕐 ${hora}\n\n`;
+    });
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !mostradores — solo pedidos de mostrador ──────────────────────────────
+  if (/^!mostradores$/i.test(texto)) {
+    const lista = getPedidosHoy().filter(p => p.tipo === "mostrador");
+    if (lista.length === 0) {
+      await msg.reply("🏪 No hay pedidos de mostrador hoy.");
+      return;
+    }
+    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔", listo: "🏪", en_camino: "🛵" };
+    let out = `🏪 *Mostradores hoy (${lista.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
+    lista.forEach((p, i) => {
+      const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ") || "Sin nombre";
+      const total  = p.total ? `$${Math.round(p.total)}` : "—";
+      const hora   = p.fecha ? p.fecha.split(" ")[1]?.substring(0, 5) : "—";
+      out += `${iconEstado[p.estado] || "⚪"} ${i + 1}. *${nombre}* — ${p.telefono || "—"}\n`;
+      out += `   💰 ${total} | 🕐 ${hora}\n\n`;
+    });
     await msg.reply(out.trim());
     return;
   }
@@ -180,10 +317,134 @@ async function handleComandos(msg, client) {
     return;
   }
 
+  // ── !listo [telefono] — avisar al cliente que está listo/en camino ─────────
+  if (/^!listo/i.test(texto)) {
+    const partes    = texto.split(" ");
+    const telRaw    = partes[1] ? partes[1].replace(/\D/g, "") : null;
+
+    if (!telRaw) {
+      await msg.reply("⚠️ Especifica el teléfono: *!listo 3312345678*");
+      return;
+    }
+
+    const cliente = getCliente(telRaw);
+    if (!cliente) {
+      await msg.reply(`⚠️ No encontré ningún cliente con teléfono *${telRaw}*.`);
+      return;
+    }
+
+    const pedidoHoy = getPedidosHoy().find(p => p.telefono === telRaw && p.estado === "confirmado");
+    if (!pedidoHoy) {
+      await msg.reply(`⚠️ No encontré un pedido *confirmado* para *${telRaw}*.\nAsegúrate de haber usado *!confirmar* primero.`);
+      return;
+    }
+
+    const nombre = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ") || "Cliente";
+    const jid    = construirJID(telRaw);
+    let mensajeCliente, nuevoEstado;
+
+    if (pedidoHoy.tipo === "domicilio") {
+      mensajeCliente = `🛵 ¡Hola ${nombre}! Tu pedido ya va en camino, pronto llegará. ¡Gracias por tu preferencia! 😊`;
+      nuevoEstado    = "en_camino";
+    } else {
+      mensajeCliente = `🏪 ¡Hola ${nombre}! Tu pedido ya está listo para recoger en el mostrador. ¡Te esperamos! 😊`;
+      nuevoEstado    = "listo";
+    }
+
+    try {
+      await client.sendMessage(jid, mensajeCliente);
+      try { actualizarEstadoConfirmado(telRaw, nuevoEstado); } catch (e) { console.error("BD Error:", e.message); }
+      await msg.reply(`✅ Aviso enviado a *${nombre}* (${telRaw}) — pedido marcado como *${nuevoEstado}*`);
+    } catch (e) {
+      await msg.reply(`❌ Error al notificar: ${e.message}`);
+    }
+    return;
+  }
+
+  // ── !cancelar [telefono] — cancelar pedido con aviso al cliente ────────────
+  if (/^!cancelar/i.test(texto)) {
+    const partes    = texto.split(" ");
+    const numBuscar = partes[1] ? partes[1].replace(/\D/g, "") : null;
+
+    // Primero busca en pendientes (aún no confirmados)
+    const numeroCliente = buscarCliente(numBuscar);
+    if (numeroCliente) {
+      const datos = pendientesConfirmacion.get(numeroCliente);
+      const mensajeCancelacion =
+        `❌ Hola *${datos.nombre}*, lamentablemente tuvimos que cancelar tu pedido.\n` +
+        `Si tienes alguna duda, con gusto te atendemos. ¡Disculpa los inconvenientes! 🙏`;
+      try {
+        await client.sendMessage(numeroCliente, mensajeCancelacion);
+        try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (e) { console.error("BD Error:", e.message); }
+        pendientesConfirmacion.delete(numeroCliente);
+        await msg.reply(`❌ Cancelación enviada a *${datos.nombre}* (${datos.telefono})`);
+      } catch (e) {
+        await msg.reply(`❌ Error al enviar cancelación: ${e.message}`);
+      }
+      return;
+    }
+
+    // Si no está en pendientes, busca en confirmados del día
+    if (!numBuscar) {
+      await msg.reply("⚠️ Especifica el teléfono: *!cancelar 3312345678*\nUsa *!pendientes* o *!confirmados* para ver la lista.");
+      return;
+    }
+
+    const cliente = getCliente(numBuscar);
+    if (!cliente) {
+      await msg.reply(`⚠️ No encontré ningún cliente con teléfono *${numBuscar}*.`);
+      return;
+    }
+
+    const nombre = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ") || "Cliente";
+    const jid    = construirJID(numBuscar);
+    const mensajeCancelacion =
+      `❌ Hola *${nombre}*, lamentablemente tuvimos que cancelar tu pedido.\n` +
+      `Si tienes alguna duda, con gusto te atendemos. ¡Disculpa los inconvenientes! 🙏`;
+
+    try {
+      await client.sendMessage(jid, mensajeCancelacion);
+      try { actualizarEstadoConfirmado(numBuscar, "cancelado"); } catch (e) { console.error("BD Error:", e.message); }
+      await msg.reply(`❌ Cancelación enviada a *${nombre}* (${numBuscar})`);
+    } catch (e) {
+      await msg.reply(`❌ Error al enviar cancelación: ${e.message}`);
+    }
+    return;
+  }
+
+  // ── !rechazar [telefono] ──────────────────────────────────────────────────
+  if (/^!rechazar/i.test(texto)) {
+    const partes        = texto.split(" ");
+    const numBuscar     = partes[1] ? partes[1].replace(/\D/g, "") : null;
+    const numeroCliente = buscarCliente(numBuscar);
+
+    if (!numeroCliente) {
+      await msg.reply("⚠️ No encontré ese pedido. Usa *!pendientes* para ver la lista.");
+      return;
+    }
+
+    const datos = pendientesConfirmacion.get(numeroCliente);
+    const mensajeRechazo =
+      `⚠️ Estimado/a *${datos.nombre}*, nuestro equipo de trabajo revisó tu pedido ` +
+      `y detectó un asunto importante con tu orden.\n` +
+      `Enseguida se comunicarán contigo para resolverlo. ¡Disculpa los inconvenientes! 🙏`;
+
+    try {
+      await client.sendMessage(numeroCliente, mensajeRechazo);
+      try { actualizarEstadoPedido(datos.telefono, "rechazado"); } catch (e) { console.error("BD Error:", e.message); }
+      pendientesConfirmacion.delete(numeroCliente);
+      await msg.reply(`⚠️ Rechazo enviado a *${datos.nombre}* (${datos.telefono})`);
+      console.log(`⚠️ Pedido rechazado para ${numeroCliente}`);
+    } catch (e) {
+      await msg.reply(`❌ Error al enviar rechazo: ${e.message}`);
+    }
+    return;
+  }
+
   // ── !stats — resumen del día ──────────────────────────────────────────────
   if (/^!stats$/i.test(texto)) {
     const pedidos     = getPedidosHoy();
-    const confirmados = pedidos.filter(p => p.estado === "confirmado");
+    const confirmados = pedidos.filter(p => ["confirmado", "listo", "en_camino"].includes(p.estado));
     const pendientes  = pedidos.filter(p => p.estado === "pendiente");
     const cancelados  = pedidos.filter(p => p.estado === "cancelado");
     const rechazados  = pedidos.filter(p => p.estado === "rechazado");
@@ -192,7 +453,6 @@ async function handleComandos(msg, client) {
     const ticket      = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
     const negocio     = getConfig("nombre_negocio") || "Tacos Javier";
 
-    // Conteo de cortes en el texto de las órdenes
     const CORTES    = ["surtido", "carne", "buche", "cuero", "lengua"];
     const conteo    = {};
     for (const p of pedidos) {
@@ -226,12 +486,75 @@ async function handleComandos(msg, client) {
     return;
   }
 
+  // ── !reporte [ayer|semana] — resumen de fechas anteriores ─────────────────
+  if (/^!reporte/i.test(texto)) {
+    const partes  = texto.split(" ");
+    const periodo = (partes[1] || "ayer").toLowerCase();
+
+    const hoy = new Date();
+    let fechaInicio, fechaFin, label;
+
+    if (periodo === "semana") {
+      const hace7 = new Date(hoy);
+      hace7.setDate(hoy.getDate() - 7);
+      fechaInicio = hace7.toISOString().split("T")[0];
+      fechaFin    = hoy.toISOString().split("T")[0];
+      label       = "últimos 7 días";
+    } else if (periodo === "mes") {
+      const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      fechaInicio = primero.toISOString().split("T")[0];
+      fechaFin    = hoy.toISOString().split("T")[0];
+      label       = `${hoy.toLocaleString("es-MX", { month: "long" })} ${hoy.getFullYear()}`;
+    } else {
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+      fechaInicio = ayer.toISOString().split("T")[0];
+      fechaFin    = ayer.toISOString().split("T")[0];
+      label       = "ayer";
+    }
+
+    const pedidos = getPedidosPorFecha(fechaInicio, fechaFin);
+    if (pedidos.length === 0) {
+      await msg.reply(`📊 No hay pedidos registrados para *${label}*.`);
+      return;
+    }
+
+    const confirmados  = pedidos.filter(p => ["confirmado", "listo", "en_camino"].includes(p.estado));
+    const cancelados   = pedidos.filter(p => ["cancelado", "rechazado"].includes(p.estado));
+    const totalVentas  = confirmados.reduce((s, p) => s + (p.total || 0), 0);
+    const ticket       = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
+
+    const CORTES = ["surtido", "carne", "buche", "cuero", "lengua"];
+    const conteo = {};
+    for (const p of pedidos) {
+      const orden = (p.orden || "").toLowerCase();
+      for (const c of CORTES) if (orden.includes(c)) conteo[c] = (conteo[c] || 0) + 1;
+    }
+    const ranking = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
+
+    let out = `📊 *REPORTE — ${label.toUpperCase()}*\n━━━━━━━━━━━━━━━━━━\n`;
+    out += `📦 Total pedidos:  *${pedidos.length}*\n`;
+    out += `✅ Confirmados:    *${confirmados.length}*\n`;
+    if (cancelados.length) out += `❌ Cancelados:    *${cancelados.length}*\n`;
+    out += `\n💰 Ventas:        *$${Math.round(totalVentas)}*\n`;
+    if (ticket) out += `🎫 Ticket prom:   *$${ticket}*\n`;
+    if (ranking.length) {
+      out += `\n🥩 *Top cortes:*\n`;
+      for (const [corte, n] of ranking) {
+        out += `   ${corte} — ${n} pedido${n !== 1 ? "s" : ""}\n`;
+      }
+    }
+    out += `━━━━━━━━━━━━━━━━━━`;
+
+    await msg.reply(out);
+    return;
+  }
+
   // ── !cliente [telefono] — datos de un cliente ─────────────────────────────
   if (/^!cliente/i.test(texto)) {
     const partes   = texto.split(" ");
     const telRaw   = partes[1] ? partes[1].replace(/\D/g, "") : null;
 
-    // Sin teléfono: muestra el primer pendiente de confirmación
     const tel = telRaw || (() => {
       const jid = [...pendientesConfirmacion.keys()][0];
       return jid ? jid.replace(/\D/g, "").slice(-10) : null;
@@ -242,7 +565,6 @@ async function handleComandos(msg, client) {
       return;
     }
 
-    // Busca por los últimos dígitos si se mandaron menos de 10
     const cliente = getCliente(tel) ||
       (tel.length < 10 ? (() => {
         const todos = require("../db").getAllClientes();
@@ -260,13 +582,13 @@ async function handleComandos(msg, client) {
     let out = `👤 *CLIENTE — ${nombre}*\n`;
     out    += `━━━━━━━━━━━━━━━━━━\n`;
     out    += `📱 Teléfono:  ${cliente.telefono}\n`;
-    if (cliente.correo)      out += `📧 Correo:    ${cliente.correo}\n`;
+    if (cliente.correo)       out += `📧 Correo:    ${cliente.correo}\n`;
     if (cliente.calle_numero) {
       out += `🏠 Dirección: ${cliente.calle_numero}`;
       if (cliente.colonia) out += `, ${cliente.colonia}`;
       out += "\n";
     }
-    if (cliente.referencia)  out += `📍 Ref:       ${cliente.referencia}\n`;
+    if (cliente.referencia)   out += `📍 Ref:       ${cliente.referencia}\n`;
     out    += `📦 Pedidos:   ${cliente.total_pedidos || 0} en total\n`;
     out    += `🗓️  Registro:  ${fechaReg}\n`;
 
@@ -282,32 +604,386 @@ async function handleComandos(msg, client) {
     return;
   }
 
-  // ── !rechazar [telefono] ──────────────────────────────────────────────────
-  if (/^!rechazar/i.test(texto)) {
-    const partes        = texto.split(" ");
-    const numBuscar     = partes[1] ? partes[1].replace(/\D/g, "") : null;
-    const numeroCliente = buscarCliente(numBuscar);
+  // ── !buscar [nombre] — buscar cliente por nombre ──────────────────────────
+  if (/^!buscar/i.test(texto)) {
+    const partes = texto.split(" ");
+    const query  = partes.slice(1).join(" ").toLowerCase().trim();
 
-    if (!numeroCliente) {
-      await msg.reply("⚠️ No encontré ese pedido. Usa *!pendientes* para ver la lista.");
+    if (!query) {
+      await msg.reply("⚠️ Uso: *!buscar [nombre]*\nEjemplo: !buscar Juan García");
       return;
     }
 
-    const datos = pendientesConfirmacion.get(numeroCliente);
-    const mensajeRechazo =
-      `⚠️ Estimado/a *${datos.nombre}*, nuestro equipo de trabajo revisó tu pedido ` +
-      `y detectó un asunto importante con tu orden.\n` +
-      `Enseguida se comunicarán contigo para resolverlo. ¡Disculpa los inconvenientes! 🙏`;
+    const todos       = getAllClientes();
+    const resultados  = todos.filter(c => {
+      const nombre = `${c.nombre || ""} ${c.apellido || ""}`.toLowerCase();
+      return nombre.includes(query) || (c.telefono || "").includes(query);
+    }).slice(0, 5);
+
+    if (!resultados.length) {
+      await msg.reply(`⚠️ No encontré clientes con *"${query}"*.`);
+      return;
+    }
+
+    let out = `🔍 *Resultados para "${query}" (${resultados.length}):*\n━━━━━━━━━━━━━━━━━━\n`;
+    for (const c of resultados) {
+      const nombre = [c.nombre, c.apellido].filter(Boolean).join(" ") || "Sin nombre";
+      out += `👤 *${nombre}*\n`;
+      out += `   📱 ${c.telefono} | 📦 ${c.total_pedidos || 0} pedidos\n`;
+      if (c.calle_numero) out += `   🏠 ${c.calle_numero}${c.colonia ? ", " + c.colonia : ""}\n`;
+      out += "\n";
+    }
+
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !historial [telefono] — pedidos anteriores de un cliente ─────────────
+  if (/^!historial/i.test(texto)) {
+    const partes = texto.split(" ");
+    const telRaw = partes[1] ? partes[1].replace(/\D/g, "") : null;
+
+    if (!telRaw) {
+      await msg.reply("⚠️ Uso: *!historial [teléfono]*\nEjemplo: !historial 3312345678");
+      return;
+    }
+
+    const cliente = getCliente(telRaw);
+    const pedidos = getPedidosPorCliente(telRaw);
+
+    if (!cliente || !pedidos.length) {
+      await msg.reply(`⚠️ No encontré historial para *${telRaw}*.`);
+      return;
+    }
+
+    const nombre    = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ") || "Sin nombre";
+    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔", listo: "🏪", en_camino: "🛵" };
+
+    let out = `📋 *Historial de ${nombre}* (${pedidos.length} pedidos)\n━━━━━━━━━━━━━━━━━━\n`;
+    for (const p of pedidos) {
+      const fecha = p.fecha ? p.fecha.split(" ")[0] : "—";
+      const hora  = p.fecha ? p.fecha.split(" ")[1]?.substring(0, 5) : "—";
+      const total = p.total ? `$${Math.round(p.total)}` : "—";
+      const tipo  = p.tipo === "domicilio" ? "🛵" : "🏪";
+      out += `${iconEstado[p.estado] || "⚪"} ${fecha} ${hora} — ${tipo} ${total}\n`;
+      if (p.orden) out += `   _${p.orden.substring(0, 60)}${p.orden.length > 60 ? "..." : ""}_\n`;
+      out += "\n";
+    }
+
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !pedido [telefono] — detalle completo de un pedido del día ───────────
+  if (/^!pedido/i.test(texto)) {
+    const partes = texto.split(" ");
+    const telRaw = partes[1] ? partes[1].replace(/\D/g, "") : null;
+
+    if (!telRaw) {
+      await msg.reply("⚠️ Uso: *!pedido [teléfono]*\nEjemplo: !pedido 3312345678");
+      return;
+    }
+
+    const cliente   = getCliente(telRaw);
+    const pedidoHoy = getPedidosHoy().find(p => p.telefono === telRaw);
+
+    if (!pedidoHoy) {
+      await msg.reply(`⚠️ No encontré ningún pedido hoy para *${telRaw}*.`);
+      return;
+    }
+
+    const nombre    = [pedidoHoy.nombre, pedidoHoy.apellido].filter(Boolean).join(" ") || "Sin nombre";
+    const hora      = pedidoHoy.fecha ? pedidoHoy.fecha.split(" ")[1]?.substring(0, 5) : "—";
+    const total     = pedidoHoy.total ? `$${Math.round(pedidoHoy.total)}` : "—";
+    const iconEstado = { pendiente: "🟡", confirmado: "✅", cancelado: "❌", rechazado: "⛔", listo: "🏪", en_camino: "🛵" };
+
+    let out = `📋 *Pedido de ${nombre}*\n━━━━━━━━━━━━━━━━━━\n`;
+    out += `${pedidoHoy.tipo === "domicilio" ? "🛵 Domicilio" : "🏪 Mostrador"} | 🕐 ${hora}\n`;
+
+    if (pedidoHoy.tipo === "domicilio" && cliente) {
+      if (cliente.calle_numero) out += `📍 ${cliente.calle_numero}${cliente.colonia ? ", " + cliente.colonia : ""}\n`;
+      if (cliente.referencia)   out += `   Ref: ${cliente.referencia}\n`;
+    }
+    if (pedidoHoy.hora_entrega) out += `⏰ Entrega: ${pedidoHoy.hora_entrega}\n`;
+    if (pedidoHoy.metodo_pago)  out += `💳 ${pedidoHoy.metodo_pago} | `;
+    out += `💰 ${total}\n`;
+
+    if (pedidoHoy.orden) {
+      out += `\n🥩 *Orden:*\n${pedidoHoy.orden}\n`;
+    }
+
+    out += `\nEstado: ${iconEstado[pedidoHoy.estado] || "⚪"} ${pedidoHoy.estado}`;
+
+    await msg.reply(out);
+    return;
+  }
+
+  // ── !precios — ver precios actuales del menú ──────────────────────────────
+  if (/^!precios$/i.test(texto)) {
+    const productos = getProductos();
+    if (!productos.length) {
+      await msg.reply("⚠️ No hay productos registrados.");
+      return;
+    }
+    const negocio = getConfig("nombre_negocio") || "Tacos Javier";
+    let out = `🥩 *Menú — ${negocio}*\n━━━━━━━━━━━━━━━━━━\n`;
+    for (const p of productos) {
+      const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
+      const taco   = p.precio_taco   ? `🌮 $${p.precio_taco}`   : "";
+      const torta  = p.precio_torta  ? `  🥪 $${p.precio_torta}` : "";
+      const estado = p.activo ? "" : "  _(agotado)_";
+      out += `• *${nombre}*${estado}\n  ${taco}${torta}\n`;
+    }
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !precio [corte] [taco] [torta] — actualizar precio de un corte ───────
+  if (/^!precio\s/i.test(texto)) {
+    const partes = texto.split(/\s+/);
+    if (partes.length < 4) {
+      await msg.reply("⚠️ Uso: *!precio [corte] [precio taco] [precio torta]*\nEjemplo: !precio buche 30 60");
+      return;
+    }
+    const corte      = partes[1].toLowerCase();
+    const precioTaco  = parseFloat(partes[2]);
+    const precioTorta = parseFloat(partes[3]);
+
+    if (isNaN(precioTaco) || isNaN(precioTorta) || precioTaco <= 0 || precioTorta <= 0) {
+      await msg.reply("⚠️ Los precios deben ser números válidos mayores a 0.");
+      return;
+    }
+
+    const producto = getProducto(corte);
+    if (!producto) {
+      await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
+      return;
+    }
+
+    updateProductoPrecio(corte, precioTaco, precioTorta);
+    invalidarCacheCortes();
+    await msg.reply(`✅ Precio de *${corte}* actualizado:\n🌮 Taco: $${precioTaco}  🥪 Torta: $${precioTorta}`);
+    return;
+  }
+
+  // ── !agotado [corte] — marcar un corte como no disponible ────────────────
+  if (/^!agotado/i.test(texto)) {
+    const partes = texto.split(/\s+/);
+    const corte  = partes.slice(1).join(" ").toLowerCase().trim();
+
+    if (!corte) {
+      await msg.reply("⚠️ Uso: *!agotado [corte]*\nEjemplo: !agotado buche");
+      return;
+    }
+
+    const producto = getProducto(corte);
+    if (!producto) {
+      await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
+      return;
+    }
+
+    setProductoActivo(corte, false);
+    invalidarCacheCortes();
+    await msg.reply(`⛔ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como agotado. El bot ya no lo ofrecerá.`);
+    return;
+  }
+
+  // ── !disponible [corte] — marcar un corte como disponible ────────────────
+  if (/^!disponible/i.test(texto)) {
+    const partes = texto.split(/\s+/);
+    const corte  = partes.slice(1).join(" ").toLowerCase().trim();
+
+    if (!corte) {
+      await msg.reply("⚠️ Uso: *!disponible [corte]*\nEjemplo: !disponible buche");
+      return;
+    }
+
+    const producto = getProducto(corte);
+    if (!producto) {
+      await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
+      return;
+    }
+
+    setProductoActivo(corte, true);
+    invalidarCacheCortes();
+    await msg.reply(`✅ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como disponible. El bot vuelve a ofrecerlo.`);
+    return;
+  }
+
+  // ── !cerrar — cerrar el negocio manualmente hoy ───────────────────────────
+  if (/^!cerrar$/i.test(texto)) {
+    setConfig("cierre_manual", "1");
+    await msg.reply("🔒 Negocio cerrado manualmente. Los clientes recibirán el mensaje de fuera de horario.\nUsa *!abrir* para reabrir.");
+    return;
+  }
+
+  // ── !abrir — reabrir el negocio ───────────────────────────────────────────
+  if (/^!abrir$/i.test(texto)) {
+    setConfig("cierre_manual", "0");
+    await msg.reply("🔓 Negocio abierto. El bot vuelve a atender en horario normal.");
+    return;
+  }
+
+  // ── !top — top clientes por número de pedidos ────────────────────────────
+  if (/^!top$/i.test(texto)) {
+    const lista = getTopClientes(10);
+    if (!lista.length) {
+      await msg.reply("📭 No hay clientes con pedidos registrados aún.");
+      return;
+    }
+    const negocio = getConfig("nombre_negocio") || "Tacos Javier";
+    let out = `🏆 *Top clientes — ${negocio}*\n━━━━━━━━━━━━━━━━━━\n`;
+    lista.forEach((c, i) => {
+      const nombre = [c.nombre, c.apellido].filter(Boolean).join(" ") || "Sin nombre";
+      const gasto  = c.gasto_total ? ` | 💰 $${Math.round(c.gasto_total)}` : "";
+      out += `${i + 1}. *${nombre}*\n   📱 ${c.telefono} | 📦 ${c.total_pedidos} pedidos${gasto}\n\n`;
+    });
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !editar [telefono] [campo] [valor] — editar datos de un cliente ───────
+  if (/^!editar/i.test(texto)) {
+    const partes = texto.split(/\s+/);
+    if (partes.length < 4) {
+      await msg.reply(
+        "⚠️ Uso: *!editar [teléfono] [campo] [valor]*\n" +
+        "Campos: nombre, apellido, direccion, colonia, referencia, correo\n" +
+        "Ejemplo: !editar 3312345678 direccion Calle Morelos 123"
+      );
+      return;
+    }
+
+    const telRaw = partes[1].replace(/\D/g, "");
+    const campo  = partes[2].toLowerCase();
+    const valor  = partes.slice(3).join(" ").trim();
+
+    const camposValidos = { nombre: "nombre", apellido: "apellido", direccion: "calle_numero",
+                            dirección: "calle_numero", colonia: "colonia", referencia: "referencia",
+                            ref: "referencia", correo: "correo" };
+    const campoDb = camposValidos[campo];
+
+    if (!campoDb) {
+      await msg.reply("⚠️ Campo inválido. Usa: nombre, apellido, direccion, colonia, referencia, correo");
+      return;
+    }
+
+    const cliente = getCliente(telRaw);
+    if (!cliente) {
+      await msg.reply(`⚠️ No encontré ningún cliente con teléfono *${telRaw}*.`);
+      return;
+    }
+
+    upsertCliente({ telefono: telRaw, [campoDb]: valor });
+    const nombre = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ") || telRaw;
+    await msg.reply(`✅ *${campo}* de *${nombre}* actualizado a: ${valor}`);
+    return;
+  }
+
+  // ── !estado — estado del bot ──────────────────────────────────────────────
+  if (/^!estado$/i.test(texto)) {
+    const uptime  = process.uptime();
+    const horas   = Math.floor(uptime / 3600);
+    const minutos = Math.floor((uptime % 3600) / 60);
+    const uptimeStr = horas > 0 ? `${horas}h ${minutos}m` : `${minutos}m`;
+
+    const mapasActivos = [datosCampos, resumenPendiente, esperandoConfirmacionItem,
+                          esperandoAgregarMas, esperandoCorte, esperandoTipoItem, esperandoCaptura];
+    const sesionesActivas = mapasActivos.reduce((acc, m) => acc + m.size, 0) + clientesNuevos.size;
+
+    const cerradoManual = getConfig("cierre_manual") === "1";
+    const negocio       = getConfig("nombre_negocio") || "Tacos Javier";
+
+    let out = `🤖 *ESTADO — ${negocio}*\n━━━━━━━━━━━━━━━━━━\n`;
+    out += `⏱️ Uptime:    *${uptimeStr}*\n`;
+    out += `📡 Sesiones:  *${sesionesActivas} activa(s)*\n`;
+    out += `🔘 Bot:       *${botPausado.pausado ? "⏸️ Pausado" : "▶️ Activo"}*\n`;
+    out += `🏪 Negocio:   *${cerradoManual ? "🔒 Cerrado manual" : "🔓 Abierto"}*\n`;
+    out += `📦 Versión:   *1.0.0*\n`;
+    out += `━━━━━━━━━━━━━━━━━━`;
+
+    await msg.reply(out);
+    return;
+  }
+
+  // ── !sesiones — ver sesiones activas de clientes ─────────────────────────
+  if (/^!sesiones$/i.test(texto)) {
+    const activos = new Map(); // jid → descripción de estado
+
+    const registrar = (jid) => {
+      if (!activos.has(jid)) activos.set(jid, descripcionEstado(jid));
+    };
+
+    for (const jid of clientesNuevos)                  registrar(jid);
+    for (const [jid] of datosCampos)                   registrar(jid);
+    for (const [jid] of esperandoCorte)                registrar(jid);
+    for (const [jid] of esperandoTipoItem)             registrar(jid);
+    for (const [jid] of esperandoConfirmacionItem)     registrar(jid);
+    for (const [jid] of esperandoAgregarMas)           registrar(jid);
+    for (const [jid] of resumenPendiente)              registrar(jid);
+    for (const [jid] of esperandoCaptura)              registrar(jid);
+
+    if (activos.size === 0) {
+      await msg.reply("📭 No hay sesiones de clientes activas en este momento.");
+      return;
+    }
+
+    let out = `📡 *Sesiones activas (${activos.size}):*\n━━━━━━━━━━━━━━━━━━\n`;
+    let i = 1;
+    for (const [jid, estado] of activos) {
+      const tel = extraerTelefonoDeJID(jid) || jid;
+      out += `${i}. 📱 *${tel}*\n   ${estado}\n\n`;
+      i++;
+    }
+    out += `_Usa !resetear [tel] para limpiar una sesión._`;
+
+    await msg.reply(out.trim());
+    return;
+  }
+
+  // ── !resetear [telefono] — limpiar sesión de un cliente ──────────────────
+  if (/^!resetear/i.test(texto)) {
+    const partes = texto.split(" ");
+    const telRaw = partes[1] ? partes[1].replace(/\D/g, "") : null;
+
+    if (!telRaw) {
+      await msg.reply("⚠️ Uso: *!resetear [teléfono]*\nEjemplo: !resetear 3312345678\nUsa *!sesiones* para ver las activas.");
+      return;
+    }
+
+    const jid = buscarJIDActivo(telRaw) || getJIDReal(telRaw);
+
+    if (!jid) {
+      await msg.reply(`⚠️ No encontré sesión activa para *${telRaw}*.\nUsa *!sesiones* para ver las sesiones activas.`);
+      return;
+    }
+
+    limpiarTodo(jid);
+    clientesNuevos.delete(jid);
+
+    await msg.reply(`🗑️ Sesión de *${telRaw}* eliminada. El cliente puede iniciar de nuevo cuando escriba.`);
+    return;
+  }
+
+  // ── !mensaje [telefono] [texto] — mensaje directo a un cliente ────────────
+  if (/^!mensaje/i.test(texto)) {
+    const partes = texto.split(" ");
+    if (partes.length < 3) {
+      await msg.reply("⚠️ Uso: *!mensaje [teléfono] [texto]*\nEjemplo: !mensaje 3312345678 Tu pedido sale en 10 min");
+      return;
+    }
+
+    const telRaw   = partes[1].replace(/\D/g, "");
+    const contenido = partes.slice(2).join(" ");
+    const jid       = construirJID(telRaw);
 
     try {
-      await client.sendMessage(numeroCliente, mensajeRechazo);
-      try { actualizarEstadoPedido(datos.telefono, "rechazado"); } catch (e) { console.error("BD Error:", e.message); }
-      pendientesConfirmacion.delete(numeroCliente);
-      await msg.reply(`⚠️ Rechazo enviado a *${datos.nombre}* (${datos.telefono})`);
-      console.log(`⚠️ Pedido rechazado para ${numeroCliente}`);
+      await client.sendMessage(jid, contenido);
+      await msg.reply(`✅ Mensaje enviado a *${telRaw}*`);
     } catch (e) {
-      await msg.reply(`❌ Error al enviar rechazo: ${e.message}`);
+      await msg.reply(`❌ Error al enviar: ${e.message}`);
     }
+    return;
   }
 }
 

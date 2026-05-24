@@ -57,25 +57,31 @@ module.exports = {
   getJIDReal:          config.getJIDReal,
 
   // productos
-  getProductos:   modelos.getProductos,
-  getProducto:    modelos.getProducto,
-  updateProducto: modelos.updateProducto,
-  createProducto: modelos.createProducto,
-  deleteProducto: modelos.deleteProducto,
+  getProductos:        modelos.getProductos,
+  getProducto:         modelos.getProducto,
+  updateProducto:      modelos.updateProducto,
+  createProducto:      modelos.createProducto,
+  deleteProducto:      modelos.deleteProducto,
+  setProductoActivo:   modelos.setProductoActivo,
+  updateProductoPrecio: modelos.updateProductoPrecio,
 
   // clientes
   getCliente:          modelos.getCliente,
   getAllClientes:       modelos.getAllClientes,
+  getTopClientes:      modelos.getTopClientes,
   upsertCliente:       modelos.upsertCliente,
   deleteCliente:       modelos.deleteCliente,
   guardarUltimoPedido: modelos.guardarUltimoPedido,
   getUltimoPedido:     modelos.getUltimoPedido,
 
   // pedidos
-  registrarPedido:       modelos.registrarPedido,
-  actualizarEstadoPedido: modelos.actualizarEstadoPedido,
-  getPedidosHoy:         modelos.getPedidosHoy,
-  getAllPedidos:          modelos.getAllPedidos,
-  updatePedidoEstado:    modelos.updatePedidoEstado,
-  deletePedido:          modelos.deletePedido,
+  registrarPedido:            modelos.registrarPedido,
+  actualizarEstadoPedido:     modelos.actualizarEstadoPedido,
+  actualizarEstadoConfirmado: modelos.actualizarEstadoConfirmado,
+  getPedidosHoy:              modelos.getPedidosHoy,
+  getAllPedidos:               modelos.getAllPedidos,
+  getPedidosPorCliente:       modelos.getPedidosPorCliente,
+  getPedidosPorFecha:         modelos.getPedidosPorFecha,
+  updatePedidoEstado:         modelos.updatePedidoEstado,
+  deletePedido:               modelos.deletePedido,
 };

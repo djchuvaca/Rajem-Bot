@@ -271,14 +271,65 @@ Desde cualquier etapa del flujo, el cliente puede escribir "cancelar":
 
 ### Comandos del grupo admin
 
-El grupo de administración puede usar:
+El grupo de administración es la interfaz operativa principal del negocio. Ver documentación completa en `06_PANEL_ADMIN.md`.
+
+**Ver pedidos:**
 
 | Comando | Acción |
 |---|---|
-| `!pedidos` | Lista todos los pedidos del día |
+| `!pedidos` | Todos los pedidos del día con estado |
 | `!pendientes` | Pedidos esperando confirmación |
-| `!confirmados` | Pedidos confirmados hoy |
-| `!cancelados` | Pedidos cancelados hoy |
-| `!rechazados` | Pedidos rechazados hoy |
-| `!confirmar [tel]` | Confirma el pedido del cliente y le notifica por WA |
-| `!rechazar [tel]` | Rechaza el pedido del cliente y le notifica por WA |
+| `!confirmados` / `!cancelados` / `!rechazados` | Filtrar por estado |
+| `!domicilios` / `!mostradores` | Filtrar por tipo de entrega |
+
+**Gestionar pedidos:**
+
+| Comando | Acción |
+|---|---|
+| `!confirmar [tel]` | Confirma y notifica al cliente por WA |
+| `!listo [tel]` | Avisa al cliente que está listo/en camino. Cambia estado a "listo" o "en_camino" |
+| `!cancelar [tel]` | Cancela con mensaje directo al cliente |
+| `!rechazar [tel]` | Rechaza con aviso al cliente |
+| `!pedido [tel]` | Detalle completo del pedido: ítems, dirección, método de pago |
+
+**Clientes:**
+
+| Comando | Acción |
+|---|---|
+| `!cliente [tel]` | Datos del cliente |
+| `!buscar [nombre]` | Buscar cliente por nombre |
+| `!historial [tel]` | Últimos 15 pedidos del cliente |
+| `!editar [tel] [campo] [valor]` | Editar nombre, apellido, dirección, colonia, referencia o correo |
+| `!top` | Top 10 clientes por número de pedidos y gasto total |
+| `!mensaje [tel] [texto]` | Enviar mensaje directo al cliente desde el grupo |
+
+**Reportes:**
+
+| Comando | Acción |
+|---|---|
+| `!stats` | Resumen del día: pedidos, ventas, ticket promedio, top cortes |
+| `!reporte ayer` | Stats de ayer |
+| `!reporte semana` | Stats de los últimos 7 días |
+| `!reporte mes` | Stats del mes actual |
+
+**Menú y productos:**
+
+| Comando | Acción |
+|---|---|
+| `!precios` | Ver precios actuales de todos los cortes |
+| `!precio [corte] [taco] [torta]` | Actualizar precio (ej: `!precio buche 30 60`) |
+| `!agotado [corte]` | Marcar corte como agotado — el bot deja de ofrecerlo |
+| `!disponible [corte]` | Reactivar corte agotado |
+
+**Control del negocio y el bot:**
+
+| Comando | Acción |
+|---|---|
+| `!cerrar` | Cierra el negocio manualmente hoy (sin alterar el horario permanente) |
+| `!abrir` | Reabre el negocio (limpia el cierre manual) |
+| `!pausar` | Pausa las respuestas automáticas a clientes |
+| `!reanudar` | Reactiva el bot |
+| `!sesiones` | Lista clientes con sesión activa y su estado actual |
+| `!resetear [tel]` | Limpia la sesión de un cliente (puede volver a iniciar desde cero) |
+| `!estado` | Uptime, sesiones activas, estado de pausa y cierre manual |
+| `!ayuda` | Lista todos los comandos disponibles |

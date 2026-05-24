@@ -37,6 +37,7 @@
 │           │  llama-3.3   │    │  maps.js (Maps RAM)  │              │
 │           │  70b-vers.   │    │  sesiones.js         │              │
 │           └──────────────┘    │  campos.js           │              │
+│                               │  bot-pausado.js      │              │
 │                               └──────────┬───────────┘              │
 │                                          │ persistirEstado()        │
 │                                          ▼                          │
@@ -70,6 +71,8 @@ Las credenciales de sesión se guardan en `.wwebjs_auth/` (directorio local). Si
 - Imagen (`msg.hasMedia && msg.type !== "ptt"`) → comprobante de pago
 - Audio/PTT → responde "solo proceso mensajes de texto"
 - Emojis de confirmación (👍✅) → normalizados a "si"
+
+**Resolución de LIDs:** WhatsApp envía `msg.from` en formato `@lid` (ej: `3310000001:12@lid`) en ciertos dispositivos. Antes de enrutar cualquier mensaje, `index.js` detecta el sufijo `@lid` y llama a `client.getContactLidAndPhone([msg.from])` para obtener el JID real (`@c.us`). El `msg.from` se reemplaza con el JID real, de modo que todos los handlers downstream siempre operan con teléfonos reales.
 
 ### Capa 2 — Router principal (mensajes.js)
 

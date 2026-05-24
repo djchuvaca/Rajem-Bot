@@ -41,6 +41,8 @@ function extraerTelefono(texto) {
 
 function extraerTelefonoDeJID(jid) {
   if (!jid) return null;
+  // LIDs (@lid) no son teléfonos reales — dejar que getContact() resuelva
+  if (jid.endsWith("@lid")) return null;
   const jidRaw = jid.replace(/@.+/, "").split(":")[0];
   const soloDigitos = jidRaw.replace(/\D/g, "");
   if (soloDigitos.length >= 12) {

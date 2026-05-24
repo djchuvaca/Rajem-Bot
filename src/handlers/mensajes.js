@@ -10,6 +10,7 @@ const { MENU_FORMATO } = require("../config");
 const { mostrarFormularioProgresivo, siguienteCampoFaltante } = require("../estado");
 
 const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping } = require("./flujos/utils");
+const botPausado = require("../estado/bot-pausado");
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido } = require("./flujos/cancelacion");
 const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
@@ -26,6 +27,8 @@ const {
 } = require("./flujos/orden");
 
 async function handleMensaje(msg, client) {
+  if (botPausado.pausado) return;
+
   const clienteNumero = msg.from;
   ultimaActividad.set(clienteNumero, Date.now());
   recordatorioEnviado.delete(clienteNumero);

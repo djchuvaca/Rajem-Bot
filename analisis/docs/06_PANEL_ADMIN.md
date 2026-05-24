@@ -6,14 +6,15 @@ Este documento describe el panel web de administración: su arquitectura, autent
 
 ## Visión general
 
-El panel es una SPA (Single Page Application) servida por Express. Comparte el mismo proceso Node.js que el bot y accede a la misma BD en memoria. El administrador del negocio lo usa para:
+El sistema tiene **dos interfaces de administración** con responsabilidades distintas:
 
-- Ver y gestionar pedidos en tiempo real
-- Confirmar, rechazar o marcar pedidos "en camino"
-- Gestionar clientes, productos, horarios y configuración
-- Enviar mensajes directos a clientes por WhatsApp
+### Grupo de WhatsApp — operación diaria
+El grupo de WhatsApp es la interfaz operativa principal. No requiere PC ni navegador. Desde el celular, el administrador puede ver pedidos, confirmarlos, gestionar clientes, actualizar precios, controlar el bot y generar reportes mediante comandos de texto. Esta es la interfaz recomendada para el día a día del negocio.
 
-**URL:** `http://localhost:3000` (configurable via `PANEL_PORT` en `.env`)  
+### Panel web — configuración del negocio
+El panel web es para configuración estructural: mensajes del bot, horarios permanentes, datos bancarios, contraseñas. Operaciones que se hacen una vez y no cambian frecuentemente.
+
+**URL del panel:** `http://localhost:3000` (configurable via `PANEL_PORT` en `.env`)  
 **Usuario por defecto:** `admin` / `admin123`  
 **Auto-refresh:** La SPA recarga los datos cada 20 segundos automáticamente.
 
@@ -252,19 +253,114 @@ waClient.sendMessage(jid, mensaje)
 
 ## Comandos del grupo admin de WhatsApp
 
-Estos comandos se procesan en `src/handlers/comandos.js` cuando llegan del grupo configurado en `GRUPO_ID`:
+Procesados en `src/handlers/comandos.js` cuando llegan del grupo configurado en `GRUPO_ID`. El bot distingue el grupo por el JID que termina en `@g.us`.
 
-| Comando | Descripción | Respuesta |
-|---|---|---|
-| `!pedidos` | Lista todos los pedidos del día | Tabla de texto con ID, cliente, tipo, total, estado |
-| `!pendientes` | Solo pedidos en estado "pendiente" | Lista filtrada |
-| `!confirmados` | Solo pedidos confirmados hoy | Lista filtrada |
-| `!cancelados` | Solo pedidos cancelados hoy | Lista filtrada |
-| `!rechazados` | Solo pedidos rechazados hoy | Lista filtrada |
-| `!confirmar [tel]` | Confirma el pedido pendiente del cliente | Actualiza BD + notifica cliente por WA |
-| `!rechazar [tel]` | Rechaza el pedido del cliente | Actualiza BD + notifica cliente |
+**Formato de `[tel]`:** 10 dígitos del número local (ej. `3312345678`). Para `!confirmar` y `!rechazar` bastan los últimos 4 dígitos si no hay ambigüedad.
 
-**Formato de `[tel]`:** últimos dígitos del número (basta con los últimos 4 para identificar al cliente si no hay ambigüedad).
+---
+
+### Ver pedidos
+
+| Comando | Descripción |
+|---|---|
+| `!pedidos` | Todos los pedidos del día con estado, tipo, total y hora |
+| `!pendientes` | Pedidos esperando `!confirmar` del admin |
+| `!confirmados` | Pedidos ya confirmados hoy |
+| `!cancelados` | Pedidos cancelados hoy |
+| `!rechazados` | Pedidos rechazados hoy |
+| `!domicilios` | Solo pedidos de domicilio del día |
+| `!mostradores` | Solo pedidos de mostrador del día |
+| `!pedido [tel]` | Detalle completo: ítems del pedido, dirección, método de pago, total, estado |
+
+---
+
+### Gestionar pedidos
+
+| Comando | Descripción |
+|---|---|
+| `!confirmar [tel]` | Confirma el pedido pendiente. Notifica al cliente con mensaje de confirmación. Actualiza BD a "confirmado" |
+| `!listo [tel]` | Notifica al cliente que su pedido está listo (mostrador) o en camino (domicilio). Actualiza BD a "listo" o "en_camino" |
+| `!cancelar [tel]` | Cancela el pedido (pendiente o confirmado) con mensaje claro al cliente |
+| `!rechazar [tel]` | Rechaza un pedido pendiente con aviso de "detectamos un asunto con tu orden" |
+
+**Nota:** `!confirmar` y `!rechazar` sin teléfono actúan sobre el primer pedido pendiente en la lista. `!listo` y `!cancelar` requieren el teléfono.
+
+---
+
+### Clientes
+
+| Comando | Descripción |
+|---|---|
+| `!cliente [tel]` | Datos del cliente: nombre, teléfono, dirección, total de pedidos, último pedido |
+| `!buscar [nombre]` | Busca clientes por nombre o apellido (retorna hasta 5 resultados) |
+| `!historial [tel]` | Últimos 15 pedidos del cliente con fecha, tipo, total y estado |
+| `!top` | Top 10 clientes por número de pedidos, con gasto total acumulado |
+| `!editar [tel] [campo] [valor]` | Edita un dato del cliente. Campos válidos: `nombre`, `apellido`, `direccion`, `colonia`, `referencia`, `correo` |
+| `!mensaje [tel] [texto]` | Envía un mensaje de texto directo al cliente desde el número del bot |
+
+**Ejemplo de editar:**
+```
+!editar 3312345678 direccion Calle Morelos 123
+!editar 3312345678 colonia Centro
+!editar 3312345678 nombre María
+```
+
+---
+
+### Reportes
+
+| Comando | Descripción |
+|---|---|
+| `!stats` | Resumen del día: total pedidos, confirmados, ventas, ticket promedio, top cortes |
+| `!reporte ayer` | Stats de ayer |
+| `!reporte semana` | Stats de los últimos 7 días |
+| `!reporte mes` | Stats del mes actual |
+
+---
+
+### Menú y productos
+
+| Comando | Descripción |
+|---|---|
+| `!precios` | Lista todos los cortes con precio de taco y torta. Marca los agotados |
+| `!precio [corte] [taco] [torta]` | Actualiza precio de un corte en tiempo real. Invalida la caché del parser automáticamente |
+| `!agotado [corte]` | Desactiva el corte — el bot no lo ofrece ni lo acepta hasta reactivarlo |
+| `!disponible [corte]` | Reactiva un corte agotado |
+
+**Ejemplo:**
+```
+!precio buche 30 60    → taco $30, torta $60
+!agotado lengua        → el bot deja de ofrecer lengua
+!disponible lengua     → vuelve a estar disponible
+```
+
+---
+
+### Control del negocio
+
+| Comando | Descripción |
+|---|---|
+| `!cerrar` | Cierra el negocio manualmente. Los clientes reciben el mensaje de fuera de horario aunque sea horario normal. No altera el horario permanente de la BD. |
+| `!abrir` | Reabre el negocio (limpia el flag de cierre manual) |
+
+**Cómo funciona `!cerrar`:** escribe `cierre_manual = "1"` en la tabla `configuracion`. `estaEnHorario()` en `horario.js` verifica este flag antes de cualquier otra lógica. `!abrir` lo pone en "0".
+
+---
+
+### Control del bot
+
+| Comando | Descripción |
+|---|---|
+| `!pausar` | Pausa completamente las respuestas automáticas a clientes. Los mensajes llegan pero el bot no responde. |
+| `!reanudar` | Reactiva el bot |
+| `!sesiones` | Lista todos los clientes con sesión activa en memoria, con su número de teléfono y estado actual (llenando formulario, confirmando resumen, esperando corte, etc.) |
+| `!resetear [tel]` | Limpia toda la sesión del cliente: borra sus Maps en memoria y la sesión persistida en BD. El cliente puede iniciar desde cero. |
+| `!estado` | Uptime del proceso, número de sesiones activas, estado de pausa, estado de cierre manual y versión |
+| `!ayuda` | Lista todos los comandos disponibles |
+
+**`!pausar` vs `!cerrar`:**
+- `!pausar` — el bot no procesa ningún mensaje de cliente (silencio total)
+- `!cerrar` — el bot responde con el mensaje de fuera de horario y ofrece preventa
 
 ---
 

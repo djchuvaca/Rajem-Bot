@@ -66,8 +66,11 @@ describe("estaEnHorario", () => {
   test("cerrado cuando horario no cubre hora actual", () => {
     const ahora = new Date();
     const dia   = ahora.getDay();
-    // Poner horario en el pasado (01:00-02:00) — casi seguro que estará cerrado
-    run(`UPDATE horarios SET abierto=1, hora_inicio='01:00', hora_fin='02:00' WHERE dia=?`, [dia]);
+    const hora  = ahora.getHours();
+    // Usar un rango 3-4 horas en el futuro: nunca incluye la hora actual
+    const hIni = `${String((hora + 3) % 24).padStart(2, "0")}:00`;
+    const hFin = `${String((hora + 4) % 24).padStart(2, "0")}:00`;
+    run(`UPDATE horarios SET abierto=1, hora_inicio=?, hora_fin=? WHERE dia=?`, [hIni, hFin, dia]);
     assert.ok(estaEnHorario() === false);
     // Restaurar horario normal de la semilla
     run(`UPDATE horarios SET hora_inicio='07:00', hora_fin='12:30' WHERE dia=?`, [dia]);
