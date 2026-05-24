@@ -233,13 +233,13 @@ Cuando el bot entra en uno de estos estados, **solo acepta la respuesta esperada
 
 **Timer:** `setInterval` cada 10 minutos en `utils.js`.
 
-**Fase 1 — 30 minutos de inactividad:**
+**Fase 1 — 20 minutos de inactividad:**
 - Si el cliente tiene cualquier estado activo y no ha respondido → bot envía un mensaje proactivo contextual
 - El mensaje muestra el estado actual: resumen pendiente, ítem pendiente de confirmar, corte pendiente, etc.
 - Solo se envía una vez por sesión (`recordatorioEnviado` Map)
 - Cuando el cliente responde → `recordatorioEnviado.delete(numero)` (puede recibir otro en una nueva inactividad)
 
-**Fase 2 — 45 minutos de inactividad:**
+**Fase 2 — 35 minutos de inactividad:**
 - `limpiarTodo(numero)` → borra todos los Maps del cliente
 - `eliminarSesion(numero)` → borra de la tabla `sesiones_activas` en BD
 - El cliente empieza desde cero si vuelve a escribir
@@ -330,6 +330,7 @@ El grupo de administración es la interfaz operativa principal del negocio. Ver 
 | `!pausar` | Pausa las respuestas automáticas a clientes |
 | `!reanudar` | Reactiva el bot |
 | `!sesiones` | Lista clientes con sesión activa y su estado actual |
-| `!resetear [tel]` | Limpia la sesión de un cliente (puede volver a iniciar desde cero) |
+| `!limpiar [confirmar]` | Elimina TODAS las sesiones activas (requiere confirmación en dos pasos) |
+| `!resetear [tel]` | Limpia la sesión de un cliente específico |
 | `!estado` | Uptime, sesiones activas, estado de pausa y cierre manual |
 | `!ayuda` | Lista todos los comandos disponibles |

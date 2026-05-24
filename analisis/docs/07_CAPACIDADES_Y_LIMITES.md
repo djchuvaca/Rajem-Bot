@@ -33,7 +33,10 @@ El parser local maneja ~95% de los pedidos sin necesidad de IA. Entiende:
 - Si Groq no responde en 15s, hace un reintento automático; si falla el reintento, le dice al cliente que no entendió (no se cae el bot)
 - Si la BD falla al registrar un pedido, el cliente recibe un error honesto (no confirmación falsa)
 - La deduplicación de mensajes (Set de 200 IDs) previene procesar duplicados que a veces envía WA
-- El timeout bifásico (recordatorio a 30 min + limpieza a 45 min) evita sesiones zombie
+- El timeout bifásico (recordatorio a 20 min + limpieza a 35 min) evita sesiones zombie
+- Si WhatsApp se desconecta, el bot reintenta automáticamente con backoff exponencial (hasta 8 reintentos)
+- Backup automático cada 6 horas — en caso de corrupción, se puede restaurar desde el más reciente
+- Rate limiting de 2s entre mensajes al mismo JID — reduce riesgo de ban por spam
 
 ---
 
@@ -49,11 +52,11 @@ El parser local maneja ~95% de los pedidos sin necesidad de IA. Entiende:
 
 | Factor | Impacto |
 |---|---|
-| Event loop de Node.js | Es de un solo hilo. Las operaciones síncronas de sql.js bloquean el evento loop brevemente (~1-5ms por operación). Con 30 clientes simultáneos, la espera máxima es ~150ms — aceptable. |
+| Event loop de Node.js | Es de un solo hilo. Las operaciones síncronas de better-sqlite3 bloquean el event loop brevemente (~0.5-2ms por operación, más rápido que sql.js). Con 30 clientes simultáneos, la espera máxima es ~60ms — aceptable. |
 | Puppeteer / Chromium | Consume 200-500 MB de RAM solo. Es el cuello de botella de memoria. |
 | whatsapp-web.js | Fue diseñado para uso personal, no para alto volumen. La sesión WA Web puede volverse inestable con muchos mensajes por segundo. |
 | Groq rate limit | Free tier: ~30 req/min. Si el ~5% de 30 clientes simultáneos necesita Groq, son ~1-2 llamadas/min — dentro del límite. |
-| RAM total estimada | Puppeteer: ~300MB + Node.js + sql.js: ~50MB + estado Maps: ~5MB para 30 clientes. Total: ~360MB. Un VPS de 1GB puede manejarlo. |
+| RAM total estimada | Puppeteer: ~300MB + Node.js + better-sqlite3: ~20MB + estado Maps: ~5MB para 30 clientes. Total: ~325MB. Un VPS de 1GB puede manejarlo. |
 
 ### Qué pasa si se supera
 
@@ -145,7 +148,7 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 
 ### Escenario 1: Más volumen (50-100 clientes simultáneos)
 
-1. **Reemplazar sql.js por better-sqlite3** — Reduce el bloqueo del event loop (usa bindings nativos síncronos más eficientes)
+1. **better-sqlite3 ya está implementado** — La migración desde sql.js ya se completó. El event loop es más eficiente.
 2. **Separar el panel en su propio proceso** — Libera el event loop del bot de las solicitudes HTTP del panel
 3. **Pool de workers para Groq** — Mover las llamadas a Groq a worker_threads para no bloquear
 
@@ -175,7 +178,8 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 - Reconocimiento de clientes frecuentes con datos pre-llenados
 - Pedidos de preventa fuera de horario
 - Resumen final con edición antes de confirmar
-- Timeout bifásico: recordatorio contextual a 30 min, limpieza a 45 min
+- Timeout bifásico: recordatorio contextual a 20 min, limpieza a 35 min
+- Rate limiting de 2s entre mensajes al mismo JID (reduce riesgo de ban)
 
 **Administración por grupo de WhatsApp (sin PC):**
 - Ver y filtrar pedidos del día por estado y tipo de entrega
@@ -187,22 +191,38 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 - Actualizar precios y disponibilidad de cortes en tiempo real
 - Cierre manual del negocio (sin alterar horario permanente)
 - Pausar/reanudar el bot completamente
-- Ver y limpiar sesiones activas de clientes
+- Ver, limpiar una sesión individual (`!resetear`) o todas (`!limpiar confirmar`)
 - Reportes de ventas: día, ayer, semana, mes
 
-**Infraestructura:**
-- Persistencia de sesiones a través de reinicios del proceso
-- Panel web con CRUD completo para configuración del negocio
-- Notificación proactiva al cliente al cambiar estado del pedido
+**Infraestructura de producción:**
+- better-sqlite3 con persistencia automática — sin riesgo de pérdida de datos por buffer
+- Backup automático cada 6 horas a `data/backups/`
+- PM2 con autorestart, restart_delay y max_restarts configurados
+- Winston logger — consola coloreada + archivos en `logs/`
+- Sentry — captura de errores en producción (opt-in via `SENTRY_DSN`)
+- Reconnección automática con backoff exponencial (hasta 8 reintentos)
+- Handlers globales de error (`uncaughtException`, `unhandledRejection`)
+
+**Panel web:**
+- Wizard de onboarding en 5 pasos (primer login automático o acceso manual)
+- CRUD completo: productos, clientes, pedidos, horarios, banco, mensajes, config
+- Exportar pedidos a CSV
+- Estadísticas históricas (últimos 7 o 30 días)
+- Notificación proactiva al cliente al cambiar estado del pedido desde el panel
+- Health check público `GET /health` para monitoreo externo
+
+**Pagos:**
+- MercadoPago (opt-in): genera link de cobro al confirmar pedido de transferencia
+- Webhook automático: confirma pedido en BD y notifica al cliente y grupo
+- Fallback transparente al flujo banco + comprobante de imagen si MP no está configurado
 
 ### Pendiente (oportunidades de mejora)
 
-- Tests automatizados (unitarios y de integración)
-- Soporte de botones/listas interactivas de WhatsApp (requiere API oficial)
-- Export de pedidos a CSV/Excel desde el panel
-- Dashboard con historial y tendencias por semana/mes en el panel web
+- Tests automatizados ampliados (unitarios y de integración de extremo a extremo)
+- Soporte de botones/listas interactivas de WhatsApp (requiere API oficial de Meta)
 - Validación de zona de cobertura geográfica
 - Soporte de horarios partidos (ej. 7:00-12:00 y 16:00-20:00)
+- Provisioning automatizado de tenants con interfaz web (hoy solo CLI via `scripts/nuevo-tenant.js`)
 
 ---
 

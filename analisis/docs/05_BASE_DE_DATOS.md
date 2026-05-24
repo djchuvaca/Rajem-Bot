@@ -4,22 +4,23 @@ Este documento describe la base de datos SQLite del bot: su arquitectura, todas 
 
 ---
 
-## Motor: sql.js (SQLite en WebAssembly)
+## Motor: better-sqlite3 (SQLite nativo)
 
-La BD no corre como un proceso separado. Vive completamente dentro del proceso de Node.js como un módulo WebAssembly. Esto tiene implicaciones importantes:
+La BD corre como bindings nativos de C++ dentro del proceso de Node.js. Migrado desde sql.js (WebAssembly) por mejor rendimiento y persistencia automática.
 
 **Ventajas:**
 - Cero configuración — no hay servidor que instalar o mantener
-- Portable — funciona en cualquier plataforma sin compilar binarios nativos
-- Acceso O(1) — los datos están en el mismo proceso que el bot
+- Persistencia automática — cada escritura persiste a disco inmediatamente, sin buffer ni debounce
+- Más rápido que sql.js — bindings nativos en lugar de WebAssembly
+- `journal_mode = DELETE` — sin archivos `-wal` ni `-shm`, simplifica los backups
 
 **Limitaciones:**
-- La BD vive en RAM. Si el proceso muere sin flushar, se pueden perder las últimas escrituras del buffer de 500ms
-- Las operaciones son síncronas y bloquean el event loop brevemente (aceptable para el volumen de una taquería)
-- No soporta múltiples procesos accediendo simultáneamente
+- Las operaciones son síncronas (igual que sql.js) — aceptable para el volumen de una taquería
+- No soporta múltiples procesos accediendo simultáneamente al mismo archivo
 
 **Archivo en disco:** `data/tacos_javier.db`  
-**Creación automática:** Si el archivo no existe al arrancar, `seedDB()` crea las tablas y los datos iniciales.
+**Creación automática:** Si el archivo no existe al arrancar, `seedDB()` crea las tablas y los datos iniciales.  
+**Backups automáticos:** `index.js` hace un fork de `scripts/backup-db.js` al iniciar y cada 6 horas. Los backups se guardan en `data/backups/`.
 
 ---
 
@@ -27,7 +28,7 @@ La BD no corre como un proceso separado. Vive completamente dentro del proceso d
 
 | Archivo | Responsabilidad |
 |---|---|
-| `core.js` | Motor: `getDB()`, `run()`, `queryOne()`, `queryAll()`, `guardarDB()` |
+| `core.js` | Motor: `initDB()`, `getDB()` (shim), `run()`, `queryOne()`, `queryAll()`, `guardarDB()` (no-op) |
 | `seed.js` | `seedDB()`: crea tablas, inserta datos iniciales, ejecuta migraciones |
 | `modelos.js` | CRUD de productos, clientes y pedidos |
 | `config.js` | CRUD de configuración, horarios, banco, mensajes, JIDs |
@@ -35,21 +36,22 @@ La BD no corre como un proceso separado. Vive completamente dentro del proceso d
 
 ---
 
-## Función `guardarDB()` — persistencia debounced
+## Función `guardarDB()` — no-op desde la migración a better-sqlite3
 
 ```javascript
-// src/db/core.js
-let _timer = null;
-function guardarDB() {
-  clearTimeout(_timer);
-  _timer = setTimeout(() => {
-    const datos = db.export();
-    fs.writeFileSync("data/tacos_javier.db", datos);
-  }, 500);
-}
+// src/db/core.js (actual)
+function guardarDB() {} // no-op: better-sqlite3 persiste automáticamente
 ```
 
-**Comportamiento:** Cada llamada a `guardarDB()` pospone la escritura 500ms. Si hay 10 escrituras en 200ms, solo se hace **una** escritura a disco al final. Esto reduce el I/O considerablemente en ráfagas de actividad.
+**Comportamiento:** La función existe en el código para compatibilidad con llamadas legacy, pero no hace nada. better-sqlite3 persiste cada escritura a disco inmediatamente, sin buffer.
+
+## `getDB()` — shim de compatibilidad
+
+```javascript
+function getDB() { return db; } // retorna un objeto compatible con la API sql.js
+```
+
+El objeto retornado tiene los métodos `run(sql, params)` y `exec(sql)` con la misma firma que sql.js. Esto permite que `seed.js` y otros módulos que usan `getDB()` funcionen sin cambios.
 
 ---
 
@@ -184,14 +186,15 @@ confirmado → cancelado
 
 **CRUD en `modelos.js`:**
 
-- `registrarPedido(datos)` → INSERT + incrementa `total_pedidos` del cliente + llama `guardarDB()`
+- `registrarPedido(datos)` → INSERT + incrementa `total_pedidos` del cliente
 - `getPedidosHoy()` → pedidos del día actual con JOIN a clientes
 - `getAllPedidos()` → últimos 200 pedidos con JOIN a clientes
 - `getPedidosPorCliente(telefono)` → últimos 15 pedidos de un cliente
 - `getPedidosPorFecha(fechaInicio, fechaFin)` → pedidos en rango de fechas con JOIN a clientes
 - `updatePedidoEstado(id, estado)` → actualiza el estado por ID
-- `actualizarEstadoPedido(telefono, estado)` → busca el pedido con estado "pendiente" más reciente y lo actualiza
-- `actualizarEstadoConfirmado(telefono, estado)` → busca el pedido con estado "confirmado" más reciente y lo actualiza (para `!listo` y `!cancelar` sobre pedidos ya confirmados)
+- `actualizarEstadoPorId(pedidoId, estado)` → alias directo por ID (usado por webhook de MercadoPago)
+- `actualizarEstadoPedido(telefono, estado)` → busca el pedido con estado "pendiente" más reciente y lo actualiza por teléfono
+- `actualizarEstadoConfirmado(telefono, estado)` → busca el pedido con estado "confirmado" más reciente (para `!listo` y `!cancelar`)
 - `deletePedido(id)` → DELETE real
 
 **Advertencia:** `actualizarEstadoPedido()` busca por teléfono, no por ID. Si el teléfono registrado difiere del JID de WA (ej. número corto vs número con LADA), puede no encontrar el pedido. Ver `guardarTelefonoReal()` y `getJIDReal()`.
@@ -395,7 +398,7 @@ Estado cambia → persistirEstado(numero)
 guardarSesion() → INSERT OR REPLACE sesiones_activas
         │
         ▼
-guardarDB() debounce 500ms → escribe tacos_javier.db a disco
+better-sqlite3 persiste automáticamente → tacos_javier.db (sin buffer)
 ```
 
 **La BD NO se consulta** durante el flujo normal de un mensaje, excepto en:

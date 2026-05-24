@@ -207,23 +207,26 @@ Archivo fuente: `src/handlers/flujos/utils.js`
 
 Un `setInterval` de 10 minutos revisa todos los clientes en `ultimaActividad`.
 
+Los tiempos reducidos (antes 30/45 min) buscan liberar sesiones zombie más rápido y evitar confusión al cliente si regresa después de mucho tiempo.
+
 ```
 Cada 10 minutos:
     Para cada cliente en ultimaActividad:
         inactivo = ahora - ultimaActividad[cliente]
 
         ┌─────────────────────────────────────────┐
-        │ inactivo > 45 min (TIMEOUT_SESION_MS)?  │
+        │ inactivo > 35 min (TIMEOUT_SESION_MS)?  │
         │                                         │
         │ Sí → estaActivo?                        │
         │       Sí → limpiarTodo() + eliminarSesion()
         │       No → omitir                       │
         │                                         │
-        │ inactivo > 30 min Y no se envió ya un   │
+        │ inactivo > 20 min Y no se envió ya un   │
         │ recordatorio (recordatorioEnviado)?      │
         │                                         │
         │ Sí → estaActivo? Y client disponible?   │
         │       Sí → _textoRecordatorio()         │
+        │             → espera jitter 1-3s        │
         │             → sendMessage() proactivo   │
         │             → recordatorioEnviado.set() │
         │       No → omitir                       │
@@ -243,6 +246,8 @@ Genera un mensaje contextual según el estado activo del cliente:
 | `esperandoTipoItem` | Menciona cantidad y corte + "¿serían tacos o tortas?" |
 | `datosCampos` o `clientesNuevos` | "Estabas en proceso de hacer tu pedido. ¿Deseas continuar?" |
 | Ninguno | null (no se envía recordatorio) |
+
+**Jitter en el recordatorio:** Antes de `client.sendMessage()`, el bot espera entre 1 y 3 segundos aleatorios para que los mensajes proactivos no lleguen exactamente a la vez cuando varios clientes llevan inactivos el mismo tiempo.
 
 ### Limpieza del recordatorio
 

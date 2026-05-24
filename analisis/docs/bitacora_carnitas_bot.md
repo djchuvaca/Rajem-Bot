@@ -1,7 +1,47 @@
 # Bitácora del Proyecto: Bot WhatsApp Tacos Javier
 **Versión actual:** carnitas-bot 1.4  
-**Fecha:** 23 Mayo 2026 (último commit: 0d27f0c — 23 May 2026)  
-**Stack:** Node.js, whatsapp-web.js, Groq (llama-3.3-70b), sql.js (SQLite), Express panel admin
+**Fecha:** 24 Mayo 2026 (último commit: 1632735)  
+**Stack:** Node.js, whatsapp-web.js, Groq (llama-3.3-70b), **better-sqlite3** (SQLite nativo), Express panel admin, Winston, PM2, Sentry, MercadoPago
+
+---
+
+## Sesión 24 Mayo 2026 — Producción completa + SaaS foundation
+
+### Features implementadas en esta sesión
+
+**Infraestructura de producción:**
+- **Migración sql.js → better-sqlite3** — Persistencia automática, mayor rendimiento, sin archivos WAL. Shim de compatibilidad en `getDB()` para código legacy.
+- **Winston logger** (`src/logger.js`) — Consola coloreada + `logs/bot-combined.log` + `logs/bot-err.log`. Directorio `logs/` se crea automáticamente.
+- **PM2** (`ecosystem.config.js`) — `autorestart: true`, `restart_delay: 15000`, `max_restarts: 10`.
+- **Sentry** (`@sentry/node`) — opt-in via `SENTRY_DSN`. Captura `uncaughtException` y `unhandledRejection`.
+- **Reconnección automática** — backoff exponencial en `disconnected` event, máx 8 reintentos (5s → 10s → ... → 5 min). `_reintentos = 0` en `ready`.
+- **Backup automático** — `scripts/backup-db.js` forked cada 6h desde `index.js`. Primera ejecución al iniciar. Backups en `data/backups/`.
+- **Handlers globales de error** — Previenen que el proceso muera por promesas no manejadas.
+
+**Bot:**
+- **Rate limiting WA** — 2s mínimo entre mensajes al mismo JID en `replyConTyping()`. Reduce riesgo de ban.
+- **Timeouts reducidos** — Recordatorio 30→20 min, limpieza 45→35 min.
+- **`!limpiar [confirmar]`** — Nuevo comando: elimina TODAS las sesiones activas con confirmación de dos pasos.
+
+**Pagos:**
+- **MercadoPago** (`src/pagos/mercadopago.js`) — SDK v3. `crearEnlacePago()` genera Preference con 30 min de expiración. `procesarPago()` verifica el estado en la API. Webhook en `POST /webhook/mercadopago`.
+- **`actualizarEstadoPorId()`** — Nueva función en `modelos.js` usada por el webhook.
+- **Fallback transparente** — Si MP no está configurado, `resumen.js` usa el flujo de banco + imagen.
+
+**Panel web:**
+- **Wizard de onboarding** (5 pasos: negocio → horarios → banco → menú → contraseña). Auto-detección de primer run por `nombre_negocio` default + `localStorage.setup_done`.
+- **`GET /health`** — Health check público (200/503) con estado WA, DB, uptime y tenant.
+- **`GET /api/stats/historico`** — Estadísticas agrupadas por día (7 o 30 días).
+- **Exportar CSV** en sección pedidos.
+- **Eliminar pedidos** desde la tabla.
+
+**SaaS:**
+- **`TENANT_ID`** env var — cada instancia tiene su propia sesión WA.
+
+### Bugs conocidos
+- Si el servidor reinicia durante un pago MP activo (ventana 30 min), el contexto del pedido (`_pendientes` Map) se pierde en memoria. El pago llega a MP pero no se auto-notifica. El admin puede confirmar manualmente desde el panel.
+
+---
 
 ---
 

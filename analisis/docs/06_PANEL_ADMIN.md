@@ -11,8 +11,8 @@ El sistema tiene **dos interfaces de administración** con responsabilidades dis
 ### Grupo de WhatsApp — operación diaria
 El grupo de WhatsApp es la interfaz operativa principal. No requiere PC ni navegador. Desde el celular, el administrador puede ver pedidos, confirmarlos, gestionar clientes, actualizar precios, controlar el bot y generar reportes mediante comandos de texto. Esta es la interfaz recomendada para el día a día del negocio.
 
-### Panel web — configuración del negocio
-El panel web es para configuración estructural: mensajes del bot, horarios permanentes, datos bancarios, contraseñas. Operaciones que se hacen una vez y no cambian frecuentemente.
+### Panel web — configuración y onboarding
+El panel web es para configuración estructural: mensajes del bot, horarios permanentes, datos bancarios, contraseñas, y el **wizard de onboarding** para configurar el negocio la primera vez. También muestra estadísticas históricas y permite exportar pedidos a CSV.
 
 **URL del panel:** `http://localhost:3000` (configurable via `PANEL_PORT` en `.env`)  
 **Usuario por defecto:** `admin` / `admin123`  
@@ -176,6 +176,34 @@ function requireAuth(req, res, next) {
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/api/stats` | Dashboard con métricas del día |
+| GET | `/api/stats/historico?periodo=semana\|mes` | Estadísticas agrupadas por día (últimos 7 o 30 días) |
+
+### Monitoreo y pagos (rutas públicas — sin autenticación)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/health` | Health check: retorna 200 si WA conectado y BD OK, 503 si no. Incluye `status`, `whatsapp`, `db`, `uptime_s`, `tenant`, `timestamp` |
+| POST | `/webhook/mercadopago` | Recibe notificaciones de pago de MercadoPago. Responde 200 inmediatamente, luego procesa async: confirma pedido en BD y notifica al cliente y grupo por WA. |
+
+**Flujo del webhook de MercadoPago:**
+```
+POST /webhook/mercadopago { type: "payment", data: { id: "..." } }
+        │
+        ▼
+res.sendStatus(200)  ← responde inmediatamente para que MP no reintente
+        │
+        ▼
+mpPagos.procesarPago(data.id) → consulta Payment en API de MP
+        │
+        ├── no aprobado → return
+        │
+        ▼
+actualizarEstadoPorId(pedidoId, "confirmado") → BD
+        │
+        ▼
+waClient.sendMessage(jid_cliente, "✅ Pago confirmado...")
+waClient.sendMessage(GRUPO_ID, "✅ PAGO CONFIRMADO — MercadoPago...")
+```
 
 **Respuesta de `/api/stats`:**
 
@@ -354,7 +382,9 @@ Procesados en `src/handlers/comandos.js` cuando llegan del grupo configurado en 
 | `!pausar` | Pausa completamente las respuestas automáticas a clientes. Los mensajes llegan pero el bot no responde. |
 | `!reanudar` | Reactiva el bot |
 | `!sesiones` | Lista todos los clientes con sesión activa en memoria, con su número de teléfono y estado actual (llenando formulario, confirmando resumen, esperando corte, etc.) |
-| `!resetear [tel]` | Limpia toda la sesión del cliente: borra sus Maps en memoria y la sesión persistida en BD. El cliente puede iniciar desde cero. |
+| `!limpiar` | Muestra cuántas sesiones activas hay y pide confirmación |
+| `!limpiar confirmar` | Elimina TODAS las sesiones activas de clientes (limpieza masiva de emergencia) |
+| `!resetear [tel]` | Limpia toda la sesión de un cliente específico: borra sus Maps en memoria y la sesión persistida en BD. El cliente puede iniciar desde cero. |
 | `!estado` | Uptime del proceso, número de sesiones activas, estado de pausa, estado de cierre manual y versión |
 | `!ayuda` | Lista todos los comandos disponibles |
 
@@ -366,21 +396,40 @@ Procesados en `src/handlers/comandos.js` cuando llegan del grupo configurado en 
 
 ## SPA del panel (`public/index.html`)
 
-El panel completo está en un solo archivo HTML con CSS y JavaScript incrustado.
+El panel completo está en un solo archivo HTML con CSS y JavaScript incrustado (~870 líneas).
 
 **Secciones de la interfaz:**
 
 | Sección | Descripción |
 |---|---|
-| Dashboard | Estadísticas del día: total de pedidos, ventas, ticket promedio, corte más pedido |
-| Pedidos | Lista de pedidos con filtros por estado. Botones para confirmar/rechazar/en camino |
-| Clientes | Lista de clientes con búsqueda. Formulario para ver/editar datos |
-| Productos | Lista de cortes con precios. Formulario para crear/editar/desactivar |
-| Configuración | Formularios para editar nombre del negocio, costo de domicilio, etc. |
-| Horarios | Grid de días con toggles de abierto/cerrado y campos de hora |
-| Banco | Formulario para datos de transferencia |
-| Mensajes | Editor de mensajes personalizables del bot |
+| Dashboard | Stats del día: pedidos, ventas, ticket promedio, corte más pedido. Tabla de histórico (7 o 30 días). |
+| Pedidos | Lista de pedidos con filtros por estado y rango de fechas. Cambiar estado, eliminar, exportar CSV. |
+| Clientes | Lista de clientes con formulario para crear/editar/eliminar. |
+| Productos | Lista de cortes con precios. Formulario para crear/editar/desactivar. |
+| Horarios | Grid de días con toggles de abierto/cerrado y campos de hora. |
+| Banco | Formulario para datos de transferencia bancaria. |
+| Mensajes | Editor de mensajes personalizables del bot. |
+| Configuración | Nombre del negocio, costo de domicilio, etc. Cambio de contraseña. |
+| Inicio rápido ⚡ | Wizard de onboarding en 5 pasos (ver abajo). |
 
 **Auto-refresh:** Cada 20 segundos, la SPA llama a `/api/pedidos?hoy=1` y `/api/stats` para actualizar el dashboard sin recargar la página.
 
 **Autenticación en la SPA:** Si cualquier llamada a la API retorna HTTP 401, la SPA muestra el formulario de login y bloquea el resto de la interfaz.
+
+---
+
+## Wizard de Onboarding (Inicio rápido)
+
+Guía de configuración inicial en 5 pasos accesible desde el panel web. Se abre automáticamente en el primer login si `nombre_negocio` aún es el valor por defecto (`"Tacos Javier"`) y `localStorage.setup_done` no está definido.
+
+| Paso | Datos que captura | API usada |
+|---|---|---|
+| 1. Negocio | Nombre, tipo de negocio, costo de domicilio | `POST /api/config` (3 claves) |
+| 2. Horarios | Toggle abierto/cerrado y horas por día | `POST /api/horarios/:dia` (7 veces) |
+| 3. Banco | Banco, beneficiario, CLABE | `POST /api/banco` |
+| 4. Menú | Precio taco, torta, 100g | `POST /api/config` (3 claves) |
+| 5. Contraseña | Contraseña actual, nueva, confirmación | `POST /api/cambiar-password` |
+
+Al completar el paso 5, se graba `localStorage.setItem('setup_done', '1')` — el wizard no vuelve a abrirse automáticamente. Se puede acceder manualmente desde el sidebar en cualquier momento.
+
+**Nota:** Si el servidor reinicia, `setup_done` en localStorage persiste en el navegador del admin, por lo que el wizard no vuelve a aparecer automáticamente aunque el proceso reinicie.
