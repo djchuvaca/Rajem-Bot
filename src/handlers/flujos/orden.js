@@ -12,7 +12,7 @@ const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumul
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
-  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, normalizar,
+  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, parsearDistribucionRefrescos, normalizar,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
@@ -425,8 +425,43 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   const ctx = esperandoExtras.get(clienteNumero);
   const { ordenTexto, tieneRefresco, tieneSalsa, fase } = ctx;
 
+  // Normalizar dígito+letra pegados: "2fantas" → "2 fantas"
+  const textoNorm = textoOriginal.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
+
   const esNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso|ninguno|ninguna|paso|nada)$/i.test(textoOriginal.trim());
   const esSi = palabrasConfirmacion.test(textoOriginal.trim());
+
+  // ── FASE: CONFIRMACIÓN DE MÚLTIPLES REFRESCOS ───────────────────────────────
+  if (fase === "confirmMultiRefresco") {
+    const pendRefs = ctx.pendientesRefrescos || [];
+    if (esSi) {
+      let nuevaOrden = ordenTexto;
+      for (const ref of pendRefs) nuevaOrden += "\n" + _formatearRefresco(ref);
+      if (!tieneSalsa) {
+        const listaSalsas = _listaNombresSalsas();
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendientesRefrescos: null });
+        persistirEstado(clienteNumero);
+        if (ctx._cantidadSalPendiente) {
+          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+          await msg.reply(`Quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+        } else {
+          await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+        }
+      } else {
+        esperandoExtras.delete(clienteNumero);
+        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
+      }
+      return true;
+    }
+    if (esNo) {
+      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco", pendientesRefrescos: null });
+      await msg.reply(`¿Cuántos refrescos y de cuáles? 🥤\n\n*${_listaNombresRefrescos()}*`);
+      return true;
+    }
+    const lineasPend = pendRefs.map(r => _formatearRefresco(r)).join("\n");
+    await msg.reply(lineasPend + "\n\n*¿Agrego estos refrescos a tu pedido?*");
+    return true;
+  }
 
   // ── FASE: CONFIRMACIÓN DE REFRESCO ──────────────────────────────────────────
   if (fase === "confirmRefresco") {
@@ -479,9 +514,26 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       }
       return true;
     }
-    const refresco = detectarRefresco(textoOriginal);
+    // Distribución multi-tipo: "2 de fanta y 1 de manzana"
+    if (ctx._cantidadRefPendiente > 1) {
+      const distRef = parsearDistribucionRefrescos(textoNorm);
+      if (distRef) {
+        const totalRef = distRef.reduce((s, r) => s + r.cantidad, 0);
+        if (totalRef !== ctx._cantidadRefPendiente) {
+          const listaRef = _listaNombresRefrescos();
+          await msg.reply(`Quieres *${ctx._cantidadRefPendiente} refrescos* pero me escribiste *${totalRef}* 🤔\n¿Cuáles serían?\n\n*${listaRef}*`);
+          return true;
+        }
+        const lineasRef = distRef.map(r => _formatearRefresco(r)).join("\n");
+        esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmMultiRefresco", pendientesRefrescos: distRef, _cantidadRefPendiente: null });
+        persistirEstado(clienteNumero);
+        await msg.reply(lineasRef + "\n\n*¿Agrego estos refrescos a tu pedido?*");
+        return true;
+      }
+    }
+    // Refresco único
+    const refresco = detectarRefresco(textoNorm);
     if (refresco) {
-      // Si el cliente vino de "N refrescos" genérico y no especificó cantidad, usar la guardada
       const cantFinal = (ctx._cantidadRefPendiente && refresco.cantidad === 1)
         ? ctx._cantidadRefPendiente : refresco.cantidad;
       const refFinal = cantFinal !== refresco.cantidad ? { ...refresco, cantidad: cantFinal } : refresco;
@@ -537,7 +589,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       }
       return true;
     }
-    const salsas = detectarSalsa(textoOriginal);
+    const salsas = detectarSalsa(textoNorm);
     if (salsas && salsas.length > 0) {
       const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
       esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });
@@ -598,7 +650,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   }
 
   // Refresco detectado directamente
-  const refresco = detectarRefresco(textoOriginal);
+  const refresco = detectarRefresco(textoNorm);
   if (refresco) {
     const lineaRef = _formatearRefresco(refresco);
     esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refresco });
@@ -608,7 +660,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   }
 
   // Salsa detectada directamente
-  const salsas = detectarSalsa(textoOriginal);
+  const salsas = detectarSalsa(textoNorm);
   if (salsas && salsas.length > 0) {
     const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
     esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });

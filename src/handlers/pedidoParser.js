@@ -597,11 +597,39 @@ function parsearDistribucionCortes(texto) {
   return items.length >= 2 ? items : null;
 }
 
+// ── DISTRIBUCIÓN DE REFRESCOS ─────────────────────────────────────────────────
+// "2 de fanta y 1 de manzana" → [{nombre:"fanta",cantidad:2,...}, {nombre:"manzana",cantidad:1,...}]
+// Requiere al menos 2 tipos distintos. Retorna null si no aplica.
+function parsearDistribucionRefrescos(texto) {
+  const NUMS_TEXTO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
+  texto = texto.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
+  const t = normalizar(texto);
+  const refrescos = getRefrescos();
+  if (!refrescos.length) return null;
+  const encontrados = [];
+  for (const ref of refrescos) {
+    const palabras = [ref.nombre, ...(ref.sinonimos || "").split(",").map(s => s.trim()).filter(Boolean)];
+    for (const p of palabras) {
+      if (!p) continue;
+      const escaped = normalizar(p).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const m = t.match(new RegExp(`\\b(\\d+|un[ao]?|dos|tres|cuatro)\\s+(?:de\\s+)?${escaped}s?\\b`, "i"));
+      if (m) {
+        const cantStr = m[1].toLowerCase();
+        const cantidad = parseInt(cantStr) || NUMS_TEXTO[cantStr] || 1;
+        encontrados.push({ nombre: ref.nombre, cantidad, precio: ref.precio_taco });
+        break;
+      }
+    }
+  }
+  return encontrados.length >= 2 ? encontrados : null;
+}
+
 // ── SEPARAR REFRESCO Y/O SALSA DE UN MENSAJE MIXTO ───────────────────────────
 // "2 tacos y una coca"                   → { textoLimpio:"2 tacos", refrescos:[{…}], salsas:[] }
 // "dos tacos, 2 cocas, 1 fanta y salsa"  → { textoLimpio:"dos tacos", refrescos:[{…},{…}], salsas:[{…}] }
 // Sin coincidencias                      → { textoLimpio: texto (original), refrescos:[], salsas:[] }
 function separarRefresco(texto) {
+  texto = texto.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
   const NUMS_TEXTO = { un: 1, una: 1, uno: 1, unos: 1, unas: 1, dos: 2, tres: 3, cuatro: 4 };
 
   function _limpiar(t) {
@@ -710,4 +738,5 @@ module.exports = {
   separarRefresco,
   textoANumero,
   parsearDistribucionCortes,
+  parsearDistribucionRefrescos,
 };
