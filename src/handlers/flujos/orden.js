@@ -775,8 +775,10 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       if (PATRON_UNO_EN_UNO.test(textoOriginal)) {
         const CORTES_UNO = getCortes();
         const tUno = normalizar(textoOriginal);
-        const matchUno = tUno.match(new RegExp(`\\b(${Object.keys(CORTES_UNO).join("|")})\\b`));
-        const corteUno = matchUno ? CORTES_UNO[matchUno[1]] : null;
+        const palabrasUno = Object.keys(CORTES_UNO).join("|");
+        const matchesUno = [...tUno.matchAll(new RegExp(`\\b(${palabrasUno})\\b`, "g"))];
+        const cortesUno = [...new Set(matchesUno.map(m => CORTES_UNO[m[1]]))];
+        const corteUno = cortesUno.length > 0 ? cortesUno.join(", ") : null;
         if (corteUno) {
           _resetError(clienteNumero);
           nuevosItems = Array.from({ length: itemDist.cantidad }, () => ({ ...itemDist, cantidad: 1, corte: corteUno }));
