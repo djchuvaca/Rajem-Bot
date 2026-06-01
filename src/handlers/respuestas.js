@@ -264,6 +264,15 @@ function generarRespuestaAutomatica(pregunta, opciones = {}) {
     case "descripcion_corte":
       return respuestaDescripcionCorte(pregunta.producto);
 
+    case "ya_en_camino":
+      return `¡Te esperamos! 🏃 En cuanto llegues te atendemos de inmediato 😊`;
+
+    case "despedida":
+      return `¡Hasta luego! Fue un placer atenderte 😊 Cuando gustes volver, aquí estaremos.`;
+
+    case "total_parcial":
+      return null; // requiere contexto del pedido — se maneja en orden.js
+
     default:
       return null;
   }

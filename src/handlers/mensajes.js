@@ -117,10 +117,14 @@ async function handleMensaje(msg, client) {
         if (!clientesNuevos.has(clienteNumero)) clientesNuevos.add(clienteNumero);
         console.log(`Bot: [RESPUESTA AUTOMÁTICA] tipo: ${pregFaq.tipo}`);
         await replyConTyping(msg, respFaq);
-        if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
-          await replyConTyping(msg, mensajeFueraDeHorario());
-        } else if (estaEnHorario() && !enFlujoActivo(clienteNumero)) {
-          await replyConTyping(msg, MENU_FORMATO());
+        // No mostrar menú para acks de cortesía
+        const esAckSinMenu = pregFaq.tipo === "ya_en_camino" || pregFaq.tipo === "despedida";
+        if (!esAckSinMenu) {
+          if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
+            await replyConTyping(msg, mensajeFueraDeHorario());
+          } else if (estaEnHorario() && !enFlujoActivo(clienteNumero)) {
+            await replyConTyping(msg, MENU_FORMATO());
+          }
         }
         return;
       }

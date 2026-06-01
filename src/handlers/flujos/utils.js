@@ -266,7 +266,7 @@ function listaCortes() {
     : "Surtido, Carne, Buche, Cuero, Lengua";
 }
 
-const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az|ya|ya\s+dale|ya\s+pues|ya\s+va)$/i;
+const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az|ya|ya\s+dale|ya\s+pues|ya\s+va|vamos|vamos\s+pues|le\s+va|le\s+voy|sale\s+y\s+vale|sale\s+pues|andele|ándele|s[ií]\s+se[nñ]or|s[ií]\s+se[nñ]ora|apunta(?:me)?|anota(?:me)?|ch[eé]ca(?:le)?|ch[eé]cale|a\s+toda\s+madre|a\s+toda|si\s+claro|sí\s+claro|claro\s+que\s+si|claro\s+que\s+sí|con\s+gusto|ándale\s+pues|le\s+entramos|le\s+entro|le\s+echamos|ponme|apuntame)$/i;
 
 module.exports = {
   telefonosReales,

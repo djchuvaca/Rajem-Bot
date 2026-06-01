@@ -760,6 +760,25 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
 async function handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrdenDom) {
   const faqP = detectarPreguntaFrecuente(textoOriginal);
   const tipoP = faqP ? faqP.tipo : null;
+
+  // "ya voy en camino" y "despedida" → ack simple, sin seguimiento
+  if (tipoP === "ya_en_camino" || tipoP === "despedida") {
+    const rSimple = generarRespuestaAutomatica(faqP, { esDomicilio: esOrdenDom });
+    if (rSimple) { await msg.reply(rSimple); return true; }
+  }
+
+  // "¿cuánto llevo?" → mostrar subtotal del pedido en curso
+  if (tipoP === "total_parcial") {
+    const ordenActual = esperandoAgregarMas.get(clienteNumero);
+    if (ordenActual) {
+      const sub = calcularSubtotal(ordenActual);
+      await msg.reply(`💰 Tu pedido hasta ahora suma *$${sub}*\n\n*¿Deseas agregar algo más?*`);
+    } else {
+      await msg.reply("*¿Qué deseas ordenar?* 😊");
+    }
+    return true;
+  }
+
   if (tipoP !== "precio" && tipoP !== "menu" && tipoP !== "domicilio" && tipoP !== "descripcion_corte") return false;
 
   const rP = generarRespuestaAutomatica(faqP, { esDomicilio: esOrdenDom });

@@ -150,12 +150,15 @@ const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s
 const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?:por|a)\s+(\w+)|(?:sin|quita)\s+(\w+)\s+(?:y\s+)?(?:pon|agrega)\s+(\w+)/i;
 
 // ── PREGUNTAS FRECUENTES ──────────────────────────────────────────────────────
-const PREGUNTAS_PRECIO    = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es)|precio\s+(?:del?|de\s+los?)|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?)/i;
-const PREGUNTAS_HORARIO   = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?|llegan?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora|trabajan?\s+hoy|ya\s+(?:cerraron?|abrieron?|est[aá]n?\s+abiertos?|est[aá]n?\s+listos?)|abren?\s+(?:hoy|ma[nñ]ana|los\s+\w+|el\s+\w+)|siguen?\s+abiertos?/i;
+const PREGUNTAS_PRECIO    = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es|salen?|cuestan?)|precio\s+(?:del?|de\s+los?|del?\s+men[uú])?|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?|los|las)|tienen?\s+precios?|^precios?$/i;
+const PREGUNTAS_HORARIO   = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?|llegan?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora|trabajan?\s+hoy|ya\s+(?:cerraron?|abrieron?|est[aá]n?\s+abiertos?|est[aá]n?\s+listos?)|abren?\s+(?:hoy|ma[nñ]ana|los\s+\w+|el\s+\w+)|siguen?\s+abiertos?|est[aá]n?\s+trabajando|a[uú]n\s+abren?/i;
 const PREGUNTAS_DOMICILIO = /(?:hacen?|tienen?|mandan?|llevan?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:(?:por|de)\s+)?domicilio|cu[aá]nto\s+(?:\w+\s+){0,3}(?:domicilio|env[ií]o)|domicilio\s+(?:gratis|incluido|cuesta|vale)|se\s+tarda|en\s+cu[aá]nto\s+tiempo|cu[aá]nto\s+tiempo/i;
-const PREGUNTAS_MENU      = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]/i;
+const PREGUNTAS_MENU      = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]|me\s+mandas?\s+(?:el\s+)?men[uú]|me\s+mandas?\s+(?:la\s+)?info/i;
 const PREGUNTAS_UBICACION = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ubicaci[oó]n|c[oó]mo\s+llegar/i;
 const PREGUNTAS_PAGO      = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
+const PREGUNTAS_TOTAL     = /cu[aá]nto\s+(?:llevo|voy|me\s+toca|es\s+(?:mi\s+)?total|va\s+(?:mi\s+)?total|va\s+todo|es\s+en\s+total)|(?:mi\s+)?total\s+(?:hasta\s+ahora|parcial|por\s+favor)|cu[aá]nto\s+es\s+(?:en\s+total|todo|lo\s+que\s+llevo)|cu[aá]nto\s+suma/i;
+const PATRON_EN_CAMINO    = /\b(?:ya\s+(?:voy|vengo|andamos|vamos|sal[ií]|estoy\s+(?:en\s+camino|saliendo|yendo|por\s+llegar|cerca))|estoy\s+(?:en\s+camino|por\s+llegar|cerca|llegando)|en\s+camino|ya\s+lleg[uú][eé]|ya\s+llegamos|ya\s+estoy\s+afuera?|ya\s+llegamos|ya\s+andamos)\b/i;
+const PATRON_DESPEDIDA    = /^(?:gracias|grax|grac|muchas\s+gracias|muy\s+amable|que\s+les?\s+vaya\s+bien|hasta\s+luego|hasta\s+pronto|nos\s+vemos|buen\s+provecho|adios|adi[oó]s|hasta\s+ma[nñ]ana|chao|chau|bye|ciao)$/i;
 
 // Detecta preguntas sobre qué es un corte específico ("¿qué es el buche?")
 const PREGUNTAS_DESCRIPCION_CORTE = /qu[eé]\s+(?:es|son|tiene|lleva|contiene)|c[oó]mo\s+(?:es|est[aá]|sabe|queda|se\s+come)|de\s+qu[eé]\s+(?:es|est[aá]\s+hecho|parte)|qu[eé]\s+parte\s+es/i;
@@ -190,6 +193,22 @@ function textoANumero(texto) {
     .replace(/\buna?\s+docena\s+(?:de\s+)?/gi, "12 ")
     .replace(/\bmedia\s+docena\s+(?:de\s+)?/gi,  "6 ")
     .replace(/\bun\s+par\s+(?:de\s+)?/gi,         "2 ")
+    // Compuestos 21-29 (antes que "veinte" para no cortar a mitad)
+    .replace(/\bveintinueve\b/gi,   "29")
+    .replace(/\bveintiocho\b/gi,    "28")
+    .replace(/\bveintisiete?\b/gi,  "27")
+    .replace(/\bveintis[eé]is\b/gi, "26")
+    .replace(/\bveinticinco\b/gi,   "25")
+    .replace(/\bveinticuatro\b/gi,  "24")
+    .replace(/\bveintitr[eé]s\b/gi, "23")
+    .replace(/\bveintid[oó]s\b/gi,  "22")
+    .replace(/\bveintiun[ao]?\b/gi, "21")
+    .replace(/\bveinti[uú]n\b/gi,   "21")
+    // Compuestos 16-19 (antes que "diez" y "seis"/"siete"/etc.)
+    .replace(/\bdiecinueve\b/gi,    "19")
+    .replace(/\bdieciocho\b/gi,     "18")
+    .replace(/\bdiecisiete\b/gi,    "17")
+    .replace(/\bdiecis[eé]is\b/gi,  "16")
     .replace(/\bnoventa\b/gi,  "90")
     .replace(/\bochenta\b/gi,  "80")
     .replace(/\bsetenta\b/gi,  "70")
@@ -199,6 +218,8 @@ function textoANumero(texto) {
     .replace(/\btreinta\b/gi,  "30")
     .replace(/\bveinte\b/gi,   "20")
     .replace(/\bquince\b/gi,   "15")
+    .replace(/\bcatorce\b/gi,  "14")
+    .replace(/\btrece\b/gi,    "13")
     .replace(/\bdoce\b/gi,     "12")
     .replace(/\bonce\b/gi,     "11")
     .replace(/\bdiez\b/gi,     "10")
@@ -298,8 +319,8 @@ function extraerCorte(fragmento) {
 // ── DIVIDIR EN ÍTEMS ──────────────────────────────────────────────────────────
 function dividirEnItems(texto) {
   const partes = texto
-    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
-    .map(p => p.trim().replace(/^y\s+/i, ""))
+    .split(/\n+|,\s*(?:y\s+)?|\s+m[aá]s\s+(?=\d|\bun[ao]?\b|\bmedio\b)|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
+    .map(p => p.trim().replace(/^(?:y|m[aá]s)\s+/i, ""))
     .filter(Boolean);
   return partes.length > 1 ? partes : [texto];
 }
@@ -370,6 +391,10 @@ function detectarSinCorte(texto) {
 // ── DETECTAR PREGUNTA FRECUENTE ───────────────────────────────────────────────
 function detectarPreguntaFrecuente(texto) {
   const t = normalizar(texto);
+  // Intents contextuales simples (no necesitan lógica de negocio)
+  if (PATRON_EN_CAMINO.test(t))  return { tipo: "ya_en_camino" };
+  if (PATRON_DESPEDIDA.test(t))  return { tipo: "despedida" };
+  if (PREGUNTAS_TOTAL.test(t))   return { tipo: "total_parcial" };
   if (PREGUNTAS_DOMICILIO.test(t)) return { tipo: "domicilio" };
   if (PREGUNTAS_PRECIO.test(t)) {
     const cortes = getCortes();
