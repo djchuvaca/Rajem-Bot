@@ -11,14 +11,14 @@ const {
   esperandoCaptura, datosRecibidos, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem,
-  esperandoExtras, ordenPreResumen,
+  esperandoExtras, ordenPreResumen, pendientesConfirmacion,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
 const { getRangoHorario } = require("../horario");
 
 // ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
-const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|interior|entre|junto|frente|cerca)$/i;
+const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|spei|deposito|dep[oó]sito|cash|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|priv|interior|entre|junto|frente|cerca|casa|fraccionamiento|fracc|unidad|lote)$/i;
 
 // ── EXTRACCIÓN DE TELÉFONO ────────────────────────────────────────────────────
 function extraerTelefono(texto) {
@@ -80,6 +80,7 @@ function limpiarTodo(numero) {
   esperandoTipoItem.delete(numero);
   esperandoExtras.delete(numero);
   ordenPreResumen.delete(numero);
+  pendientesConfirmacion.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
 }
@@ -112,9 +113,9 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
   // ── Método de pago ────────────────────────────────────────────────────────
   if (!campos.metodo) {
-    if (/transferencia/i.test(textoCompleto))                 campos.metodo = "transferencia";
-    else if (!esDomicilio && /tarjeta/i.test(textoCompleto)) campos.metodo = "tarjeta";
-    else if (/efectivo/i.test(textoCompleto))                campos.metodo = "efectivo";
+    if (/transferencia|spei|dep[oó]sito|transfiero?/i.test(textoCompleto))              campos.metodo = "transferencia";
+    else if (!esDomicilio && /tarjeta|con\s+tarjeta/i.test(textoCompleto))             campos.metodo = "tarjeta";
+    else if (/efectivo|en\s+efectivo|cash/i.test(textoCompleto))                       campos.metodo = "efectivo";
   }
 
   // ── Hora (preventa) ───────────────────────────────────────────────────────
@@ -186,7 +187,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
     const primeraLinea  = textoNuevo.split(/\n/)[0].trim();
     const primeraLimpia = primeraLinea
       .replace(/\b\d{10}\b/g, "")
-      .replace(/efectivo|tarjeta|transferencia/gi, "")
+      .replace(/efectivo|en\s+efectivo|cash|tarjeta|transferencia|spei|dep[oó]sito/gi, "")
       .replace(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi, "")
       .replace(/col\.?\s+[\w\s]{2,40}/gi, "")
       .replace(/art[ií]culo\s+\d+[^\s]*/gi, "")
@@ -331,7 +332,7 @@ function datosCompletos(texto, esPreventa = false, esDomicilio = false) {
     const palabras = texto.match(/[a-záéíóúüñ]{2,}/gi) || [];
     return palabras.filter(p => !PALABRAS_NO_NOMBRE.test(p)).length >= 2;
   })();
-  const tieneMetodoPago = /efectivo|tarjeta|transferencia/i.test(texto);
+  const tieneMetodoPago = /efectivo|en\s+efectivo|cash|tarjeta|con\s+tarjeta|transferencia|spei|dep[oó]sito|transfiero?/i.test(texto);
   const tieneHora = /\b([1-9]|1[0-2])(:[0-5][0-9])?\s*(am|pm|a\.m\.|p\.m\.)/i.test(texto)
     || /\b([1-9]|1[0-2]):[0-5][0-9]\b/.test(texto)
     || /\ba\s+las?\s+\d{1,2}/i.test(texto)
@@ -351,7 +352,7 @@ function pareceFragmentoDatos(texto) {
     if (PALABRAS_NO_NOMBRE.test(limpio)) return false;
     return /^[a-záéíóúüñ\s]{4,50}$/i.test(limpio);
   })();
-  const esMetodoPago = /efectivo|tarjeta|transferencia/i.test(texto);
+  const esMetodoPago = /efectivo|en\s+efectivo|cash|tarjeta|con\s+tarjeta|transferencia|spei|dep[oó]sito|transfiero?/i.test(texto);
   const esDireccion  = /calle|colonia|#|num|col\.|av\.|blvd/i.test(texto);
   const esHora       = /\b([1-9]|1[0-2])(:[0-5][0-9])?\s*(am|pm|a\.m\.|p\.m\.)/i.test(texto)
     || /\b([1-9]|1[0-2]):[0-5][0-9]\b/.test(texto)
@@ -379,6 +380,13 @@ function extraerDatosPedido(resumenTexto) {
 // ── DETECTAR EDICIÓN ─────────────────────────────────────────────────────────
 function detectarEdicion(texto) {
   const t = texto.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  // Correcciones naturales: "mi nombre es X", "me llamo X", "el nombre es X"
+  const mNombreDirecto = texto.match(/(?:mi\s+nombre(?:\s+(?:completo|y\s+apellido))?\s+es|me\s+llamo|el\s+nombre\s+es)\s+(.+)/i);
+  if (mNombreDirecto) {
+    const partes = mNombreDirecto[1].trim().split(/\s+/);
+    return { campo: "nombre", valor: { nombre: partes[0], apellido: partes.slice(1).join(" ") || null }, preguntar: false };
+  }
 
   // NOMBRE con valor
   const mNombreVal = texto.match(/cambia(?:r|me)?\s+(?:mi\s+)?nombre(?:\s+y\s+apellido)?\s+(?:a|por)\s+(.+)/i);

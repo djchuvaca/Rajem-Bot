@@ -779,7 +779,8 @@ async function handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrden
     return true;
   }
 
-  if (tipoP !== "precio" && tipoP !== "menu" && tipoP !== "domicilio" && tipoP !== "descripcion_corte") return false;
+  const TIPOS_FAQ_PEDIDO = new Set(["precio", "menu", "domicilio", "descripcion_corte", "horario", "ubicacion", "metodos_pago"]);
+  if (!TIPOS_FAQ_PEDIDO.has(tipoP)) return false;
 
   const rP = generarRespuestaAutomatica(faqP, { esDomicilio: esOrdenDom });
   if (!rP) return false;

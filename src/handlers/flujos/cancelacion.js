@@ -7,8 +7,8 @@ const { actualizarEstadoPedido, getMensaje, getConfig } = require("../../db");
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
-const RE_CANCELAR = /cancelar|cancela|cancel|cancelo|cancelame|cancelado|ya no quiero|ya no/i;
-const RE_NUEVO    = /\b(empez(?:ar|emos)\s+de\s+nuevo|reinici(?:ar|o)|volver\s+a\s+empezar|otro\s+pedido|nuevo\s+pedido|quiero\s+(?:hacer\s+)?otro\s+pedido|olvida(?:mos)?\s+(?:todo|mi\s+pedido)|borremos?\s+todo)\b/i;
+const RE_CANCELAR = /\bcancelar\b|\bcancela\b|\bcancel\b|\bcancelo\b|\bcancelame\b|\bcancelado\b|^ya\s+no\s+quiero\s*$|^ya\s+no\s*$/i;
+const RE_NUEVO    = /\b(empez(?:ar|emos)\s+de\s+(?:nuevo|cero)|comenzar\s+de\s+cero|reinici(?:ar|o)|volver\s+a\s+empezar|otro\s+pedido|nuevo\s+pedido|quiero\s+(?:hacer\s+)?otro\s+pedido|olvida(?:mos)?\s+(?:todo|mi\s+pedido)|borremos?\s+todo)\b/i;
 
 // ── CANCELACIÓN DE PEDIDO CONFIRMADO ─────────────────────────────────────────
 async function handleCancelacionConfirmada(msg, client, textoOriginal, clienteNumero) {
