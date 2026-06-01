@@ -33,6 +33,9 @@ function getCortes() {
       if (p.categoria === "refresco") continue;
       const nombre = p.nombre.toLowerCase().trim();
       mapa[nombre] = nombre;
+      // Plural simple: termina en vocal → +s, en consonante → +es
+      const plural = /[aeiouáéíóú]$/i.test(nombre) ? nombre + "s" : nombre + "es";
+      mapa[plural] = nombre;
       if (p.sinonimos) {
         for (const s of p.sinonimos.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)) {
           mapa[s] = nombre;
@@ -107,11 +110,11 @@ function detectarRefresco(texto) {
 
 function _cortesDefault() {
   return {
-    surtido: "surtido", surtida: "surtido", mixto: "surtido", mixta: "surtido",
-    carne: "carne", carner: "carne", masiza: "carne", maciza: "carne", carnita: "carne", carnitas: "carne",
-    buche: "buche", buchito: "buche", buchon: "buche", buchones: "buche",
+    surtido: "surtido", surtida: "surtido", surtidos: "surtido", mixto: "surtido", mixta: "surtido",
+    carne: "carne", carnes: "carne", carner: "carne", masiza: "carne", maciza: "carne", carnita: "carne", carnitas: "carne",
+    buche: "buche", buches: "buche", buchito: "buche", buchon: "buche", buchones: "buche",
     cuero: "cuero", cueros: "cuero", cueritos: "cuero", cuerito: "cuero",
-    lengua: "lengua", lenguita: "lengua", lenguitas: "lengua",
+    lengua: "lengua", lenguas: "lengua", lenguita: "lengua", lenguitas: "lengua",
   };
 }
 
