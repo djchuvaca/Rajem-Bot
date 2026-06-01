@@ -566,13 +566,19 @@ function detectarSinTipo(texto) {
 }
 
 // ── DISTRIBUCIÓN DE CORTES ────────────────────────────────────────────────────
-// "1 de carne, 2 de surtido, 1 de lengua" → [{cantidad:1,corte:"carne"}, ...]
+// "1 de carne, 2 de surtido, 1 de lengua"  → [{cantidad:1,corte:"carne"}, ...]
+// "uno de carne y lengua, 2 de surtido, 1 de cuero" → [{cantidad:1,corte:"carne, lengua"}, ...]
+// "N de corte1 y corte2" se interpreta como 1 ítem con corte combinado (sin número antes del y).
 // Requiere al menos 2 pares (cantidad + corte válido). Retorna null si no aplica.
 function parsearDistribucionCortes(texto) {
   const NUMS_TEXTO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
+  // Insertar espacio entre dígito y letra pegados: "1Surtido" → "1 Surtido"
+  texto = texto.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
   const t = normalizar(texto);
   const CORTES_MAP = getCortes();
-  const patron = /\b(\d+|un[ao]?|dos|tres|cuatro)\s+(?:de\s+)?(\w+)/gi;
+  // El grupo opcional (?:\s+y\s+(?!\d)(\w+))? captura un segundo corte tras "y"
+  // solo si NO va seguido de dígito (para no consumir "y 1 de surtido").
+  const patron = /\b(\d+|un[ao]?|dos|tres|cuatro)\s+(?:de\s+)?(\w+)(?:\s+y\s+(?!\d)(\w+))?/gi;
   const matches = [...t.matchAll(patron)];
   if (matches.length < 2) return null;
   const items = [];
@@ -580,9 +586,10 @@ function parsearDistribucionCortes(texto) {
     const cantStr = m[1].toLowerCase();
     const cantidad = parseInt(cantStr) || NUMS_TEXTO[cantStr] || null;
     if (!cantidad) return null;
-    const corte = CORTES_MAP[m[2].toLowerCase()] || null;
-    if (!corte) return null;
-    items.push({ cantidad, corte });
+    const corte1 = CORTES_MAP[m[2].toLowerCase()] || null;
+    if (!corte1) return null;
+    const corte2 = m[3] ? (CORTES_MAP[m[3].toLowerCase()] || null) : null;
+    items.push({ cantidad, corte: corte2 ? `${corte1}, ${corte2}` : corte1 });
   }
   return items.length >= 2 ? items : null;
 }

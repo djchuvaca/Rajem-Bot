@@ -771,6 +771,11 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       const distribucion = parsearDistribucionCortes(textoOriginal);
       if (distribucion) {
         const totalDist = distribucion.reduce((s, d) => s + d.cantidad, 0);
+        if (totalDist !== itemDist.cantidad) {
+          _sumarError(clienteNumero);
+          await msg.reply(`Quieres *${itemDist.cantidad} tacos* pero lo que me escribiste suma *${totalDist}* 🤔\n¿Cómo los distribuyes? Por ejemplo: _1 de carne, 2 de surtido, 1 de lengua_`);
+          return true;
+        }
         if (totalDist === itemDist.cantidad) {
           _resetError(clienteNumero);
           const nuevosItems = distribucion.map(d => ({ ...itemDist, cantidad: d.cantidad, corte: d.corte }));
