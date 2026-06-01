@@ -774,14 +774,25 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       const PATRON_UNO_EN_UNO = /\bde\s+1\s+en\s+1\b|\bde\s+uno\s+en\s+uno\b|\buno\s+(?:a|por)\s+uno\b|\bde\s+a\s+(?:1|uno)\b/i;
       if (PATRON_UNO_EN_UNO.test(textoOriginal)) {
         const CORTES_UNO = getCortes();
-        const tUno = normalizar(textoOriginal);
+        // Quitar el patrón "de 1 en 1" para leer cantidad y cortes sin interferencia
+        const textoSinPatron = textoOriginal.replace(PATRON_UNO_EN_UNO, "").trim();
+        const tUno = normalizar(textoSinPatron);
         const palabrasUno = Object.keys(CORTES_UNO).join("|");
         const matchesUno = [...tUno.matchAll(new RegExp(`\\b(${palabrasUno})\\b`, "g"))];
         const cortesUno = [...new Set(matchesUno.map(m => CORTES_UNO[m[1]]))];
         const corteUno = cortesUno.length > 0 ? cortesUno.join(", ") : null;
         if (corteUno) {
+          // Detectar cantidad explícita ("2 de buche de 1 en 1" → 2)
+          const NUMS_UNO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
+          const matchCant = tUno.match(/\b(\d+|un[ao]?|dos|tres|cuatro)\b/);
+          const cantExp = matchCant ? (parseInt(matchCant[1]) || NUMS_UNO[matchCant[1].toLowerCase()] || null) : null;
+          const cantUno = (cantExp && cantExp < itemDist.cantidad) ? cantExp : itemDist.cantidad;
           _resetError(clienteNumero);
-          nuevosItems = Array.from({ length: itemDist.cantidad }, () => ({ ...itemDist, cantidad: 1, corte: corteUno }));
+          nuevosItems = Array.from({ length: cantUno }, () => ({ ...itemDist, cantidad: 1, corte: corteUno }));
+          // Si es parcial, agregar el ítem restante sin corte para seguir preguntando
+          if (cantUno < itemDist.cantidad) {
+            nuevosItems.push({ ...itemDist, cantidad: itemDist.cantidad - cantUno });
+          }
         }
       }
 
