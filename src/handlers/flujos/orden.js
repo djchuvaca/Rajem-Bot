@@ -12,7 +12,7 @@ const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumul
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
-  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
+  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, normalizar,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
