@@ -762,72 +762,92 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     return true;
   }
 
-  // Distribución de cortes: "1 de carne, 2 de surtido, 1 de lengua"
+  // Distribución de cortes (dos sub-casos comparten la misma finalización)
   {
     const pedParcDist = esperandoCorte.get(clienteNumero);
     const idxDist = pedParcDist._indiceActual || 0;
     const itemDist = pedParcDist.items[idxDist];
     if (itemDist && (itemDist.presentacion === "taco" || itemDist.presentacion === "torta")) {
-      const distribucion = parsearDistribucionCortes(textoOriginal);
-      if (distribucion) {
-        const totalDist = distribucion.reduce((s, d) => s + d.cantidad, 0);
-        if (totalDist !== itemDist.cantidad) {
-          _sumarError(clienteNumero);
-          await msg.reply(`Quieres *${itemDist.cantidad} tacos* pero lo que me escribiste suma *${totalDist}* 🤔\n¿Cómo los distribuyes? Por ejemplo: _1 de carne, 2 de surtido, 1 de lengua_`);
-          return true;
-        }
-        if (totalDist === itemDist.cantidad) {
+      let nuevosItems = null;
+
+      // Sub-caso A: "todas de carne de 1 en 1" → expande en N ítems individuales con ese corte
+      const PATRON_UNO_EN_UNO = /\bde\s+1\s+en\s+1\b|\bde\s+uno\s+en\s+uno\b|\buno\s+(?:a|por)\s+uno\b|\bde\s+a\s+(?:1|uno)\b/i;
+      if (PATRON_UNO_EN_UNO.test(textoOriginal)) {
+        const CORTES_UNO = getCortes();
+        const tUno = normalizar(textoOriginal);
+        const matchUno = tUno.match(new RegExp(`\\b(${Object.keys(CORTES_UNO).join("|")})\\b`));
+        const corteUno = matchUno ? CORTES_UNO[matchUno[1]] : null;
+        if (corteUno) {
           _resetError(clienteNumero);
-          const nuevosItems = distribucion.map(d => ({ ...itemDist, cantidad: d.cantidad, corte: d.corte }));
-          pedParcDist.items.splice(idxDist, 1, ...nuevosItems);
-          const siguienteIdx = pedParcDist.items.findIndex((item, i) => i >= idxDist + nuevosItems.length && !item.corte);
-          if (siguienteIdx !== -1) {
-            pedParcDist._indiceActual = siguienteIdx;
-            esperandoCorte.set(clienteNumero, pedParcDist);
-            const sigItem = pedParcDist.items[siguienteIdx];
-            const desc = sigItem.presentacion === "taco"   ? `los ${sigItem.cantidad} tacos`
-                       : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
-                       : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
-                       : `los $${sigItem.monto}`;
-            await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+          nuevosItems = Array.from({ length: itemDist.cantidad }, () => ({ ...itemDist, cantidad: 1, corte: corteUno }));
+        }
+      }
+
+      // Sub-caso B: "1 de carne, 2 de surtido, 1 de lengua" → distribución explícita
+      if (!nuevosItems) {
+        const distribucion = parsearDistribucionCortes(textoOriginal);
+        if (distribucion) {
+          const totalDist = distribucion.reduce((s, d) => s + d.cantidad, 0);
+          if (totalDist !== itemDist.cantidad) {
+            _sumarError(clienteNumero);
+            const tipo = itemDist.presentacion === "torta" ? "tortas" : "tacos";
+            await msg.reply(`Quieres *${itemDist.cantidad} ${tipo}* pero lo que me escribiste suma *${totalDist}* 🤔\n¿Cómo los distribuyes? Por ejemplo: _1 de carne, 2 de surtido, 1 de lengua_`);
             return true;
           }
-          esperandoCorte.delete(clienteNumero);
-          if (pedParcDist._baseConfirmacion !== undefined) {
-            const jsonCorteConf = { tipo: "pedido", items: pedParcDist.items };
-            const { texto: lineasCorteConf } = jsonALineas(jsonCorteConf);
-            const baseConf   = pedParcDist._baseConfirmacion.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
-            const nuevasConf = lineasCorteConf.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
-            const combConf   = baseConf + "\n" + nuevasConf;
-            const subtConf   = calcularSubtotal(combConf);
-            const textoBC    = combConf + "\n💰 Subtotal: $" + subtConf;
-            esperandoConfirmacionItem.set(clienteNumero, { lineas: textoBC, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
-            historial.push({ role: "user", content: textoOriginal });
-            historial.push({ role: "assistant", content: textoBC });
-            await msg.reply(textoBC + "\n\n*¿Es correcto?*");
-            return true;
-          }
-          if (pedParcDist._esModificacionResumen === true && pedParcDist._ordenBase) {
-            const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
-            const { texto: lineasNuevas } = jsonALineas(jsonCompletoCorte);
-            pedidoJSONActual.set(clienteNumero, { _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte });
-            esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
-            historial.push({ role: "user", content: textoOriginal });
-            historial.push({ role: "assistant", content: lineasNuevas });
-            await msg.reply(lineasNuevas + "\n\n*¿Agrego esto a tu pedido?*");
-            return true;
-          }
-          const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
-          pedidoJSONActual.set(clienteNumero, jsonCompletoCorte);
-          persistirEstado(clienteNumero);
-          const resultado = jsonALineas(jsonCompletoCorte);
-          esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
-          historial.push({ role: "user", content: textoOriginal });
-          historial.push({ role: "assistant", content: resultado.texto });
-          await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
-          console.log(`Bot: [DISTRIBUCIÓN CORTES] Subtotal: $${resultado.subtotal}`);
+          _resetError(clienteNumero);
+          nuevosItems = distribucion.map(d => ({ ...itemDist, cantidad: d.cantidad, corte: d.corte }));
+        }
+      }
+
+      // Finalización compartida
+      if (nuevosItems) {
+        pedParcDist.items.splice(idxDist, 1, ...nuevosItems);
+        const siguienteIdx = pedParcDist.items.findIndex((item, i) => i >= idxDist + nuevosItems.length && !item.corte);
+        if (siguienteIdx !== -1) {
+          pedParcDist._indiceActual = siguienteIdx;
+          esperandoCorte.set(clienteNumero, pedParcDist);
+          const sigItem = pedParcDist.items[siguienteIdx];
+          const desc = sigItem.presentacion === "taco"   ? `los ${sigItem.cantidad} tacos`
+                     : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
+                     : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
+                     : `los $${sigItem.monto}`;
+          await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
           return true;
         }
+        esperandoCorte.delete(clienteNumero);
+        if (pedParcDist._baseConfirmacion !== undefined) {
+          const jsonCorteConf = { tipo: "pedido", items: pedParcDist.items };
+          const { texto: lineasCorteConf } = jsonALineas(jsonCorteConf);
+          const baseConf   = pedParcDist._baseConfirmacion.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+          const nuevasConf = lineasCorteConf.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+          const combConf   = baseConf + "\n" + nuevasConf;
+          const textoBC    = combConf + "\n💰 Subtotal: $" + calcularSubtotal(combConf);
+          esperandoConfirmacionItem.set(clienteNumero, { lineas: textoBC, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+          historial.push({ role: "user", content: textoOriginal });
+          historial.push({ role: "assistant", content: textoBC });
+          await msg.reply(textoBC + "\n\n*¿Es correcto?*");
+          return true;
+        }
+        if (pedParcDist._esModificacionResumen === true && pedParcDist._ordenBase) {
+          const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
+          const { texto: lineasNuevas } = jsonALineas(jsonCompletoCorte);
+          pedidoJSONActual.set(clienteNumero, { _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte });
+          esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+          historial.push({ role: "user", content: textoOriginal });
+          historial.push({ role: "assistant", content: lineasNuevas });
+          await msg.reply(lineasNuevas + "\n\n*¿Agrego esto a tu pedido?*");
+          return true;
+        }
+        const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
+        pedidoJSONActual.set(clienteNumero, jsonCompletoCorte);
+        persistirEstado(clienteNumero);
+        const resultado = jsonALineas(jsonCompletoCorte);
+        esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+        historial.push({ role: "user", content: textoOriginal });
+        historial.push({ role: "assistant", content: resultado.texto });
+        await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
+        console.log(`Bot: [DISTRIBUCIÓN CORTES] Subtotal: $${resultado.subtotal}`);
+        return true;
       }
     }
   }
