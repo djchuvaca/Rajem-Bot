@@ -494,7 +494,7 @@ async function handleComandos(msg, client) {
     const ticket      = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
     const negocio     = getConfig("nombre_negocio") || "Tacos Javier";
 
-    const CORTES    = ["surtido", "carne", "buche", "cuero", "lengua"];
+    const CORTES    = getProductos().map(p => p.nombre.toLowerCase());
     const conteo    = {};
     for (const p of pedidos) {
       const orden = (p.orden || "").toLowerCase();
@@ -565,7 +565,7 @@ async function handleComandos(msg, client) {
     const totalVentas  = confirmados.reduce((s, p) => s + (p.total || 0), 0);
     const ticket       = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
 
-    const CORTES = ["surtido", "carne", "buche", "cuero", "lengua"];
+    const CORTES = getProductos().map(p => p.nombre.toLowerCase());
     const conteo = {};
     for (const p of pedidos) {
       const orden = (p.orden || "").toLowerCase();
@@ -939,7 +939,7 @@ async function handleComandos(msg, client) {
     out += `📡 Sesiones:  *${sesionesActivas} activa(s)*\n`;
     out += `🔘 Bot:       *${botPausado.pausado ? "⏸️ Pausado" : "▶️ Activo"}*\n`;
     out += `🏪 Negocio:   *${cerradoManual ? "🔒 Cerrado manual" : "🔓 Abierto"}*\n`;
-    out += `📦 Versión:   *1.0.0*\n`;
+    out += `📦 Versión:   *${require("../../package.json").version}*\n`;
     out += `━━━━━━━━━━━━━━━━━━`;
 
     await msg.reply(out);

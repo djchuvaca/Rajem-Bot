@@ -186,7 +186,7 @@ app.get("/api/stats", requireAuth, (req, res) => {
 
   // Corte más pedido hoy (busca en texto de la orden)
   const conteoCortes = {};
-  const CORTES_STAT  = ["surtido", "carne", "buche", "cuero", "lengua"];
+  const CORTES_STAT  = getProductos().map(p => p.nombre.toLowerCase());
   for (const p of pedidosHoy) {
     const orden = (p.orden || "").toLowerCase();
     for (const c of CORTES_STAT) if (orden.includes(c)) conteoCortes[c] = (conteoCortes[c] || 0) + 1;
@@ -393,7 +393,7 @@ setInterval(async () => {
         `⚠️ *Pedido sin confirmar*\n\n` +
         `El pedido *#${p.id}* de *${nombre}* lleva más de 10 minutos esperando.\n` +
         `Total: $${Math.round(p.total || 0)}\n\n` +
-        `Usa *!confirmar ${p.id}* o revisa el panel.`
+        `Usa *!confirmar ${p.telefono || nombre}* o revisa el panel.`
       );
     } catch (_) {}
   }
@@ -410,7 +410,7 @@ setInterval(async () => {
 function startPanel(port = 3000) {
   app.listen(port, () => {
     console.log(`\n🌐 Panel de administración corriendo en http://localhost:${port}`);
-    console.log(`   Usuario: admin | Contraseña: admin123\n`);
+    console.log(`   Usuario: admin (usa scripts/reset-password.js para recuperar acceso)\n`);
   });
 }
 

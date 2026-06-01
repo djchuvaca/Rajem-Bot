@@ -9,7 +9,7 @@ const {
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
 const { getProductos } = require("../../db");
-const { textoANumero } = require("../pedidoParser");
+const { textoANumero, getCortes, buscarCorteFuzzy } = require("../pedidoParser");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
 const telefonosReales    = new Map();
@@ -166,11 +166,23 @@ function parsearSinCorteItems(texto) {
     .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
     .map(p => p.trim().replace(/^y\s+/i, ""))
     .filter(Boolean);
+  const CORTES_ACTIVOS = getCortes(); // { surtido: "surtido", buche: "buche", ... } desde BD
+  const palabrasCorteActivas = Object.keys(CORTES_ACTIVOS).join("|");
   const items = [];
   for (const parte of partes) {
     const tp = parte.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const matchCorte = parte.match(/(?:de\s*|\b)(surtido|carne|carner|masiza|maciza|buche|cuero|cueros|lengua)\b/i);
-    const corte = matchCorte ? { surtido:"surtido", carne:"carne", carner:"carne", masiza:"carne", maciza:"carne", buche:"buche", cuero:"cuero", cueros:"cuero", lengua:"lengua" }[matchCorte[1].toLowerCase()] : null;
+    let corte = null;
+    if (palabrasCorteActivas) {
+      const matchCorte = parte.match(new RegExp(`(?:de\\s*|\\b)(${palabrasCorteActivas})\\b`, "i"));
+      if (matchCorte) corte = CORTES_ACTIVOS[matchCorte[1].toLowerCase()] || null;
+    }
+    if (!corte) {
+      for (const palabra of tp.split(/\s+/)) {
+        if (palabra.length < 4) continue;
+        const cf = buscarCorteFuzzy(palabra);
+        if (cf) { corte = cf; break; }
+      }
+    }
     const matchPieza = tp.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
     if (matchPieza) { items.push({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte }); continue; }
     let encontroMedida = false;
@@ -246,6 +258,14 @@ function validarHora(texto) {
   return `${h > 12 ? h - 12 : h}${minStr} ${sufijo}`;
 }
 
+function listaCortes() {
+  const cortes = getCortes();
+  const unicos = [...new Set(Object.values(cortes))];
+  return unicos.length > 0
+    ? unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(", ")
+    : "Surtido, Carne, Buche, Cuero, Lengua";
+}
+
 const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az|ya|ya\s+dale|ya\s+pues|ya\s+va)$/i;
 
 module.exports = {
@@ -260,4 +280,5 @@ module.exports = {
   quitarItemDeOrden,
   validarHora,
   palabrasConfirmacion,
+  listaCortes,
 };

@@ -12,7 +12,7 @@ const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumul
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
-  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, parsearDistribucionRefrescos, normalizar,
+  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, parsearDistribucionRefrescos, normalizar, buscarCorteFuzzy,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
@@ -20,7 +20,7 @@ const { getUltimoPedido } = require("../../db");
 const { buildPrompt } = require("../../prompts/index");
 const { MENU_FORMATO } = require("../../config");
 const {
-  telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, palabrasConfirmacion,
+  telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, palabrasConfirmacion, listaCortes,
 } = require("./utils");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -54,6 +54,7 @@ function _listaNombresSalsas() {
     ? sals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ")
     : "picada · cebolla · suave · roja · limones";
 }
+
 
 function _formatearRefresco(ref) {
   const nombreDisplay = ref.nombre.charAt(0).toUpperCase() + ref.nombre.slice(1);
@@ -607,9 +608,8 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
 
   // Subtotal acumulado
   if (/cu[aá]nto\s+(?:llevo|tengo|es(?:\s+todo)?(?:\s+lo\s+que\s+llevo)?|llega|va)|(?:total|subtotal)\s+(?:hasta\s+ahorita|por\s+ahora|de\s+lo\s+que\s+llevo)/i.test(textoOriginal)) {
-    const sub = calcularSubtotal(ordenTexto);
     const lista = formatearListaAcumulada(ordenTexto);
-    await msg.reply(`${lista}\n\n💰 *Total acumulado: $${sub}*`);
+    await msg.reply(lista);
     await new Promise(r => setTimeout(r, 300));
     await msg.reply("¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤");
     return true;
@@ -649,21 +649,46 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
     return true;
   }
 
-  // Refresco detectado directamente
-  const refresco = detectarRefresco(textoNorm);
-  if (refresco) {
-    const lineaRef = _formatearRefresco(refresco);
-    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refresco });
+  // Multi-refresco: "2 de fanta y 1 de sprite"
+  const multiRefPregunta = parsearDistribucionRefrescos(textoNorm);
+  if (multiRefPregunta) {
+    const lineasRef = multiRefPregunta.map(r => _formatearRefresco(r)).join("\n");
+    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmMultiRefresco", pendientesRefrescos: multiRefPregunta });
+    persistirEstado(clienteNumero);
+    await msg.reply(lineasRef + "\n\n*¿Agrego estos refrescos a tu pedido?*");
+    return true;
+  }
+
+  const refrescoPregunta = detectarRefresco(textoNorm);
+  const salsasPregunta   = detectarSalsa(textoNorm);
+
+  // Refresco + salsa en el mismo mensaje: "una coca y salsa picada"
+  if (refrescoPregunta && salsasPregunta && salsasPregunta.length > 0) {
+    const lineaRef   = _formatearRefresco(refrescoPregunta);
+    const lineaSalsa = `🌶️ Salsas: ${salsasPregunta.join(", ")}`;
+    const nuevaOrden = ordenTexto + "\n" + lineaRef + "\n" + lineaSalsa;
+    const refNombre  = refrescoPregunta.nombre.charAt(0).toUpperCase() + refrescoPregunta.nombre.slice(1);
+    const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
+    esperandoExtras.delete(clienteNumero);
+    persistirEstado(clienteNumero);
+    await msg.reply(`Agregué *${refNombre}* y salsas (${salNombres}) a tu pedido! 🥤🌶️`);
+    await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
+    return true;
+  }
+
+  // Refresco único
+  if (refrescoPregunta) {
+    const lineaRef = _formatearRefresco(refrescoPregunta);
+    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refrescoPregunta });
     persistirEstado(clienteNumero);
     await msg.reply(lineaRef + "\n\n*¿Agrego esto a tu pedido?*");
     return true;
   }
 
-  // Salsa detectada directamente
-  const salsas = detectarSalsa(textoNorm);
-  if (salsas && salsas.length > 0) {
-    const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
-    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });
+  // Salsa detectada
+  if (salsasPregunta && salsasPregunta.length > 0) {
+    const lineaSalsa = `🌶️ Salsas: ${salsasPregunta.join(", ")}`;
+    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsasPregunta });
     persistirEstado(clienteNumero);
     await msg.reply(lineaSalsa + "\n\n*¿Agrego esto a tu pedido?*");
     return true;
@@ -706,7 +731,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
       return true;
     }
   }
@@ -864,6 +889,18 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
         }
       }
 
+      // Sub-caso C: "igual", "el mismo", "lo mismo" → aplicar corte del ítem anterior
+      if (!nuevosItems && idxDist > 0) {
+        const PATRON_IGUAL = /\bigual(?:\s+(?:para\s+(?:todos?|el\s+resto|las?\s+dem[aá]s?))?)?\b|\bel\s+mismos?\b|\blo\s+mismos?\b|\blos\s+mismos?\b|\btambién\s+(?:de\s+)?(?:ese|eso|el\s+mismo)\b/i;
+        if (PATRON_IGUAL.test(textoOriginal)) {
+          const cortePrevio = pedParcDist.items[idxDist - 1].corte;
+          if (cortePrevio) {
+            _resetError(clienteNumero);
+            nuevosItems = [{ ...itemDist, corte: cortePrevio }];
+          }
+        }
+      }
+
       // Finalización compartida
       if (nuevosItems) {
         pedParcDist.items.splice(idxDist, 1, ...nuevosItems);
@@ -876,7 +913,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
                      : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
                      : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
                      : `los $${sigItem.monto}`;
-          await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+          await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
           return true;
         }
         esperandoCorte.delete(clienteNumero);
@@ -929,7 +966,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
                        : itemFaq.presentacion === "gramos" ? `los ${itemFaq.gramos}g`
                        : `los $${itemFaq.monto}`;
       await msg.reply(respFaqCorte);
-      await msg.reply(`*¿Y de qué tipo de carne quieres ${descFaq}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿Y de qué tipo de carne quieres ${descFaq}?*\nTenemos: ${listaCortes()}`);
       return true;
     }
   }
@@ -938,7 +975,16 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   const CORTES_MAP = getCortes();
   const palabrasCorteEsp = Object.keys(CORTES_MAP).join("|");
   const matchCorteRespuesta = t.match(new RegExp(`\\b(${palabrasCorteEsp})\\b`));
-  const corteDetectado = matchCorteRespuesta ? CORTES_MAP[matchCorteRespuesta[1]] || null : null;
+  let corteDetectado = matchCorteRespuesta ? CORTES_MAP[matchCorteRespuesta[1]] || null : null;
+  // Fuzzy fallback para typos: "cueroo", "surtidoo", "lngua"
+  if (!corteDetectado) {
+    const DESCARTAR_FUZZY = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
+    for (const palabra of t.split(/\s+/)) {
+      if (palabra.length < 4 || DESCARTAR_FUZZY.test(palabra)) continue;
+      const cf = buscarCorteFuzzy(palabra);
+      if (cf) { corteDetectado = cf; break; }
+    }
+  }
 
   if (!corteDetectado) {
     const _pedPend  = esperandoCorte.get(clienteNumero);
@@ -948,8 +994,8 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
                     : _itemPend.presentacion === "gramos" ? `los ${_itemPend.gramos}g`
                     : `los $${_itemPend.monto}`;
     const errores = _sumarError(clienteNumero);
-    const extra = errores >= 2 ? "\n\n_Por ejemplo escríbeme: *surtido*, *carne*, *buche*, *cuero* o *lengua*_" : "";
-    await msg.reply(`Necesito que me digas el tipo de carne para ${_descPend}.\n*¿Cuál prefieres?* Surtido, Carne, Buche, Cuero o Lengua` + extra);
+    const extra = errores >= 2 ? `\n\n_Por ejemplo escríbeme: *${listaCortes().toLowerCase()}*_` : "";
+    await msg.reply(`Necesito que me digas el tipo de carne para ${_descPend}.\n*¿Cuál prefieres?* ${listaCortes()}` + extra);
     return true;
   }
 
@@ -967,7 +1013,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
                : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
                : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
                : `los $${sigItem.monto}`;
-    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
     return true;
   }
 
@@ -1029,9 +1075,9 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
                : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                : `los $${primerItem.monto}`;
-    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
   } else {
-    await msg.reply("*¿De qué tipo de carne lo quieres?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua");
+    await msg.reply(`*¿De qué tipo de carne lo quieres?*\nTenemos: ${listaCortes()}`);
   }
   return true;
 }
@@ -1082,9 +1128,8 @@ async function handleAgregarMas(msg, textoOriginal, clienteNumero, historial, es
   if (/cu[aá]nto\s+(?:llevo|tengo|es(?:\s+todo)?(?:\s+lo\s+que\s+llevo)?(?:\s+hasta\s+ahorita)?)|(?:total|subtotal)\s+(?:hasta\s+ahorita|por\s+ahora|de\s+lo\s+que\s+llevo)|cu[aá]nto\s+(?:llega|asciende|va)\s+mi\s+pedido/i.test(textoOriginal)) {
     const ordSub = esperandoAgregarMas.get(clienteNumero) || "";
     if (ordSub) {
-      const subAct   = calcularSubtotal(ordSub);
       const listaAct = formatearListaAcumulada(ordSub);
-      await msg.reply(`${listaAct}\n\n💰 *Total acumulado: $${subAct}*`);
+      await msg.reply(listaAct);
       await new Promise(r => setTimeout(r, 300));
       await msg.reply("*¿Deseas agregar algo más?*");
       return true;

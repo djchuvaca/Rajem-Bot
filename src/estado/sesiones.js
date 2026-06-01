@@ -9,7 +9,7 @@ const {
   resumenPendiente, esperandoCaptura, datosAcumulados, datosCampos,
   pedidosConfirmados, esperandoMotivoCancelacion, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
-  tipoEntregaCliente, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
+  tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
   esperandoExtras, ordenPreResumen,
 } = require("./maps");
 
@@ -31,6 +31,7 @@ function serializarEstado(numero) {
   if (pedidoJSONActual.has(numero))           estado.pedidoJSONActual     = pedidoJSONActual.get(numero);
   if (esperandoConfirmacionDatos.has(numero)) estado.esperandoConfirmDatos = esperandoConfirmacionDatos.get(numero);
   if (tipoEntregaCliente.has(numero))         estado.tipoEntregaCliente   = tipoEntregaCliente.get(numero);
+  if (esperandoCorte.has(numero))             estado.esperandoCorte       = esperandoCorte.get(numero);
   if (esperandoEdicion.has(numero))           estado.esperandoEdicion     = esperandoEdicion.get(numero);
   if (esperandoTipoItem.has(numero))          estado.esperandoTipoItem    = esperandoTipoItem.get(numero);
   if (pendientesConfirmacion.has(numero))     estado.pendienteConfirmacion = pendientesConfirmacion.get(numero);
@@ -57,6 +58,7 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.pedidoJSONActual)      pedidoJSONActual.set(numero, estado.pedidoJSONActual);
   if (estado.esperandoConfirmDatos) esperandoConfirmacionDatos.set(numero, estado.esperandoConfirmDatos);
   if (estado.tipoEntregaCliente)    tipoEntregaCliente.set(numero, estado.tipoEntregaCliente);
+  if (estado.esperandoCorte)        esperandoCorte.set(numero, estado.esperandoCorte);
   if (estado.esperandoEdicion)      esperandoEdicion.set(numero, estado.esperandoEdicion);
   if (estado.esperandoTipoItem)       esperandoTipoItem.set(numero, estado.esperandoTipoItem);
   if (estado.pendienteConfirmacion)   pendientesConfirmacion.set(numero, estado.pendienteConfirmacion);
@@ -81,7 +83,7 @@ function persistirEstado(numero) {
 const _CLAVES_FLUJO_ACTIVO = new Set([
   "resumenPendiente", "esperandoCaptura", "esperandoConfirmItem",
   "esperandoAgregarMas", "esperandoConfirmDatos", "esperandoEdicion",
-  "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
+  "esperandoCorte", "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
   "ordenPreResumen", "pendienteConfirmacion",
 ]);
 

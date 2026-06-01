@@ -74,13 +74,18 @@ function detectarSalsa(texto) {
   const salsas = getSalsas();
   if (!salsas.length) return null;
   const t = normalizar(texto);
+  // "salsa de la casa" / "la que tengan" → todas las salsas disponibles
+  if (/\bsal(?:sa)?\s+de\s+la\s+casa\b|\bla\s+que\s+(?:tengan?|haya)\b|\bcualquier\s+salsa\b/i.test(t)) {
+    return salsas.map(s => s.nombre);
+  }
   const encontradas = [];
   for (const s of salsas) {
     const palabras = [s.nombre, ...(s.sinonimos || "").split(",").map(p => p.trim()).filter(Boolean)];
     for (const p of palabras) {
       if (!p) continue;
-      const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      if (new RegExp(`\\b${escaped}\\b`, "i").test(t)) {
+      const escaped = normalizar(p).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const match = new RegExp(`\\b${escaped}\\b`, "i").exec(t);
+      if (match && !_tieneNegacionAntes(t, match.index)) {
         if (!encontradas.includes(s.nombre)) encontradas.push(s.nombre);
         break;
       }
@@ -97,10 +102,13 @@ function detectarRefresco(texto) {
     const palabras = [ref.nombre, ...(ref.sinonimos || "").split(",").map(s => s.trim()).filter(Boolean)];
     for (const p of palabras) {
       if (!p) continue;
-      const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      if (new RegExp(`\\b${escaped}\\b`, "i").test(t)) {
-        const matchNum = t.match(/\b([1-9]\d?)\b/);
-        const cantidad = matchNum ? Math.min(parseInt(matchNum[1]), 20) : 1;
+      const escaped = normalizar(p).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const match = new RegExp(`\\b${escaped}\\b`, "i").exec(t);
+      if (match && !_tieneNegacionAntes(t, match.index)) {
+        // Buscar el número más cercano al refresco (hasta 30 chars antes)
+        const vicinidad = t.slice(Math.max(0, match.index - 30), match.index + match[0].length + 5);
+        const mNear = vicinidad.match(/\b([1-9]\d?)\b/);
+        const cantidad = mNear ? Math.min(parseInt(mNear[1]), 20) : 1;
         return { nombre: ref.nombre, cantidad, precio: ref.precio_taco };
       }
     }
@@ -133,7 +141,7 @@ const MEDIDAS = [
 ];
 
 // ── SEÑALES DE COMPLEJIDAD → GROQ ─────────────────────────────────────────────
-const SEÑALES_GROQ        = /y\s+aparte|para\s+m[ií]|para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada|\+/i;
+const SEÑALES_GROQ        = /y\s+aparte|para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
 
 // ── PATRONES DE MODIFICACIÓN ──────────────────────────────────────────────────
@@ -157,6 +165,14 @@ function normalizar(texto) {
   return texto.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+// Devuelve true si hay una negación ("no", "sin", "menos"…) justo antes del índice dado.
+// No cuenta como negación si el producto va directamente después de "con".
+function _tieneNegacionAntes(texto, posicion) {
+  const ventana = texto.slice(Math.max(0, posicion - 50), posicion);
+  if (/\bcon\s+(?:\w+\s+){0,1}$/i.test(ventana)) return false;
+  return /\b(?:no|sin|menos|excepto)\b(?:\s+\w+){0,4}\s*$/.test(ventana);
+}
+
 // ── MEJORA 3: PREPROCESAR CANTIDADES INFORMALES ───────────────────────────────
 function preprocesarCantidades(texto) {
   return texto
@@ -174,6 +190,13 @@ function textoANumero(texto) {
     .replace(/\buna?\s+docena\s+(?:de\s+)?/gi, "12 ")
     .replace(/\bmedia\s+docena\s+(?:de\s+)?/gi,  "6 ")
     .replace(/\bun\s+par\s+(?:de\s+)?/gi,         "2 ")
+    .replace(/\bnoventa\b/gi,  "90")
+    .replace(/\bochenta\b/gi,  "80")
+    .replace(/\bsetenta\b/gi,  "70")
+    .replace(/\bsesenta\b/gi,  "60")
+    .replace(/\bcincuenta\b/gi,"50")
+    .replace(/\bcuarenta\b/gi, "40")
+    .replace(/\btreinta\b/gi,  "30")
     .replace(/\bveinte\b/gi,   "20")
     .replace(/\bquince\b/gi,   "15")
     .replace(/\bdoce\b/gi,     "12")
@@ -575,12 +598,10 @@ function detectarSinTipo(texto) {
 // Requiere al menos 2 pares (cantidad + corte válido). Retorna null si no aplica.
 function parsearDistribucionCortes(texto) {
   const NUMS_TEXTO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
-  // Insertar espacio entre dígito y letra pegados: "1Surtido" → "1 Surtido"
   texto = texto.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
+  texto = textoANumero(texto);
   const t = normalizar(texto);
   const CORTES_MAP = getCortes();
-  // El grupo opcional (?:\s+y\s+(?!\d)(\w+))? captura un segundo corte tras "y"
-  // solo si NO va seguido de dígito (para no consumir "y 1 de surtido").
   const patron = /\b(\d+|un[ao]?|dos|tres|cuatro)\s+(?:de\s+)?(\w+)(?:\s+y\s+(?!\d)(\w+))?/gi;
   const matches = [...t.matchAll(patron)];
   if (matches.length < 2) return null;
@@ -589,9 +610,9 @@ function parsearDistribucionCortes(texto) {
     const cantStr = m[1].toLowerCase();
     const cantidad = parseInt(cantStr) || NUMS_TEXTO[cantStr] || null;
     if (!cantidad) return null;
-    const corte1 = CORTES_MAP[m[2].toLowerCase()] || null;
+    const corte1 = CORTES_MAP[m[2].toLowerCase()] || buscarCorteFuzzy(m[2].toLowerCase()) || null;
     if (!corte1) return null;
-    const corte2 = m[3] ? (CORTES_MAP[m[3].toLowerCase()] || null) : null;
+    const corte2 = m[3] ? (CORTES_MAP[m[3].toLowerCase()] || buscarCorteFuzzy(m[3].toLowerCase()) || null) : null;
     items.push({ cantidad, corte: corte2 ? `${corte1}, ${corte2}` : corte1 });
   }
   return items.length >= 2 ? items : null;
@@ -603,6 +624,7 @@ function parsearDistribucionCortes(texto) {
 function parsearDistribucionRefrescos(texto) {
   const NUMS_TEXTO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
   texto = texto.replace(/(\d)([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/g, "$1 $2");
+  texto = textoANumero(texto);
   const t = normalizar(texto);
   const refrescos = getRefrescos();
   if (!refrescos.length) return null;
@@ -612,7 +634,7 @@ function parsearDistribucionRefrescos(texto) {
     for (const p of palabras) {
       if (!p) continue;
       const escaped = normalizar(p).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      const m = t.match(new RegExp(`\\b(\\d+|un[ao]?|dos|tres|cuatro)\\s+(?:de\\s+)?${escaped}s?\\b`, "i"));
+      const m = t.match(new RegExp(`\\b(\\d+|un[ao]?|dos|tres|cuatro)\\s+(?:refrescos?\\s+)?(?:de\\s+)?${escaped}s?\\b`, "i"));
       if (m) {
         const cantStr = m[1].toLowerCase();
         const cantidad = parseInt(cantStr) || NUMS_TEXTO[cantStr] || 1;
@@ -650,11 +672,12 @@ function separarRefresco(texto) {
       const escaped = varNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
       if (!new RegExp(`\\b${escaped}s?\\b`).test(textoActual)) continue;
 
-      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`));
+      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`))
+                   || textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+refrescos?\\s+(?:de\\s+)?${escaped}s?\\b`));
       const cantidad = mCant ? parseInt(mCant[1]) : 1;
 
       const reRemove = new RegExp(
-        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*${escaped}s?\\b`,
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*(?:refrescos?\\s+(?:de\\s+)?)?${escaped}s?\\b`,
         "g"
       );
       textoActual = _limpiar(textoActual.replace(reRemove, ""));
@@ -688,11 +711,12 @@ function separarRefresco(texto) {
       const escaped = varNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
       if (!new RegExp(`\\b${escaped}s?\\b`).test(textoActual)) continue;
 
-      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`));
+      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`))
+                   || textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+salsas?\\s+(?:de\\s+)?${escaped}s?\\b`));
       const cantidad = mCant ? parseInt(mCant[1]) : 1;
 
       const reRemove = new RegExp(
-        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*${escaped}s?\\b`,
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*(?:salsas?\\s+(?:de\\s+)?)?${escaped}s?\\b`,
         "g"
       );
       textoActual = _limpiar(textoActual.replace(reRemove, ""));
@@ -737,6 +761,7 @@ module.exports = {
   normalizar,
   separarRefresco,
   textoANumero,
+  buscarCorteFuzzy,
   parsearDistribucionCortes,
   parsearDistribucionRefrescos,
 };

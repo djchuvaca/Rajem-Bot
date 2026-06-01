@@ -3,7 +3,7 @@ const {
   resumenPendiente, esperandoCaptura, esperandoEdicion, esperandoAgregarMas,
   esperandoConfirmacionItem, esperandoCorte, datosCampos, tipoEntregaCliente,
   horaEntregaPreventa, pedidoJSONActual, pendientesConfirmacion, clientesNuevos,
-  pedidosConfirmados, getHistorial, extraerDatosPedido, persistirEstado,
+  pedidosConfirmados, ordenPreResumen, getHistorial, extraerDatosPedido, persistirEstado,
   detectarEdicion, aplicarEdicion, limpiarTodo, extraerTelefonoDeJID,
 } = require("../../estado");
 const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pedido/resumen");
@@ -17,7 +17,7 @@ const { getRangoHorario } = require("../../horario");
 const mpPagos = require("../../pagos/mercadopago");
 const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
-  replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems,
+  replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
 } = require("./utils");
 
 // ── EDICIÓN DESDE RESUMEN PENDIENTE ──────────────────────────────────────────
@@ -159,8 +159,9 @@ async function handleCambiosTipoDesdeResumen(msg, textoOriginal, clienteNumero, 
       persistirEstado(clienteNumero);
       await msg.reply("Perfecto! Cambié tu pedido a domicilio.\n\n" + resumenNuevo.texto);
     } else {
-      if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
       resumenPendiente.delete(clienteNumero);
+      if (ordenExtraida) ordenPreResumen.set(clienteNumero, ordenExtraida);
+      tipoEntregaCliente.set(clienteNumero, "domicilio");
       persistirEstado(clienteNumero);
       await msg.reply("Perfecto! Para cambiar a domicilio necesito tu dirección.\n*¿Cuál es tu calle y número?*");
     }
@@ -260,7 +261,7 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);
@@ -283,7 +284,7 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
                  : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                  : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
                  : `los $${primerItem.monto}`;
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);

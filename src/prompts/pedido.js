@@ -2,6 +2,15 @@
 // El código hace TODOS los cálculos de precios y conversiones
 
 function buildPedido() {
+  const { getProductos } = require("../db");
+  const productos = getProductos();
+  const nombresCortes = productos.length
+    ? productos.map(p => p.nombre.toLowerCase()).join(", ")
+    : "surtido, carne, buche, cuero, lengua";
+  const cortesLista = productos.length
+    ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
+    : "Surtido, Carne, Buche, Cuero o Lengua";
+
   return `
 INSTRUCCIONES PARA TOMA DE PEDIDO:
 
@@ -91,13 +100,13 @@ PLATOS SEPARADOS — palabras: "para mí", "para ella", "y aparte", "separado":
 - "3 tacos surtido para mí y aparte 2 tortas buche" →
   [plato_separado(1,[taco,3,surtido]), plato_separado(2,[torta,2,buche])]
 
-CORTES VÁLIDOS: surtido, carne, buche, cuero, lengua
+CORTES VÁLIDOS: ${nombresCortes}
 - "carne" / "carner" / "masiza" → "carne"
 - COMBINACIONES: "carne con lengua" → dos cortes: ["carne","lengua"]
 
 PREGUNTAR SIEMPRE SI FALTA:
 - Pieza (taco/torta) no especificada con cantidad ≤ 100 → preguntar
-- Corte no especificado → preguntar: {"tipo":"pregunta","mensaje":"¿De qué tipo de carne? Tenemos: Surtido, Carne, Buche, Cuero o Lengua 🥩"}
+- Corte no especificado → preguntar: {"tipo":"pregunta","mensaje":"¿De qué tipo de carne? Tenemos: ${cortesLista} 🥩"}
 
 EJEMPLOS COMPLETOS:
 
