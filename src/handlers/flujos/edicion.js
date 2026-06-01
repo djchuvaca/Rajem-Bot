@@ -3,7 +3,7 @@ const {
   esperandoEdicion, esperandoConfirmacionDatos, datosCampos,
   tipoEntregaCliente, horaEntregaPreventa, resumenPendiente,
   esperandoAgregarMas, datosRecibidos, clientesPreventa,
-  correoPreguntas, referenciaPreguntas, getHistorial,
+  referenciaPreguntas, getHistorial, ordenPreResumen,
   mostrarFormularioProgresivo, siguienteCampoFaltante, camposATexto,
   persistirEstado, detectarEdicion, aplicarEdicion,
 } = require("../../estado");
@@ -74,6 +74,13 @@ async function handleEdicionPendiente(msg, textoOriginal, clienteNumero, histori
     resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
     persistirEstado(clienteNumero);
     await msg.reply("Perfecto! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
+  } else if (edicionPendiente.contexto === "extras") {
+    const { esperandoExtras } = require("../../estado");
+    if (edicionPendiente.extrasCtx) esperandoExtras.set(clienteNumero, { ...edicionPendiente.extrasCtx, fase: "pregunta" });
+    const ca = datosCampos.get(clienteNumero) || {};
+    const esDomAg = ca.tipoEntrega === "domicilio";
+    const formEdAg = mostrarFormularioProgresivo(clienteNumero, esDomAg, esPreventa);
+    await msg.reply("Perfecto! Datos actualizados:\n\n" + formEdAg + "\n\n¿Deseas agregar algún *Refresco* o *Salsa* extra?");
   } else if (edicionPendiente.contexto === "agregarMas") {
     if (edicionPendiente.ordenTexto !== undefined) esperandoAgregarMas.set(clienteNumero, edicionPendiente.ordenTexto);
     const ca = datosCampos.get(clienteNumero) || {};
@@ -150,18 +157,30 @@ async function handleConfirmacionDatos(msg, textoOriginal, clienteNumero, histor
 
   if (confirma) {
     esperandoConfirmacionDatos.delete(clienteNumero);
-    correoPreguntas.add(clienteNumero);
     if (esOrdenDom) referenciaPreguntas.add(clienteNumero);
     const faltante = siguienteCampoFaltante(clienteNumero, esOrdenDom, esPreventaDatos);
     if (!faltante) {
       datosRecibidos.add(clienteNumero);
-      historial.push({ role: "user",      content: "Mi pedido es " + (esOrdenDom ? "a domicilio" : "para mostrador") });
-      historial.push({ role: "assistant", content: "Datos confirmados. Menú enviado." });
-      persistirEstado(clienteNumero);
-      const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
-      await msg.reply(formCompleto + "\n\nPerfecto! Aqui te mando el menu.");
-      await new Promise(r => setTimeout(r, 600));
-      await msg.reply(MENU_FORMATO);
+      if (ordenPreResumen.has(clienteNumero)) {
+        // Flujo post-orden: generar resumen
+        const ordenTexto = ordenPreResumen.get(clienteNumero);
+        ordenPreResumen.delete(clienteNumero);
+        const resumenGenerado = generarResumen(clienteNumero, ordenTexto, esOrdenDom, esPreventaDatos);
+        resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
+        historial.push({ role: "user",      content: "Datos confirmados." });
+        historial.push({ role: "assistant", content: resumenGenerado.texto });
+        persistirEstado(clienteNumero);
+        await msg.reply(resumenGenerado.texto);
+      } else {
+        // Fallback: mostrar menú
+        historial.push({ role: "user",      content: "Mi pedido es " + (esOrdenDom ? "a domicilio" : "para mostrador") });
+        historial.push({ role: "assistant", content: "Datos confirmados. Menú enviado." });
+        const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
+        persistirEstado(clienteNumero);
+        await msg.reply(formCompleto + "\n\nPerfecto! Aqui te mando el menu.");
+        await new Promise(r => setTimeout(r, 600));
+        await msg.reply(MENU_FORMATO());
+      }
     } else {
       const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventaDatos);
       await msg.reply(formCompleto + "\n\n" + faltante.pregunta);

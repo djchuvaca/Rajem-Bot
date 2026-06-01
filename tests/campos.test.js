@@ -137,11 +137,7 @@ describe("interpretarCampos — mostrador", () => {
     interpretarCampos(NUM2, "Ana López", false, false);
     interpretarCampos(NUM2, "3319876543", false, false);
     interpretarCampos(NUM2, "efectivo", false, false);
-    // Simular que ya se preguntó correo
-    const { correoPreguntas } = require("../src/estado/maps");
-    correoPreguntas.add(NUM2);
     assert.ok(camposCompletos(NUM2, false, false));
-    correoPreguntas.delete(NUM2);
     _mapa.delete(NUM2);
   });
 });
@@ -188,11 +184,8 @@ describe("siguienteCampoFaltante", () => {
     interpretarCampos(NUM2, "Luis Mora", false, false);
     interpretarCampos(NUM2, "3315551234", false, false);
     interpretarCampos(NUM2, "efectivo", false, false);
-    const { correoPreguntas } = require("../src/estado/maps");
-    correoPreguntas.add(NUM2);
     const f = siguienteCampoFaltante(NUM2, false, false);
     assert.equal(f, null);
-    correoPreguntas.delete(NUM2);
     _mapa.delete(NUM2);
   });
 });

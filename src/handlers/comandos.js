@@ -1,14 +1,15 @@
 const {
   pendientesConfirmacion, clientesNuevos, datosCampos, resumenPendiente,
   esperandoConfirmacionItem, esperandoAgregarMas, esperandoCorte,
-  esperandoTipoItem, esperandoCaptura, limpiarTodo, extraerTelefonoDeJID,
+  esperandoTipoItem, esperandoCaptura, esperandoExtras, ordenPreResumen,
+  limpiarTodo, extraerTelefonoDeJID,
 } = require("../estado");
 const {
-  actualizarEstadoPedido, actualizarEstadoConfirmado,
+  actualizarEstadoPedido, actualizarEstadoConfirmado, actualizarEstadoPorId,
   getPedidosHoy, getPedidosPorCliente, getPedidosPorFecha,
   getCliente, getAllClientes, getTopClientes,
   getProductos, getProducto, setProductoActivo, updateProductoPrecio,
-  upsertCliente, getConfig, setConfig, getJIDReal,
+  upsertCliente, getConfig, setConfig, getJIDReal, limpiarTodasLasSesionesDB,
 } = require("../db");
 const { invalidarCacheCortes } = require("./pedidoParser");
 const botPausado = require("../estado/bot-pausado");
@@ -45,7 +46,8 @@ function construirJID(telefono) {
 
 function buscarJIDActivo(telRaw) {
   const mapas = [datosCampos, resumenPendiente, esperandoConfirmacionItem,
-                 esperandoAgregarMas, esperandoCorte, esperandoTipoItem, esperandoCaptura];
+                 esperandoAgregarMas, esperandoCorte, esperandoTipoItem, esperandoCaptura,
+                 esperandoExtras, ordenPreResumen];
   for (const mapa of mapas) {
     for (const jid of mapa.keys()) {
       if (jid.includes(telRaw)) return jid;
@@ -62,6 +64,8 @@ function descripcionEstado(jid) {
   if (resumenPendiente.has(jid))            return "confirmando resumen del pedido";
   if (esperandoConfirmacionItem.has(jid))   return "confirmando ítem del pedido";
   if (esperandoAgregarMas.has(jid))         return "decidiendo si agrega más";
+  if (esperandoExtras.has(jid))             return "agregando extras (refresco/salsa)";
+  if (ordenPreResumen.has(jid))             return "llenando formulario post-orden";
   if (esperandoCorte.has(jid))              return "eligiendo corte de carne";
   if (esperandoTipoItem.has(jid))           return "eligiendo taco o torta";
   if (datosCampos.has(jid))                 return "llenando formulario";
@@ -74,7 +78,7 @@ async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
-  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
+  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|en_camino|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
   if (!esComando) return;
 
   // ── !ayuda — lista de comandos ─────────────────────────────────────────────
@@ -91,6 +95,7 @@ async function handleComandos(msg, client) {
       `*Gestionar pedidos:*\n` +
       `!confirmar [tel] — confirmar pedido\n` +
       `!listo [tel] — avisar listo/en camino\n` +
+      `!en_camino [id] — avisar en camino por ID de pedido\n` +
       `!cancelar [tel] — cancelar con aviso\n` +
       `!rechazar [tel] — rechazar pedido\n\n` +
       `*Clientes:*\n` +
@@ -362,6 +367,41 @@ async function handleComandos(msg, client) {
     return;
   }
 
+  // ── !en_camino [id] — avisar que el pedido va en camino (por ID de pedido) ──
+  if (/^!en_camino/i.test(texto)) {
+    const partes = texto.split(" ");
+    const idNum  = partes[1] ? parseInt(partes[1]) : NaN;
+
+    if (isNaN(idNum)) {
+      await msg.reply("⚠️ Especifica el ID del pedido: *!en_camino 42*\nEl ID aparece en el resumen del grupo y en el panel.");
+      return;
+    }
+
+    const pedidoHoy = getPedidosHoy().find(p => p.id === idNum);
+    if (!pedidoHoy) {
+      await msg.reply(`⚠️ No encontré el pedido *#${idNum}* en los pedidos de hoy.`);
+      return;
+    }
+    if (!pedidoHoy.telefono) {
+      await msg.reply(`⚠️ El pedido *#${idNum}* no tiene teléfono registrado. Usa *!listo [tel]* directamente.`);
+      return;
+    }
+
+    const cliente = getCliente(pedidoHoy.telefono);
+    const nombre  = [cliente?.nombre, cliente?.apellido].filter(Boolean).join(" ") || "Cliente";
+    const jid     = construirJID(pedidoHoy.telefono);
+    const mensajeCliente = `🛵 ¡Hola ${nombre}! Tu pedido ya va en camino, pronto llegará. ¡Gracias por tu preferencia! 😊`;
+
+    try {
+      await client.sendMessage(jid, mensajeCliente);
+      try { actualizarEstadoPorId(idNum, "en_camino"); } catch (e) { console.error("BD Error:", e.message); }
+      await msg.reply(`✅ Aviso enviado a *${nombre}* (${pedidoHoy.telefono}) — pedido *#${idNum}* marcado como en camino`);
+    } catch (e) {
+      await msg.reply(`❌ Error al notificar: ${e.message}`);
+    }
+    return;
+  }
+
   // ── !cancelar [telefono] — cancelar pedido con aviso al cliente ────────────
   if (/^!cancelar/i.test(texto)) {
     const partes    = texto.split(" ");
@@ -583,7 +623,6 @@ async function handleComandos(msg, client) {
     let out = `👤 *CLIENTE — ${nombre}*\n`;
     out    += `━━━━━━━━━━━━━━━━━━\n`;
     out    += `📱 Teléfono:  ${cliente.telefono}\n`;
-    if (cliente.correo)       out += `📧 Correo:    ${cliente.correo}\n`;
     if (cliente.calle_numero) {
       out += `🏠 Dirección: ${cliente.calle_numero}`;
       if (cliente.colonia) out += `, ${cliente.colonia}`;
@@ -849,7 +888,7 @@ async function handleComandos(msg, client) {
     if (partes.length < 4) {
       await msg.reply(
         "⚠️ Uso: *!editar [teléfono] [campo] [valor]*\n" +
-        "Campos: nombre, apellido, direccion, colonia, referencia, correo\n" +
+        "Campos: nombre, apellido, direccion, colonia, referencia\n" +
         "Ejemplo: !editar 3312345678 direccion Calle Morelos 123"
       );
       return;
@@ -861,11 +900,11 @@ async function handleComandos(msg, client) {
 
     const camposValidos = { nombre: "nombre", apellido: "apellido", direccion: "calle_numero",
                             dirección: "calle_numero", colonia: "colonia", referencia: "referencia",
-                            ref: "referencia", correo: "correo" };
+                            ref: "referencia" };
     const campoDb = camposValidos[campo];
 
     if (!campoDb) {
-      await msg.reply("⚠️ Campo inválido. Usa: nombre, apellido, direccion, colonia, referencia, correo");
+      await msg.reply("⚠️ Campo inválido. Usa: nombre, apellido, direccion, colonia, referencia");
       return;
     }
 
@@ -996,7 +1035,9 @@ async function handleComandos(msg, client) {
       limpiarTodo(jid);
       clientesNuevos.delete(jid);
     }
-    await msg.reply(`🗑️ Listo. Se eliminaron *${jidsActivos.size} sesión(es)* activa(s).`);
+    // Borrar también sesiones huérfanas en BD (no cargadas en memoria)
+    limpiarTodasLasSesionesDB();
+    await msg.reply(`🗑️ Listo. Se eliminaron *${jidsActivos.size} sesión(es)* activa(s) y se limpió la BD de sesiones.`);
     return;
   }
 

@@ -8,7 +8,7 @@
 //   0 6 * * * cd /ruta/al/bot && node scripts/backup-db.js
 //
 // Los backups se guardan en backups/tacos_javier_YYYY-MM-DD_HH-MM-SS.db
-// Los backups de más de 30 días se eliminan automáticamente.
+// Los backups de más de 7 días se eliminan automáticamente.
 
 "use strict";
 
@@ -17,7 +17,7 @@ const path = require("path");
 
 const DB_ORIGEN  = path.join(__dirname, "../data/tacos_javier.db");
 const BACKUP_DIR = path.join(__dirname, "../backups");
-const DIAS_MAX   = 30;
+const DIAS_MAX   = 7;
 
 if (!fs.existsSync(DB_ORIGEN)) {
   console.error("❌ No se encontró la BD en:", DB_ORIGEN);

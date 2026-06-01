@@ -3,13 +3,11 @@
 // Solo se activa si MERCADOPAGO_ACCESS_TOKEN y APP_URL están definidos en .env.
 
 const { MercadoPagoConfig, Preference, Payment } = require("mercadopago");
+const {
+  guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
+} = require("../db");
 
 let _mpCliente = null;
-
-// pedidoId (string) → { jid, telefono, resumen, nombre }
-// Se pierde si el servidor reinicia durante el periodo de pago (30 min).
-// En ese caso el pago queda registrado en MP pero no se auto-notifica por WA.
-const _pendientes = new Map();
 
 function getCliente() {
   if (!_mpCliente && process.env.MERCADOPAGO_ACCESS_TOKEN) {
@@ -44,7 +42,9 @@ async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resume
     },
   });
 
-  _pendientes.set(String(pedidoId), { jid, telefono, resumen, nombre });
+  // expiraEn en UTC ISO sin milisegundos — compatible con datetime('now') de SQLite
+  const expiraEn = new Date(Date.now() + 30 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  guardarPagoPendiente(String(pedidoId), { jid, telefono, resumen, nombre }, expiraEn);
   return resultado.init_point;
 }
 
@@ -57,9 +57,10 @@ async function procesarPago(paymentId) {
 
   if (pago.status !== "approved") return null;
 
+  limpiarPagosPendientesExpirados();
   const pedidoId = String(pago.external_reference);
-  const pendiente = _pendientes.get(pedidoId);
-  _pendientes.delete(pedidoId);
+  const pendiente = obtenerPagoPendiente(pedidoId);
+  eliminarPagoPendiente(pedidoId);
 
   return { pedidoId, aprobado: true, sinContexto: !pendiente, ...(pendiente || {}) };
 }

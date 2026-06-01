@@ -140,7 +140,7 @@ Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
 ---
 
 ## Bugs conocidos / pendientes
-- Si el servidor reinicia durante un pago con MercadoPago (ventana de 30 min), el contexto del pedido se pierde del Map en memoria. El pago llega a MP pero no se auto-confirma vía WA. El admin puede confirmar manualmente desde el panel.
+- (ninguno conocido actualmente)
 
 ## Notas de implementación importantes
 - `extraerTelefono(texto)` — usar siempre esta función para extraer teléfonos de texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52 prefijo y separadores (331-234-5678, 331 234 5678).

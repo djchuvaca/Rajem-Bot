@@ -5,11 +5,12 @@
 
 const {
   conversaciones, clientesNuevos, clientesPreventa, datosRecibidos,
-  correoPreguntas, referenciaPreguntas, horaEntregaPreventa,
+  referenciaPreguntas, horaEntregaPreventa,
   resumenPendiente, esperandoCaptura, datosAcumulados, datosCampos,
   pedidosConfirmados, esperandoMotivoCancelacion, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
+  esperandoExtras, ordenPreResumen,
 } = require("./maps");
 
 function serializarEstado(numero) {
@@ -17,7 +18,6 @@ function serializarEstado(numero) {
   if (clientesNuevos.has(numero))             estado.clienteNuevo         = true;
   if (clientesPreventa.has(numero))           estado.preventa             = true;
   if (datosRecibidos.has(numero))             estado.datosRecibidos       = true;
-  if (correoPreguntas.has(numero))            estado.correoPreguntas      = true;
   if (referenciaPreguntas.has(numero))        estado.referenciaPreguntas  = true;
   if (horaEntregaPreventa.has(numero))        estado.horaEntrega          = horaEntregaPreventa.get(numero);
   if (resumenPendiente.has(numero))           estado.resumenPendiente     = resumenPendiente.get(numero);
@@ -34,6 +34,8 @@ function serializarEstado(numero) {
   if (esperandoEdicion.has(numero))           estado.esperandoEdicion     = esperandoEdicion.get(numero);
   if (esperandoTipoItem.has(numero))          estado.esperandoTipoItem    = esperandoTipoItem.get(numero);
   if (pendientesConfirmacion.has(numero))     estado.pendienteConfirmacion = pendientesConfirmacion.get(numero);
+  if (esperandoExtras.has(numero))            estado.esperandoExtras       = esperandoExtras.get(numero);
+  if (ordenPreResumen.has(numero))            estado.ordenPreResumen       = ordenPreResumen.get(numero);
   return estado;
 }
 
@@ -42,7 +44,6 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.clienteNuevo)          clientesNuevos.add(numero);
   if (estado.preventa)              clientesPreventa.add(numero);
   if (estado.datosRecibidos)        datosRecibidos.add(numero);
-  if (estado.correoPreguntas)       correoPreguntas.add(numero);
   if (estado.referenciaPreguntas)   referenciaPreguntas.add(numero);
   if (estado.horaEntrega)           horaEntregaPreventa.set(numero, estado.horaEntrega);
   if (estado.resumenPendiente)      resumenPendiente.set(numero, estado.resumenPendiente);
@@ -59,6 +60,8 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.esperandoEdicion)      esperandoEdicion.set(numero, estado.esperandoEdicion);
   if (estado.esperandoTipoItem)       esperandoTipoItem.set(numero, estado.esperandoTipoItem);
   if (estado.pendienteConfirmacion)   pendientesConfirmacion.set(numero, estado.pendienteConfirmacion);
+  if (estado.esperandoExtras)         esperandoExtras.set(numero, estado.esperandoExtras);
+  if (estado.ordenPreResumen)         ordenPreResumen.set(numero, estado.ordenPreResumen);
   if (historial.length > 0)           conversaciones.set(numero, historial);
 }
 
@@ -73,13 +76,27 @@ function persistirEstado(numero) {
   guardarSesion(numero, estado, historial);
 }
 
+// Claves que indican que el cliente está en medio de un flujo conversacional real.
+// Sesiones con solo datos de fondo (datosCampos, tipoEntregaCliente, etc.) no se restauran.
+const _CLAVES_FLUJO_ACTIVO = new Set([
+  "resumenPendiente", "esperandoCaptura", "esperandoConfirmItem",
+  "esperandoAgregarMas", "esperandoConfirmDatos", "esperandoEdicion",
+  "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
+  "ordenPreResumen", "pendienteConfirmacion",
+]);
+
+function _tieneFlujoActivo(estado) {
+  return Object.keys(estado).some(k => _CLAVES_FLUJO_ACTIVO.has(k));
+}
+
 function restaurarTodasLasSesiones() {
   const { cargarTodasLasSesiones, limpiarSesionesAntiguas } = require("../db");
-  limpiarSesionesAntiguas(48);
+  limpiarSesionesAntiguas(8);
   const sesiones = cargarTodasLasSesiones();
   let restauradas = 0;
   for (const { numero, estado, historial } of sesiones) {
     try {
+      if (!_tieneFlujoActivo(estado)) continue;
       restaurarEstado(numero, estado, historial);
       restauradas++;
     } catch (e) {

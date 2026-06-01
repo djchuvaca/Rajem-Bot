@@ -7,11 +7,19 @@ const { getConfig, getProductos } = require("../db");
 // ── CARGAR CORTES DESDE BD (con fallback) ────────────────────────────────────
 let _cortesCache = null;
 let _cortesCacheTs = 0;
+let _refrescosCache = null;
+let _refrescosCacheTs = 0;
+let _salsasCache = null;
+let _salsasCacheTs = 0;
 const _CORTES_TTL = 60 * 1000;
 
 function invalidarCacheCortes() {
   _cortesCache = null;
   _cortesCacheTs = 0;
+  _refrescosCache = null;
+  _refrescosCacheTs = 0;
+  _salsasCache = null;
+  _salsasCacheTs = 0;
 }
 
 function getCortes() {
@@ -22,6 +30,7 @@ function getCortes() {
     if (!productos || !productos.length) return _cortesDefault();
     const mapa = {};
     for (const p of productos) {
+      if (p.categoria === "refresco") continue;
       const nombre = p.nombre.toLowerCase().trim();
       mapa[nombre] = nombre;
       if (p.sinonimos) {
@@ -34,6 +43,66 @@ function getCortes() {
     _cortesCacheTs = Date.now();
     return mapa;
   } catch (e) { return _cortesDefault(); }
+}
+
+function getRefrescos() {
+  const ahora = Date.now();
+  if (_refrescosCache && ahora - _refrescosCacheTs < _CORTES_TTL) return _refrescosCache;
+  try {
+    const productos = getProductos();
+    _refrescosCache = (productos || []).filter(p => p.categoria === "refresco");
+    _refrescosCacheTs = Date.now();
+    return _refrescosCache;
+  } catch (e) { return []; }
+}
+
+function getSalsas() {
+  const ahora = Date.now();
+  if (_salsasCache && ahora - _salsasCacheTs < _CORTES_TTL) return _salsasCache;
+  try {
+    const productos = getProductos();
+    _salsasCache = (productos || []).filter(p => p.categoria === "salsa");
+    _salsasCacheTs = Date.now();
+    return _salsasCache;
+  } catch (e) { return []; }
+}
+
+function detectarSalsa(texto) {
+  const salsas = getSalsas();
+  if (!salsas.length) return null;
+  const t = normalizar(texto);
+  const encontradas = [];
+  for (const s of salsas) {
+    const palabras = [s.nombre, ...(s.sinonimos || "").split(",").map(p => p.trim()).filter(Boolean)];
+    for (const p of palabras) {
+      if (!p) continue;
+      const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (new RegExp(`\\b${escaped}\\b`, "i").test(t)) {
+        if (!encontradas.includes(s.nombre)) encontradas.push(s.nombre);
+        break;
+      }
+    }
+  }
+  return encontradas.length > 0 ? encontradas : null;
+}
+
+function detectarRefresco(texto) {
+  const refrescos = getRefrescos();
+  if (!refrescos.length) return null;
+  const t = normalizar(texto);
+  for (const ref of refrescos) {
+    const palabras = [ref.nombre, ...(ref.sinonimos || "").split(",").map(s => s.trim()).filter(Boolean)];
+    for (const p of palabras) {
+      if (!p) continue;
+      const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (new RegExp(`\\b${escaped}\\b`, "i").test(t)) {
+        const matchNum = t.match(/\b([1-9]\d?)\b/);
+        const cantidad = matchNum ? Math.min(parseInt(matchNum[1]), 20) : 1;
+        return { nombre: ref.nombre, cantidad, precio: ref.precio_taco };
+      }
+    }
+  }
+  return null;
 }
 
 function _cortesDefault() {
@@ -496,6 +565,123 @@ function detectarSinTipo(texto) {
   return { cantidad, corte };
 }
 
+// ── DISTRIBUCIÓN DE CORTES ────────────────────────────────────────────────────
+// "1 de carne, 2 de surtido, 1 de lengua" → [{cantidad:1,corte:"carne"}, ...]
+// Requiere al menos 2 pares (cantidad + corte válido). Retorna null si no aplica.
+function parsearDistribucionCortes(texto) {
+  const NUMS_TEXTO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
+  const t = normalizar(texto);
+  const CORTES_MAP = getCortes();
+  const patron = /\b(\d+|un[ao]?|dos|tres|cuatro)\s+(?:de\s+)?(\w+)/gi;
+  const matches = [...t.matchAll(patron)];
+  if (matches.length < 2) return null;
+  const items = [];
+  for (const m of matches) {
+    const cantStr = m[1].toLowerCase();
+    const cantidad = parseInt(cantStr) || NUMS_TEXTO[cantStr] || null;
+    if (!cantidad) return null;
+    const corte = CORTES_MAP[m[2].toLowerCase()] || null;
+    if (!corte) return null;
+    items.push({ cantidad, corte });
+  }
+  return items.length >= 2 ? items : null;
+}
+
+// ── SEPARAR REFRESCO Y/O SALSA DE UN MENSAJE MIXTO ───────────────────────────
+// "2 tacos y una coca"                   → { textoLimpio:"2 tacos", refrescos:[{…}], salsas:[] }
+// "dos tacos, 2 cocas, 1 fanta y salsa"  → { textoLimpio:"dos tacos", refrescos:[{…},{…}], salsas:[{…}] }
+// Sin coincidencias                      → { textoLimpio: texto (original), refrescos:[], salsas:[] }
+function separarRefresco(texto) {
+  const NUMS_TEXTO = { un: 1, una: 1, uno: 1, unos: 1, unas: 1, dos: 2, tres: 3, cuatro: 4 };
+
+  function _limpiar(t) {
+    return t.replace(/^\s*[,y]\s*/i, "").replace(/\s{2,}/g, " ").trim();
+  }
+
+  const textNorm   = normalizar(texto);
+  let   textoActual = textNorm;
+
+  // ── PASO 1: refrescos específicos del catálogo — itera todos para capturar varios ──
+  const refrescos = getRefrescos();
+  const refrescosEncontrados = [];
+  for (const ref of refrescos) {
+    const variantes = [ref.nombre, ...(ref.sinonimos || "").split(",").map(s => s.trim()).filter(Boolean)];
+    for (const variante of variantes) {
+      if (!variante) continue;
+      const varNorm = normalizar(variante);
+      const escaped = varNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (!new RegExp(`\\b${escaped}s?\\b`).test(textoActual)) continue;
+
+      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`));
+      const cantidad = mCant ? parseInt(mCant[1]) : 1;
+
+      const reRemove = new RegExp(
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*${escaped}s?\\b`,
+        "g"
+      );
+      textoActual = _limpiar(textoActual.replace(reRemove, ""));
+      refrescosEncontrados.push({ nombre: ref.nombre, cantidad, precio: ref.precio_taco });
+      break; // siguiente refresco del catálogo
+    }
+  }
+
+  // ── PASO 2: refresco genérico ("2 refrescos"…) solo si no se encontró ninguno específico ──
+  if (refrescosEncontrados.length === 0) {
+    const mGen = textoActual.match(/\b([1-9]\d?|un[ao]?s?|dos|tres|cuatro)\s+refrescos?\b/);
+    if (mGen) {
+      const cantStr  = mGen[1];
+      const cantidad = /^\d+$/.test(cantStr) ? parseInt(cantStr) : (NUMS_TEXTO[cantStr] || 1);
+      const reRemove = new RegExp(
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?s?|dos|tres|cuatro)?\\s*refrescos?\\b`,
+        "g"
+      );
+      textoActual = _limpiar(textoActual.replace(reRemove, ""));
+      refrescosEncontrados.push({ nombre: null, cantidad, precio: 0, esGenerico: true });
+    }
+  }
+
+  // ── PASO 3: salsas específicas del catálogo ──
+  const salsasEncontradas = [];
+  for (const sal of getSalsas()) {
+    const variantes = [sal.nombre, ...(sal.sinonimos || "").split(",").map(s => s.trim()).filter(Boolean)];
+    for (const variante of variantes) {
+      if (!variante) continue;
+      const varNorm = normalizar(variante);
+      const escaped = varNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (!new RegExp(`\\b${escaped}s?\\b`).test(textoActual)) continue;
+
+      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`));
+      const cantidad = mCant ? parseInt(mCant[1]) : 1;
+
+      const reRemove = new RegExp(
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*${escaped}s?\\b`,
+        "g"
+      );
+      textoActual = _limpiar(textoActual.replace(reRemove, ""));
+      salsasEncontradas.push({ nombre: sal.nombre, cantidad });
+      break; // siguiente salsa del catálogo
+    }
+  }
+
+  // ── PASO 4: salsa genérica ("2 salsas", "unas salsas extras"…) solo si no hubo específicas ──
+  if (salsasEncontradas.length === 0) {
+    const mSalsa = textoActual.match(/\b([1-9]\d?|un[ao]?s?|dos|tres|cuatro)\s+salsas?(?:\s+extras?)?\b/);
+    if (mSalsa) {
+      const cantStr  = mSalsa[1];
+      const cantidad = /^\d+$/.test(cantStr) ? parseInt(cantStr) : (NUMS_TEXTO[cantStr] || 1);
+      const reRemove = new RegExp(
+        `(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?s?|dos|tres|cuatro)?\\s*salsas?(?:\\s+extras?)?\\b`,
+        "g"
+      );
+      textoActual = _limpiar(textoActual.replace(reRemove, ""));
+      salsasEncontradas.push({ nombre: null, cantidad, esGenerico: true });
+    }
+  }
+
+  if (refrescosEncontrados.length === 0 && salsasEncontradas.length === 0) return { textoLimpio: texto, refrescos: [], salsas: [] };
+  return { textoLimpio: textoActual || "", refrescos: refrescosEncontrados, salsas: salsasEncontradas };
+}
+
 module.exports = {
   parsearPedidoSimple,
   detectarSinCorte,
@@ -505,6 +691,13 @@ module.exports = {
   detectarRepetirPedido,
   calcularScore,
   getCortes,
+  getRefrescos,
+  detectarRefresco,
+  getSalsas,
+  detectarSalsa,
   invalidarCacheCortes,
   normalizar,
+  separarRefresco,
+  textoANumero,
+  parsearDistribucionCortes,
 };

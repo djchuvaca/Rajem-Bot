@@ -15,8 +15,8 @@ function updateProducto(id, datos) {
 }
 function createProducto(datos) {
   run(
-    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?)",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '']
+    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '', datos.categoria || 'corte']
   );
 }
 function deleteProducto(id) {
@@ -37,17 +37,16 @@ function upsertCliente(datos) {
       `UPDATE clientes SET
         nombre       = COALESCE(?, nombre),
         apellido     = COALESCE(?, apellido),
-        correo       = COALESCE(?, correo),
         calle_numero = COALESCE(?, calle_numero),
         colonia      = COALESCE(?, colonia),
         referencia   = COALESCE(?, referencia)
         WHERE telefono = ?`,
-      [datos.nombre, datos.apellido, datos.correo, datos.calle_numero, datos.colonia, datos.referencia, datos.telefono]
+      [datos.nombre, datos.apellido, datos.calle_numero, datos.colonia, datos.referencia, datos.telefono]
     );
   } else {
     run(
-      "INSERT INTO clientes (nombre, apellido, telefono, correo, calle_numero, colonia, referencia) VALUES (?,?,?,?,?,?,?)",
-      [datos.nombre, datos.apellido, datos.telefono, datos.correo, datos.calle_numero, datos.colonia, datos.referencia]
+      "INSERT INTO clientes (nombre, apellido, telefono, calle_numero, colonia, referencia) VALUES (?,?,?,?,?,?)",
+      [datos.nombre, datos.apellido, datos.telefono, datos.calle_numero, datos.colonia, datos.referencia]
     );
   }
   return getCliente(datos.telefono);
@@ -171,10 +170,37 @@ function getPedidosPorFecha(fechaInicio, fechaFin) {
   );
 }
 
+// ─── PAGOS PENDIENTES (MercadoPago) ──────────────────────────────────────────
+function guardarPagoPendiente(pedidoId, { jid, telefono, resumen, nombre }, expiraEn) {
+  run(
+    `INSERT OR REPLACE INTO pagos_pendientes (pedido_id, jid, telefono, nombre, resumen, expira_en)
+     VALUES (?,?,?,?,?,?)`,
+    [String(pedidoId), jid, telefono || '', nombre || '', resumen || '', expiraEn]
+  );
+}
+
+function obtenerPagoPendiente(pedidoId) {
+  const row = queryOne(
+    "SELECT * FROM pagos_pendientes WHERE pedido_id = ? AND expira_en > datetime('now')",
+    [String(pedidoId)]
+  );
+  if (!row) return null;
+  return { jid: row.jid, telefono: row.telefono, nombre: row.nombre, resumen: row.resumen };
+}
+
+function eliminarPagoPendiente(pedidoId) {
+  run("DELETE FROM pagos_pendientes WHERE pedido_id = ?", [String(pedidoId)]);
+}
+
+function limpiarPagosPendientesExpirados() {
+  run("DELETE FROM pagos_pendientes WHERE expira_en <= datetime('now')");
+}
+
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha,
   setProductoActivo, updateProductoPrecio, getTopClientes,
+  guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
 };

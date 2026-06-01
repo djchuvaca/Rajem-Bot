@@ -231,7 +231,7 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
     resumenPendiente.delete(clienteNumero);
     await msg.reply("Entendido! *¿Qué deseas ordenar?*");
     await new Promise(r => setTimeout(r, 300));
-    await msg.reply(MENU_FORMATO);
+    await msg.reply(MENU_FORMATO());
     return true;
   }
 
@@ -317,7 +317,6 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
       const camposCliente = datosCampos.get(clienteNumero) || {};
       const cliente = upsertCliente({
         nombre, apellido, telefono: telefonoLimpio,
-        correo:      (camposCliente.correo && camposCliente.correo !== "no proporcionó") ? camposCliente.correo : null,
         calle_numero: camposCliente.calle    || null,
         colonia:      camposCliente.colonia  || null,
         referencia:   (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null,
@@ -372,12 +371,13 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     // Transferencia tradicional (MP no configurado o falló)
     esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono });
     resumenPendiente.delete(clienteNumero);
-    await msg.reply(DATOS_BANCO);
+    await msg.reply(DATOS_BANCO());
     return true;
   }
 
   // ── 1. Guardar en BD antes de confirmar ────────────────────────────────────
   let dbError = false;
+  let pedidoId = null;
   try {
     const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
     const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
@@ -387,7 +387,6 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     else if (partes.length === 2) { nombre = partes[0];                   apellido = partes[1]; }
     else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
     const camposCliente = datosCampos.get(clienteNumero) || {};
-    const correo        = (camposCliente.correo && camposCliente.correo !== "no proporcionó") ? camposCliente.correo : null;
     const calle_numero  = camposCliente.calle || null;
     const colonia       = camposCliente.colonia || null;
     const referencia    = (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null;
@@ -396,8 +395,8 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     const metodo_pago   = /transferencia/i.test(pendiente.texto) ? "transferencia"
                         : /tarjeta/i.test(pendiente.texto)       ? "tarjeta"
                         : "efectivo";
-    const cliente = upsertCliente({ nombre, apellido, telefono: telefonoLimpio, correo, calle_numero, colonia, referencia });
-    const pedidoId = registrarPedido({
+    const cliente = upsertCliente({ nombre, apellido, telefono: telefonoLimpio, calle_numero, colonia, referencia });
+    pedidoId = registrarPedido({
       cliente_id: cliente ? cliente.id : null,
       tipo:       infoPedido.tipo || "mostrador",
       orden:      (pendiente.texto || "").substring(0, 500),
@@ -423,7 +422,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   const grupoId = process.env.GRUPO_ID;
   if (grupoId) {
     try {
-      await client.sendMessage(grupoId, `Nueva venta!\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}`);
+      await client.sendMessage(grupoId, `🆕 Pedido #${pedidoId}\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}\n!listo ${infoPedido.telefono}\n!en_camino ${pedidoId}`);
     } catch (e) { console.error("Error al notificar grupo:", e.message); }
   }
 
@@ -444,7 +443,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   limpiarTodo(clienteNumero);
   clientesNuevos.add(clienteNumero);
   const msgConfirmacion = getMensaje("confirmacion_pedido") || "Listo! Tu pedido fue recibido y esta en espera de confirmacion de nuestro equipo.\nEn breve te avisamos. Gracias por tu preferencia!\n\n_Si deseas cancelar tu pedido escribe *cancelar*._";
-  await msg.reply(msgConfirmacion);
+  await msg.reply(msgConfirmacion + (pedidoId ? `\n\n_📋 Pedido #${pedidoId}_` : ""));
   return true;
 }
 

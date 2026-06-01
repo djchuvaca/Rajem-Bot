@@ -1,4 +1,5 @@
 require("dotenv").config();
+const Sentry             = require("@sentry/node");
 
 // ── SENTRY ────────────────────────────────────────────────────────────────────
 if (process.env.SENTRY_DSN) {
@@ -21,7 +22,6 @@ if (process.env.SENTRY_DSN) {
 
 const path               = require("path");
 const { fork }           = require("child_process");
-const Sentry             = require("@sentry/node");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 
@@ -72,6 +72,7 @@ client.on("ready", () => {
   console.log("  Gestionar pedidos:");
   console.log("    !confirmar [tel]            — confirmar pedido");
   console.log("    !listo [tel]                — avisar listo/en camino");
+  console.log("    !en_camino [id]             — avisar en camino por ID de pedido");
   console.log("    !cancelar [tel]             — cancelar con aviso al cliente");
   console.log("    !rechazar [tel]             — rechazar pedido");
   console.log("  Clientes:");
@@ -129,6 +130,7 @@ client.on("disconnected", (reason) => {
 
 
 const _msgProcesados = new Set();
+const _colaJID = new Map(); // cola de procesamiento por JID (evita concurrencia)
 
 client.on("message", async (msg) => {
   if (msg.from === "status@broadcast") return;
@@ -170,7 +172,13 @@ client.on("message", async (msg) => {
     if (procesado) return;
   }
 
-  await handleMensaje(msg, client);
+  // Serializar mensajes del mismo JID para evitar condiciones de carrera
+  const _jid = msg.from;
+  const _anterior = _colaJID.get(_jid) ?? Promise.resolve();
+  const _esta = _anterior.catch(() => {}).then(() => handleMensaje(msg, client));
+  _colaJID.set(_jid, _esta);
+  _esta.finally(() => { if (_colaJID.get(_jid) === _esta) _colaJID.delete(_jid); });
+  await _esta;
 });
 
 // ── Backup automático cada 6 horas ───────────────────────────────────────────

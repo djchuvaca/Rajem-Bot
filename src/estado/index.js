@@ -25,13 +25,14 @@ module.exports = {
   esperandoConfirmacionItem:  maps.esperandoConfirmacionItem,
   esperandoAgregarMas:        maps.esperandoAgregarMas,
   pedidoJSONActual:           maps.pedidoJSONActual,
-  correoPreguntas:            maps.correoPreguntas,
   referenciaPreguntas:        maps.referenciaPreguntas,
   esperandoConfirmacionDatos: maps.esperandoConfirmacionDatos,
   tipoEntregaCliente:         maps.tipoEntregaCliente,
   esperandoCorte:             maps.esperandoCorte,
   esperandoEdicion:           maps.esperandoEdicion,
   esperandoTipoItem:          maps.esperandoTipoItem,
+  esperandoExtras:            maps.esperandoExtras,
+  ordenPreResumen:            maps.ordenPreResumen,
   CARPETA_CAPTURAS:           maps.CARPETA_CAPTURAS,
 
   // ── Sesiones ───────────────────────────────────────────────────────────────

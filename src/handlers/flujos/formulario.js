@@ -3,17 +3,40 @@ const { detectarTipoEntrega } = require("../entrega");
 const {
   clientesPreventa, clientesNuevos, datosRecibidos, datosCampos,
   tipoEntregaCliente, horaEntregaPreventa, referenciaPreguntas,
-  correoPreguntas, esperandoConfirmacionDatos, getHistorial,
+  esperandoConfirmacionDatos, ordenPreResumen, getHistorial,
   acumularDatos, interpretarCampos, mostrarFormularioProgresivo,
   siguienteCampoFaltante, manejarOpcional, camposCompletos, camposATexto,
   persistirEstado, detectarEdicion, aplicarEdicion, extraerTelefonoDeJID,
+  resumenPendiente,
 } = require("../../estado");
+const { generarResumen } = require("../../pedido/resumen");
 const { getCliente, getTelefonoReal } = require("../../db");
 const { SALUDO, MENU_FORMATO } = require("../../config");
 const { estaEnHorario, mensajeFueraDeHorario, getRangoHorario } = require("../../horario");
-const { detectarPreguntaFrecuente } = require("../pedidoParser");
+const { detectarPreguntaFrecuente, calcularScore, detectarSinTipo, parsearPedidoSimple } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
-const { telefonosReales, replyConTyping } = require("./utils");
+const { telefonosReales, replyConTyping, ordenPendientePreventa } = require("./utils");
+
+// ── DETECCIÓN Y RESUMEN DE SEÑALES DE PEDIDO ─────────────────────────────────
+const _PRESUPUESTO_RE = /\bpor\s*\$\s*\d+|\$\s*\d+\s*(de|en)\b/i;
+
+function _tieneSeñalesDePedido(texto) {
+  return calcularScore(texto) >= 4 || _PRESUPUESTO_RE.test(texto);
+}
+
+function _resumirIntentoPedido(texto) {
+  const st = detectarSinTipo(texto);
+  if (st) return `${st.cantidad} tacos o tortas de ${st.corte}`;
+  const pp = parsearPedidoSimple(texto);
+  if (pp && pp.tipo === "pedido" && pp.items?.length) {
+    const item = pp.items[0];
+    if (item.presentacion === "pesos")  return `$${item.monto} de ${item.corte}`;
+    if (item.presentacion === "taco")   return `${item.cantidad} taco${item.cantidad !== 1 ? "s" : ""} de ${item.corte}`;
+    if (item.presentacion === "torta")  return `${item.cantidad} torta${item.cantidad !== 1 ? "s" : ""} de ${item.corte}`;
+    if (item.presentacion === "gramos") return `${item.gramos}g de ${item.corte}`;
+  }
+  return texto;
+}
 
 // ── 1. PRIMER MENSAJE ─────────────────────────────────────────────────────────
 // Retorna true si consumió el mensaje (sin tipo de entrega detectado)
@@ -22,11 +45,39 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
   if (clientesNuevos.has(clienteNumero)) return false;
 
   clientesNuevos.add(clienteNumero);
-  if (!estaEnHorario()) { await replyConTyping(msg, mensajeFueraDeHorario()); return true; }
-  await replyConTyping(msg, SALUDO);
-
+  if (!estaEnHorario()) {
+    if (_tieneSeñalesDePedido(textoOriginal)) {
+      ordenPendientePreventa.set(clienteNumero, textoOriginal);
+      const resumen = _resumirIntentoPedido(textoOriginal);
+      await replyConTyping(msg,
+        `Entiendo que quieres ordenar *${resumen}*, pero en este momento estamos fuera de servicio.\n\n` +
+        `¿Te gustaría hacer tu pedido en *preventa*? Tu orden estará lista al inicio de nuestro horario de atención.`
+      );
+    } else {
+      await replyConTyping(msg, mensajeFueraDeHorario());
+    }
+    return true;
+  }
   const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  if (!/\bdomicilio\b|\benvio\b|\ba\s+casa\b|\bmostrador\b|\brecoger\b|\bpara\s+llevar\b/.test(tNorm)) return true;
+  const tieneTipoEntrega = /\bdomicilio\b|\benvio\b|\ba\s+casa\b|\bmostrador\b|\brecoger\b|\bpara\s+llevar\b/.test(tNorm);
+
+  const telKnown        = extraerTelefonoDeJID(clienteNumero) || telefonosReales.get(clienteNumero);
+  const clienteConocido = telKnown ? getCliente(telKnown) : null;
+  const primerNombre    = clienteConocido?.nombre?.split(" ")[0] || null;
+
+  // Para clientes recurrentes con tipo de entrega en el primer mensaje,
+  // handleTipoEntrega mostrará el saludo personalizado + menú. Evitar doble saludo.
+  if (!tieneTipoEntrega || !primerNombre) {
+    const saludoFinal = primerNombre ? `Hola de nuevo, *${primerNombre}*! 🌮 ¿Qué te pongo hoy?` : SALUDO();
+    await replyConTyping(msg, saludoFinal);
+  }
+
+  // Guardar intento de pedido para retomarlo automáticamente tras el formulario
+  if (_tieneSeñalesDePedido(textoOriginal)) {
+    ordenPendientePreventa.set(clienteNumero, textoOriginal);
+  }
+
+  if (!tieneTipoEntrega) return true;
   return false; // tiene tipo de entrega — caer al bloque de tipo de entrega
 }
 
@@ -39,15 +90,32 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
 
   if (aceptaPreventa) {
     clientesPreventa.add(clienteNumero);
-    await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO);
+    await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO());
     return true;
   }
   if (rechazaPreventa) {
     clientesNuevos.delete(clienteNumero);
+    ordenPendientePreventa.delete(clienteNumero);
     await msg.reply("Esta bien! Cuando gustes pedir, aqui estaremos. Hasta pronto!");
     return true;
   }
-  await msg.reply(mensajeFueraDeHorario());
+  if (_tieneSeñalesDePedido(textoOriginal)) {
+    const textoAnterior  = ordenPendientePreventa.get(clienteNumero);
+    const textoAcumulado = textoAnterior ? `${textoAnterior}, ${textoOriginal}` : textoOriginal;
+    ordenPendientePreventa.set(clienteNumero, textoAcumulado);
+    const resumen = _resumirIntentoPedido(textoAcumulado);
+    await msg.reply(
+      `Entiendo que quieres ordenar *${resumen}*, pero en este momento estamos fuera de servicio.\n\n` +
+      `¿Te gustaría hacer tu pedido en *preventa*? Tu orden estará lista al inicio de nuestro horario de atención.`
+    );
+  } else if (ordenPendientePreventa.has(clienteNumero)) {
+    const resumen = _resumirIntentoPedido(ordenPendientePreventa.get(clienteNumero));
+    await msg.reply(
+      `Recuerda que estamos fuera de servicio.\n¿Confirmas que quieres *${resumen}* en preventa?\n\nResponde *sí* para apartar tu pedido o *no* si prefieres esperar.`
+    );
+  } else {
+    await msg.reply(mensajeFueraDeHorario());
+  }
   return true;
 }
 
@@ -63,18 +131,16 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
     return true;
   }
 
+  // Pre-cargar datos del cliente frecuente (silencioso — el formulario se muestra después del pedido)
   const telGuardado   = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero);
   const telFormulario = datosCampos.get(clienteNumero)?.telefono;
   const telBuscar     = telGuardado || telFormulario || null;
-  console.log(`[CLIENTE FRECUENTE] buscando tel: ${telBuscar}`);
-  const clienteBD = telBuscar ? getCliente(telBuscar) : null;
-  console.log(`[CLIENTE FRECUENTE] encontrado:`, clienteBD ? clienteBD.nombre : "NO");
+  const clienteBD     = telBuscar ? getCliente(telBuscar) : null;
 
   if (clienteBD && clienteBD.nombre) {
     const campos = {
       nombre:     [clienteBD.nombre, clienteBD.apellido].filter(Boolean).join(" "),
       telefono:   clienteBD.telefono,
-      correo:     clienteBD.correo || "no proporcionó",
       metodo:     null,
       calle:      tipoEntrega === "domicilio" ? (clienteBD.calle_numero || null) : null,
       colonia:    tipoEntrega === "domicilio" ? (clienteBD.colonia || null) : null,
@@ -83,64 +149,45 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
       tipoEntrega,
     };
     datosCampos.set(clienteNumero, campos);
-    historial.push({ role: "user",      content: tipoEntrega === "domicilio" ? "Mi pedido es a domicilio." : "Mi pedido es para recoger en mostrador." });
-    historial.push({ role: "assistant", content: "Perfecto, verificando tus datos." });
-    esperandoConfirmacionDatos.set(clienteNumero, { tipoEntrega, esPreventa });
-    const formPrecargado = mostrarFormularioProgresivo(clienteNumero, tipoEntrega === "domicilio", esPreventa);
-    await msg.reply(`Hola de nuevo *${campos.nombre.split(" ")[0]}*! 😊 Encontramos tus datos:\n\n${formPrecargado}\n\n*¿Son correctos los datos?*`);
-    console.log(`Bot: [CLIENTE FRECUENTE — datos precargados]`);
-    return true;
+    console.log(`[CLIENTE FRECUENTE] datos pre-cargados: ${campos.nombre}`);
+  } else {
+    let telAutodetectado = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero) || null;
+    if (!telAutodetectado) telAutodetectado = extraerTelefonoDeJID(clienteNumero);
+    if (!telAutodetectado) {
+      try {
+        const contacto = await msg.getContact();
+        const numRaw   = (contacto.number || "").replace(/\D/g, "");
+        const sinPais  = numRaw.length > 10 ? numRaw.slice(-10) : numRaw;
+        if (/^[2-9]\d{9}$/.test(sinPais)) telAutodetectado = sinPais;
+      } catch (_) {}
+    }
+    const camposIniciales = datosCampos.get(clienteNumero) || {};
+    if (telAutodetectado && !camposIniciales.telefono) camposIniciales.telefono = telAutodetectado;
+    camposIniciales.tipoEntrega = tipoEntrega;
+    datosCampos.set(clienteNumero, camposIniciales);
+    interpretarCampos(clienteNumero, textoOriginal, tipoEntrega === "domicilio", esPreventa);
   }
-
-  let telAutodetectado = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero) || null;
-  if (!telAutodetectado) telAutodetectado = extraerTelefonoDeJID(clienteNumero);
-  if (!telAutodetectado) {
-    try {
-      const contacto = await msg.getContact();
-      const numRaw   = (contacto.number || "").replace(/\D/g, "");
-      const sinPais  = numRaw.length > 10 ? numRaw.slice(-10) : numRaw;
-      if (/^[2-9]\d{9}$/.test(sinPais)) telAutodetectado = sinPais;
-    } catch (_) {}
-  }
-
-  const camposIniciales = datosCampos.get(clienteNumero) || {};
-  if (telAutodetectado && !camposIniciales.telefono) camposIniciales.telefono = telAutodetectado;
-  camposIniciales.tipoEntrega = tipoEntrega;
-  datosCampos.set(clienteNumero, camposIniciales);
-
-  // Extraer datos que el cliente haya incluido en el mismo mensaje
-  const esDomicilioLocal = tipoEntrega === "domicilio";
-  interpretarCampos(clienteNumero, textoOriginal, esDomicilioLocal, esPreventa);
 
   tipoEntregaCliente.set(clienteNumero, tipoEntrega);
-  const parEntrega = tipoEntrega === "mostrador"
-    ? { user: "Mi pedido es para recoger en mostrador.", bot: "Perfecto, llena el formulario con tus datos." }
-    : { user: "Mi pedido es a domicilio.",               bot: "Perfecto, llena el formulario con tus datos." };
+  const parUser = tipoEntrega === "domicilio" ? "Mi pedido es a domicilio." : "Mi pedido es para recoger en mostrador.";
   historial.length = 0;
-  historial.push({ role: "user",      content: parEntrega.user });
-  historial.push({ role: "assistant", content: parEntrega.bot  });
+  historial.push({ role: "user",      content: parUser });
+  historial.push({ role: "assistant", content: "Perfecto, aquí el menú." });
 
-  const camposAct = datosCampos.get(clienteNumero);
-  const formProg  = mostrarFormularioProgresivo(clienteNumero, esDomicilioLocal, esPreventa);
-
-  if (camposCompletos(clienteNumero, esDomicilioLocal, esPreventa)) {
-    // El cliente incluyó todos sus datos en el primer mensaje
-    persistirEstado(clienteNumero);
-    await msg.reply(formProg + "\n\n*¿Son correctos los datos?*");
-    console.log(`Bot: [FORMULARIO COMPLETO EN PRIMER MSG - ${tipoEntrega.toUpperCase()}]`);
-    return true;
-  }
-
-  const siguienteFalt = siguienteCampoFaltante(clienteNumero, esDomicilioLocal, esPreventa);
   persistirEstado(clienteNumero);
-  await msg.reply(siguienteFalt ? formProg + "\n\n" + siguienteFalt.pregunta : formProg + "\n\n*¿Son correctos los datos?*");
-  console.log(`Bot: [FORMULARIO - ${tipoEntrega.toUpperCase()}${esPreventa ? " PREVENTA" : ""}] Tel: ${camposAct?.telefono}`);
+  const primerNombre = clienteBD?.nombre?.split(" ")[0] || null;
+  if (primerNombre) {
+    await replyConTyping(msg, `Hola de nuevo *${primerNombre}*! 😊 Aquí te mando el menú:`);
+    await new Promise(r => setTimeout(r, 400));
+  }
+  await msg.reply(MENU_FORMATO());
+  console.log(`Bot: [TIPO ENTREGA — ${tipoEntrega.toUpperCase()}${esPreventa ? " PREVENTA" : ""}]`);
   return true;
 }
 
-// ── 2C. CAMBIO DE TIPO DURANTE FORMULARIO ────────────────────────────────────
+// ── 2C. CAMBIO DE TIPO DURANTE FORMULARIO (post-orden) ───────────────────────
 async function handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa) {
-  if (datosRecibidos.has(clienteNumero)) return false;
+  if (!ordenPreResumen.has(clienteNumero)) return false;
 
   const esCambioDomicilio = /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*domicilio/i.test(textoOriginal)
     || /quiero\s*(que\s*)?(sea\s*)?a\s*domicilio/i.test(textoOriginal)
@@ -191,9 +238,9 @@ async function handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNume
   return true;
 }
 
-// ── 3. FORMULARIO PROGRESIVO ──────────────────────────────────────────────────
+// ── 3. FORMULARIO PROGRESIVO (post-orden) ────────────────────────────────────
 async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, historial, esPreventa) {
-  if (datosRecibidos.has(clienteNumero)) return false;
+  if (!ordenPreResumen.has(clienteNumero)) return false;
 
   const camposActualesFormulario = datosCampos.get(clienteNumero) || {};
   const esOrdenDomicilio = camposActualesFormulario.tipoEntrega === "domicilio"
@@ -218,16 +265,15 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   if (esConfirmacionDatos && camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
     if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
-    const textoFinal = camposATexto(clienteNumero);
     datosRecibidos.add(clienteNumero);
-    historial.length = 0;
-    historial.push({ role: "user",      content: textoFinal });
-    historial.push({ role: "assistant", content: "Datos recibidos. MENU TACOS JAVIER enviado." });
-    const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
+    const ordenTexto = ordenPreResumen.get(clienteNumero);
+    ordenPreResumen.delete(clienteNumero);
+    const resumenGenerado = generarResumen(clienteNumero, ordenTexto, esOrdenDomicilio, esPreventa);
+    resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
+    historial.push({ role: "user",      content: camposATexto(clienteNumero) });
+    historial.push({ role: "assistant", content: resumenGenerado.texto });
     persistirEstado(clienteNumero);
-    await msg.reply(formCompleto + "\n\nPerfecto, datos recibidos! Aqui te mando el menu.");
-    await new Promise(r => setTimeout(r, 600));
-    await msg.reply(MENU_FORMATO);
+    await msg.reply(resumenGenerado.texto);
     return true;
   }
 
@@ -258,19 +304,12 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   }
 
   const referenciaYaPreguntada = referenciaPreguntas.has(clienteNumero);
-  const faltante = siguienteCampoFaltante(clienteNumero, esOrdenDomicilio, esPreventa);
-  if (faltante && (faltante.campo === "correo" || faltante.campo === "referencia")) {
-    const fueMarcado = manejarOpcional(clienteNumero, faltante.campo, textoOriginal);
-    if (!fueMarcado && faltante.campo === "referencia" && referenciaYaPreguntada) {
-      const ca = datosCampos.get(clienteNumero) || {};
-      ca.referencia = textoOriginal.trim();
-      datosCampos.set(clienteNumero, ca);
-      persistirEstado(clienteNumero);
-    }
-    if (!fueMarcado && faltante.campo === "correo") {
-      const ca = datosCampos.get(clienteNumero) || {};
-      if (/[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(textoOriginal.trim())) {
-        ca.correo = textoOriginal.trim();
+  if (esOrdenDomicilio && referenciaYaPreguntada) {
+    const ca = datosCampos.get(clienteNumero) || {};
+    if (!ca.referencia) {
+      const fueMarcado = manejarOpcional(clienteNumero, "referencia", textoOriginal);
+      if (!fueMarcado) {
+        ca.referencia = textoOriginal.trim();
         datosCampos.set(clienteNumero, ca);
         persistirEstado(clienteNumero);
       }
@@ -296,15 +335,15 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   if (camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
     if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
-    const textoFinal = camposATexto(clienteNumero);
     datosRecibidos.add(clienteNumero);
-    historial.length = 0;
-    historial.push({ role: "user",      content: textoFinal });
-    historial.push({ role: "assistant", content: "Datos recibidos. MENU TACOS JAVIER enviado." });
-    const formCompleto = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
-    await msg.reply(formCompleto + "\n\nPerfecto, datos recibidos! Aqui te mando el menu.");
-    await new Promise(r => setTimeout(r, 600));
-    await msg.reply(MENU_FORMATO);
+    const ordenTexto = ordenPreResumen.get(clienteNumero);
+    ordenPreResumen.delete(clienteNumero);
+    const resumenGenerado = generarResumen(clienteNumero, ordenTexto, esOrdenDomicilio, esPreventa);
+    resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
+    historial.push({ role: "user",      content: camposATexto(clienteNumero) });
+    historial.push({ role: "assistant", content: resumenGenerado.texto });
+    persistirEstado(clienteNumero);
+    await msg.reply(resumenGenerado.texto);
     return true;
   }
 
@@ -315,7 +354,6 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
     await msg.reply(formProgresivo + "\n\n" + siguienteFaltante.pregunta);
   } else {
     const ca = datosCampos.get(clienteNumero) || {};
-    if (!ca.correo)                         { ca.correo     = "no proporcionó"; correoPreguntas.add(clienteNumero); }
     if (esOrdenDomicilio && !ca.referencia) { ca.referencia = "sin referencia"; referenciaPreguntas.add(clienteNumero); }
     datosCampos.set(clienteNumero, ca);
     persistirEstado(clienteNumero);

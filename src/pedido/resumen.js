@@ -153,7 +153,6 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     : `🏪 *PEDIDO EN MOSTRADOR — ${negocio}*\n`;
   resumen += `👤 *Cliente:* ${nombreCap}\n`;
   resumen += `📱 *Teléfono:* ${c.telefono || "—"}\n`;
-  resumen += `📧 *Correo:* ${c.correo && c.correo !== "no proporcionó" ? c.correo : "no proporcionó"}\n`;
   resumen += `📋 *Orden:*\n${ordenLimpia}\n\n`;
 
   if (esDomicilio) {

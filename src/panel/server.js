@@ -150,6 +150,7 @@ const MSGS_ESTADO = {
   confirmado: "✅ Tu pedido ha sido *confirmado*. ¡Pronto estará listo!",
   rechazado:  "❌ Tu pedido fue *rechazado*. Contáctanos si tienes dudas.",
   en_camino:  "🛵 Tu pedido ya va *en camino*. ¡Prepárate para recibirlo!",
+  listo:      "🏪 Tu pedido ya está *listo* para recoger en el mostrador. ¡Te esperamos! 😊",
 };
 
 app.put("/api/pedidos/:id/estado", requireAuth, (req, res) => {
@@ -271,6 +272,48 @@ app.post("/webhook/mercadopago", async (req, res) => {
   }
 });
 
+// ── SESIONES ACTIVAS ──────────────────────────────────────────────────────────
+app.get("/api/sesiones", requireAuth, (req, res) => {
+  const {
+    clientesNuevos: cN, datosRecibidos: dR,
+    esperandoCorte: eC, esperandoTipoItem: eTI,
+    esperandoConfirmacionItem: eCI, esperandoAgregarMas: eAM,
+    resumenPendiente: rP, esperandoCaptura: eCap,
+  } = require("../estado");
+
+  const todos = new Set([
+    ...cN, ...dR,
+    ...eC.keys(), ...eTI.keys(), ...eCI.keys(),
+    ...eAM.keys(), ...rP.keys(), ...eCap.keys(),
+  ]);
+
+  const ETIQUETAS = {
+    resumen_pendiente: "Resumen pendiente",
+    esperando_captura: "Esperando transferencia",
+    agregar_mas:       "Agregando más",
+    confirmacion_item: "Confirmando ítem",
+    esperando_corte:   "Eligiendo corte",
+    esperando_tipo:    "Eligiendo taco/torta",
+    tomando_pedido:    "Tomando pedido",
+    formulario:        "Llenando formulario",
+  };
+
+  const sesiones = [];
+  for (const num of todos) {
+    let estado = "formulario";
+    if (rP.has(num))   estado = "resumen_pendiente";
+    else if (eCap.has(num))  estado = "esperando_captura";
+    else if (eAM.has(num))   estado = "agregar_mas";
+    else if (eCI.has(num))   estado = "confirmacion_item";
+    else if (eC.has(num))    estado = "esperando_corte";
+    else if (eTI.has(num))   estado = "esperando_tipo";
+    else if (dR.has(num))    estado = "tomando_pedido";
+    sesiones.push({ numero: num.replace(/@.+/, "").slice(-10), estado, etiqueta: ETIQUETAS[estado] });
+  }
+
+  res.json({ total: sesiones.length, sesiones });
+});
+
 // ── HEALTH CHECK (público, para monitoreo externo) ───────────────────────────
 app.get("/health", (req, res) => {
   const { wa_estado, uptime_segundos, tenant } = getStatusInfo();
@@ -318,6 +361,51 @@ app.post("/api/pedidos/:id/notificar", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── ALERTA PEDIDOS PENDIENTES SIN ATENDER ─────────────────────────────────────
+const _pedidosAlertados = new Set();
+let _alertasInicializado = false;
+
+setInterval(async () => {
+  const grupoId = process.env.GRUPO_ID;
+  if (!grupoId) return;
+  const waClient = getWhatsappClient();
+  if (!waClient) return;
+
+  const { queryAll } = require("../db/core");
+  const pendientes = queryAll(
+    `SELECT p.id, c.nombre, c.apellido, c.telefono, p.total, p.hora_entrega
+     FROM pedidos p
+     LEFT JOIN clientes c ON p.cliente_id = c.id
+     WHERE p.estado = 'pendiente'
+       AND datetime(p.fecha, 'localtime') <= datetime('now', 'localtime', '-10 minutes')
+     ORDER BY p.fecha ASC`
+  );
+
+  for (const p of pendientes) {
+    if (_pedidosAlertados.has(p.id)) continue;
+    _pedidosAlertados.add(p.id);
+    // Primer tick tras arranque: marcar como vistos sin alertar (son pedidos pre-reinicio)
+    if (!_alertasInicializado) continue;
+    const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ") || p.telefono || "—";
+    try {
+      await waClient.sendMessage(grupoId,
+        `⚠️ *Pedido sin confirmar*\n\n` +
+        `El pedido *#${p.id}* de *${nombre}* lleva más de 10 minutos esperando.\n` +
+        `Total: $${Math.round(p.total || 0)}\n\n` +
+        `Usa *!confirmar ${p.id}* o revisa el panel.`
+      );
+    } catch (_) {}
+  }
+
+  _alertasInicializado = true;
+
+  // Quitar de alertados los que ya no son pendientes (fueron atendidos)
+  const idsActuales = new Set(pendientes.map(p => p.id));
+  for (const id of _pedidosAlertados) {
+    if (!idsActuales.has(id)) _pedidosAlertados.delete(id);
+  }
+}, 5 * 60 * 1000).unref();
 
 function startPanel(port = 3000) {
   app.listen(port, () => {

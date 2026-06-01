@@ -6,11 +6,12 @@
 
 const {
   conversaciones, datosAcumulados, datosCampos,
-  correoPreguntas, referenciaPreguntas, clientesPreventa,
+  referenciaPreguntas, clientesPreventa,
   horaEntregaPreventa, esperandoMotivoCancelacion, resumenPendiente,
   esperandoCaptura, datosRecibidos, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem,
+  esperandoExtras, ordenPreResumen,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
@@ -77,7 +78,8 @@ function limpiarTodo(numero) {
   esperandoCorte.delete(numero);
   esperandoEdicion.delete(numero);
   esperandoTipoItem.delete(numero);
-  correoPreguntas.delete(numero);
+  esperandoExtras.delete(numero);
+  ordenPreResumen.delete(numero);
   referenciaPreguntas.delete(numero);
   eliminarSesion(numero);
 }
@@ -93,7 +95,7 @@ function acumularDatos(numero, texto) {
 // ── INTERPRETACIÓN DE CAMPOS ──────────────────────────────────────────────────
 function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa = false) {
   const campos = datosCampos.get(numero) || {
-    nombre: null, telefono: null, correo: null, metodo: null,
+    nombre: null, telefono: null, metodo: null,
     calle: null, colonia: null, referencia: null, hora: null, tipoEntrega: null,
   };
 
@@ -106,12 +108,6 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
   {
     const tel = extraerTelefono(textoCompleto);
     if (tel) campos.telefono = tel;
-  }
-
-  // ── Correo ────────────────────────────────────────────────────────────────
-  if (!campos.correo) {
-    const m = textoCompleto.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
-    if (m) campos.correo = m[0];
   }
 
   // ── Método de pago ────────────────────────────────────────────────────────
@@ -261,7 +257,6 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
   msg += `${SEP}\n`;
   msg += `👤 *Nombre y apellido:* ${lleno(campos.nombre)}\n`;
   msg += `📱 *Teléfono:* ${lleno(campos.telefono)}\n`;
-  msg += `📧 *Correo:* ${opc(campos.correo)}\n`;
 
   if (esDomicilio) {
     msg += `📍 *Calle y número:* ${lleno(campos.calle)}\n`;
@@ -282,16 +277,6 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
 
   if (!campos.nombre)   return { campo: "nombre",   pregunta: "*¿Cuál es tu nombre completo (nombre y apellido)?*" };
   if (!campos.telefono) return { campo: "telefono", pregunta: "*¿Cuál es tu número de teléfono a 10 dígitos?*" };
-
-  if (!campos.correo && !correoPreguntas.has(numero)) {
-    correoPreguntas.add(numero);
-    persistirEstado(numero);
-    return { campo: "correo", pregunta: "*¿Tienes correo electrónico?* _(opcional, escribe 'no' si no quieres proporcionarlo)_" };
-  }
-  if (campos.correo && !correoPreguntas.has(numero)) {
-    correoPreguntas.add(numero);
-    persistirEstado(numero);
-  }
 
   if (esDomicilio) {
     if (!campos.calle)   return { campo: "calle",   pregunta: "*¿Cuál es tu calle y número?*" };
@@ -318,7 +303,6 @@ function manejarOpcional(numero, campo, texto) {
   const rechazo = /^(no|nel|nop|nope|sin|no\s+tengo|no\s+quiero|no\s+proporciono|omitir|ninguna|ninguno)$/i.test(texto.trim());
   if (!rechazo) return false;
   const campos = datosCampos.get(numero) || {};
-  if (campo === "correo")     { campos.correo     = "no proporcionó"; datosCampos.set(numero, campos); persistirEstado(numero); return true; }
   if (campo === "referencia") { campos.referencia = "sin referencia"; datosCampos.set(numero, campos); persistirEstado(numero); return true; }
   return false;
 }
@@ -329,7 +313,6 @@ function camposCompletos(numero, esDomicilio = false, esPreventa = false) {
   if (!campos.nombre || !campos.telefono || !campos.metodo) return false;
   if (esDomicilio && (!campos.calle || !campos.colonia))    return false;
   if (esPreventa  && !campos.hora)                          return false;
-  if (!correoPreguntas.has(numero) && !campos.correo)       return false;
   if (esDomicilio && !referenciaPreguntas.has(numero) && !campos.referencia) return false;
   return true;
 }
@@ -337,7 +320,7 @@ function camposCompletos(numero, esDomicilio = false, esPreventa = false) {
 // ── CAMPOS A TEXTO ────────────────────────────────────────────────────────────
 function camposATexto(numero) {
   const c = datosCampos.get(numero) || {};
-  return [c.nombre, c.telefono, c.correo, c.metodo, c.calle, c.colonia, c.referencia, c.hora]
+  return [c.nombre, c.telefono, c.metodo, c.calle, c.colonia, c.referencia, c.hora]
     .filter(Boolean).join("\n");
 }
 
@@ -368,7 +351,6 @@ function pareceFragmentoDatos(texto) {
     if (PALABRAS_NO_NOMBRE.test(limpio)) return false;
     return /^[a-záéíóúüñ\s]{4,50}$/i.test(limpio);
   })();
-  const esCorreo     = /\S+@\S+\.\S+/.test(texto);
   const esMetodoPago = /efectivo|tarjeta|transferencia/i.test(texto);
   const esDireccion  = /calle|colonia|#|num|col\.|av\.|blvd/i.test(texto);
   const esHora       = /\b([1-9]|1[0-2])(:[0-5][0-9])?\s*(am|pm|a\.m\.|p\.m\.)/i.test(texto)
@@ -376,7 +358,7 @@ function pareceFragmentoDatos(texto) {
     || /\ba\s+las?\s+\d{1,2}/i.test(texto)
     || /\bpaso\s+a\s+las?\s+\d{1,2}/i.test(texto)
     || /^\d{1,2}(:\d{2})?$/.test(texto.trim());
-  return esTelefono || esNombreOApellido || esCorreo || esMetodoPago || esDireccion || esHora;
+  return esTelefono || esNombreOApellido || esMetodoPago || esDireccion || esHora;
 }
 
 function extraerDatosPedido(resumenTexto) {
@@ -412,12 +394,6 @@ function detectarEdicion(texto) {
   if (mTelVal) return { campo: "telefono", valor: mTelVal[1], preguntar: false };
   if (/cambia(?:r|me)?\s+(?:mi\s+)?tel[eé]fono$/i.test(t))
     return { campo: "telefono", preguntar: true, pregunta: "*¿Cuál es tu nuevo número de teléfono a 10 dígitos?*" };
-
-  // CORREO con valor
-  const mCorreoVal = texto.match(/cambia(?:r|me)?\s+(?:mi\s+)?correo(?:\s+electr[oó]nico)?\s+(?:a|por)\s+(\S+@\S+)/i);
-  if (mCorreoVal) return { campo: "correo", valor: mCorreoVal[1].trim(), preguntar: false };
-  if (/cambia(?:r|me)?\s+(?:mi\s+)?correo(?:\s+electr[oó]nico)?$/i.test(t))
-    return { campo: "correo", preguntar: true, pregunta: "*¿Cuál es tu nuevo correo electrónico?*" };
 
   // MÉTODO con valor directo
   const mMetVal = texto.match(/cambia(?:r|me)?\s+(?:el\s+)?(?:m[eé]todo|pago)(?:\s+de\s+pago)?\s+(?:a|por)\s+(efectivo|tarjeta|transferencia)/i);
@@ -474,7 +450,6 @@ function aplicarEdicion(clienteNumero, edicion) {
       }
       break;
     case "telefono":  campos.telefono  = edicion.valor; break;
-    case "correo":    campos.correo    = edicion.valor; break;
     case "metodo":    campos.metodo    = edicion.valor; break;
     case "hora":      campos.hora      = edicion.valor; break;
     case "calle": {

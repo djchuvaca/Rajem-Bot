@@ -48,7 +48,8 @@ module.exports = {
   guardarSesion:          config.guardarSesion,
   eliminarSesion:         config.eliminarSesion,
   cargarTodasLasSesiones: config.cargarTodasLasSesiones,
-  limpiarSesionesAntiguas: config.limpiarSesionesAntiguas,
+  limpiarSesionesAntiguas:    config.limpiarSesionesAntiguas,
+  limpiarTodasLasSesionesDB: config.limpiarTodasLasSesionesDB,
 
   // teléfonos reales
   guardarTelefonoReal: config.guardarTelefonoReal,
@@ -85,4 +86,10 @@ module.exports = {
   getPedidosPorFecha:         modelos.getPedidosPorFecha,
   updatePedidoEstado:         modelos.updatePedidoEstado,
   deletePedido:               modelos.deletePedido,
+
+  // pagos pendientes MP
+  guardarPagoPendiente:             modelos.guardarPagoPendiente,
+  obtenerPagoPendiente:             modelos.obtenerPagoPendiente,
+  eliminarPagoPendiente:            modelos.eliminarPagoPendiente,
+  limpiarPagosPendientesExpirados:  modelos.limpiarPagosPendientesExpirados,
 };

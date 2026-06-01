@@ -22,13 +22,14 @@ const pedidosConfirmados         = new Map();
 const esperandoConfirmacionItem  = new Map();
 const esperandoAgregarMas        = new Map();
 const pedidoJSONActual           = new Map();
-const correoPreguntas            = new Set();
 const referenciaPreguntas        = new Set();
 const esperandoConfirmacionDatos = new Map();
 const tipoEntregaCliente         = new Map();
 const esperandoCorte    = new Map();
 const esperandoEdicion  = new Map();
 const esperandoTipoItem = new Map();
+const esperandoExtras   = new Map(); // reemplaza esperandoAgregarMas + esperandoSalsas en flujo normal
+const ordenPreResumen   = new Map(); // orden guardada mientras se recopila el formulario post-orden
 
 const CARPETA_CAPTURAS = path.join(__dirname, "../../capturas");
 if (!fs.existsSync(CARPETA_CAPTURAS)) fs.mkdirSync(CARPETA_CAPTURAS);
@@ -38,6 +39,6 @@ module.exports = {
   datosRecibidos, datosAcumulados, datosCampos, pendientesConfirmacion,
   clientesPreventa, horaEntregaPreventa, esperandoMotivoCancelacion,
   pedidosConfirmados, esperandoConfirmacionItem, esperandoAgregarMas,
-  pedidoJSONActual, correoPreguntas, referenciaPreguntas,
-  esperandoConfirmacionDatos, tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, CARPETA_CAPTURAS,
+  pedidoJSONActual, referenciaPreguntas,
+  esperandoConfirmacionDatos, tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, esperandoExtras, ordenPreResumen, CARPETA_CAPTURAS,
 };

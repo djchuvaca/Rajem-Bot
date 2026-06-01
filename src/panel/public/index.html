@@ -185,6 +185,8 @@ tr:hover td{background:var(--surface2)}
     <!-- DASHBOARD -->
     <div class="section active" id="s-dashboard">
       <div class="stats-grid" id="stats-grid"></div>
+      <div class="card" id="card-sesiones" style="display:none"></div>
+      <div class="card" id="card-cortes" style="display:none"></div>
       <div class="card">
         <div class="card-title">Pedidos de hoy</div>
         <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th></tr></thead><tbody></tbody></table></div>
@@ -394,7 +396,6 @@ tr:hover td{background:var(--surface2)}
         <input class="form-input" id="cli-telefono" type="text" placeholder="3113676885">
         <div class="hint">10 dígitos sin código de país</div>
       </div>
-      <div class="form-group"><label class="form-label">Correo</label><input class="form-input" id="cli-correo" type="email" placeholder="correo@ejemplo.com"></div>
     </div>
     <div class="form-group"><label class="form-label">Calle y número</label><input class="form-input" id="cli-calle" type="text" placeholder="Artículo 123 #36"></div>
     <div class="form-row">
@@ -506,7 +507,7 @@ const loaders = {
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
-  const stats = await api('/api/stats');
+  const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones')]);
   document.getElementById('sidebar-negocio').textContent = stats.negocio;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card"><div class="stat-num">${stats.pedidos_hoy}</div><div class="stat-label">Pedidos hoy</div></div>
@@ -515,7 +516,44 @@ async function loadDashboard() {
     <div class="stat-card red"><div class="stat-num">${stats.cancelados+stats.rechazados}</div><div class="stat-label">Cancelados/Rechazados</div></div>
     <div class="stat-card blue"><div class="stat-num">$${Math.round(stats.total_ventas_hoy)}</div><div class="stat-label">Ventas hoy</div></div>
     <div class="stat-card"><div class="stat-num">${stats.total_clientes}</div><div class="stat-label">Clientes totales</div></div>
+    <div class="stat-card blue" style="cursor:pointer" onclick="document.getElementById('card-sesiones').scrollIntoView({behavior:'smooth'})">
+      <div class="stat-num">${sesData.total||0}</div><div class="stat-label">Chats activos</div>
+    </div>
   `;
+  // Tarjeta de sesiones activas
+  const cardSes = document.getElementById('card-sesiones');
+  if (sesData.total > 0) {
+    const filas = sesData.sesiones.map(s =>
+      `<tr><td><code style="color:var(--muted);font-size:11px">${s.numero}</code></td><td>${s.etiqueta}</td></tr>`
+    ).join('');
+    cardSes.innerHTML = `<div class="card-title">Chats activos ahora</div><div class="table-wrap"><table><thead><tr><th>Teléfono</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+    cardSes.style.display = '';
+  } else {
+    cardSes.style.display = 'none';
+  }
+  // Tarjeta de cortes del día
+  const cardCortes = document.getElementById('card-cortes');
+  const cortes = stats.conteo_cortes || {};
+  const cortesEntries = Object.entries(cortes).filter(([,v]) => v > 0).sort(([,a],[,b]) => b-a);
+  if (cortesEntries.length > 0) {
+    const totalCortes = cortesEntries.reduce((s,[,v]) => s+v, 0);
+    const barras = cortesEntries.map(([corte, cnt]) => {
+      const pct = Math.round(cnt/totalCortes*100);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+          <span style="text-transform:capitalize;font-weight:600">${corte}</span>
+          <span style="color:var(--muted)">${cnt} pedido${cnt!==1?'s':''} · ${pct}%</span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:8px">
+          <div style="background:var(--accent);width:${pct}%;height:8px;border-radius:4px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    }).join('');
+    cardCortes.innerHTML = `<div class="card-title">Cortes del día</div>${barras}`;
+    cardCortes.style.display = '';
+  } else {
+    cardCortes.style.display = 'none';
+  }
   loadHistorico();
   const pedidos = await api('/api/pedidos?hoy=1');
   const tbody = document.querySelector('#pedidos-hoy-table tbody');
@@ -620,7 +658,6 @@ async function loadClientes() {
       <td><code style="color:var(--muted);font-size:11px">#${c.id}</code></td>
       <td><strong>${c.nombre||''} ${c.apellido||''}</strong></td>
       <td>${c.telefono||''}</td>
-      <td style="color:var(--muted);font-size:12px">${c.correo||'—'}</td>
       <td style="font-size:12px;color:var(--muted2)">${[c.calle_numero, c.colonia?'Col. '+c.colonia:''].filter(Boolean).join(', ')||'—'}</td>
       <td style="text-align:center">${c.total_pedidos||0}</td>
       <td style="color:var(--muted);font-size:12px">${(c.fecha_registro||'').substring(0,10)}</td>
@@ -637,7 +674,6 @@ function openModalCliente(c=null) {
   document.getElementById('cli-nombre').value     = c?.nombre      || '';
   document.getElementById('cli-apellido').value   = c?.apellido    || '';
   document.getElementById('cli-telefono').value   = c?.telefono    || '';
-  document.getElementById('cli-correo').value     = c?.correo      || '';
   document.getElementById('cli-calle').value      = c?.calle_numero|| '';
   document.getElementById('cli-colonia').value    = c?.colonia     || '';
   document.getElementById('cli-referencia').value = c?.referencia  || '';
@@ -653,7 +689,6 @@ async function saveCliente() {
     nombre:       document.getElementById('cli-nombre').value.trim() || null,
     apellido:     document.getElementById('cli-apellido').value.trim() || null,
     telefono,
-    correo:       document.getElementById('cli-correo').value.trim() || null,
     calle_numero: document.getElementById('cli-calle').value.trim() || null,
     colonia:      document.getElementById('cli-colonia').value.trim() || null,
     referencia:   document.getElementById('cli-referencia').value.trim() || null,

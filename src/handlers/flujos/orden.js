@@ -5,11 +5,14 @@ const {
   esperandoCorte, resumenPendiente, pedidoJSONActual, tipoEntregaCliente,
   datosCampos, horaEntregaPreventa, clientesPreventa, persistirEstado,
   detectarEdicion, aplicarEdicion, mostrarFormularioProgresivo,
+  esperandoExtras, ordenPreResumen, datosRecibidos,
+  camposCompletos, siguienteCampoFaltante, esperandoConfirmacionDatos,
 } = require("../../estado");
 const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumulada } = require("../../pedido/resumen");
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
+  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
@@ -35,6 +38,69 @@ function groqConTimeout(params) {
       setTimeout(() => reject(new Error("GROQ_TIMEOUT")), GROQ_TIMEOUT_MS)
     ),
   ]);
+}
+
+// ── HELPERS PARA EXTRAS ───────────────────────────────────────────────────────
+function _listaNombresRefrescos() {
+  const refs = require("../pedidoParser").getRefrescos();
+  return refs.length > 0
+    ? refs.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ")
+    : "Coca Cola · Fanta · Sprite";
+}
+
+function _listaNombresSalsas() {
+  const sals = getSalsas();
+  return sals.length > 0
+    ? sals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ")
+    : "picada · cebolla · suave · roja · limones";
+}
+
+function _formatearRefresco(ref) {
+  const nombreDisplay = ref.nombre.charAt(0).toUpperCase() + ref.nombre.slice(1);
+  const precio = ref.precio * ref.cantidad;
+  return ref.cantidad > 1
+    ? `🥤 ${ref.cantidad}x ${nombreDisplay} — $${precio}`
+    : `🥤 ${nombreDisplay} — $${precio}`;
+}
+
+async function _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, esOrdenDom, esPreventa, historial) {
+  // Si en esta misma sesión ya se confirmaron los datos, ir directo al resumen
+  if (datosRecibidos.has(clienteNumero) && camposCompletos(clienteNumero, esOrdenDom, esPreventa)) {
+    const resumenGenerado = generarResumen(clienteNumero, ordenTexto, esOrdenDom, esPreventa);
+    resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
+    historial.push({ role: "user",      content: "no, ya es todo" });
+    historial.push({ role: "assistant", content: resumenGenerado.texto });
+    persistirEstado(clienteNumero);
+    await msg.reply(resumenGenerado.texto);
+    return;
+  }
+
+  // Asegurarse de que tipoEntrega esté en datosCampos
+  const campos = datosCampos.get(clienteNumero) || {};
+  if (!campos.tipoEntrega) {
+    campos.tipoEntrega = esOrdenDom ? "domicilio" : "mostrador";
+    datosCampos.set(clienteNumero, campos);
+  }
+
+  ordenPreResumen.set(clienteNumero, ordenTexto);
+
+  const esCompleto = camposCompletos(clienteNumero, esOrdenDom, esPreventa);
+  if (esCompleto) {
+    // Cliente con datos precargados: pedir confirmación
+    const formPrecargado = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+    esperandoConfirmacionDatos.set(clienteNumero, { tipoEntrega: campos.tipoEntrega, esPreventa });
+    persistirEstado(clienteNumero);
+    await msg.reply("Para confirmar tu pedido necesito tus datos:\n\n" + formPrecargado + "\n\n*¿Son correctos los datos?*");
+  } else {
+    // Cliente nuevo o con datos incompletos: recopilar progresivamente
+    const faltante = siguienteCampoFaltante(clienteNumero, esOrdenDom, esPreventa);
+    const formProg  = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+    persistirEstado(clienteNumero);
+    await msg.reply(
+      "Para confirmar tu pedido necesito algunos datos:\n\n" +
+      (faltante ? formProg + "\n\n" + faltante.pregunta : formProg + "\n\n*¿Son correctos los datos?*")
+    );
+  }
 }
 
 // ── ESPERANDO TIPO DE ÍTEM (taco/torta) ──────────────────────────────────────
@@ -70,12 +136,18 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
   if (pendiente.ordenBase) {
     const lineasFiltradas = resultado.texto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
     const nuevaOrden = pendiente.ordenBase + "\n" + lineasFiltradas;
-    esperandoAgregarMas.set(clienteNumero, nuevaOrden);
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
+
+    if (pendiente._fromExtras) {
+      // Loop back to extras after confirmation
+      esperandoExtras.set(clienteNumero, { ...pendiente._fromExtras, ordenTexto: nuevaOrden, fase: "pregunta" });
+    } else {
+      esperandoAgregarMas.set(clienteNumero, nuevaOrden);
+    }
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pendiente._refrescosPendientes || [], _salsasPendientes: pendiente._salsasPendientes || [] });
     persistirEstado(clienteNumero);
     await msg.reply(resultado.texto + "\n\n*¿Agrego esto a tu pedido?*");
   } else {
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pendiente._refrescosPendientes || [], _salsasPendientes: pendiente._salsasPendientes || [] });
     persistirEstado(clienteNumero);
     await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
   }
@@ -85,6 +157,9 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
 
 // ── CAMBIO DE TIPO DURANTE TOMA DE PEDIDO ────────────────────────────────────
 async function handleCambioTipoDuranteTomaPedido(msg, textoOriginal, clienteNumero, historial) {
+  // Durante formulario post-orden, handleCambioTipoDuranteFormulario (formulario.js) lo maneja
+  if (ordenPreResumen.has(clienteNumero)) return false;
+
   const esCambioAMostrador = /cambi(a|ar|ame)\s*(a|al)?\s*mostrador|que\s+sea\s+(a\s+|en\s+)?mostrador|para\s+mostrador|mejor\s+mostrador|voy\s+a\s+recoger|paso\s+a\s+recoger|yo\s+recojo/i.test(textoOriginal);
   const esCambioADomicilio = /cambi(a|ar|ame)\s*(a|al)?\s*domicilio|que\s+sea\s+(a\s+)?domicilio|para\s+domicilio|mejor\s+domicilio|a\s+domicilio/i.test(textoOriginal);
   if (!esCambioAMostrador && !esCambioADomicilio) return false;
@@ -113,7 +188,7 @@ async function handleCambioTipoDuranteTomaPedido(msg, textoOriginal, clienteNume
   if (idxTipo !== -1) historial[idxTipo].content = nuevoTipo === "mostrador" ? "Mi pedido es para recoger en mostrador." : "Mi pedido es a domicilio.";
   await msg.reply(`Perfecto! Cambié tu pedido a ${nuevoTipo}. *¿Qué deseas ordenar?*`);
   await new Promise(r => setTimeout(r, 300));
-  await msg.reply(MENU_FORMATO);
+  await msg.reply(MENU_FORMATO());
   return true;
 }
 
@@ -149,10 +224,25 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   if (esRechazo || /^no$/i.test(textoOriginal.trim())) {
     esperandoConfirmacionItem.delete(clienteNumero);
     esperandoAgregarMas.delete(clienteNumero);
+    esperandoExtras.delete(clienteNumero);
     _resetError(clienteNumero);
     const textoSinNo = textoOriginal.replace(/^(?:no|nel|nop)[,\s]+/i, "").trim();
     if (textoSinNo.length > 3) {
-      const jsonRechazoPed = parsearPedidoSimple(textoSinNo);
+      let jsonRechazoPed = parsearPedidoSimple(textoSinNo);
+      if (!jsonRechazoPed) {
+        const matchNum = textoSinNo.match(/\b(\d+)\b/);
+        const esTacoR  = /\btacos?\b/i.test(textoSinNo);
+        const esTortaR = /\btortas?\b/i.test(textoSinNo);
+        if (matchNum && (esTacoR || esTortaR)) {
+          const cortesMap = getCortes();
+          const palabrasC = Object.keys(cortesMap).join("|");
+          const mCorte    = itemData.lineas.match(new RegExp(`\\b(${palabrasC})\\b`, "i"));
+          if (mCorte) {
+            const corteR = cortesMap[mCorte[1].toLowerCase()];
+            jsonRechazoPed = { tipo: "pedido", items: [{ presentacion: esTortaR ? "torta" : "taco", cantidad: parseInt(matchNum[1]), corte: corteR }] };
+          }
+        }
+      }
       if (jsonRechazoPed && jsonRechazoPed.tipo === "pedido") {
         pedidoJSONActual.set(clienteNumero, jsonRechazoPed);
         persistirEstado(clienteNumero);
@@ -170,7 +260,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       hist.splice(hist.length - 2, 2);
     await msg.reply("No pasa nada! *¿Qué deseas ordenar?* 😊");
     await new Promise(r => setTimeout(r, 400));
-    await msg.reply(MENU_FORMATO);
+    await msg.reply(MENU_FORMATO());
     return true;
   }
 
@@ -207,8 +297,11 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       return true;
     }
 
-    const ordenActual   = esperandoAgregarMas.get(clienteNumero) || "";
-    const lineasNuevas  = itemData.lineas.split("\n").filter(l => {
+    // ── Nuevo flujo extras o flujo legacy ─────────────────────────────────────
+    const extrasCtx = esperandoExtras.has(clienteNumero) ? esperandoExtras.get(clienteNumero) : null;
+    const ordenActual = extrasCtx ? extrasCtx.ordenTexto : (esperandoAgregarMas.get(clienteNumero) || "");
+
+    const lineasNuevas = itemData.lineas.split("\n").filter(l => {
       const t = l.trim();
       if (!t) return false;
       if (/^📍|^📌|^🛵|^💵|^💰|^💳|^🕖/u.test(t)) return false;
@@ -217,11 +310,94 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       return true;
     }).join("\n");
     const nuevaOrden = ordenActual ? ordenActual + "\n" + lineasNuevas : lineasNuevas;
-    esperandoAgregarMas.set(clienteNumero, nuevaOrden);
+
     historial.push({ role: "user",      content: "si, correcto" });
     historial.push({ role: "assistant", content: itemData.lineas });
     persistirEstado(clienteNumero);
-    await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
+
+    if (extrasCtx || !esperandoAgregarMas.has(clienteNumero)) {
+      // Nuevo flujo: ir a extras
+      const esPreventa = clientesPreventa.has(clienteNumero);
+      const refrescosPendientes = itemData._refrescosPendientes || [];
+      const salsasPendientes    = itemData._salsasPendientes    || [];
+      const esGenericoRef  = refrescosPendientes.length === 1 && refrescosPendientes[0]?.esGenerico === true;
+      const esGenericoSal  = salsasPendientes.length   === 1 && salsasPendientes[0]?.esGenerico   === true;
+      const specificRefs   = refrescosPendientes.filter(r => !r.esGenerico);
+      const specificSals   = salsasPendientes.filter(s => !s.esGenerico);
+
+      let ordenConExtras = nuevaOrden;
+      let tieneRefrescoInicial = extrasCtx?.tieneRefresco || false;
+      let tieneSalsaInicial    = extrasCtx?.tieneSalsa    || false;
+
+      if (specificRefs.length > 0) {
+        for (const ref of specificRefs) ordenConExtras += "\n" + _formatearRefresco(ref);
+        tieneRefrescoInicial = true;
+      }
+      if (specificSals.length > 0) {
+        const nombresSals = specificSals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+        ordenConExtras += `\n🌶️ Salsas: ${nombresSals}`;
+        tieneSalsaInicial = true;
+      }
+
+      const faseInicial = esGenericoRef                                                          ? "especRefresco"
+                        : (specificRefs.length > 0 || esGenericoSal || specificSals.length > 0) ? "especSalsa"
+                        : "pregunta";
+
+      esperandoExtras.set(clienteNumero, {
+        ordenTexto:            ordenConExtras,
+        esOrdenDom,
+        esPreventa,
+        tieneRefresco:         tieneRefrescoInicial,
+        tieneSalsa:            tieneSalsaInicial,
+        fase:                  faseInicial,
+        _cantidadRefPendiente: esGenericoRef ? refrescosPendientes[0].cantidad : null,
+        _cantidadSalPendiente: esGenericoSal ? salsasPendientes[0].cantidad   : null,
+      });
+
+      const listaSalsas = _listaNombresSalsas();
+      if (esGenericoRef) {
+        const listaRef = _listaNombresRefrescos();
+        const cantMsg = refrescosPendientes[0].cantidad > 1 ? `${refrescosPendientes[0].cantidad} refrescos` : "un refresco";
+        await msg.reply(`Anotado, quieres *${cantMsg}*! 🥤 ¿Cuáles serían?\n\n*${listaRef}*`);
+      } else if (specificRefs.length > 0 && esGenericoSal) {
+        const refNombres = specificRefs.map(r => `*${r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)}*`).join(" y ");
+        const cantSalMsg = salsasPendientes[0].cantidad > 1 ? `${salsasPendientes[0].cantidad} salsas` : "una salsa";
+        await msg.reply(
+          `Agregué ${refNombres} a tu pedido! 🥤\n\n` +
+          `También quieres *${cantSalMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`
+        );
+      } else if (specificRefs.length > 0 && specificSals.length > 0) {
+        const refNombres = specificRefs.map(r => `*${r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)}*`).join(" y ");
+        const salNombres = specificSals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+        await msg.reply(
+          `Agregué ${refNombres} y salsas (${salNombres}) a tu pedido! 🥤🌶️\n\n` +
+          `¿Deseas agregar algo más? _(Escribe *no* si ya es todo)_`
+        );
+      } else if (specificRefs.length > 0) {
+        const refNombres = specificRefs.map(r => `*${r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)}*`).join(" y ");
+        await msg.reply(
+          `Agregué ${refNombres} a tu pedido! 🥤\n\n` +
+          `¿Quieres también alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n` +
+          `_(O escribe *no* si no quieres)_`
+        );
+      } else if (esGenericoSal) {
+        const cantSalMsg = salsasPendientes[0].cantidad > 1 ? `${salsasPendientes[0].cantidad} salsas` : "una salsa";
+        await msg.reply(`Anotado, quieres *${cantSalMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+      } else if (specificSals.length > 0) {
+        const salNombres = specificSals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+        await msg.reply(
+          `Agregué salsas (${salNombres}) a tu pedido! 🌶️\n\n` +
+          `¿Quieres también algún *Refresco*? 🥤\n\n*${_listaNombresRefrescos()}*\n\n` +
+          `_(O escribe *no* si no quieres)_`
+        );
+      } else {
+        await msg.reply("¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤\n\n_(O escribe *no* si ya es todo)_");
+      }
+    } else {
+      // Flujo legacy (resumen fallback): mantener en esperandoAgregarMas
+      esperandoAgregarMas.set(clienteNumero, nuevaOrden);
+      await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
+    }
     return true;
   }
 
@@ -242,88 +418,264 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   return true;
 }
 
-// ── ESPERANDO SI AGREGA MÁS ───────────────────────────────────────────────────
-async function handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa) {
-  if (!esperandoAgregarMas.has(clienteNumero)) return false;
+// ── EXTRAS (Refresco / Salsa / más items) ────────────────────────────────────
+async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa) {
+  if (!esperandoExtras.has(clienteNumero)) return false;
 
-  const esAgregarNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
-  const esAgregarSi = /^(si|sí|ok|va|dale|claro|sale|andale|quiero|agrega|más|mas)$/i.test(textoOriginal.trim());
+  const ctx = esperandoExtras.get(clienteNumero);
+  const { ordenTexto, tieneRefresco, tieneSalsa, fase } = ctx;
 
-  // "¿Cuánto llevo?" — subtotal acumulado
-  if (/cu[aá]nto\s+(?:llevo|tengo|es(?:\s+todo)?(?:\s+lo\s+que\s+llevo)?(?:\s+hasta\s+ahorita)?)|(?:total|subtotal)\s+(?:hasta\s+ahorita|por\s+ahora|de\s+lo\s+que\s+llevo)|cu[aá]nto\s+(?:llega|asciende|va)\s+mi\s+pedido/i.test(textoOriginal)) {
-    const ordSub = esperandoAgregarMas.get(clienteNumero) || "";
-    if (ordSub) {
-      const subAct   = calcularSubtotal(ordSub);
-      const listaAct = formatearListaAcumulada(ordSub);
-      await msg.reply(`${listaAct}\n\n💰 *Total acumulado: $${subAct}*`);
-      await new Promise(r => setTimeout(r, 300));
-      await msg.reply("*¿Deseas agregar algo más?*");
-      return true;
-    }
-  }
+  const esNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso|ninguno|ninguna|paso|nada)$/i.test(textoOriginal.trim());
+  const esSi = palabrasConfirmacion.test(textoOriginal.trim());
 
-  if (!esAgregarNo && !esAgregarSi) {
-    const faqAgMas = detectarPreguntaFrecuente(textoOriginal);
-    if (faqAgMas && ["precio", "menu", "descripcion_corte", "domicilio"].includes(faqAgMas.tipo)) {
-      const esOrdenDomAgMas = tipoEntregaCliente.get(clienteNumero) === "domicilio";
-      const respFaq = generarRespuestaAutomatica(faqAgMas, { esDomicilio: esOrdenDomAgMas });
-      if (respFaq) {
-        await msg.reply(respFaq);
-        await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
-        return true;
+  // ── FASE: CONFIRMACIÓN DE REFRESCO ──────────────────────────────────────────
+  if (fase === "confirmRefresco") {
+    const pendRef = ctx.pendienteRefresco;
+    if (esSi) {
+      const lineaRef = _formatearRefresco(pendRef);
+      const nuevaOrden = ordenTexto + "\n" + lineaRef;
+      if (!tieneSalsa) {
+        const listaSalsas = _listaNombresSalsas();
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendienteRefresco: null });
+        persistirEstado(clienteNumero);
+        if (ctx._cantidadSalPendiente) {
+          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+          await msg.reply(`Quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+        } else {
+          await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+        }
+      } else {
+        esperandoExtras.delete(clienteNumero);
+        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
       }
+      return true;
+    }
+    if (esNo) {
+      const listaRef = _listaNombresRefrescos();
+      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco", pendienteRefresco: null });
+      await msg.reply(`¿Cuántos refrescos y de cuáles? 🥤\n\n*${listaRef}*`);
+      return true;
+    }
+    const lineaRef2 = _formatearRefresco(pendRef);
+    await msg.reply(lineaRef2 + "\n\n*¿Agrego esto a tu pedido?*");
+    return true;
+  }
+
+  // ── FASE: ESPECIFICAR REFRESCO ───────────────────────────────────────────────
+  if (fase === "especRefresco") {
+    if (esNo) {
+      if (!tieneSalsa) {
+        const listaSalsas = _listaNombresSalsas();
+        esperandoExtras.set(clienteNumero, { ...ctx, fase: "especSalsa" });
+        if (ctx._cantidadSalPendiente) {
+          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+          await msg.reply(`Quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+        } else {
+          await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+        }
+      } else {
+        esperandoExtras.delete(clienteNumero);
+        await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+      }
+      return true;
+    }
+    const refresco = detectarRefresco(textoOriginal);
+    if (refresco) {
+      // Si el cliente vino de "N refrescos" genérico y no especificó cantidad, usar la guardada
+      const cantFinal = (ctx._cantidadRefPendiente && refresco.cantidad === 1)
+        ? ctx._cantidadRefPendiente : refresco.cantidad;
+      const refFinal = cantFinal !== refresco.cantidad ? { ...refresco, cantidad: cantFinal } : refresco;
+      const lineaRef = _formatearRefresco(refFinal);
+      esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refFinal, _cantidadRefPendiente: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(lineaRef + "\n\n*¿Agrego esto a tu pedido?*");
+      return true;
+    }
+    const listaRef = _listaNombresRefrescos();
+    await msg.reply(`No entendí. ¿Cuántos refrescos y de cuáles? 🥤\n\n*${listaRef}*`);
+    return true;
+  }
+
+  // ── FASE: CONFIRMACIÓN DE SALSA ──────────────────────────────────────────────
+  if (fase === "confirmSalsa") {
+    const pendSalsa = ctx.pendienteSalsas;
+    if (esSi) {
+      const lineaSalsa = `🌶️ Salsas: ${pendSalsa.join(", ")}`;
+      const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
+      if (!tieneRefresco) {
+        const listaRef = _listaNombresRefrescos();
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneSalsa: true, fase: "especRefresco", pendienteSalsas: null });
+        persistirEstado(clienteNumero);
+        await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
+      } else {
+        esperandoExtras.delete(clienteNumero);
+        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
+      }
+      return true;
+    }
+    if (esNo) {
+      const listaSalsas = _listaNombresSalsas();
+      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especSalsa", pendienteSalsas: null });
+      await msg.reply(`¿Cuáles salsas deseas? 🌶️\n\n*${listaSalsas}*`);
+      return true;
+    }
+    const lineaSalsa2 = `🌶️ Salsas: ${pendSalsa.join(", ")}`;
+    await msg.reply(lineaSalsa2 + "\n\n*¿Agrego esto a tu pedido?*");
+    return true;
+  }
+
+  // ── FASE: ESPECIFICAR SALSA ──────────────────────────────────────────────────
+  if (fase === "especSalsa") {
+    if (esNo) {
+      if (!tieneRefresco) {
+        const listaRef = _listaNombresRefrescos();
+        esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco" });
+        await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
+      } else {
+        esperandoExtras.delete(clienteNumero);
+        await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+      }
+      return true;
+    }
+    const salsas = detectarSalsa(textoOriginal);
+    if (salsas && salsas.length > 0) {
+      const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
+      esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });
+      persistirEstado(clienteNumero);
+      await msg.reply(lineaSalsa + "\n\n*¿Agrego esto a tu pedido?*");
+      return true;
+    }
+    const listaSalsas = _listaNombresSalsas();
+    await msg.reply(`No entendí. ¿Cuáles salsas deseas? 🌶️\n\n*${listaSalsas}*`);
+    return true;
+  }
+
+  // ── FASE: PREGUNTA INICIAL ─────────────────────────────────────────────────
+  // (fase === "pregunta" u otra no reconocida)
+
+  // Subtotal acumulado
+  if (/cu[aá]nto\s+(?:llevo|tengo|es(?:\s+todo)?(?:\s+lo\s+que\s+llevo)?|llega|va)|(?:total|subtotal)\s+(?:hasta\s+ahorita|por\s+ahora|de\s+lo\s+que\s+llevo)/i.test(textoOriginal)) {
+    const sub = calcularSubtotal(ordenTexto);
+    const lista = formatearListaAcumulada(ordenTexto);
+    await msg.reply(`${lista}\n\n💰 *Total acumulado: $${sub}*`);
+    await new Promise(r => setTimeout(r, 300));
+    await msg.reply("¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤");
+    return true;
+  }
+
+  // FAQ
+  const faqExt = detectarPreguntaFrecuente(textoOriginal);
+  if (faqExt && ["precio", "menu", "descripcion_corte", "domicilio"].includes(faqExt.tipo)) {
+    const respFaq = generarRespuestaAutomatica(faqExt, { esDomicilio: esOrdenDom });
+    if (respFaq) {
+      await msg.reply(respFaq);
+      await msg.reply("¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤\n\n_(O escribe *no* si ya es todo)_");
+      return true;
     }
   }
 
-  const edAgMas = !esAgregarNo && !esAgregarSi ? detectarEdicion(textoOriginal) : null;
-  if (edAgMas) {
-    const ordAgMas = esperandoAgregarMas.get(clienteNumero);
-    if (edAgMas.preguntar) {
+  // Edición de datos del formulario
+  const edExt = detectarEdicion(textoOriginal);
+  if (edExt) {
+    if (edExt.preguntar) {
       const { esperandoEdicion } = require("../../estado");
-      esperandoEdicion.set(clienteNumero, { campo: edAgMas.campo, contexto: "agregarMas", ordenTexto: ordAgMas });
-      await msg.reply(edAgMas.pregunta);
+      esperandoEdicion.set(clienteNumero, { campo: edExt.campo, contexto: "extras", extrasCtx: ctx });
+      await msg.reply(edExt.pregunta);
       return true;
     }
-    aplicarEdicion(clienteNumero, edAgMas);
-    const formAgMas = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
-    await msg.reply("Perfecto! Datos actualizados:\n\n" + formAgMas + "\n\n*¿Qué deseas ordenar?*");
+    aplicarEdicion(clienteNumero, edExt);
+    const formAct = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+    await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤");
     return true;
   }
 
-  if (esAgregarNo) {
-    _resetError(clienteNumero);
-    const ordenRaw = esperandoAgregarMas.get(clienteNumero);
-    const ordenCompleta = ordenRaw.split("\n").filter(l => {
-      const t = l.trim();
-      if (!t) return false;
-      if (/^📍|^📌|^🛵|^💵|^💰|^💳|^🕖/u.test(t)) return false;
-      if (/direcci[oó]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
-      return true;
-    }).join("\n");
-    esperandoAgregarMas.delete(clienteNumero);
-    const resumenGenerado = generarResumen(clienteNumero, ordenCompleta, esOrdenDom, esPreventa);
-    resumenPendiente.set(clienteNumero, { texto: resumenGenerado.texto, esTransferencia: resumenGenerado.esTransferencia });
+  // "no" → generar resumen
+  if (esNo) {
+    esperandoExtras.delete(clienteNumero);
+    persistirEstado(clienteNumero);
+    await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+    return true;
+  }
+
+  // Refresco detectado directamente
+  const refresco = detectarRefresco(textoOriginal);
+  if (refresco) {
+    const lineaRef = _formatearRefresco(refresco);
+    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refresco });
+    persistirEstado(clienteNumero);
+    await msg.reply(lineaRef + "\n\n*¿Agrego esto a tu pedido?*");
+    return true;
+  }
+
+  // Salsa detectada directamente
+  const salsas = detectarSalsa(textoOriginal);
+  if (salsas && salsas.length > 0) {
+    const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
+    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });
+    persistirEstado(clienteNumero);
+    await msg.reply(lineaSalsa + "\n\n*¿Agrego esto a tu pedido?*");
+    return true;
+  }
+
+  // "sí" genérico → preguntar qué quiere
+  if (esSi) {
+    const listaRef  = _listaNombresRefrescos();
+    const listaSal  = _listaNombresSalsas();
+    await msg.reply(
+      "¡Claro! ¿Qué deseas agregar?\n\n" +
+      `🥤 *Refrescos:* ${listaRef}\n` +
+      `🌶️ *Salsas:* ${listaSal}\n\n` +
+      "_O escríbeme directamente qué quieres_"
+    );
+    return true;
+  }
+
+  // Pedido completo detectado (más tacos/tortas)
+  const jsonNuevo = parsearPedidoSimple(textoOriginal);
+  if (jsonNuevo && jsonNuevo.tipo === "pedido") {
+    pedidoJSONActual.set(clienteNumero, jsonNuevo);
+    persistirEstado(clienteNumero);
+    const resultado = jsonALineas(jsonNuevo);
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
     historial.push({ role: "user",      content: textoOriginal });
-    historial.push({ role: "assistant", content: resumenGenerado.texto });
-    await msg.reply(resumenGenerado.texto);
+    historial.push({ role: "assistant", content: resultado.texto });
+    await msg.reply(resultado.texto + "\n\n*¿Agrego esto a tu pedido?*");
     return true;
   }
 
-  if (esAgregarSi) {
-    _resetError(clienteNumero);
-    const ordenActual = esperandoAgregarMas.get(clienteNumero) || "";
-    const listaActual = formatearListaAcumulada(ordenActual);
-    await msg.reply(listaActual);
-    await new Promise(r => setTimeout(r, 400));
-    await msg.reply(MENU_FORMATO);
-    await new Promise(r => setTimeout(r, 400));
-    await msg.reply("*¿Qué más te gustaría agregar de nuestro menú?*");
+  // Sin corte: preguntar corte
+  if (detectarSinCorte(textoOriginal)) {
+    const pedidoParcial = parsearSinCorteItems(textoOriginal);
+    if (pedidoParcial) {
+      pedidoParcial._indiceActual = 0;
+      esperandoCorte.set(clienteNumero, pedidoParcial);
+      const primerItem = pedidoParcial.items[0];
+      const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
+                 : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
+                 : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
+                 : `los $${primerItem.monto}`;
+      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+      return true;
+    }
+  }
+
+  // Sin tipo: preguntar taco o torta
+  const itemSinTipo = detectarSinTipo(textoOriginal);
+  if (itemSinTipo) {
+    esperandoTipoItem.set(clienteNumero, { ...itemSinTipo, ordenBase: ordenTexto, _fromExtras: ctx });
+    await msg.reply(`*¿Los ${itemSinTipo.cantidad} de ${itemSinTipo.corte} serían tacos o tortas?*`);
     return true;
   }
 
-  const erroresAgMas = _sumarError(clienteNumero);
-  const extraAgMas = erroresAgMas >= 2 ? "\n\n_Puedes responder: *sí* para agregar algo, o *no* / *ya es todo* para terminar_" : "";
-  await msg.reply("*¿Deseas agregar algo más a tu pedido?*" + extraAgMas);
+  // No entendido → repetir pregunta con opciones
+  const listaRefR  = _listaNombresRefrescos();
+  const listaSalR  = _listaNombresSalsas();
+  await msg.reply(
+    "No entendí. ¿Quieres agregar algo? 😊\n\n" +
+    `🥤 *Refrescos:* ${listaRefR}\n` +
+    `🌶️ *Salsas:* ${listaSalR}\n\n` +
+    "_O escribe *no* si ya terminaste tu pedido_"
+  );
   return true;
 }
 
@@ -356,7 +708,7 @@ async function handleRepetirPedido(msg, textoOriginal, clienteNumero, historial)
   if (!ultimoJSON) {
     await msg.reply("No tengo registrado un pedido anterior tuyo. *¿Qué deseas ordenar?* 😊");
     await new Promise(r => setTimeout(r, 300));
-    await msg.reply(MENU_FORMATO);
+    await msg.reply(MENU_FORMATO());
     return true;
   }
   pedidoJSONActual.set(clienteNumero, ultimoJSON);
@@ -372,13 +724,14 @@ async function handleRepetirPedido(msg, textoOriginal, clienteNumero, historial)
 
 // ── PARSER LOCAL (pedido completo con corte) ──────────────────────────────────
 async function handlePedidoSimple(msg, textoOriginal, clienteNumero, historial) {
-  const jsonSimple = parsearPedidoSimple(textoOriginal);
+  const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
+  const jsonSimple = parsearPedidoSimple(textoLimpio);
   if (!jsonSimple || jsonSimple.tipo !== "pedido") return false;
 
   pedidoJSONActual.set(clienteNumero, jsonSimple);
   persistirEstado(clienteNumero);
   const resultado = jsonALineas(jsonSimple);
-  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
+  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: refrescosPendientes, _salsasPendientes: salsasPendientes });
   historial.push({ role: "user",      content: textoOriginal });
   historial.push({ role: "assistant", content: resultado.texto });
   await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
@@ -390,20 +743,88 @@ async function handlePedidoSimple(msg, textoOriginal, clienteNumero, historial) 
 async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial, esOrdenDom) {
   if (!esperandoCorte.has(clienteNumero)) return false;
 
-  // Pedido completo enviado en lugar de solo el corte (solo si todos los ítems son tacos/tortas)
+  // Pedido completo enviado en lugar de solo el corte
   const jsonGreedy = parsearPedidoSimple(textoOriginal);
   if (jsonGreedy && jsonGreedy.tipo === "pedido" && Array.isArray(jsonGreedy.items) && jsonGreedy.items.length > 0
       && jsonGreedy.items.every(i => i.presentacion === "taco" || i.presentacion === "torta")) {
+    const _corteGreedy = esperandoCorte.get(clienteNumero);
+    const refrescosPendientesGreedy = _corteGreedy?._refrescosPendientes || [];
+    const salsasPendientesGreedy      = _corteGreedy?._salsasPendientes      || [];
     esperandoCorte.delete(clienteNumero);
     pedidoJSONActual.set(clienteNumero, jsonGreedy);
     persistirEstado(clienteNumero);
     const resGreedy = jsonALineas(jsonGreedy);
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: resGreedy.texto });
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: resGreedy.texto, _refrescosPendientes: refrescosPendientesGreedy, _salsasPendientes: salsasPendientesGreedy });
     historial.push({ role: "user",      content: textoOriginal });
     historial.push({ role: "assistant", content: resGreedy.texto });
     await msg.reply(resGreedy.texto + "\n\n*¿Es correcto?*");
     console.log(`Bot: [GREEDY CORTE→PEDIDO] sin llamar a Groq`);
     return true;
+  }
+
+  // Distribución de cortes: "1 de carne, 2 de surtido, 1 de lengua"
+  {
+    const pedParcDist = esperandoCorte.get(clienteNumero);
+    const idxDist = pedParcDist._indiceActual || 0;
+    const itemDist = pedParcDist.items[idxDist];
+    if (itemDist && (itemDist.presentacion === "taco" || itemDist.presentacion === "torta")) {
+      const distribucion = parsearDistribucionCortes(textoOriginal);
+      if (distribucion) {
+        const totalDist = distribucion.reduce((s, d) => s + d.cantidad, 0);
+        if (totalDist === itemDist.cantidad) {
+          _resetError(clienteNumero);
+          const nuevosItems = distribucion.map(d => ({ ...itemDist, cantidad: d.cantidad, corte: d.corte }));
+          pedParcDist.items.splice(idxDist, 1, ...nuevosItems);
+          const siguienteIdx = pedParcDist.items.findIndex((item, i) => i >= idxDist + nuevosItems.length && !item.corte);
+          if (siguienteIdx !== -1) {
+            pedParcDist._indiceActual = siguienteIdx;
+            esperandoCorte.set(clienteNumero, pedParcDist);
+            const sigItem = pedParcDist.items[siguienteIdx];
+            const desc = sigItem.presentacion === "taco"   ? `los ${sigItem.cantidad} tacos`
+                       : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
+                       : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
+                       : `los $${sigItem.monto}`;
+            await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: Surtido, Carne, Buche, Cuero o Lengua`);
+            return true;
+          }
+          esperandoCorte.delete(clienteNumero);
+          if (pedParcDist._baseConfirmacion !== undefined) {
+            const jsonCorteConf = { tipo: "pedido", items: pedParcDist.items };
+            const { texto: lineasCorteConf } = jsonALineas(jsonCorteConf);
+            const baseConf   = pedParcDist._baseConfirmacion.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+            const nuevasConf = lineasCorteConf.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+            const combConf   = baseConf + "\n" + nuevasConf;
+            const subtConf   = calcularSubtotal(combConf);
+            const textoBC    = combConf + "\n💰 Subtotal: $" + subtConf;
+            esperandoConfirmacionItem.set(clienteNumero, { lineas: textoBC, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+            historial.push({ role: "user", content: textoOriginal });
+            historial.push({ role: "assistant", content: textoBC });
+            await msg.reply(textoBC + "\n\n*¿Es correcto?*");
+            return true;
+          }
+          if (pedParcDist._esModificacionResumen === true && pedParcDist._ordenBase) {
+            const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
+            const { texto: lineasNuevas } = jsonALineas(jsonCompletoCorte);
+            pedidoJSONActual.set(clienteNumero, { _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte });
+            esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedParcDist._ordenBase, jsonNuevo: jsonCompletoCorte, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+            historial.push({ role: "user", content: textoOriginal });
+            historial.push({ role: "assistant", content: lineasNuevas });
+            await msg.reply(lineasNuevas + "\n\n*¿Agrego esto a tu pedido?*");
+            return true;
+          }
+          const jsonCompletoCorte = { tipo: "pedido", items: pedParcDist.items };
+          pedidoJSONActual.set(clienteNumero, jsonCompletoCorte);
+          persistirEstado(clienteNumero);
+          const resultado = jsonALineas(jsonCompletoCorte);
+          esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pedParcDist._refrescosPendientes || [], _salsasPendientes: pedParcDist._salsasPendientes || [] });
+          historial.push({ role: "user", content: textoOriginal });
+          historial.push({ role: "assistant", content: resultado.texto });
+          await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
+          console.log(`Bot: [DISTRIBUCIÓN CORTES] Subtotal: $${resultado.subtotal}`);
+          return true;
+        }
+      }
+    }
   }
 
   // FAQ durante espera de corte
@@ -472,7 +893,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const combConf   = baseConf + "\n" + nuevasConf;
     const subtConf   = calcularSubtotal(combConf);
     const textoBC    = combConf + "\n💰 Subtotal: $" + subtConf;
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: textoBC });
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: textoBC, _refrescosPendientes: pedidoParcial._refrescosPendientes || [], _salsasPendientes: pedidoParcial._salsasPendientes || [] });
     historial.push({ role: "user",      content: textoOriginal });
     historial.push({ role: "assistant", content: textoBC });
     await msg.reply(textoBC + "\n\n*¿Es correcto?*");
@@ -483,7 +904,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const jsonCompletoCorte = { tipo: "pedido", items: pedidoParcial.items };
     const { texto: lineasNuevas } = jsonALineas(jsonCompletoCorte);
     pedidoJSONActual.set(clienteNumero, { _esModificacionResumen: true, ordenBase: pedidoParcial._ordenBase, jsonNuevo: jsonCompletoCorte });
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedidoParcial._ordenBase, jsonNuevo: jsonCompletoCorte });
+    esperandoConfirmacionItem.set(clienteNumero, { lineas: lineasNuevas, _esModificacionResumen: true, ordenBase: pedidoParcial._ordenBase, jsonNuevo: jsonCompletoCorte, _refrescosPendientes: pedidoParcial._refrescosPendientes || [], _salsasPendientes: pedidoParcial._salsasPendientes || [] });
     historial.push({ role: "user",      content: textoOriginal });
     historial.push({ role: "assistant", content: lineasNuevas });
     await msg.reply(lineasNuevas + "\n\n*¿Agrego esto a tu pedido?*");
@@ -494,7 +915,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   pedidoJSONActual.set(clienteNumero, jsonCompletoCorte);
   persistirEstado(clienteNumero);
   const resultado = jsonALineas(jsonCompletoCorte);
-  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
+  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pedidoParcial._refrescosPendientes || [], _salsasPendientes: pedidoParcial._salsasPendientes || [] });
   historial.push({ role: "user",      content: textoOriginal });
   historial.push({ role: "assistant", content: resultado.texto });
   await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
@@ -504,11 +925,14 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
 
 // ── DETECCIÓN SIN CORTE ───────────────────────────────────────────────────────
 async function handleSinCorte(msg, textoOriginal, clienteNumero) {
-  if (!detectarSinCorte(textoOriginal)) return false;
+  const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
+  if (!detectarSinCorte(textoLimpio)) return false;
 
-  const pedidoParcial = parsearSinCorteItems(textoOriginal);
+  const pedidoParcial = parsearSinCorteItems(textoLimpio);
   if (pedidoParcial) {
     pedidoParcial._indiceActual = 0;
+    pedidoParcial._refrescosPendientes = refrescosPendientes;
+    pedidoParcial._salsasPendientes      = salsasPendientes;
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const primerItem = pedidoParcial.items[0];
     const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
@@ -524,17 +948,21 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
 
 // ── DETECCIÓN SIN TIPO (taco/torta) ──────────────────────────────────────────
 async function handleSinTipo(msg, textoOriginal, clienteNumero) {
-  const itemSinTipo = detectarSinTipo(textoOriginal);
+  const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
+  const itemSinTipo = detectarSinTipo(textoLimpio);
   if (!itemSinTipo) return false;
 
-  const ordenBase = esperandoAgregarMas.get(clienteNumero) || null;
-  if (ordenBase) esperandoAgregarMas.delete(clienteNumero);
-  esperandoTipoItem.set(clienteNumero, { ...itemSinTipo, ordenBase });
+  // Check both extras and legacy agregar mas contexts
+  const extrasCtx = esperandoExtras.has(clienteNumero) ? esperandoExtras.get(clienteNumero) : null;
+  const ordenBase = extrasCtx ? extrasCtx.ordenTexto : (esperandoAgregarMas.get(clienteNumero) || null);
+  if (!extrasCtx && ordenBase) esperandoAgregarMas.delete(clienteNumero);
+
+  esperandoTipoItem.set(clienteNumero, { ...itemSinTipo, ordenBase, _fromExtras: extrasCtx || false, _refrescosPendientes: refrescosPendientes, _salsasPendientes: salsasPendientes });
   await msg.reply(`*¿Los ${itemSinTipo.cantidad} de ${itemSinTipo.corte} serían tacos o tortas?*`);
   return true;
 }
 
-// ── MODIFICACIÓN SOBRE ÍTEM ACTUAL (esperandoAgregarMas) ─────────────────────
+// ── MODIFICACIÓN SOBRE ORDEN ACUMULADA (flujo legacy esperandoAgregarMas) ────
 async function handleModificacionAgregarMas(msg, textoOriginal, clienteNumero) {
   if (!esperandoAgregarMas.has(clienteNumero)) return false;
 
@@ -550,6 +978,98 @@ async function handleModificacionAgregarMas(msg, textoOriginal, clienteNumero) {
   const lineas   = ordenModificada.split("\n").filter(l => l.trim());
   await msg.reply(lineas.join("\n") + `\n💰 Subtotal: $${subtotal}\n\n*¿Es correcto?*`);
   console.log(`Bot: [MODIFICACIÓN LOCAL] tipo: ${modificacion.tipo}`);
+  return true;
+}
+
+// ── ESPERANDO SI AGREGA MÁS (flujo legacy para fallback desde resumen) ────────
+async function handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa) {
+  if (!esperandoAgregarMas.has(clienteNumero)) return false;
+
+  const esAgregarNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
+  const esAgregarSi = /^(si|sí|ok|va|dale|claro|sale|andale|quiero|agrega|más|mas)$/i.test(textoOriginal.trim());
+
+  // "¿Cuánto llevo?"
+  if (/cu[aá]nto\s+(?:llevo|tengo|es(?:\s+todo)?(?:\s+lo\s+que\s+llevo)?(?:\s+hasta\s+ahorita)?)|(?:total|subtotal)\s+(?:hasta\s+ahorita|por\s+ahora|de\s+lo\s+que\s+llevo)|cu[aá]nto\s+(?:llega|asciende|va)\s+mi\s+pedido/i.test(textoOriginal)) {
+    const ordSub = esperandoAgregarMas.get(clienteNumero) || "";
+    if (ordSub) {
+      const subAct   = calcularSubtotal(ordSub);
+      const listaAct = formatearListaAcumulada(ordSub);
+      await msg.reply(`${listaAct}\n\n💰 *Total acumulado: $${subAct}*`);
+      await new Promise(r => setTimeout(r, 300));
+      await msg.reply("*¿Deseas agregar algo más?*");
+      return true;
+    }
+  }
+
+  if (!esAgregarNo && !esAgregarSi) {
+    const faqAgMas = detectarPreguntaFrecuente(textoOriginal);
+    if (faqAgMas && ["precio", "menu", "descripcion_corte", "domicilio"].includes(faqAgMas.tipo)) {
+      const esOrdenDomAgMas = tipoEntregaCliente.get(clienteNumero) === "domicilio";
+      const respFaq = generarRespuestaAutomatica(faqAgMas, { esDomicilio: esOrdenDomAgMas });
+      if (respFaq) {
+        await msg.reply(respFaq);
+        await msg.reply("*¿Deseas agregar algo más a tu pedido?*");
+        return true;
+      }
+    }
+  }
+
+  const edAgMas = !esAgregarNo && !esAgregarSi ? detectarEdicion(textoOriginal) : null;
+  if (edAgMas) {
+    const ordAgMas = esperandoAgregarMas.get(clienteNumero);
+    if (edAgMas.preguntar) {
+      const { esperandoEdicion } = require("../../estado");
+      esperandoEdicion.set(clienteNumero, { campo: edAgMas.campo, contexto: "agregarMas", ordenTexto: ordAgMas });
+      await msg.reply(edAgMas.pregunta);
+      return true;
+    }
+    aplicarEdicion(clienteNumero, edAgMas);
+    const formAgMas = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
+    await msg.reply("Perfecto! Datos actualizados:\n\n" + formAgMas + "\n\n*¿Qué deseas ordenar?*");
+    return true;
+  }
+
+  if (esAgregarNo) {
+    _resetError(clienteNumero);
+    const ordenRaw = esperandoAgregarMas.get(clienteNumero);
+    const ordenCompleta = ordenRaw.split("\n").filter(l => {
+      const t = l.trim();
+      if (!t) return false;
+      if (/^📍|^📌|^🛵|^💵|^💰|^💳|^🕖/u.test(t)) return false;
+      if (/direcci[oó]n|referencia|subtotal|tarifa|domicilio:\s*\$|total:/i.test(t)) return false;
+      return true;
+    }).join("\n");
+    esperandoAgregarMas.delete(clienteNumero);
+    // Pasar a extras
+    esperandoExtras.set(clienteNumero, {
+      ordenTexto:    ordenCompleta,
+      esOrdenDom:    tipoEntregaCliente.get(clienteNumero) === "domicilio",
+      esPreventa:    clientesPreventa.has(clienteNumero),
+      tieneRefresco: false,
+      tieneSalsa:    false,
+      fase:          "pregunta",
+    });
+    persistirEstado(clienteNumero);
+    historial.push({ role: "user", content: textoOriginal });
+    await msg.reply("¿Deseas agregar algún *Refresco* o *Salsa* extra? 🌶️🥤\n\n_(O escribe *no* si ya es todo)_");
+    return true;
+  }
+
+  if (esAgregarSi) {
+    _resetError(clienteNumero);
+    const ordenActual = esperandoAgregarMas.get(clienteNumero) || "";
+    const listaActual = formatearListaAcumulada(ordenActual);
+    await msg.reply(listaActual);
+    await new Promise(r => setTimeout(r, 400));
+    await msg.reply(MENU_FORMATO());
+    await new Promise(r => setTimeout(r, 400));
+    await msg.reply("*¿Qué más te gustaría agregar de nuestro menú?*");
+    return true;
+  }
+
+  const erroresAgMas = _sumarError(clienteNumero);
+  const extraAgMas = erroresAgMas >= 2 ? "\n\n_Puedes responder: *sí* para agregar algo, o *no* / *ya es todo* para terminar_" : "";
+  await msg.reply("*¿Deseas agregar algo más a tu pedido?*" + extraAgMas);
   return true;
 }
 
@@ -613,16 +1133,16 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, 
     }
     if (jsonData && jsonData.tipo === "info" && jsonData.mensaje) {
       await replyConTyping(msg, jsonData.mensaje);
-      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO);
+      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO());
       return;
     }
     if (respuestaTexto) {
       await replyConTyping(msg, respuestaTexto);
       console.log(`Bot: ${respuestaTexto.substring(0, 80)}...`);
-      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO);
+      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO());
     } else {
       await msg.reply("Disculpa, no entendi. Me repites tu pedido?");
-      if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO);
+      if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO());
     }
   } catch (error) {
     if (error.message === "GROQ_TIMEOUT") {
@@ -651,7 +1171,7 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, 
         await replyConTyping(msg, textoRetry);
       } else {
         await msg.reply("Disculpa, no entendi. Me repites tu pedido?");
-        if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO);
+        if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO());
       }
     } catch (retryErr) {
       const esTimeout = retryErr.message === "GROQ_TIMEOUT";
@@ -665,6 +1185,7 @@ module.exports = {
   handleEsperandoTipoItem,
   handleCambioTipoDuranteTomaPedido,
   handleConfirmacionItem,
+  handleExtras,
   handleAgregarMas,
   handleFAQDurantePedido,
   handleRepetirPedido,

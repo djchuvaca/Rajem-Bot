@@ -25,13 +25,23 @@ function _datosBancoDefault() {
 // ── MENÚ FORMATO ──────────────────────────────────────────────────────────────
 function getMenuFormato() {
   try {
-    const productos = getProductos();
-    const nombres   = productos.length > 0
-      ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
+    const productos   = getProductos();
+    const cortes      = productos.filter(p => p.categoria !== "refresco");
+    const refrescos   = productos.filter(p => p.categoria === "refresco");
+    const nombres     = cortes.length > 0
+      ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
-    const p = productos[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
-    const domCosto  = getConfig("domicilio_costo") || "50";
-    const negocio   = getConfig("nombre_negocio")  || "Tacos Javier";
+    const p          = cortes[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
+    const domCosto   = getConfig("domicilio_costo") || "50";
+    const negocio    = getConfig("nombre_negocio")  || "Tacos Javier";
+
+    let refrescosSeccion = "";
+    if (refrescos.length > 0) {
+      const refNombres = refrescos.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ");
+      refrescosSeccion =
+        `🥤 *REFRESCOS* — $${refrescos[0].precio_taco} c/u\n` +
+        `${refNombres}\n\n`;
+    }
 
     return (
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
@@ -47,6 +57,7 @@ function getMenuFormato() {
       `Tú decides cuánto gastar, nosotros pesamos\n` +
       `_Incluye tortillas y salsas_\n\n` +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
+      refrescosSeccion +
       `━━━━━━━━━━━━━━━━━━\n` +
       `🟢 Todos los tacos y tortas incluyen salsas\n` +
       `🛵 Domicilio: $${domCosto} extra\n\n` +
@@ -133,11 +144,11 @@ function getSaludo() {
 }
 
 module.exports = {
-  get DATOS_BANCO()              { return getDatosBanco(); },
-  get MENU_FORMATO()             { return getMenuFormato(); },
+  DATOS_BANCO:             getDatosBanco,
+  MENU_FORMATO:            getMenuFormato,
   FORM_MOSTRADOR:          (tel) => getFormMostrador(tel),
   FORM_DOMICILIO:          (tel) => getFormDomicilio(tel),
   FORM_PREVENTA_MOSTRADOR: (tel) => getFormPreventaMostrador(tel),
   FORM_PREVENTA_DOMICILIO: (tel) => getFormPreventaDomicilio(tel),
-  get SALUDO()                   { return getSaludo(); },
+  SALUDO:                  getSaludo,
 };

@@ -1,15 +1,14 @@
 // src/handlers/mensajes.js — Router delgado (~120 líneas)
 const {
   clientesPreventa, esperandoCaptura, clientesNuevos, getHistorial,
-  tipoEntregaCliente, datosCampos,
+  tipoEntregaCliente, datosCampos, datosRecibidos,
 } = require("../estado");
 const { detectarPreguntaFrecuente } = require("./pedidoParser");
 const { generarRespuestaAutomatica } = require("./respuestas");
 const { estaEnHorario, mensajeFueraDeHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");
-const { mostrarFormularioProgresivo, siguienteCampoFaltante } = require("../estado");
 
-const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping } = require("./flujos/utils");
+const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping, ordenPendientePreventa } = require("./flujos/utils");
 const botPausado = require("../estado/bot-pausado");
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido } = require("./flujos/cancelacion");
@@ -21,7 +20,8 @@ const {
 } = require("./flujos/resumen");
 const {
   handleEsperandoTipoItem, handleCambioTipoDuranteTomaPedido, handleConfirmacionItem,
-  handleAgregarMas, handleFAQDurantePedido, handleRepetirPedido, handlePedidoSimple,
+  handleExtras, handleAgregarMas,
+  handleFAQDurantePedido, handleRepetirPedido, handlePedidoSimple,
   handleEsperandoCorte, handleSinCorte, handleSinTipo,
   handleModificacionAgregarMas, handlePresupuestoInverso, handleGroqFallback,
 } = require("./flujos/orden");
@@ -120,16 +120,7 @@ async function handleMensaje(msg, client) {
         if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
           await replyConTyping(msg, mensajeFueraDeHorario());
         } else if (estaEnHorario() && !enFlujoActivo(clienteNumero)) {
-          if (histFaq.length > 0 && !require("../estado").datosRecibidos.has(clienteNumero)) {
-            const camposFaqForm = datosCampos.get(clienteNumero) || {};
-            const esDomFaqForm  = camposFaqForm.tipoEntrega === "domicilio";
-            const esPrevFaqForm = clientesPreventa.has(clienteNumero);
-            const formFaqResp   = mostrarFormularioProgresivo(clienteNumero, esDomFaqForm, esPrevFaqForm);
-            const faltFaqResp   = siguienteCampoFaltante(clienteNumero, esDomFaqForm, esPrevFaqForm);
-            await replyConTyping(msg, formFaqResp + (faltFaqResp ? "\n\n" + faltFaqResp.pregunta : "\n\n*¿Son correctos los datos?*"));
-          } else {
-            await replyConTyping(msg, MENU_FORMATO);
-          }
+          await replyConTyping(msg, MENU_FORMATO());
         }
         return;
       }
@@ -147,10 +138,16 @@ async function handleMensaje(msg, client) {
 
   if (await handleEdicionPendiente(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
   if (await handleConfirmacionDatos(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleTipoEntrega(msg, client, textoOriginal, clienteNumero, historial, esPreventa)) return;
+  if (await handleTipoEntrega(msg, client, textoOriginal, clienteNumero, historial, esPreventa)) {
+    if (ordenPendientePreventa.has(clienteNumero)) {
+      textoOriginal = ordenPendientePreventa.get(clienteNumero);
+      ordenPendientePreventa.delete(clienteNumero);
+      // No retornamos — el texto del pedido guardado cae al flujo de órdenes
+    } else {
+      return;
+    }
+  }
   if (await handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)) return;
-  if (await handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa)) return;
-  if (await handleFormularioProgresivo(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
 
   const esOrdenDom = tipoEntregaCliente.get(clienteNumero) === "domicilio"
     || (tipoEntregaCliente.get(clienteNumero) == null && historial.some(h => h.content && h.content.includes("domicilio")));
@@ -166,7 +163,10 @@ async function handleMensaje(msg, client) {
   if (await handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial, esOrdenDom)) return;
   if (await handleCambioTipoDuranteTomaPedido(msg, textoOriginal, clienteNumero, historial)) return;
   if (await handleConfirmacionItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom)) return;
+  if (await handleExtras(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa)) return;
   if (await handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa)) return;
+  if (await handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa)) return;
+  if (await handleFormularioProgresivo(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
   if (await handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrdenDom)) return;
   if (await handleRepetirPedido(msg, textoOriginal, clienteNumero, historial)) return;
   if (await handlePedidoSimple(msg, textoOriginal, clienteNumero, historial)) return;

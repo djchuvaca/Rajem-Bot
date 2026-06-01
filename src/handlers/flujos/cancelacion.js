@@ -1,11 +1,11 @@
 // src/handlers/flujos/cancelacion.js
 const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
-  esperandoTipoItem, limpiarTodo,
+  esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo,
 } = require("../../estado");
 const { actualizarEstadoPedido, getMensaje, getConfig } = require("../../db");
 const { SALUDO } = require("../../config");
-const { replyConTyping, enFlujoActivo } = require("./utils");
+const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
 const RE_CANCELAR = /cancelar|cancela|cancel|cancelo|cancelame|cancelado|ya no quiero|ya no/i;
 const RE_NUEVO    = /\b(empez(?:ar|emos)\s+de\s+nuevo|reinici(?:ar|o)|volver\s+a\s+empezar|otro\s+pedido|nuevo\s+pedido|quiero\s+(?:hacer\s+)?otro\s+pedido|olvida(?:mos)?\s+(?:todo|mi\s+pedido)|borremos?\s+todo)\b/i;
@@ -45,7 +45,7 @@ async function handleCancelacionConfirmada(msg, client, textoOriginal, clienteNu
     pedidosConfirmados.delete(clienteNumero);
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
-    await replyConTyping(msg, SALUDO);
+    await replyConTyping(msg, SALUDO());
   }
   return true;
 }
@@ -68,6 +68,9 @@ async function handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero
   clientesNuevos.delete(clienteNumero);
   limpiarTodo(clienteNumero);
   esperandoTipoItem.delete(clienteNumero);
+  esperandoExtras.delete(clienteNumero);
+  ordenPreResumen.delete(clienteNumero);
+  ordenPendientePreventa.delete(clienteNumero);
   try { actualizarEstadoPedido(datosCancelacion.telefono, "cancelado"); } catch (e) {}
   const msgCancelacion = getMensaje("cancelacion_enviada") || "Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!";
   await msg.reply(msgCancelacion);
@@ -83,12 +86,17 @@ async function handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
     esperandoTipoItem.delete(clienteNumero);
+    esperandoExtras.delete(clienteNumero);
+    ordenPreResumen.delete(clienteNumero);
+    ordenPendientePreventa.delete(clienteNumero);
     await msg.reply("Tu pedido ha sido cancelado. Cuando gustes ordenar, aqui estaremos. Hasta pronto!");
     return true;
   }
   if (quiereEmpezarDeNuevo && enFlujoActivo(clienteNumero)) {
     limpiarTodo(clienteNumero);
     esperandoTipoItem.delete(clienteNumero);
+    esperandoExtras.delete(clienteNumero);
+    ordenPreResumen.delete(clienteNumero);
     await msg.reply("Listo! Empezamos de nuevo. 😊\n\n*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*");
     return true;
   }

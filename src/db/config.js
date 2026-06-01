@@ -100,6 +100,15 @@ function limpiarSesionesAntiguas(horas = 6) {
   } catch (e) { console.error("[SESION] Error limpiando sesiones:", e.message); }
 }
 
+function limpiarTodasLasSesionesDB() {
+  const { getDB } = require("./core");
+  const dbInst = getDB();
+  if (!dbInst) return;
+  try {
+    dbInst.run("DELETE FROM sesiones_activas");
+  } catch (e) { console.error("[SESION] Error limpiando todas las sesiones:", e.message); }
+}
+
 // ─── TELÉFONOS REALES ─────────────────────────────────────────────────────────
 function guardarTelefonoReal(numeroWhatsApp, telefonoReal) {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
@@ -127,7 +136,7 @@ module.exports = {
   getBanco, updateBanco,
   getMensaje, setMensaje, getAllMensajes,
   getUsuarioPanel, updatePasswordPanel,
-  guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas,
+  guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas, limpiarTodasLasSesionesDB,
   guardarTelefonoReal, getTelefonoReal,
   guardarJIDReal, getJIDReal,
 };

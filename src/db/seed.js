@@ -72,11 +72,20 @@ async function seedDB() {
       historial_json TEXT DEFAULT '[]',
       actualizado_en TEXT DEFAULT (datetime('now', 'localtime'))
     );
+    CREATE TABLE IF NOT EXISTS pagos_pendientes (
+      pedido_id  TEXT PRIMARY KEY,
+      jid        TEXT NOT NULL,
+      telefono   TEXT NOT NULL DEFAULT '',
+      nombre     TEXT         DEFAULT '',
+      resumen    TEXT         DEFAULT '',
+      expira_en  TEXT NOT NULL
+    );
   `);
 
   // ── MIGRACIONES (columnas nuevas en tablas existentes) ─────────────────────
   try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN sinonimos TEXT DEFAULT ''"); } catch (_) {}
+  try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
 
   // ── SEED PRODUCTOS ─────────────────────────────────────────────────────────
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
@@ -95,6 +104,7 @@ async function seedDB() {
     console.log("✅ Productos iniciales insertados");
   } else {
     db.run("UPDATE productos SET nombre = 'carne' WHERE nombre = 'carner'");
+    db.run("UPDATE productos SET categoria = 'corte' WHERE categoria IS NULL");
     const descripciones = [
       ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso, delicioso, con ese sabor incomparable de Tacos Javier."],
       ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa, con ese sabor incomparable que solo encuentras en Tacos Javier. Perfecto para unos tacos que rayen en lo light."],
@@ -116,6 +126,41 @@ async function seedDB() {
       db.run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [sins, nombre]);
     }
   }
+
+  // ── SEED REFRESCOS ─────────────────────────────────────────────────────────
+  const refrescosData = [
+    ["coca cola", "Refresco Coca-Cola bien frío 🥤", 20, 20, 0, "coca,coke,cola,coca-cola", "refresco"],
+    ["fanta",     "Refresco Fanta bien frío 🥤",     20, 20, 0, "fanta,naranja",             "refresco"],
+    ["sprite",    "Refresco Sprite bien frío 🥤",    20, 20, 0, "sprite,limon,limón",        "refresco"],
+  ];
+  for (const [nombre, desc, taco, torta, g100, sins, cat] of refrescosData) {
+    const ya = queryOne("SELECT id FROM productos WHERE nombre = ?", [nombre]);
+    if (!ya) {
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        [nombre, desc, taco, torta, g100, sins, cat]);
+    }
+  }
+
+  // ── SEED SALSAS ────────────────────────────────────────────────────────────
+  try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
+  const salsasData = [
+    ["picada",  "Salsa picada de la casa 🌶️",   0, 0, 0, "picante,salsa picada",               "salsa"],
+    ["cebolla", "Cebolla fresca 🧅",             0, 0, 0, "cebollas,cebollita,cebollitas,cebolla rallada", "salsa"],
+    ["suave",   "Salsa suave 🌿",               0, 0, 0, "salsa suave,verde",                   "salsa"],
+    ["roja",    "Salsa roja casera 🔴",          0, 0, 0, "salsa roja",                          "salsa"],
+    ["limones", "Limones frescos 🍋",            0, 0, 0, "limon,limón,limonez,limonazo",        "salsa"],
+  ];
+  for (const [nombre, desc, taco, torta, g100, sins, cat] of salsasData) {
+    const ya = queryOne("SELECT id FROM productos WHERE nombre = ?", [nombre]);
+    if (!ya) {
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        [nombre, desc, taco, torta, g100, sins, cat]);
+    } else {
+      run("UPDATE productos SET categoria = ? WHERE nombre = ?", [cat, nombre]);
+    }
+  }
+  // Rename legacy "cebolla rallada" if it exists
+  run("UPDATE productos SET nombre = 'cebolla', sinonimos = 'cebollas,cebollita,cebollitas,cebolla rallada' WHERE nombre = 'cebolla rallada'");
 
   // ── SEED CONFIGURACIÓN ─────────────────────────────────────────────────────
   const countConf = db.exec("SELECT COUNT(*) as c FROM configuracion")[0]?.values[0][0] || 0;

@@ -5,16 +5,18 @@ const {
   clientesNuevos, esperandoCorte, esperandoConfirmacionItem,
   esperandoAgregarMas, datosRecibidos, resumenPendiente,
   esperandoEdicion, esperandoConfirmacionDatos, esperandoTipoItem,
-  datosCampos, limpiarTodo,
+  esperandoExtras, ordenPreResumen, datosCampos, limpiarTodo,
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
 const { getProductos } = require("../../db");
+const { textoANumero } = require("../pedidoParser");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
 const telefonosReales    = new Map();
 const ultimoPedido       = new Map();
 const ultimaActividad    = new Map();
-const recordatorioEnviado = new Map(); // numero → timestamp del recordatorio
+const recordatorioEnviado    = new Map(); // numero → timestamp del recordatorio
+const ordenPendientePreventa = new Map(); // texto del primer mensaje con pedido fuera de horario
 
 // ── Timeouts de inactividad ────────────────────────────────────────────────────
 const TIMEOUT_RECORDATORIO_MS = 20 * 60 * 1000; // 20 min → recordatorio
@@ -29,7 +31,23 @@ function _textoRecordatorio(numero) {
     const d = esperandoConfirmacionItem.get(numero);
     return `Hola! 👋 Quedamos pendientes aquí:\n\n${d.lineas}\n\n*¿Es correcto?*`;
   }
+  if (esperandoExtras.has(numero)) {
+    const extCtx = esperandoExtras.get(numero);
+    if (extCtx && extCtx.ordenTexto) {
+      const lineas = extCtx.ordenTexto.split("\n").filter(l => l.trim() && !/^💰|subtotal/i.test(l.trim())).join("\n");
+      return `Hola! 👋 ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algún Refresco o Salsa extra?*`;
+    }
+    return "Hola! 👋 ¿Sigues ahí? ¿Deseas agregar algo a tu pedido?";
+  }
+  if (ordenPreResumen.has(numero)) {
+    return "Hola! 👋 Quedamos pendientes de completar tus datos para confirmar tu pedido. *¿Sigues ahí?*";
+  }
   if (esperandoAgregarMas.has(numero)) {
+    const ordAcum = esperandoAgregarMas.get(numero);
+    if (ordAcum) {
+      const lineas = ordAcum.split("\n").filter(l => l.trim() && !/^💰|subtotal/i.test(l.trim())).join("\n");
+      return `Hola! 👋 ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algo más o ya es todo?*`;
+    }
     return "Hola! 👋 ¿Sigues ahí? ¿Deseas agregar algo más a tu pedido o ya es todo?";
   }
   if (esperandoCorte.has(numero)) {
@@ -69,6 +87,8 @@ setInterval(async () => {
         limpiarTodo(numero);
         clientesNuevos.delete(numero);
         esperandoTipoItem.delete(numero);
+        esperandoExtras.delete(numero);
+        ordenPendientePreventa.delete(numero);
         ultimaActividad.delete(numero);
         recordatorioEnviado.delete(numero);
       }
@@ -103,7 +123,8 @@ function enFlujoActivo(clienteNumero) {
   return esperandoCorte.has(clienteNumero)
     || esperandoConfirmacionItem.has(clienteNumero)
     || esperandoAgregarMas.has(clienteNumero)
-    || datosRecibidos.has(clienteNumero)
+    || esperandoExtras.has(clienteNumero)
+    || ordenPreResumen.has(clienteNumero)
     || resumenPendiente.has(clienteNumero)
     || esperandoEdicion.has(clienteNumero)
     || esperandoConfirmacionDatos.has(clienteNumero)
@@ -134,6 +155,7 @@ async function replyConTyping(msg, texto) {
 }
 
 function parsearSinCorteItems(texto) {
+  texto = textoANumero(texto);
   const MEDIDAS_ITEMS = [
     { re: /\bun\s+cuarto\b|\b1\/4\b|\b250\s*g/i,           gramos: 250  },
     { re: /\bmedio\s+kilo\b|\bmedio\b|\b1\/2\b|\b500\s*g/i, gramos: 500  },
@@ -231,6 +253,7 @@ module.exports = {
   ultimoPedido,
   ultimaActividad,
   recordatorioEnviado,
+  ordenPendientePreventa,
   enFlujoActivo,
   replyConTyping,
   parsearSinCorteItems,
