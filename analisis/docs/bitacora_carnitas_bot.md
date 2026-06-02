@@ -1,7 +1,94 @@
 # Bitácora del Proyecto: Bot WhatsApp Tacos Javier
 **Versión actual:** carnitas-bot 1.4  
-**Fecha:** 24 Mayo 2026 (último commit: 1632735)  
+**Fecha:** 1 Junio 2026 (último commit: c26f8b4)  
 **Stack:** Node.js, whatsapp-web.js, Groq (llama-3.3-70b), **better-sqlite3** (SQLite nativo), Express panel admin, Winston, PM2, Sentry, MercadoPago
+
+---
+
+## Sesión 1 Junio 2026 — Fix reconexión + mejoras masivas de NLU
+
+### Fix de reconexión WA (`index.js`)
+
+**Problema:** Al llegar el evento `disconnected` con motivo `LOGOUT`, el handler llamaba `client.initialize()` directamente después del delay de backoff. El proceso de Chromium seguía vivo y bloqueaba los archivos del perfil (`first_party_sets.db`, etc.), causando:
+- `EBUSY: resource busy or locked` al intentar `LocalAuth.logout()`
+- `The browser is already running for ...session-carnitas-bot` al intentar inicializar
+
+**Fix:** En el `setTimeout` del backoff, ahora se llama `await client.destroy()` antes de `client.initialize()`. Si `destroy()` lanza error (EBUSY), se captura como warning y se continúa de todas formas.
+
+**Nota:** Si el bot pide QR después de un `LOGOUT`, es comportamiento esperado — WhatsApp invalidó la sesión en sus servidores. Restaurar la carpeta `.wwebjs_auth` de una versión anterior rara vez funciona porque el servidor ya revocó las credenciales.
+
+---
+
+### Mejoras NLU masivas (`pedidoParser.js`, `respuestas.js`, `orden.js`, `mensajes.js`)
+
+**13 mejoras implementadas, 169 tests pasando (0 fallos):**
+
+#### 1. "y aparte" ya no fuerza Groq
+- Eliminado de `SEÑALES_GROQ`
+- Añadido a `preprocesarCantidades()` como limpieza de conector residual
+- Caso típico: "3 tacos de carne y aparte una coca" → `separarRefresco()` extrae la coca → limpia "y aparte" → parsea "3 tacos de carne" local
+
+#### 2. Multi-intent FAQ
+- Nueva función `detectarTodasPreguntasFrecuentes(texto)` que retorna array de todas las FAQs detectadas, deduplicado
+- `mensajes.js` ahora usa esta función para el bloque global de FAQs
+- "¿a qué hora abren y cuánto cuesta el domicilio?" → responde horario + domicilio en dos mensajes
+
+#### 3. `PATRON_CAMBIAR_CORTE` extendido
+- Nuevas construcciones: "en lugar de X ponme Y", "en vez de X dame Y", "mejor Y que X"
+- Antes solo cubría "cambia X por Y" y "sin X y pon Y"
+
+#### 4. Números compuestos en `textoANumero()`
+- "treinta y dos tacos" → "32 tacos"
+- "veinte y uno de buche" → "21 de buche"
+- Soporta todas las decenas (20–90) con unidades 1–9, procesados antes que los simples
+
+#### 5. `PATRON_AGREGAR_MAS` extendido
+- Nuevas frases: "ponme otros N", "súmame N", "añade N", "también quiero N de X"
+- Mantiene comportamiento original para "agrega N más de X" y "N más"
+
+#### 6. "todos"/"de todo" → surtido en `handleEsperandoCorte`
+- Cuando el bot pregunta "¿de qué corte?" y el cliente responde "de todos"/"de todo"/"cualquiera", mapea a "surtido"
+- Antes caía al error path
+
+#### 7. Precio contextual en FAQ durante pedido
+- `handleFAQDurantePedido`: cuando el cliente pregunta el precio, si tiene un pedido acumulado agrega "_Tu pedido actual: $X_" al final de la respuesta
+
+#### 8. Nuevo intent `pedido_listo`
+- "¿ya están listos mis tacos?" antes matcheaba `PREGUNTAS_HORARIO` y respondía con el horario de apertura
+- Nuevo intent específico, evaluado antes que `horario`
+- Respuesta: "En cuanto esté listo tu pedido te avisamos aquí mismo"
+
+#### 9. Caché de regex de cortes `getCortesRegex()`
+- La regex de cortes se reconstruía en cada llamada a `calcularScore()` y `detectarPreguntaFrecuente()`
+- Ahora se cachea con mismo TTL que `getCortes()` (60s)
+- `invalidarCacheCortes()` también limpia el caché de regex
+
+#### 10. `PREGUNTAS_TOTAL` extendido
+- Nuevas variantes: "¿cuánto va mi cuenta?", "¿cuánto llevo acumulado?", "¿cuánto asciende mi pedido?"
+
+#### 11. `PATRON_LO_MISMO` extendido con referencias temporales
+- Nuevas frases: "el de ayer", "el pedido de ayer/antier", "lo mismo de ayer/antier", "el de la semana pasada", "igual que la última vez"
+
+#### 12. `aplicarQuitarUno` con corte específico
+- `detectarModificacion` ahora extrae el corte del patrón `quitar_uno` cuando el cliente lo especifica
+- "quita un taco de carne" → busca primero la línea con carne; si no la encuentra, reduce el último ítem
+- Cambio de firma: `aplicarQuitarUno(ordenTexto, corteEspecificado = null)`
+
+#### 13. Temperatura adaptativa en retry de Groq
+- Primera llamada: `temperature: 0.2` (determinista)
+- Reintento: `temperature: 0.35` (más variación para obtener respuesta diferente)
+
+---
+
+### Archivos modificados en esta sesión
+
+| Archivo | Cambios |
+|---|---|
+| `index.js` | `client.destroy()` antes de `client.initialize()` en el handler `disconnected` |
+| `src/handlers/pedidoParser.js` | 13 mejoras NLU (ver arriba). Nueva función `detectarTodasPreguntasFrecuentes`. Nueva función `getCortesRegex`. Nueva variable cache `_cortesRegexCache`. `SEÑALES_GROQ` sin "y aparte". Compuestos en `textoANumero`. Patrones extendidos. Nuevo intent `pedido_listo`. |
+| `src/handlers/respuestas.js` | `aplicarQuitarUno(ordenTexto, corte?)` con corte específico. Nuevo case `pedido_listo` en `generarRespuestaAutomatica`. |
+| `src/handlers/flujos/orden.js` | "todos/de todo" → surtido en `handleEsperandoCorte`. Precio contextual en `handleFAQDurantePedido`. Retry con `temperature: 0.35`. |
+| `src/handlers/mensajes.js` | Importa y usa `detectarTodasPreguntasFrecuentes` para el bloque global de FAQs. |
 
 ---
 

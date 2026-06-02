@@ -80,7 +80,7 @@ Las credenciales de sesión se guardan en `.wwebjs_auth/` (directorio local, nom
 
 **Resolución de LIDs:** WhatsApp envía `msg.from` en formato `@lid` (ej: `3310000001:12@lid`) en ciertos dispositivos. Antes de enrutar cualquier mensaje, `index.js` detecta el sufijo `@lid` y llama a `client.getContactLidAndPhone([msg.from])` para obtener el JID real (`@c.us`). El `msg.from` se reemplaza con el JID real, de modo que todos los handlers downstream siempre operan con teléfonos reales.
 
-**Reconnección automática:** Si WhatsApp se desconecta (evento `disconnected`), `index.js` reintenta automáticamente con backoff exponencial: 5s → 10s → 20s → ... → máximo 5 minutos. Máximo 8 reintentos. El contador `_reintentos` se resetea en cada evento `ready`.
+**Reconnección automática:** Si WhatsApp se desconecta (evento `disconnected`), `index.js` reintenta automáticamente con backoff exponencial: 5s → 10s → 20s → ... → máximo 5 minutos. Máximo 8 reintentos. El contador `_reintentos` se resetea en cada evento `ready`. Antes de cada reintento se llama `await client.destroy()` para matar el proceso de Chromium anterior y liberar los archivos del perfil; si `destroy()` falla se loguea como warning y se continúa igual.
 
 ### Capa 2 — Router principal (mensajes.js)
 

@@ -123,7 +123,12 @@ client.on("disconnected", (reason) => {
   _reintentos++;
   logger.info(`Reintentando conexión en ${Math.round(delay / 1000)}s (intento ${_reintentos}/${_MAX_REINTENTOS})...`);
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    try {
+      await client.destroy();
+    } catch (err) {
+      logger.warn(`Error al destruir cliente antes de reconectar (ignorado): ${err.message}`);
+    }
     client.initialize().catch(err => logger.error(`Error al reinicializar: ${err.message}`));
   }, delay);
 });

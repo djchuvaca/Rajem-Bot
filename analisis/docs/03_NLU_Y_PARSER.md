@@ -48,12 +48,14 @@ Funciones exportadas:
 - `parsearPedidoSimple(texto)` — parser principal
 - `detectarSinCorte(texto)` — detecta pedido sin corte especificado
 - `detectarSinTipo(texto)` — detecta pedido sin taco/torta especificado
-- `detectarPreguntaFrecuente(texto)` — detecta FAQs
+- `detectarPreguntaFrecuente(texto)` — detecta la primera FAQ que coincide (retorna `{tipo, producto?}`)
+- `detectarTodasPreguntasFrecuentes(texto)` — detecta **todas** las FAQs del mensaje (multi-intent); retorna array deduplicado
 - `detectarModificacion(texto)` — detecta modificar/quitar/cambiar ítem
 - `detectarRepetirPedido(texto)` — detecta "lo mismo de siempre"
 - `calcularScore(texto)` — retorna el score numérico del mensaje
-- `getCortes()` — retorna el mapa de cortes desde BD (con caché)
-- `invalidarCacheCortes()` — fuerza recarga de cortes desde BD
+- `getCortes()` — retorna el mapa de cortes desde BD (con caché TTL 60s)
+- `getCortesRegex()` — retorna la regex de cortes compilada (caché TTL 60s, misma ventana que `getCortes`)
+- `invalidarCacheCortes()` — fuerza recarga de cortes, regex cache y sinónimos
 - `normalizar(texto)` — quita tildes, pasa a minúsculas
 
 ---
@@ -68,11 +70,14 @@ Elimina palabras coloquiales que anteceden a un número y que confunden el parse
 
 | Expresión eliminada | Ejemplo entrada | Resultado |
 |---|---|---|
+| "y aparte" | "3 tacos de carne y aparte" | "3 tacos de carne" |
 | "unos X" | "unos 3 tacos" | "3 tacos" |
 | "como X" | "como 4 de buche" | "4 de buche" |
 | "nada más X" | "nada más 2 tacos" | "2 tacos" |
 | "solo X" | "solo 1 surtido" | "1 surtido" |
 | "tan solo X" | "tan solo 2" | "2" |
+
+**Nota sobre "y aparte":** Esta frase antes forzaba Groq. Ahora se limpia como conector residual después de que `separarRefresco()` extrae la bebida. Ejemplo: "3 tacos de carne y aparte una coca" → separa la coca → limpia "y aparte" → parsea "3 tacos de carne" local.
 
 ### `textoANumero(texto)`
 
@@ -80,12 +85,17 @@ Convierte números escritos en palabras a dígitos. Permite que "tres tacos de c
 
 | Texto | Conversión |
 |---|---|
+| "treinta y dos tacos" | "32 tacos" |
+| "veinte y uno de buche" | "21 de buche" |
+| "cuarenta y cinco" | "45" |
 | "una docena de tacos" | "12 tacos" |
 | "media docena" | "6 " |
 | "un par de tortas" | "2 tortas" |
 | "veinte", "quince", "doce"... | "20", "15", "12"... |
 | "tres", "dos", "uno"... | "3", "2", "1"... |
 | "un taco", "una torta" | "1 taco", "1 torta" |
+
+**Compuestos (DECENA + "y" + UNIDAD):** Se procesan antes que los simples para evitar conflictos. Soporta todas las decenas (20–90) con unidades 1–9.
 
 ---
 
@@ -173,9 +183,11 @@ El score determina si el bot intenta parsear localmente o deriva a Groq.
 
 | Condición | Puntos |
 |---|---|
-| Señales de complejidad (`y aparte`, `para mí`, `para ella`, `separado`, `cada uno`...) | −10 |
+| Señales de complejidad (`para mí`, `para ella`, `separado`, `cada uno`, `otro plato`...) | −10 |
 | Patrones de distribución (`de 3 en 3`, `alternado`, `uno de cada`...) | −10 |
 | Multi-ítem donde no todas las partes tienen número | −2 |
+
+**Nota:** `"y aparte"` fue eliminado de `SEÑALES_GROQ`. Ya no fuerza Groq — se limpia en preprocesamiento como conector residual de bebidas.
 
 ### Puntos positivos (score alto → parser local)
 
@@ -282,11 +294,13 @@ Retorna `{ cantidad, corte }` si el pedido tiene corte y cantidad pero no dice "
 
 Detecta frases como:
 - "lo mismo de siempre"
-- "lo mismo de antes"
+- "lo mismo de antes" / "lo mismo de ayer" / "lo mismo de antier"
 - "repite mi pedido"
 - "lo de siempre"
-- "igual que la vez pasada"
+- "igual que la vez pasada" / "igual que la última vez"
 - "lo anterior"
+- "el de ayer" / "el pedido de ayer" / "el pedido de antier"
+- "el de la semana pasada"
 
 ### `detectarModificacion(texto)` → handleModificacionAgregarMas
 
@@ -294,27 +308,51 @@ Detecta tres tipos de modificación durante la toma del pedido:
 
 | Tipo | Ejemplo | Resultado |
 |---|---|---|
-| quitar_uno | "quítame uno", "uno menos" | `{ tipo: "quitar_uno" }` |
+| quitar_uno | "quítame uno", "uno menos" | `{ tipo: "quitar_uno", corte: null }` |
+| quitar_uno (específico) | "quita un taco de carne", "uno menos de buche" | `{ tipo: "quitar_uno", corte: "carne" }` |
 | agregar_mas | "agrega 2 más de carne", "3 más" | `{ tipo: "agregar_mas", cantidad: 2, corte: "carne" }` |
+| agregar_mas (nuevas frases) | "ponme otros 3 de buche", "súmame 2", "añade 1", "también quiero 4 de surtido" | `{ tipo: "agregar_mas", cantidad: N, corte: "..." }` |
 | cambiar_corte | "cámbiame el buche por surtido" | `{ tipo: "cambiar_corte", de: "buche", por: "surtido" }` |
+| cambiar_corte (nuevas frases) | "en lugar de carne ponme buche", "en vez de cuero dame lengua", "mejor surtido que carne" | `{ tipo: "cambiar_corte", de: "carne", por: "buche" }` |
+
+**`quitar_uno` con corte específico:** Si el cliente especifica cuál ítem reducir ("quita uno de los de carne"), `aplicarQuitarUno(ordenTexto, corte)` busca primero la línea que contiene ese corte. Si no la encuentra, vuelve al comportamiento anterior (reduce el último ítem).
 
 ---
 
-## Detección de FAQs — `detectarPreguntaFrecuente(texto)`
+## Detección de FAQs — `detectarPreguntaFrecuente` y `detectarTodasPreguntasFrecuentes`
 
-Retorna `{ tipo, producto? }` o `null`.
+### `detectarPreguntaFrecuente(texto)` — Retorna la primera coincidencia
+
+Retorna `{ tipo, producto? }` o `null`. Usada dentro de handlers de flujo activo (estados bloqueantes) donde solo se espera una FAQ por mensaje.
 
 **Orden de detección (importa por solapamientos):**
 
-1. `domicilio` — ¿hacen domicilio?, ¿cuánto cobran de envío?, ¿se tarda mucho?
-2. `precio` — ¿cuánto cuesta el taco?, ¿a cómo están?
-3. `descripcion_corte` — ¿qué es el buche?, ¿cómo es la lengua?, ¿tienen cuero?
-4. `horario` — ¿a qué hora abren?, ¿ya cerraron?, ¿siguen abiertos?
-5. `menu` — ¿qué tienen?, ¿qué hay?, ¿qué venden?, menú
-6. `ubicacion` — ¿dónde están?, dirección, ¿cómo llego?
-7. `metodos_pago` — ¿cómo pago?, ¿aceptan tarjeta?
+1. `ya_en_camino` — "ya voy en camino", "ya estoy por llegar"
+2. `despedida` — "gracias", "hasta luego", "bye"
+3. `total_parcial` — ¿cuánto llevo?, ¿cuánto va mi cuenta?, ¿cuánto llevo acumulado?
+4. `domicilio` — ¿hacen domicilio?, ¿cuánto cobran de envío?, ¿cuánto se tarda?
+5. `precio` — ¿cuánto cuesta el taco?, ¿a cómo están?
+6. `descripcion_corte` — ¿qué es el buche?, ¿cómo es la lengua?, ¿tienen cuero?
+7. `pedido_listo` — ¿ya están listos mis tacos?, ¿ya quedó mi pedido? (respuesta: "te avisamos aquí") — **antes de `horario`** para evitar responder con horario de apertura
+8. `horario` — ¿a qué hora abren?, ¿ya cerraron?, ¿siguen abiertos?
+9. `menu` — ¿qué tienen?, ¿qué hay?, ¿qué venden?, menú
+10. `ubicacion` — ¿dónde están?, dirección, ¿cómo llego?
+11. `metodos_pago` — ¿cómo pago?, ¿aceptan tarjeta?
 
-**Nota crítica:** `descripcion_corte` se evalúa **antes** que `menu` para que "¿qué es el buche?" no sea capturado como pregunta de menú.
+**Nota crítica:** `descripcion_corte` se evalúa **antes** que `menu` para que "¿qué es el buche?" no sea capturado como pregunta de menú. `pedido_listo` se evalúa **antes** que `horario` para que "¿ya están listos?" responda correctamente en lugar de mostrar el horario.
+
+### `detectarTodasPreguntasFrecuentes(texto)` — Multi-intent
+
+Retorna **array** con todas las FAQs detectadas en el mensaje, deduplicado por `tipo+producto`. Permite responder a preguntas compuestas.
+
+**Ejemplo:**
+```
+"¿a qué hora abren y cuánto cuesta el domicilio?"
+→ [{ tipo: "horario" }, { tipo: "domicilio" }]
+→ Bot responde ambas preguntas y luego muestra el menú
+```
+
+Usada exclusivamente en `mensajes.js` para el bloque global de FAQs (cuando el cliente NO está en flujo activo).
 
 ---
 
@@ -332,11 +370,12 @@ Cuando el parser local no puede resolver el mensaje (score < 4, parse falló, o 
 **Timeout y retry:**
 
 ```
-1. Primera llamada: timeout de 15s
+1. Primera llamada: timeout de 15s, temperature: 0.2
    │ OK → usar respuesta
    │ Error o timeout
    ▼
-2. Segundo intento: timeout de 15s
+2. Segundo intento: timeout de 15s, temperature: 0.35
+   │ (temperatura más alta = respuesta diferente al reintento)
    │ OK → usar respuesta
    │ Error o timeout
    ▼
@@ -352,7 +391,6 @@ Cuando el parser local no puede resolver el mensaje (score < 4, parse falló, o 
 Las siguientes expresiones en el mensaje desencadenan score −10 y fuerzan el paso a Groq independientemente de otros factores:
 
 ```
-"y aparte"          → pedido en platos separados
 "para mí"           → pedido dividido por persona
 "para ella/él"      → pedido dividido por persona
 "separado"          → pedido en platos separados
@@ -361,6 +399,9 @@ Las siguientes expresiones en el mensaje desencadenan score −10 y fuerzan el p
 "plato de"          → pedido por plato
 "cada uno"          → distribución por persona
 "para cada"         → distribución por persona
+```
+
+**Eliminado de SEÑALES_GROQ:** `"y aparte"` ya no fuerza Groq. Se limpia en `preprocesarCantidades()` como conector residual de bebidas (caso habitual: "3 tacos y aparte una coca").
 
 Distribución:
 "de 2 en 2"         → distribución regular

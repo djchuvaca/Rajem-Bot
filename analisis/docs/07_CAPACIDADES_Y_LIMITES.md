@@ -10,14 +10,18 @@ Este documento establece qué puede hacer el sistema con claridad y honestidad: 
 
 El parser local maneja ~95% de los pedidos sin necesidad de IA. Entiende:
 
-- Números en texto: "tres tacos de surtido", "una docena de cuero"
+- Números en texto: "tres tacos de surtido", "una docena de cuero", **"treinta y dos tacos"** (compuestos)
 - Medidas: "medio kilo", "cuarto de carne", "300g de buche"
 - Pedidos por monto: "$150 de surtido"
 - Alias coloquiales: "carnitas" → carne, "cueritos" → cuero, "buchón" → buche
 - Errores ortográficos: "surtudo", "lenguita", "carner" (fuzzy match con Levenshtein ≤ 2)
 - Multi-ítem: "3 tacos de surtido y 2 de carne", pedidos con saltos de línea
+- Pedidos con bebida: "3 tacos de carne y aparte una coca" (separa bebida y parsea local)
 - Combinaciones: "mitad surtido y mitad buche", "de todo menos lengua"
-- Modificaciones: "quítame uno", "agrega 2 más de carne", "cámbiame el buche por surtido"
+- Modificaciones con corte específico: "quita un taco de carne", "ponme otros 3 de buche", "en lugar de cuero dame buche", "mejor surtido que carne"
+- Respuestas a "todos los cortes" → surtido en estado esperandoCorte
+- Preguntas compuestas: "¿a qué hora abren y cuánto es el domicilio?" (multi-intent, responde ambas)
+- Precio contextual: al preguntar precio durante un pedido, muestra también el subtotal actual
 
 ### Flujo conversacional robusto
 
@@ -167,7 +171,7 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 
 ---
 
-## Estado actual del proyecto (24 Mayo 2026)
+## Estado actual del proyecto (1 Junio 2026)
 
 ### Lo que está implementado y funcionando
 

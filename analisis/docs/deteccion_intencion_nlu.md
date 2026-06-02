@@ -1,5 +1,5 @@
 # Detección de Intención en Lenguaje Natural — Bot Tacos Javier
-**Fecha:** 23 Mayo 2026  
+**Fecha:** 1 Junio 2026  
 **Archivos fuente:** `src/handlers/mensajes.js` · `src/handlers/flujos/*.js` · `src/handlers/pedidoParser.js` · `src/estado/campos.js`
 
 ---
@@ -77,9 +77,12 @@ Retorna TRUE si el cliente está en alguno de estos estados:
 
 Si el cliente no está en un flujo activo, el bot primero verifica si es una pregunta informativa. Estas se resuelven **sin Groq**, en milisegundos, con datos de la BD.
 
-**Función:** `detectarPreguntaFrecuente(texto)` en `pedidoParser.js`
+**Funciones:** `detectarPreguntaFrecuente` y `detectarTodasPreguntasFrecuentes` en `pedidoParser.js`
 
-Detecta **6 categorías**. Cada una tiene su propio regex compilado.
+- **`detectarPreguntaFrecuente(texto)`** — retorna la primera coincidencia. Usada en estados bloqueantes.
+- **`detectarTodasPreguntasFrecuentes(texto)`** — retorna **todas** las FAQs del mensaje (multi-intent, deduplicado). Usada en `mensajes.js` cuando el cliente no está en flujo activo; permite responder a dos preguntas en un solo mensaje ("¿a qué hora abren y cuánto cuesta el domicilio?").
+
+Detecta **8 categorías** (antes 6). Cada una tiene su propio regex compilado.
 
 ---
 
@@ -99,6 +102,20 @@ Detecta **6 categorías**. Cada una tiene su propio regex compilado.
 | "no tengo dinero" | ❌ no detecta | → Groq |
 
 **Detección de corte específico:** Si en el mismo mensaje aparece una palabra clave de corte (`surtido`, `carne`, `buche`, `cuero`, `lengua`), el bot filtra la respuesta solo para ese corte.
+
+---
+
+### FAQ 1.5 — Pedido listo (nuevo)
+
+**Detecta:** "¿ya están listos mis tacos?", "¿ya quedó mi pedido?"
+
+**Importante:** Se evalúa **antes** que `horario` para evitar responder con el horario de apertura cuando el cliente pregunta por su pedido. Antes, "¿ya están listos?" matcheaba erróneamente como pregunta de horario.
+
+| El cliente escribe | Bot detecta | Bot responde |
+|---|---|---|
+| "¿ya están listos mis tacos?" | `tipo: "pedido_listo"` | "En cuanto esté listo te avisamos aquí" |
+| "¿ya quedó listo mi pedido?" | `tipo: "pedido_listo"` | idem |
+| "¿ya están abiertos?" | `tipo: "horario"` | Horario completo (no confunde) |
 
 ---
 
@@ -260,38 +277,44 @@ Detecta **3 tipos de modificaciones**, cada una con su propio patrón.
 
 ### Modificación 1 — Quitar uno
 
-**Regex:** `PATRON_QUITAR_UNO`
+**Regex:** `PATRON_QUITAR_UNO` (captura corte opcional)
 
 | El cliente escribe | Bot detecta | Acción |
 |---|---|---|
-| "quítame uno" | `tipo: "quitar_uno"` | Reduce cantidad en 1 |
-| "menos uno" | `tipo: "quitar_uno"` | Reduce cantidad en 1 |
-| "un taco menos" | `tipo: "quitar_uno"` | Reduce cantidad en 1 |
-| "quita uno de los tacos" | ❌ no detecta | → Groq |
+| "quítame uno" | `tipo: "quitar_uno", corte: null` | Reduce el último ítem en 1 |
+| "menos uno" | `tipo: "quitar_uno", corte: null` | Reduce el último ítem en 1 |
+| "un taco menos" | `tipo: "quitar_uno", corte: null` | Reduce el último ítem en 1 |
+| "quita un taco de carne" | `tipo: "quitar_uno", corte: "carne"` | Reduce específicamente el de carne |
+| "uno menos de buche" | `tipo: "quitar_uno", corte: "buche"` | Reduce específicamente el de buche |
 | "bájale uno" | ❌ no detecta | → Groq |
 
 ### Modificación 2 — Agregar más del mismo
 
-**Regex:** `PATRON_AGREGAR_MAS` con captura de cantidad
+**Regex:** `PATRON_AGREGAR_MAS` con captura de cantidad y corte opcional
 
 | El cliente escribe | Bot detecta | Acción |
 |---|---|---|
-| "agrega 2 más" | `tipo: "agregar_mas", cantidad: 2` | Suma 2 al pedido |
+| "agrega 2 más de carne" | `tipo: "agregar_mas", cantidad: 2, corte: "carne"` | Suma 2 de carne |
 | "agrégale otros 3" | `tipo: "agregar_mas", cantidad: 3` | Suma 3 al pedido |
-| "ponle 2 más" | `tipo: "agregar_mas", cantidad: 2` | Suma 2 al pedido |
-| "2 más" (solo número) | ❌ puede no detectar | → siguiente capa |
+| "ponme otros 2 de buche" | `tipo: "agregar_mas", cantidad: 2, corte: "buche"` | Suma 2 de buche |
+| "súmame 1 de surtido" | `tipo: "agregar_mas", cantidad: 1, corte: "surtido"` | Suma 1 de surtido |
+| "añade 3 tacos" | `tipo: "agregar_mas", cantidad: 3` | Suma 3 |
+| "también quiero 2 de lengua" | `tipo: "agregar_mas", cantidad: 2, corte: "lengua"` | Suma 2 de lengua |
+| "2 más" | `tipo: "agregar_mas", cantidad: 2` | Suma 2 |
 | "quiero más" (sin número) | ❌ no detecta cantidad | → Groq |
 
 ### Modificación 3 — Cambiar corte
 
-**Regex:** `PATRON_CAMBIAR_CORTE` con captura de "de" y "por"
+**Regex:** `PATRON_CAMBIAR_CORTE` — detecta cuatro construcciones
 
 | El cliente escribe | Bot detecta | Acción |
 |---|---|---|
 | "cambia el buche por cuero" | `tipo: "cambiar_corte", de: "buche", por: "cuero"` | Reemplaza corte |
-| "cámbiame la carne por lengua" | `tipo: "cambiar_corte", de: "carne", por: "lengua"` | Reemplaza corte |
+| "cámbiame la carne a lengua" | `tipo: "cambiar_corte", de: "carne", por: "lengua"` | Reemplaza corte |
+| "en lugar de surtido ponme carne" | `tipo: "cambiar_corte", de: "surtido", por: "carne"` | Reemplaza corte |
+| "en vez de cuero dame buche" | `tipo: "cambiar_corte", de: "cuero", por: "buche"` | Reemplaza corte |
+| "mejor lengua que cuero" | `tipo: "cambiar_corte", de: "cuero", por: "lengua"` | Reemplaza corte |
 | "sin surtido, que sea puro buche" | ❌ no detecta | → Groq |
-| "en vez de cuero quiero carne" | ❌ no detecta | → Groq |
 
 ---
 
@@ -340,8 +363,9 @@ Antes de parsear, el bot calcula un puntaje de "claridad" del mensaje:
 
 ```
 PENALIZACIONES (señales de que el pedido es complejo):
-  Contiene "y aparte", "para mí", "separado", "en pares", "mitad"  → −10 pts
-  Contiene "de X en X", "alternado", "intercalado"                  → −10 pts
+  Contiene "para mí", "separado", "en pares", "cada uno", "otro plato"  → −10 pts
+  Contiene "de X en X", "alternado", "intercalado"                       → −10 pts
+  NOTE: "y aparte" ya NO penaliza — se limpia en preprocesamiento
 
 BONIFICACIONES (señales de que el pedido es claro):
   Contiene un número ("3", "5", "500")                              → +2 pts
@@ -373,6 +397,8 @@ UMBRAL: Score >= 4 → parsear local. Score < 4 → enviar a Groq.
 | "350g de lengua" | gramos +2, lengua +2 = **+4** | ✅ Parser local |
 | "$200 de surtido" | número +2, surtido +2 = **+4** | ✅ Parser local |
 | "3 tacos de carne y 2 de buche" | número +2, tacos +2, carne+buche +2 = **+6** | ✅ Parser local |
+| "3 tacos de carne y aparte una coca" | separa coca, "y aparte" se limpia → número +2, tacos +2, carne +2 = **+6** | ✅ Parser local |
+| "treinta y dos tacos de surtido" | textoANumero→"32 tacos de surtido" → número +2, tacos +2, surtido +2 = **+6** | ✅ Parser local |
 | "mitad carne mitad buche" | penalización −10 = **−10** | ❌ → Groq |
 | "de 2 en 2 carne y buche" | penalización −10 = **−10** | ❌ → Groq |
 | "alternados de carne y cuero" | penalización −10 = **−10** | ❌ → Groq |
@@ -603,7 +629,7 @@ Mensaje del cliente
 
 | Situación | Por qué falla | Capa que lo recibe |
 |---|---|---|
-| "lo mismo de siempre" | Requiere historial entre sesiones | Groq |
+| "lo mismo de siempre" | `detectarRepetirPedido` lo maneja; Groq solo si no hay historial en BD | Parser/BD |
 | "para dos personas" | Cantidad en personas, no unidades | Groq |
 | "de a poco de todo" | Cantidades vagas | Groq |
 | "ponme lo que recomiendas" | Requiere razonamiento | Groq |

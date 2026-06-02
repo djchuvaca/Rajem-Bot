@@ -3,7 +3,7 @@ const {
   clientesPreventa, esperandoCaptura, clientesNuevos, getHistorial,
   tipoEntregaCliente, datosCampos, datosRecibidos,
 } = require("../estado");
-const { detectarPreguntaFrecuente } = require("./pedidoParser");
+const { detectarPreguntaFrecuente, detectarTodasPreguntasFrecuentes } = require("./pedidoParser");
 const { generarRespuestaAutomatica } = require("./respuestas");
 const { estaEnHorario, mensajeFueraDeHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");
@@ -107,18 +107,24 @@ async function handleMensaje(msg, client) {
 
   // ── PREGUNTAS FRECUENTES GLOBALES (solo si no está en flujo activo) ──────────
   {
-    const pregFaq = !enFlujoActivo(clienteNumero) ? detectarPreguntaFrecuente(textoOriginal) : null;
-    if (pregFaq) {
+    const pregsFaq = !enFlujoActivo(clienteNumero) ? detectarTodasPreguntasFrecuentes(textoOriginal) : null;
+    if (pregsFaq && pregsFaq.length > 0) {
       const histFaq   = getHistorial(clienteNumero);
       const esDomFaq  = tipoEntregaCliente.get(clienteNumero) === "domicilio"
         || (tipoEntregaCliente.get(clienteNumero) == null && histFaq.some(h => h.content && h.content.includes("domicilio")));
-      const respFaq = generarRespuestaAutomatica(pregFaq, { esDomicilio: esDomFaq });
-      if (respFaq) {
-        if (!clientesNuevos.has(clienteNumero)) clientesNuevos.add(clienteNumero);
-        console.log(`Bot: [RESPUESTA AUTOMÁTICA] tipo: ${pregFaq.tipo}`);
-        await replyConTyping(msg, respFaq);
-        // No mostrar menú para acks de cortesía
-        const esAckSinMenu = pregFaq.tipo === "ya_en_camino" || pregFaq.tipo === "despedida";
+      let respondio    = false;
+      let esAckSinMenu = false;
+      for (const pregFaq of pregsFaq) {
+        const respFaq = generarRespuestaAutomatica(pregFaq, { esDomicilio: esDomFaq });
+        if (respFaq) {
+          if (!clientesNuevos.has(clienteNumero)) clientesNuevos.add(clienteNumero);
+          console.log(`Bot: [RESPUESTA AUTOMÁTICA] tipo: ${pregFaq.tipo}`);
+          await replyConTyping(msg, respFaq);
+          respondio = true;
+          if (pregFaq.tipo === "ya_en_camino" || pregFaq.tipo === "despedida") esAckSinMenu = true;
+        }
+      }
+      if (respondio) {
         if (!esAckSinMenu) {
           if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
             await replyConTyping(msg, mensajeFueraDeHorario());

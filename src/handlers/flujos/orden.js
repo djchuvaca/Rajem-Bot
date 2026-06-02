@@ -786,7 +786,19 @@ async function handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrden
   if (!rP) return false;
 
   console.log("Bot: [FAQ pedido] tipo: " + tipoP);
-  await msg.reply(rP);
+
+  if (tipoP === "precio") {
+    const ordenActual = esperandoAgregarMas.get(clienteNumero)
+      || (esperandoExtras.has(clienteNumero) ? esperandoExtras.get(clienteNumero).ordenTexto : null);
+    if (ordenActual) {
+      const subFaq = calcularSubtotal(ordenActual);
+      await msg.reply(rP + `\n\n_Tu pedido actual: *$${subFaq}*_`);
+    } else {
+      await msg.reply(rP);
+    }
+  } else {
+    await msg.reply(rP);
+  }
   const fu = esperandoAgregarMas.has(clienteNumero) ? "*¿Qué más deseas agregar?*" : "*¿Qué deseas ordenar?*";
   await msg.reply(fu);
   return true;
@@ -1004,6 +1016,11 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       const cf = buscarCorteFuzzy(palabra);
       if (cf) { corteDetectado = cf; break; }
     }
+  }
+
+  // "de todos" / "de todo" / "cualquiera" → surtido
+  if (!corteDetectado && /\b(?:todos?|de\s+todos?|de\s+todas?|cualquier(?:a)?|de\s+todo)\b/i.test(textoOriginal)) {
+    if (Object.values(getCortes()).includes("surtido")) corteDetectado = "surtido";
   }
 
   if (!corteDetectado) {
@@ -1317,7 +1334,7 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, 
       const respuestaRetry = await groqConTimeout({
         model:       "llama-3.3-70b-versatile",
         max_tokens:  400,
-        temperature: 0.2,
+        temperature: 0.35,
         messages:    [{ role: "system", content: systemPromptRetry }, ...historial],
       });
       const textoRetry = respuestaRetry.choices[0]?.message?.content?.trim() || "";

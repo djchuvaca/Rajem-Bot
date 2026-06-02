@@ -1,12 +1,14 @@
 # Mapeo de FAQs — Bot Tacos Javier
-**Fecha:** 23 Mayo 2026  
+**Fecha:** 1 Junio 2026  
 **Archivo fuente:** `src/handlers/pedidoParser.js` + `src/handlers/respuestas.js` + `src/handlers/flujos/orden.js`
 
 ---
 
 ## Catálogo de FAQs registradas
 
-El bot detecta 6 tipos de preguntas frecuentes. Cada tipo tiene sus patrones de detección y una respuesta automática generada desde la BD (sin Groq).
+El bot detecta **8 tipos** de preguntas frecuentes (antes 6). Cada tipo tiene sus patrones de detección y una respuesta automática generada desde la BD (sin Groq).
+
+**Multi-intent:** Cuando el cliente hace dos preguntas en un solo mensaje ("¿a qué hora abren y cuánto es el domicilio?"), `detectarTodasPreguntasFrecuentes()` detecta ambas y el bot responde las dos antes de mostrar el menú.
 
 ---
 
@@ -162,6 +164,23 @@ _Incluye tortillas y salsas_
 🗺️ [link de Google Maps] (si está configurado)
 
 _¡Te esperamos!_ 😊
+```
+
+---
+
+### 7. PEDIDO LISTO (`tipo: "pedido_listo"`) — nuevo
+
+**Preguntas que detecta:**
+- "¿ya están listos mis tacos?"
+- "¿ya quedó listo mi pedido?"
+- "¿ya está lista mi orden?"
+
+**Por qué existe este intent:** Antes de su creación, "¿ya están listos?" matcheaba `PREGUNTAS_HORARIO` y el bot respondía con el horario de apertura. Ahora `pedido_listo` se evalúa **antes** que `horario`.
+
+**Respuesta del bot:**
+```
+¡En cuanto esté listo tu pedido te avisamos aquí mismo! 😊
+Si tienes dudas o quieres hacer algún cambio, con gusto te ayudamos.
 ```
 
 ---

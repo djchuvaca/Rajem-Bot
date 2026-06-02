@@ -188,26 +188,31 @@ function respuestaMetodosPago(esDomicilio = false) {
 }
 
 // ── RESPUESTA: MODIFICACIÓN — QUITAR UNO ─────────────────────────────────────
-function aplicarQuitarUno(ordenTexto) {
+function aplicarQuitarUno(ordenTexto, corteEspecificado = null) {
   const lineas = ordenTexto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l));
   if (!lineas.length) return null;
 
-  // Buscar desde el último ítem (el más reciente del pedido)
-  for (let i = lineas.length - 1; i >= 0; i--) {
-    const m = lineas[i].match(/(\d+)\s+(tacos?|tortas?)/i);
-    if (m) {
+  function _reducirLinea(arr, filtroCorte) {
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const m = arr[i].match(/(\d+)\s+(tacos?|tortas?)/i);
+      if (!m) continue;
+      if (filtroCorte && !arr[i].toLowerCase().includes(filtroCorte.toLowerCase())) continue;
       const cantActual = parseInt(m[1]);
-      if (cantActual <= 1) return null; // no se puede quitar si solo hay 1
-      lineas[i] = lineas[i].replace(/\d+\s+(tacos?|tortas?)/i, (match) => {
+      if (cantActual <= 1) return null;
+      arr[i] = arr[i].replace(/\d+\s+(tacos?|tortas?)/i, (match) => {
         const partes = match.split(/\s+/);
-        const nuevaCantidad = parseInt(partes[0]) - 1;
-        return `${nuevaCantidad} ${partes.slice(1).join(" ")}`;
+        return `${parseInt(partes[0]) - 1} ${partes.slice(1).join(" ")}`;
       });
-      // Recalcular precio de esa línea
-      return lineas.join("\n");
+      return arr.join("\n");
     }
+    return null;
   }
-  return null;
+
+  if (corteEspecificado) {
+    const res = _reducirLinea([...lineas], corteEspecificado);
+    if (res) return res;
+  }
+  return _reducirLinea(lineas, null);
 }
 
 // ── RESPUESTA: MODIFICACIÓN — CAMBIAR CORTE ──────────────────────────────────
@@ -264,6 +269,9 @@ function generarRespuestaAutomatica(pregunta, opciones = {}) {
     case "descripcion_corte":
       return respuestaDescripcionCorte(pregunta.producto);
 
+    case "pedido_listo":
+      return `¡En cuanto esté listo tu pedido te avisamos aquí mismo! 😊 Si tienes dudas o quieres hacer algún cambio, con gusto te ayudamos.`;
+
     case "ya_en_camino":
       return `¡Te esperamos! 🏃 En cuanto llegues te atendemos de inmediato 😊`;
 
@@ -287,7 +295,7 @@ function aplicarModificacion(modificacion, ordenTexto) {
 
   switch (modificacion.tipo) {
     case "quitar_uno":
-      return aplicarQuitarUno(ordenTexto);
+      return aplicarQuitarUno(ordenTexto, modificacion.corte || null);
 
     case "cambiar_corte":
       return aplicarCambiarCorte(ordenTexto, modificacion.de, modificacion.por);

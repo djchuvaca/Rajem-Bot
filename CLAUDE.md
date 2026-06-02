@@ -24,9 +24,9 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 - `ecosystem.config.js` — Configuración PM2 para producción. `autorestart: true`, `restart_delay: 15000`, `max_restarts: 10`, logs en `logs/`.
 
 ### Handlers
-- `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. No contiene lógica de negocio.
-- `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Tiene caché `_cortesCache` (TTL 60s, invalidable con `invalidarCacheCortes()`).
-- `src/handlers/respuestas.js` — respuestas FAQ sin Groq (precios, horarios, domicilio, banco)
+- `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. Usa `detectarTodasPreguntasFrecuentes()` para el bloque global de FAQs (multi-intent).
+- `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Cachés: `_cortesCache` + `_cortesRegexCache` (TTL 60s, invalidables con `invalidarCacheCortes()`). Exporta `detectarPreguntaFrecuente` (primera coincidencia) y `detectarTodasPreguntasFrecuentes` (multi-intent, array). Intents: `precio`, `horario`, `domicilio`, `menu`, `ubicacion`, `metodos_pago`, `descripcion_corte`, `pedido_listo`, `ya_en_camino`, `despedida`, `total_parcial`.
+- `src/handlers/respuestas.js` — respuestas FAQ sin Groq. `aplicarQuitarUno(ordenTexto, corte?)` acepta corte opcional para reducir ítem específico.
 - `src/handlers/comandos.js` — comandos de grupo: ver pedidos (!pedidos, !pendientes, !confirmados, !cancelados, !rechazados, !domicilios, !mostradores, !pedido), gestionar (!confirmar, !listo, !cancelar, !rechazar), clientes (!cliente, !buscar, !historial, !top, !editar, !mensaje), reportes (!stats, !reporte ayer/semana/mes), menú (!precios, !precio, !agotado, !disponible), control (!cerrar, !abrir, !pausar, !reanudar, !sesiones, !resetear, !limpiar, !estado, !ayuda)
 - `src/handlers/imagenes.js` — recibe comprobantes de transferencia vía imagen
 
@@ -97,6 +97,7 @@ Cuando WhatsApp se desconecta, el bot reintenta con **backoff exponencial**:
 - Delay inicial: 5s → 10s → 20s → ... → máx 5 min
 - Máximo 8 reintentos (`_MAX_REINTENTOS`). Si se supera, el proceso queda en espera hasta que PM2 lo reinicie.
 - `_reintentos` se resetea en el evento `ready`.
+- **`client.destroy()` antes de `client.initialize()`**: libera el proceso de Chromium y los archivos del perfil bloqueados antes de reiniciar. Si `destroy()` falla (EBUSY), se loguea como warning y se continúa. Sin este paso, el reintento lanzaba "browser is already running".
 
 ## Backup automático
 `_runBackup()` en `index.js` ejecuta `scripts/backup-db.js` via `fork()`:
@@ -141,6 +142,17 @@ Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
 
 ## Bugs conocidos / pendientes
 - (ninguno conocido actualmente)
+
+## Notas NLU relevantes (pedidoParser.js)
+- `"y aparte"` **no** fuerza Groq — se limpia en `preprocesarCantidades()` como conector de bebida.
+- `textoANumero()` maneja compuestos: "treinta y dos" → "32", "veinte y uno" → "21".
+- `detectarTodasPreguntasFrecuentes(texto)` devuelve array — usar solo en `mensajes.js` para el bloque global (fuera de flujo activo). En handlers de estado usar `detectarPreguntaFrecuente`.
+- `detectarModificacion()` extrae `corte` en `quitar_uno` cuando el cliente lo especifica. `aplicarQuitarUno` lo recibe como segundo parámetro opcional.
+- `PATRON_CAMBIAR_CORTE` cubre: "cambia X por Y", "sin X y pon Y", "en lugar de X ponme Y", "en vez de X dame Y", "mejor Y que X".
+- `PATRON_AGREGAR_MAS` cubre: "agrega N más", "N más", "ponme otros N", "súmame N", "añade N", "también quiero N".
+- Nuevo intent `pedido_listo` — evaluado ANTES que `horario` para que "¿ya están listos?" no responda con el horario de apertura.
+- En `handleEsperandoCorte`: "de todos"/"de todo"/"cualquiera" → "surtido" antes de llegar al error path.
+- En `handleFAQDurantePedido`: cuando el tipo es "precio" y hay pedido acumulado, añade el subtotal actual a la respuesta.
 
 ## Notas de implementación importantes
 - `extraerTelefono(texto)` — usar siempre esta función para extraer teléfonos de texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52 prefijo y separadores (331-234-5678, 331 234 5678).

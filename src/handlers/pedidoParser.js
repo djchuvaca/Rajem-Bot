@@ -11,6 +11,8 @@ let _refrescosCache = null;
 let _refrescosCacheTs = 0;
 let _salsasCache = null;
 let _salsasCacheTs = 0;
+let _cortesRegexCache = null;
+let _cortesRegexCacheTs = 0;
 const _CORTES_TTL = 60 * 1000;
 
 function invalidarCacheCortes() {
@@ -20,6 +22,8 @@ function invalidarCacheCortes() {
   _refrescosCacheTs = 0;
   _salsasCache = null;
   _salsasCacheTs = 0;
+  _cortesRegexCache = null;
+  _cortesRegexCacheTs = 0;
 }
 
 function getCortes() {
@@ -141,22 +145,22 @@ const MEDIDAS = [
 ];
 
 // ── SEÑALES DE COMPLEJIDAD → GROQ ─────────────────────────────────────────────
-const SEÑALES_GROQ        = /y\s+aparte|para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
+const SEÑALES_GROQ        = /para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
 
 // ── PATRONES DE MODIFICACIÓN ──────────────────────────────────────────────────
-const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+uno|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos|menos\s+uno|un\s+(?:taco|torta)\s+menos|reduce\s+uno/i;
-const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?|(\d+)\s+m[aá]s(?:\s+(?:de\s+)?(\w+))?/i;
-const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?:por|a)\s+(\w+)|(?:sin|quita)\s+(\w+)\s+(?:y\s+)?(?:pon|agrega)\s+(\w+)/i;
+const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+(?:uno|un[ao]?\s+(?:taco|torta))(?:\s+(?:de(?:\s+(?:los?|las?))?\s+)?(\w+))?|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos(?:\s+(?:de\s+)?(\w+))?|menos\s+uno(?:\s+(?:de\s+)?(\w+))?|un\s+(?:taco|torta)\s+menos(?:\s+(?:de\s+)?(\w+))?|reduce\s+uno/i;
+const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?|(\d+)\s+m[aá]s(?:\s+(?:de\s+)?(\w+))?|(?:ponme|s[úu]mame|a[ñn]ade(?:me)?)\s+(?:(?:otros?|m[aá]s)\s+)?(\d+)(?:\s+(?:de\s+)?(\w+))?|tambi[eé]n\s+(?:quiero|quieres?|pide|agrega|manda)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?/i;
+const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?:por|a)\s+(\w+)|(?:sin|quita)\s+(\w+)\s+(?:y\s+)?(?:pon|agrega)\s+(\w+)|en\s+(?:lugar|vez)\s+de\s+(?:(?:el|la|los|las)\s+)?(\w+)\s+(?:ponme|quiero|dame|pon)\s+(\w+)|mejor\s+(\w+)\s+(?:que|en\s+lugar\s+de)\s+(?:(?:el|la|los|las)\s+)?(\w+)/i;
 
 // ── PREGUNTAS FRECUENTES ──────────────────────────────────────────────────────
 const PREGUNTAS_PRECIO    = /cu[aá]nto\s+(?:cuesta|vale|est[aá]|cobran|es|salen?|cuestan?)|precio\s+(?:del?|de\s+los?|del?\s+men[uú])?|a\s+(?:c[oó]mo|cu[aá]nto)\s+(?:est[aá]n?|cobran?|venden?|los|las)|tienen?\s+precios?|^precios?$/i;
-const PREGUNTAS_HORARIO   = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?|llegan?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora|trabajan?\s+hoy|ya\s+(?:cerraron?|abrieron?|est[aá]n?\s+abiertos?|est[aá]n?\s+listos?)|abren?\s+(?:hoy|ma[nñ]ana|los\s+\w+|el\s+\w+)|siguen?\s+abiertos?|est[aá]n?\s+trabajando|a[uú]n\s+abren?/i;
+const PREGUNTAS_HORARIO   = /(?:a\s+qu[eé]\s+hora|cu[aá]ndo)\s+(?:abren?|cierran?|atienden?|llegan?)|qu[eé]\s+hora(?:rio)?|est[aá]n?\s+abiertos?|hasta\s+qu[eé]\s+hora|trabajan?\s+hoy|ya\s+(?:cerraron?|abrieron?|est[aá]n?\s+abiertos?)|abren?\s+(?:hoy|ma[nñ]ana|los\s+\w+|el\s+\w+)|siguen?\s+abiertos?|est[aá]n?\s+trabajando|a[uú]n\s+abren?/i;
 const PREGUNTAS_DOMICILIO = /(?:hacen?|tienen?|mandan?|llevan?|reparten?)\s+domicilio|env[ií]o|costo\s+(?:del?|de\s+)?domicilio|cobran?\s+(?:(?:por|de)\s+)?domicilio|cu[aá]nto\s+(?:\w+\s+){0,3}(?:domicilio|env[ií]o)|domicilio\s+(?:gratis|incluido|cuesta|vale)|se\s+tarda|en\s+cu[aá]nto\s+tiempo|cu[aá]nto\s+tiempo|me\s+(?:llegan?|traen?(?:\s+a\s+casa)?)|van\s+hasta\s+\w|llevan?\s+hasta/i;
 const PREGUNTAS_MENU      = /qu[eé]\s+(?:tienen?|hay|venden?|ofrecen?|manejan?)|men[uú]|me\s+mandas?\s+(?:el\s+)?men[uú]|me\s+mandas?\s+(?:la\s+)?info/i;
 const PREGUNTAS_UBICACION = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ubicaci[oó]n|c[oó]mo\s+llegar/i;
 const PREGUNTAS_PAGO      = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
-const PREGUNTAS_TOTAL     = /cu[aá]nto\s+(?:llevo|voy|me\s+toca|es\s+(?:mi\s+)?total|va\s+(?:mi\s+)?total|va\s+todo|es\s+en\s+total)|(?:mi\s+)?total\s+(?:hasta\s+ahora|parcial|por\s+favor)|cu[aá]nto\s+es\s+(?:en\s+total|todo|lo\s+que\s+llevo)|cu[aá]nto\s+suma/i;
+const PREGUNTAS_TOTAL     = /cu[aá]nto\s+(?:llevo|voy|me\s+toca|es\s+(?:mi\s+)?total|va\s+(?:mi\s+)?total|va\s+todo|es\s+en\s+total|llevo\s+acumulado|tengo\s+acumulado)|(?:mi\s+)?total\s+(?:hasta\s+ahora|parcial|por\s+favor)|cu[aá]nto\s+es\s+(?:en\s+total|todo|lo\s+que\s+llevo)|cu[aá]nto\s+suma|cu[aá]nto\s+(?:va|asciende|llega)\s+(?:mi\s+)?(?:pedido|total|cuenta)/i;
 const PATRON_EN_CAMINO    = /\b(?:ya\s+(?:voy|vengo|andamos|vamos|sal[ií]|estoy\s+(?:en\s+camino|saliendo|yendo|por\s+llegar|cerca))|estoy\s+(?:en\s+camino|por\s+llegar|cerca|llegando)|en\s+camino|ya\s+lleg[uú][eé]|ya\s+llegamos|ya\s+estoy\s+afuera?|ya\s+llegamos|ya\s+andamos)\b/i;
 const PATRON_DESPEDIDA    = /^(?:gracias|grax|grac|muchas\s+gracias|muy\s+amable|que\s+les?\s+vaya\s+bien|hasta\s+luego|hasta\s+pronto|nos\s+vemos|buen\s+provecho|adios|adi[oó]s|hasta\s+ma[nñ]ana|chao|chau|bye|ciao)$/i;
 
@@ -179,6 +183,7 @@ function _tieneNegacionAntes(texto, posicion) {
 // ── MEJORA 3: PREPROCESAR CANTIDADES INFORMALES ───────────────────────────────
 function preprocesarCantidades(texto) {
   return texto
+    .replace(/\by\s+aparte\b/gi, "")
     .replace(/\bunos?\s+(?=\d)/gi, "")
     .replace(/\bcomo\s+(?=\d)/gi, "")
     .replace(/\bnada\s+m[aá]s\s+(?=\d)/gi, "")
@@ -189,6 +194,15 @@ function preprocesarCantidades(texto) {
 // ── MEJORA 5 (nueva): CONVERSIÓN DE NÚMEROS EN TEXTO A DÍGITOS ───────────────
 // Permite que "tres tacos de carne" funcione igual que "3 tacos de carne".
 function textoANumero(texto) {
+  // Compuestos: "treinta y dos" → "32", "veinte y uno" → "21"
+  texto = texto.replace(
+    /\b(veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\s+y\s+(un[ao]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)\b/gi,
+    (_, dec, uni) => {
+      const D = { veinte:20, treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70, ochenta:80, noventa:90 };
+      const U = { un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9 };
+      return String((D[dec.toLowerCase()]||0) + (U[uni.toLowerCase()]||0));
+    }
+  );
   return texto
     .replace(/\buna?\s+docena\s+(?:de\s+)?/gi, "12 ")
     .replace(/\bmedia\s+docena\s+(?:de\s+)?/gi,  "6 ")
@@ -263,6 +277,16 @@ function buscarCorteFuzzy(palabra) {
   return mejorDist <= 2 && !empate ? mejorCorte : null;
 }
 
+// ── CACHÉ DE REGEX DE CORTES ──────────────────────────────────────────────────
+function getCortesRegex() {
+  const ahora = Date.now();
+  if (_cortesRegexCache && ahora - _cortesRegexCacheTs < _CORTES_TTL) return _cortesRegexCache;
+  const palabras = Object.keys(getCortes()).join("|");
+  _cortesRegexCache = new RegExp(`\\b(${palabras})\\b`, "i");
+  _cortesRegexCacheTs = Date.now();
+  return _cortesRegexCache;
+}
+
 // ── SISTEMA DE SCORE ──────────────────────────────────────────────────────────
 function calcularScore(texto) {
   const t = normalizar(texto);
@@ -276,10 +300,8 @@ function calcularScore(texto) {
   if (/\b\d+\s*g(?:ramos?)?\b/.test(t))            score += 2;
   if (MEDIDAS.some(m => m.re.test(t)))             score += 2;
 
-  const cortes = getCortes();
-  const palabrasCorte = Object.keys(cortes).join("|");
   const DESCARTAR_SCORE = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
-  if (new RegExp(`\\b(${palabrasCorte})\\b`, "i").test(t)) {
+  if (getCortesRegex().test(t)) {
     score += 2;
   } else if (t.split(/\s+/).some(p => p.length >= 4 && !DESCARTAR_SCORE.test(p) && buscarCorteFuzzy(p))) {
     score += 2;
@@ -397,17 +419,13 @@ function detectarPreguntaFrecuente(texto) {
   if (PREGUNTAS_TOTAL.test(t))   return { tipo: "total_parcial" };
   if (PREGUNTAS_DOMICILIO.test(t)) return { tipo: "domicilio" };
   if (PREGUNTAS_PRECIO.test(t)) {
-    const cortes = getCortes();
-    const palabras = Object.keys(cortes).join("|");
-    const m = t.match(new RegExp(`\\b(${palabras})\\b`, "i"));
-    return { tipo: "precio", producto: m ? cortes[m[1].toLowerCase()] : null };
+    const m = t.match(getCortesRegex());
+    return { tipo: "precio", producto: m ? getCortes()[m[1].toLowerCase()] : null };
   }
   // Descripción de corte debe ir antes de menú para que "¿qué es el buche?" no sea capturado como menú
   if (PREGUNTAS_DESCRIPCION_CORTE.test(t)) {
-    const cortes = getCortes();
-    const palabras = Object.keys(cortes).join("|");
-    const m = t.match(new RegExp(`\\b(${palabras})\\b`, "i"));
-    if (m) return { tipo: "descripcion_corte", producto: cortes[m[1].toLowerCase()] };
+    const m = t.match(getCortesRegex());
+    if (m) return { tipo: "descripcion_corte", producto: getCortes()[m[1].toLowerCase()] };
   }
   // "¿Tienen buche?", "¿Manejan lengua?", "¿Hay cuero?" con corte conocido
   {
@@ -419,6 +437,8 @@ function detectarPreguntaFrecuente(texto) {
       if (_corteTienen) return { tipo: "descripcion_corte", producto: _corteTienen };
     }
   }
+  // "¿ya está listo mi pedido?" — check BEFORE horario para evitar responder con horario de apertura
+  if (/ya\s+(?:est[aá][ns]?\s+(?:listo?|lista?|listos?)|qued[oó]\s+(?:listo?|lista?))(?:\s+(?:mi|el|los|las|tu)\s*(?:pedido|tacos?|tortas?|orden))?/i.test(t)) return { tipo: "pedido_listo" };
   if (PREGUNTAS_HORARIO.test(t))   return { tipo: "horario" };
   if (PREGUNTAS_MENU.test(t))      return { tipo: "menu" };
   if (PREGUNTAS_UBICACION.test(t)) return { tipo: "ubicacion" };
@@ -426,22 +446,71 @@ function detectarPreguntaFrecuente(texto) {
   return null;
 }
 
+// ── DETECTAR TODAS LAS PREGUNTAS FRECUENTES (multi-intent) ───────────────────
+function detectarTodasPreguntasFrecuentes(texto) {
+  const t = normalizar(texto);
+  const resultados = [];
+
+  if (PATRON_EN_CAMINO.test(t))    resultados.push({ tipo: "ya_en_camino" });
+  if (PATRON_DESPEDIDA.test(t))    resultados.push({ tipo: "despedida" });
+  if (PREGUNTAS_TOTAL.test(t))     resultados.push({ tipo: "total_parcial" });
+  if (PREGUNTAS_DOMICILIO.test(t)) resultados.push({ tipo: "domicilio" });
+
+  if (PREGUNTAS_PRECIO.test(t)) {
+    const m = t.match(getCortesRegex());
+    resultados.push({ tipo: "precio", producto: m ? getCortes()[m[1].toLowerCase()] : null });
+  }
+
+  if (PREGUNTAS_DESCRIPCION_CORTE.test(t)) {
+    const m = t.match(getCortesRegex());
+    if (m) resultados.push({ tipo: "descripcion_corte", producto: getCortes()[m[1].toLowerCase()] });
+  }
+
+  const _mTienenTodas = t.match(/\b(?:tienen?|manejan?|hay\s+de|venden?|ofrecen?|cuentan?\s+con)\s+(\w+)/i);
+  if (_mTienenTodas) {
+    const _word = _mTienenTodas[1].toLowerCase();
+    const _corte = getCortes()[_word] || buscarCorteFuzzy(_word);
+    if (_corte) resultados.push({ tipo: "descripcion_corte", producto: _corte });
+  }
+
+  if (/ya\s+(?:est[aá][ns]?\s+(?:listo?|lista?|listos?)|qued[oó]\s+(?:listo?|lista?))(?:\s+(?:mi|el|los|las|tu)\s*(?:pedido|tacos?|tortas?|orden))?/i.test(t))
+    resultados.push({ tipo: "pedido_listo" });
+
+  if (PREGUNTAS_HORARIO.test(t))   resultados.push({ tipo: "horario" });
+  if (PREGUNTAS_MENU.test(t))      resultados.push({ tipo: "menu" });
+  if (PREGUNTAS_UBICACION.test(t)) resultados.push({ tipo: "ubicacion" });
+  if (PREGUNTAS_PAGO.test(t))      resultados.push({ tipo: "metodos_pago" });
+
+  const vistos = new Set();
+  return resultados.filter(r => {
+    const k = r.tipo + (r.producto || "");
+    if (vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+}
+
 // ── DETECTAR MODIFICACIÓN ─────────────────────────────────────────────────────
 function detectarModificacion(texto) {
   const t = normalizar(texto);
-  if (PATRON_QUITAR_UNO.test(t)) return { tipo: "quitar_uno" };
+  if (PATRON_QUITAR_UNO.test(t)) {
+    const mQ = t.match(PATRON_QUITAR_UNO);
+    const corteRaw = (mQ[1] || mQ[2] || mQ[3] || mQ[4] || "").toLowerCase().trim();
+    const corte = corteRaw ? (getCortes()[corteRaw] || buscarCorteFuzzy(corteRaw) || null) : null;
+    return { tipo: "quitar_uno", corte };
+  }
   if (PATRON_AGREGAR_MAS.test(t)) {
     const m = t.match(PATRON_AGREGAR_MAS);
-    const cantidad = parseInt(m[1] || m[3] || "1");
-    const _corteRaw = (m[2] || m[4] || "").toLowerCase();
+    const cantidad = parseInt(m[1] || m[3] || m[5] || m[7] || "1");
+    const _corteRaw = (m[2] || m[4] || m[6] || m[8] || "").toLowerCase();
     const _corte = _corteRaw ? (getCortes()[_corteRaw] || buscarCorteFuzzy(_corteRaw) || null) : null;
     return { tipo: "agregar_mas", cantidad, corte: _corte };
   }
   if (PATRON_CAMBIAR_CORTE.test(t)) {
     const m = t.match(PATRON_CAMBIAR_CORTE);
     const cortes = getCortes();
-    const rawDe  = normalizar(m[1] || m[3] || "");
-    const rawPor = normalizar(m[2] || m[4] || "");
+    const rawDe  = normalizar(m[1] || m[3] || m[5] || m[8] || "");
+    const rawPor = normalizar(m[2] || m[4] || m[6] || m[7] || "");
     const de  = cortes[rawDe]  || buscarCorteFuzzy(rawDe)  || null;
     const por = cortes[rawPor] || buscarCorteFuzzy(rawPor) || null;
     if (de && por) return { tipo: "cambiar_corte", de, por };
@@ -520,7 +589,7 @@ function parsearPedidoMultiLinea(texto) {
 }
 
 // ── MEJORA: REPETIR PEDIDO ANTERIOR ──────────────────────────────────────────
-const PATRON_LO_MISMO = /\b(lo\s+mismo(?:\s+de\s+(?:siempre|antes))?|igual\s+que\s+(?:la\s+)?vez\s+pasada|repite?\s+(?:mi\s+)?pedido|lo\s+de\s+siempre|lo\s+mismo\s+de\s+antes|lo\s+anterior)\b/i;
+const PATRON_LO_MISMO = /\b(lo\s+mismo(?:\s+de\s+(?:siempre|antes|ayer|antier|la\s+semana\s+pasada))?|igual\s+que\s+(?:la\s+)?(?:vez\s+pasada|[uú]ltima\s+vez)|repite?\s+(?:mi\s+)?pedido|lo\s+de\s+siempre|lo\s+mismo\s+de\s+(?:antes|ayer|antier)|lo\s+anterior|el\s+de\s+ayer|el\s+pedido\s+de\s+(?:ayer|antier)|el\s+de\s+la\s+semana\s+pasada)\b/i;
 
 function detectarRepetirPedido(texto) {
   return PATRON_LO_MISMO.test(normalizar(texto));
@@ -774,6 +843,7 @@ module.exports = {
   detectarSinCorte,
   detectarSinTipo,
   detectarPreguntaFrecuente,
+  detectarTodasPreguntasFrecuentes,
   detectarModificacion,
   detectarRepetirPedido,
   calcularScore,
