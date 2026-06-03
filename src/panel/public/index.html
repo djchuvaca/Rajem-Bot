@@ -152,7 +152,7 @@ tr:hover td{background:var(--surface2)}
   </div>
   <nav class="sidebar-nav">
     <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
-    <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos</div>
+    <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos <span id="nav-badge-pendientes" style="display:none;background:var(--red);color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px"></span></div>
     <div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
     <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos</div>
     <div class="nav-item" onclick="showSection('reportes')" data-s="reportes"><span class="icon">📈</span> Reportes</div>
@@ -186,11 +186,28 @@ tr:hover td{background:var(--surface2)}
     <!-- DASHBOARD -->
     <div class="section active" id="s-dashboard">
       <div class="stats-grid" id="stats-grid"></div>
+      <!-- Control del negocio -->
+      <div class="card" id="card-negocio-control">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Negocio</span>
+            <span id="ctrl-badge-cierre" style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600"></span>
+            <span id="ctrl-badge-pausa"  style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="ctrl-btn-cierre" class="btn btn-sm" onclick="toggleCierre()"></button>
+            <button id="ctrl-btn-pausa"  class="btn btn-sm" onclick="togglePausa()"></button>
+          </div>
+        </div>
+      </div>
       <div class="card" id="card-sesiones" style="display:none"></div>
       <div class="card" id="card-cortes" style="display:none"></div>
       <div class="card">
-        <div class="card-title">Pedidos de hoy</div>
-        <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th></tr></thead><tbody></tbody></table></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">Pedidos de hoy</div>
+          <span id="dashboard-ts" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -448,6 +465,10 @@ tr:hover td{background:var(--surface2)}
       <input class="form-input" id="cli-whatsapp" type="text" placeholder="521XXXXXXXXXX@c.us o @lid">
       <div class="hint">Si lo ingresas, el bot reconocerá a este cliente aunque sea la primera vez que escriba.</div>
     </div>
+    <div id="cli-historial-section" style="display:none;margin-top:12px">
+      <div style="font-size:12px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Historial de pedidos</div>
+      <div id="cli-historial-lista" style="max-height:200px;overflow-y:auto"></div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCliente()">Guardar</button>
@@ -475,6 +496,59 @@ tr:hover td{background:var(--surface2)}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE PEDIDO -->
+<div class="modal-overlay" id="modal-pedido">
+  <div class="modal" style="width:560px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+      <div>
+        <div class="modal-title" style="margin:0" id="mp-titulo">Pedido #—</div>
+        <div id="mp-fecha" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <span id="mp-badge-estado"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Cliente</div>
+        <div id="mp-cliente" style="font-size:13px;font-weight:600"></div>
+        <div id="mp-telefono" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Entrega</div>
+        <div id="mp-tipo" style="font-size:13px;font-weight:600"></div>
+        <div id="mp-direccion" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Orden completa</div>
+      <div id="mp-orden" style="font-size:13px;line-height:1.6;white-space:pre-wrap"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <span style="font-size:16px;font-weight:700;color:var(--accent)" id="mp-total"></span>
+        <span style="font-size:12px;color:var(--muted);margin-left:8px;align-self:flex-end" id="mp-pago"></span>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Cambiar estado</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)" onclick="cambiarEstadoDesdeModal('confirmado')">✅ Confirmar</button>
+        <button class="btn btn-sm" style="background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)" onclick="cambiarEstadoDesdeModal('listo')">🏪 Listo</button>
+        <button class="btn btn-sm" style="background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)" onclick="cambiarEstadoDesdeModal('en_camino')">🛵 En camino</button>
+        <button class="btn btn-sm btn-danger" onclick="cambiarEstadoDesdeModal('cancelado')">❌ Cancelar</button>
+        <button class="btn btn-sm btn-danger" onclick="cambiarEstadoDesdeModal('rechazado')">⛔ Rechazar</button>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Mensaje directo al cliente</div>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="mp-msg" placeholder="Ej: Tu pedido sale en 10 min…" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="enviarMsgDesdePedido()">Enviar</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-pedido')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -547,9 +621,48 @@ const loaders = {
   banco: loadBanco, mensajes: loadMensajes, config: loadConfig, onboarding: loadOnboarding,
 };
 
+// ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
+async function loadNegocioEstado() {
+  const n = await api('/api/negocio/estado');
+  const bc = document.getElementById('ctrl-badge-cierre');
+  const bp = document.getElementById('ctrl-badge-pausa');
+  const bc2 = document.getElementById('ctrl-btn-cierre');
+  const bp2 = document.getElementById('ctrl-btn-pausa');
+  if (!bc) return;
+  if (n.cerrado) {
+    bc.textContent = '🔒 Cerrado'; bc.style.background = 'rgba(239,68,68,.15)'; bc.style.color = 'var(--red)';
+    bc2.textContent = '🔓 Abrir negocio'; bc2.className = 'btn btn-sm btn-secondary';
+  } else {
+    bc.textContent = '🔓 Abierto'; bc.style.background = 'rgba(34,197,94,.15)'; bc.style.color = 'var(--green)';
+    bc2.textContent = '🔒 Cerrar hoy'; bc2.className = 'btn btn-sm btn-secondary';
+  }
+  if (n.pausado) {
+    bp.textContent = '⏸ Bot pausado'; bp.style.background = 'rgba(245,158,11,.15)'; bp.style.color = 'var(--yellow)';
+    bp2.textContent = '▶ Reanudar bot'; bp2.className = 'btn btn-sm btn-secondary';
+  } else {
+    bp.textContent = '▶ Bot activo'; bp.style.background = 'rgba(34,197,94,.1)'; bp.style.color = 'var(--green)';
+    bp2.textContent = '⏸ Pausar bot'; bp2.className = 'btn btn-sm btn-secondary';
+  }
+  return n;
+}
+
+async function toggleCierre() {
+  const n = await api('/api/negocio/estado');
+  await api('/api/negocio/cierre', 'POST', { cerrar: !n.cerrado });
+  toast(!n.cerrado ? '🔒 Negocio cerrado manualmente' : '🔓 Negocio abierto');
+  loadNegocioEstado();
+}
+async function togglePausa() {
+  const n = await api('/api/negocio/estado');
+  await api('/api/negocio/pausa', 'POST', { pausar: !n.pausado });
+  toast(!n.pausado ? '⏸ Bot pausado' : '▶ Bot reactivado');
+  loadNegocioEstado();
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+let _dashLastUpdate = 0;
 async function loadDashboard() {
-  const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones')]);
+  const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones'), loadNegocioEstado()]);
   document.getElementById('sidebar-negocio').textContent = stats.negocio;
   const pct_dom = stats.confirmados > 0 ? Math.round(stats.domicilios_hoy / stats.confirmados * 100) : 0;
   document.getElementById('stats-grid').innerHTML = `
@@ -599,19 +712,35 @@ async function loadDashboard() {
   } else {
     cardCortes.style.display = 'none';
   }
+  // Badge de pendientes en sidebar
+  const nPend = stats.pendientes || 0;
+  const navBadge = document.getElementById('nav-badge-pendientes');
+  if (navBadge) { navBadge.textContent = nPend; navBadge.style.display = nPend > 0 ? '' : 'none'; }
+
+  // Timestamp actualización
+  _dashLastUpdate = Date.now();
+  const tsEl = document.getElementById('dashboard-ts');
+  if (tsEl) tsEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
   loadHistorico();
   const pedidos = await api('/api/pedidos?hoy=1');
   const tbody = document.querySelector('#pedidos-hoy-table tbody');
-  tbody.innerHTML = pedidos.length ? pedidos.map(p => `
-    <tr>
-      <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
+  tbody.innerHTML = pedidos.length ? pedidos.map(p => {
+    const esPendiente = p.estado === 'pendiente';
+    const accion = esPendiente
+      ? `<button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);white-space:nowrap" onclick="confirmarRapido(${p.id},event)">✅ Confirmar</button>`
+      : '';
+    return `<tr>
+      <td style="cursor:pointer;color:var(--accent)" onclick='openModalPedido(${JSON.stringify(p)})'><code>#${p.id}</code></td>
       <td>${p.nombre||''} ${p.apellido||''}<br><span style="color:var(--muted);font-size:11px">${p.telefono||''}</span></td>
       <td>${p.tipo==='domicilio'?'🛵':'🏪'} ${p.tipo||''}</td>
       <td><strong>$${Math.round(p.total||0)}</strong></td>
       <td>${p.metodo_pago||''}</td>
       <td>${badgeEstado(p.estado)}</td>
       <td style="color:var(--muted);font-size:12px">${(p.fecha||'').split(' ')[1]?.substring(0,5)||''}</td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay pedidos hoy</td></tr>';
+      <td style="white-space:nowrap">${accion} <button class="btn btn-sm btn-secondary" onclick='openModalPedido(${JSON.stringify(p)})' title="Ver detalle">🔍</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">No hay pedidos hoy</td></tr>';
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────────
@@ -677,7 +806,58 @@ function exportarCSV() {
 
 async function cambiarEstadoPedido(id, estado) {
   await api(`/api/pedidos/${id}/estado`, 'PUT', { estado });
-  toast('Estado actualizado');
+  toast('Estado actualizado — notificación enviada al cliente');
+}
+
+async function confirmarRapido(id, event) {
+  event.stopPropagation();
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = '…';
+  await api(`/api/pedidos/${id}/estado`, 'PUT', { estado: 'confirmado' });
+  toast('✅ Pedido #' + id + ' confirmado — cliente notificado');
+  loadDashboard();
+}
+
+// ── MODAL DETALLE PEDIDO ──────────────────────────────────────────────────────
+let _modalPedidoActual = null;
+function openModalPedido(p) {
+  _modalPedidoActual = p;
+  document.getElementById('mp-titulo').textContent = `Pedido #${p.id}`;
+  document.getElementById('mp-fecha').textContent = p.fecha || '';
+  document.getElementById('mp-badge-estado').outerHTML = `<span id="mp-badge-estado">${badgeEstado(p.estado)}</span>`;
+  document.getElementById('mp-badge-estado').innerHTML = badgeEstado(p.estado);
+  document.getElementById('mp-cliente').textContent = `${p.nombre||''} ${p.apellido||''}`.trim() || 'Sin nombre';
+  document.getElementById('mp-telefono').textContent = p.telefono || '';
+  document.getElementById('mp-tipo').textContent = p.tipo === 'domicilio' ? '🛵 Domicilio' : '🏪 Mostrador';
+  document.getElementById('mp-orden').textContent = p.orden || '(sin detalle)';
+  document.getElementById('mp-total').textContent = `$${Math.round(p.total || 0)}`;
+  document.getElementById('mp-pago').textContent = p.metodo_pago || '';
+  document.getElementById('mp-msg').value = '';
+  // Dirección si es domicilio
+  const dirEl = document.getElementById('mp-direccion');
+  if (p.tipo === 'domicilio' && (p.calle_numero || p.colonia)) {
+    dirEl.textContent = [p.calle_numero, p.colonia ? 'Col. '+p.colonia : ''].filter(Boolean).join(', ');
+  } else {
+    dirEl.textContent = '';
+  }
+  document.getElementById('modal-pedido').classList.add('show');
+}
+
+async function cambiarEstadoDesdeModal(estado) {
+  if (!_modalPedidoActual) return;
+  await api(`/api/pedidos/${_modalPedidoActual.id}/estado`, 'PUT', { estado });
+  toast('Estado actualizado — cliente notificado');
+  closeModal('modal-pedido');
+  if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
+  else if (document.querySelector('[data-s="pedidos"]').classList.contains('active')) loadPedidos();
+}
+
+async function enviarMsgDesdePedido() {
+  const msg = document.getElementById('mp-msg').value.trim();
+  if (!msg || !_modalPedidoActual) return;
+  const r = await api(`/api/pedidos/${_modalPedidoActual.id}/notificar`, 'POST', { mensaje: msg });
+  if (r.ok) { toast('Mensaje enviado ✅'); document.getElementById('mp-msg').value = ''; }
+  else toast(r.error || 'Error al enviar', false);
 }
 
 // ── CAMBIO 2: nueva función deletePedido ──────────────────────────────────────
@@ -912,7 +1092,7 @@ function exportarClientesCSV() {
   window.open('/api/clientes/export', '_blank');
 }
 
-function openModalCliente(c=null) {
+async function openModalCliente(c=null) {
   document.getElementById('modal-cli-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
   document.getElementById('cli-id').value         = c?.id          || '';
   document.getElementById('cli-nombre').value     = c?.nombre      || '';
@@ -922,6 +1102,28 @@ function openModalCliente(c=null) {
   document.getElementById('cli-colonia').value    = c?.colonia     || '';
   document.getElementById('cli-referencia').value = c?.referencia  || '';
   document.getElementById('cli-whatsapp').value   = '';
+
+  // Historial de pedidos
+  const histSection = document.getElementById('cli-historial-section');
+  const histLista   = document.getElementById('cli-historial-lista');
+  if (c?.telefono) {
+    const pedidos = await api('/api/pedidos?cliente=' + c.telefono);
+    if (pedidos.length) {
+      const iconE = {pendiente:'🟡',confirmado:'✅',cancelado:'❌',rechazado:'⛔',listo:'🏪',en_camino:'🛵'};
+      histLista.innerHTML = pedidos.map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+          <span>${iconE[p.estado]||'⚪'} ${(p.fecha||'').substring(0,10)} — ${p.tipo==='domicilio'?'🛵':'🏪'}</span>
+          <span style="color:var(--muted)">${p.orden?p.orden.substring(0,40)+'…':''}</span>
+          <strong>$${Math.round(p.total||0)}</strong>
+        </div>`).join('');
+      histSection.style.display = '';
+    } else {
+      histSection.style.display = 'none';
+    }
+  } else {
+    histSection.style.display = 'none';
+  }
+
   document.getElementById('modal-cliente').classList.add('show');
 }
 
@@ -957,22 +1159,35 @@ async function deleteCliente(id) {
 }
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
+let _productosCache = [];
 async function loadProductos() {
-  const prods = await api('/api/productos');
+  _productosCache = await api('/api/productos');
   const tbody = document.querySelector('#productos-table tbody');
-  tbody.innerHTML = prods.length ? prods.map(p => `
+  tbody.innerHTML = _productosCache.length ? _productosCache.map(p => `
     <tr>
       <td><strong>${p.nombre}</strong></td>
-      <td style="font-size:12px;color:var(--muted2);max-width:200px">${(p.descripcion||'').substring(0,60)}...</td>
+      <td style="font-size:12px;color:var(--muted2);max-width:200px">${(p.descripcion||'').substring(0,60)}…</td>
       <td>$${p.precio_taco}</td>
       <td>$${p.precio_torta}</td>
       <td>$${p.precio_100g}</td>
-      <td><span class="badge ${p.activo?'badge-green':'badge-red'}">${p.activo?'Activo':'Inactivo'}</span></td>
+      <td>
+        <span class="badge ${p.activo?'badge-green':'badge-red'}" style="cursor:pointer" title="${p.activo?'Clic para marcar agotado':'Clic para marcar disponible'}" onclick="toggleProductoActivo(${p.id},${p.activo?0:1})">
+          ${p.activo?'✓ Activo':'✗ Agotado'}
+        </span>
+      </td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick='openModalProducto(${JSON.stringify(p)})'>✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteProducto(${p.id})">🗑</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay productos</td></tr>';
+}
+
+async function toggleProductoActivo(id, nuevoActivo) {
+  const prod = _productosCache.find(p => p.id === id);
+  if (!prod) return;
+  await api(`/api/productos/${id}`, 'PUT', { ...prod, activo: nuevoActivo });
+  toast(nuevoActivo ? `✓ ${prod.nombre} marcado como disponible` : `✗ ${prod.nombre} marcado como agotado`);
+  loadProductos();
 }
 
 function openModalProducto(p=null) {
@@ -1285,7 +1500,7 @@ async function initApp() {
 setInterval(() => {
   if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
   if (document.querySelector('[data-s="pedidos"]').classList.contains('active')) loadPedidos();
-}, 20000);
+}, 10000);
 
 setInterval(checkWaStatus, 30000);
 

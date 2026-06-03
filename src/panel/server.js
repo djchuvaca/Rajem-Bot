@@ -18,6 +18,7 @@ const { queryOne } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
+const botPausado = require("../estado/bot-pausado");
 const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos/mercadopago");
 
@@ -154,9 +155,30 @@ app.delete("/api/clientes/:id", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
+app.get("/api/negocio/estado", requireAuth, (req, res) => {
+  res.json({
+    cerrado: getConfig("cierre_manual") === "1",
+    pausado: botPausado.pausado,
+  });
+});
+app.post("/api/negocio/pausa", requireAuth, (req, res) => {
+  botPausado.pausado = !!req.body.pausar;
+  res.json({ ok: true, pausado: botPausado.pausado });
+});
+app.post("/api/negocio/cierre", requireAuth, (req, res) => {
+  setConfig("cierre_manual", req.body.cerrar ? "1" : "0");
+  res.json({ ok: true, cerrado: !!req.body.cerrar });
+});
+
 // ── PEDIDOS ───────────────────────────────────────────────────────────────────
 app.get("/api/pedidos", requireAuth, (req, res) => {
-  res.json(req.query.hoy ? getPedidosHoy() : getAllPedidos());
+  if (req.query.hoy) return res.json(getPedidosHoy());
+  if (req.query.cliente) {
+    const { getPedidosPorCliente } = require("../db");
+    return res.json(getPedidosPorCliente(req.query.cliente));
+  }
+  res.json(getAllPedidos());
 });
 const MSGS_ESTADO = {
   confirmado: "✅ Tu pedido ha sido *confirmado*. ¡Pronto estará listo!",
