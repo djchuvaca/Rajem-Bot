@@ -113,6 +113,17 @@ app.delete("/api/productos/:id", requireAuth, (req, res) => { deleteProducto(par
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
 app.get("/api/clientes", requireAuth, (req, res) => res.json(getAllClientes()));
 
+// Rutas estáticas ANTES del parámetro dinámico :telefono
+app.get("/api/clientes/export", requireAuth, (req, res) => {
+  const clientes = getAllClientes();
+  const cols     = ["id","nombre","apellido","telefono","calle_numero","colonia","referencia","total_pedidos","fecha_registro"];
+  const enc      = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows     = [cols.join(","), ...clientes.map(c => cols.map(col => enc(c[col])).join(","))];
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="clientes_${new Date().toISOString().substring(0, 10)}.csv"`);
+  res.send("﻿" + rows.join("\n"));
+});
+
 app.get("/api/clientes/:telefono", requireAuth, (req, res) => {
   const cliente = getCliente(req.params.telefono);
   if (!cliente) return res.status(404).json({ error: "No encontrado" });
@@ -232,17 +243,6 @@ app.get("/api/reportes", requireAuth, (req, res) => {
     [desde, hasta]
   );
   res.json({ stats, porDia });
-});
-
-// ── EXPORTAR CLIENTES CSV ────────────────────────────────────────────────────
-app.get("/api/clientes/export", requireAuth, (req, res) => {
-  const clientes = getAllClientes();
-  const cols     = ["id","nombre","apellido","telefono","calle_numero","colonia","referencia","total_pedidos","fecha_registro"];
-  const enc      = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const rows     = [cols.join(","), ...clientes.map(c => cols.map(col => enc(c[col])).join(","))];
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="clientes_${new Date().toISOString().substring(0, 10)}.csv"`);
-  res.send("﻿" + rows.join("\n"));
 });
 
 // ── TOP CLIENTES ──────────────────────────────────────────────────────────────
