@@ -84,6 +84,7 @@ module.exports = {
   getAllPedidos:               modelos.getAllPedidos,
   getPedidosPorCliente:       modelos.getPedidosPorCliente,
   getPedidosPorFecha:         modelos.getPedidosPorFecha,
+  getStatsReporte:            modelos.getStatsReporte,
   updatePedidoEstado:         modelos.updatePedidoEstado,
   deletePedido:               modelos.deletePedido,
 

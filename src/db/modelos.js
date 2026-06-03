@@ -170,6 +170,39 @@ function getPedidosPorFecha(fechaInicio, fechaFin) {
   );
 }
 
+function getStatsReporte(fechaInicio, fechaFin) {
+  const pedidos     = getPedidosPorFecha(fechaInicio, fechaFin);
+  const confirmados = pedidos.filter(p => ['confirmado','listo','en_camino'].includes(p.estado));
+  const cancelados  = pedidos.filter(p => ['cancelado','rechazado'].includes(p.estado));
+  const domicilios  = confirmados.filter(p => p.tipo === 'domicilio');
+  const mostradores = confirmados.filter(p => p.tipo === 'mostrador');
+  const ventas      = confirmados.reduce((s, p) => s + (p.total || 0), 0);
+  const ticket      = confirmados.length ? Math.round(ventas / confirmados.length) : 0;
+
+  const productos = getProductos();
+  const conteoCortes = {};
+  for (const p of pedidos) {
+    const orden = (p.orden || '').toLowerCase();
+    for (const prod of productos) {
+      if (orden.includes(prod.nombre.toLowerCase()))
+        conteoCortes[prod.nombre] = (conteoCortes[prod.nombre] || 0) + 1;
+    }
+  }
+
+  return {
+    total:            pedidos.length,
+    confirmados:      confirmados.length,
+    cancelados:       cancelados.length,
+    domicilios:       domicilios.length,
+    mostradores:      mostradores.length,
+    ventas:           Math.round(ventas),
+    ticket,
+    conteoCortes,
+    ventasDomicilio:  Math.round(domicilios.reduce((s, p) => s + (p.total || 0), 0)),
+    ventasMostrador:  Math.round(mostradores.reduce((s, p) => s + (p.total || 0), 0)),
+  };
+}
+
 // ─── PAGOS PENDIENTES (MercadoPago) ──────────────────────────────────────────
 function guardarPagoPendiente(pedidoId, { jid, telefono, resumen, nombre }, expiraEn) {
   run(
@@ -200,7 +233,7 @@ module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
-  getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha,
+  getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha, getStatsReporte,
   setProductoActivo, updateProductoPrecio, getTopClientes,
   guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
 };

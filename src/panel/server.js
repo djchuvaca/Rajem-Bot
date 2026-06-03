@@ -12,6 +12,7 @@ const {
   getAllClientes, getCliente, upsertCliente, deleteCliente,
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
   getConfig, guardarTelefonoReal, getJIDReal,
+  getPedidosPorFecha, getStatsReporte, getTopClientes,
 } = require("../db");
 const { queryOne } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
@@ -180,11 +181,12 @@ app.delete("/api/pedidos/:id", requireAuth, (req, res) => {
 // ── STATS ─────────────────────────────────────────────────────────────────────
 app.get("/api/stats", requireAuth, (req, res) => {
   const pedidosHoy  = getPedidosHoy();
-  const confirmados = pedidosHoy.filter(p => p.estado === "confirmado");
+  const confirmados = pedidosHoy.filter(p => ["confirmado","listo","en_camino"].includes(p.estado));
   const totalVentas = confirmados.reduce((a, p) => a + (p.total || 0), 0);
   const ticket      = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
+  const domicilios  = confirmados.filter(p => p.tipo === "domicilio");
+  const mostradores = confirmados.filter(p => p.tipo === "mostrador");
 
-  // Corte más pedido hoy (busca en texto de la orden)
   const conteoCortes = {};
   const CORTES_STAT  = getProductos().map(p => p.nombre.toLowerCase());
   for (const p of pedidosHoy) {
@@ -194,18 +196,59 @@ app.get("/api/stats", requireAuth, (req, res) => {
   const corteMasPedido = Object.entries(conteoCortes).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
   res.json({
-    pedidos_hoy:      pedidosHoy.length,
-    pendientes:       pedidosHoy.filter(p => p.estado === "pendiente").length,
-    confirmados:      confirmados.length,
-    cancelados:       pedidosHoy.filter(p => p.estado === "cancelado").length,
-    rechazados:       pedidosHoy.filter(p => p.estado === "rechazado").length,
-    total_ventas_hoy: totalVentas,
-    ticket_promedio:  ticket,
-    corte_mas_pedido: corteMasPedido,
-    conteo_cortes:    conteoCortes,
-    total_clientes:   queryOne("SELECT COUNT(*) as n FROM clientes")?.n || 0,
-    negocio:          getConfig("nombre_negocio") || "Tacos Javier",
+    pedidos_hoy:       pedidosHoy.length,
+    pendientes:        pedidosHoy.filter(p => p.estado === "pendiente").length,
+    confirmados:       confirmados.length,
+    cancelados:        pedidosHoy.filter(p => p.estado === "cancelado").length,
+    rechazados:        pedidosHoy.filter(p => p.estado === "rechazado").length,
+    total_ventas_hoy:  totalVentas,
+    ticket_promedio:   ticket,
+    domicilios_hoy:    domicilios.length,
+    mostradores_hoy:   mostradores.length,
+    ventas_domicilio:  Math.round(domicilios.reduce((s, p) => s + (p.total || 0), 0)),
+    ventas_mostrador:  Math.round(mostradores.reduce((s, p) => s + (p.total || 0), 0)),
+    corte_mas_pedido:  corteMasPedido,
+    conteo_cortes:     conteoCortes,
+    total_clientes:    queryOne("SELECT COUNT(*) as n FROM clientes")?.n || 0,
+    negocio:           getConfig("nombre_negocio") || "Tacos Javier",
   });
+});
+
+// ── REPORTES POR RANGO DE FECHAS ──────────────────────────────────────────────
+app.get("/api/reportes", requireAuth, (req, res) => {
+  const { desde, hasta } = req.query;
+  if (!desde || !hasta) return res.status(400).json({ error: "Parámetros desde y hasta requeridos" });
+  const { queryAll } = require("../db/core");
+  const stats  = getStatsReporte(desde, hasta);
+  const porDia = queryAll(
+    `SELECT date(p.fecha, 'localtime') AS dia,
+            COUNT(*)                                                             AS total,
+            SUM(CASE WHEN p.estado IN ('confirmado','listo','en_camino') THEN 1 ELSE 0 END) AS confirmados,
+            SUM(CASE WHEN p.tipo='domicilio' AND p.estado IN ('confirmado','listo','en_camino') THEN 1 ELSE 0 END) AS domicilios,
+            ROUND(SUM(CASE WHEN p.estado IN ('confirmado','listo','en_camino') THEN p.total ELSE 0 END), 2) AS ventas
+     FROM pedidos p
+     WHERE date(p.fecha, 'localtime') >= ? AND date(p.fecha, 'localtime') <= ?
+     GROUP BY dia ORDER BY dia ASC`,
+    [desde, hasta]
+  );
+  res.json({ stats, porDia });
+});
+
+// ── EXPORTAR CLIENTES CSV ────────────────────────────────────────────────────
+app.get("/api/clientes/export", requireAuth, (req, res) => {
+  const clientes = getAllClientes();
+  const cols     = ["id","nombre","apellido","telefono","calle_numero","colonia","referencia","total_pedidos","fecha_registro"];
+  const enc      = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows     = [cols.join(","), ...clientes.map(c => cols.map(col => enc(c[col])).join(","))];
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="clientes_${new Date().toISOString().substring(0, 10)}.csv"`);
+  res.send("﻿" + rows.join("\n"));
+});
+
+// ── TOP CLIENTES ──────────────────────────────────────────────────────────────
+app.get("/api/stats/top-clientes", requireAuth, (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+  res.json(getTopClientes(limit));
 });
 
 // ── STATS HISTÓRICO ───────────────────────────────────────────────────────────

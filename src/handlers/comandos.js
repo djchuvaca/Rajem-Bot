@@ -78,7 +78,7 @@ async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
-  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|en_camino|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado)/i.test(texto);
+  const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|en_camino|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado|cortes|ingresos)/i.test(texto);
   if (!esComando) return;
 
   // ── !ayuda — lista de comandos ─────────────────────────────────────────────
@@ -105,6 +105,8 @@ async function handleComandos(msg, client) {
       `!mensaje [tel] [texto] — mensaje directo\n\n` +
       `*Reportes:*\n` +
       `!stats — resumen del día\n` +
+      `!ingresos — resumen financiero (ventas, ticket, método de pago)\n` +
+      `!cortes — desglose de pedidos por corte hoy\n` +
       `!reporte ayer — resumen de ayer\n` +
       `!reporte semana — últimos 7 días\n\n` +
       `*Menú y productos:*\n` +
@@ -1038,6 +1040,88 @@ async function handleComandos(msg, client) {
     // Borrar también sesiones huérfanas en BD (no cargadas en memoria)
     limpiarTodasLasSesionesDB();
     await msg.reply(`🗑️ Listo. Se eliminaron *${jidsActivos.size} sesión(es)* activa(s) y se limpió la BD de sesiones.`);
+    return;
+  }
+
+  // ── !cortes — desglose de pedidos por corte hoy ──────────────────────────
+  if (/^!cortes$/i.test(texto)) {
+    const pedidos    = getPedidosHoy();
+    const productos  = getProductos();
+    const negocio    = getConfig("nombre_negocio") || "Tacos Javier";
+    const fecha      = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+
+    if (pedidos.length === 0) {
+      await msg.reply("📋 No hay pedidos registrados hoy todavía.");
+      return;
+    }
+
+    const conteo = {};
+    for (const p of pedidos) {
+      const orden = (p.orden || "").toLowerCase();
+      for (const prod of productos) {
+        if (orden.includes(prod.nombre.toLowerCase()))
+          conteo[prod.nombre] = (conteo[prod.nombre] || 0) + 1;
+      }
+    }
+
+    const ranking = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
+    if (!ranking.length) {
+      await msg.reply("🥩 No se encontraron cortes identificables en los pedidos de hoy.");
+      return;
+    }
+
+    const total = ranking.reduce((s, [, n]) => s + n, 0);
+    let out = `🥩 *Cortes del día — ${negocio}*\n_${fecha}_\n━━━━━━━━━━━━━━━━━━\n`;
+    for (const [corte, n] of ranking) {
+      const pct  = Math.round(n / total * 100);
+      const bar  = "█".repeat(Math.round(pct / 10)) + "░".repeat(10 - Math.round(pct / 10));
+      const cap  = corte.charAt(0).toUpperCase() + corte.slice(1);
+      out += `*${cap}*: ${n} pedido${n !== 1 ? "s" : ""} (${pct}%)\n${bar}\n\n`;
+    }
+    out += `📦 Total identificados: *${total}* en ${pedidos.length} pedido${pedidos.length !== 1 ? "s" : ""}`;
+    await msg.reply(out);
+    return;
+  }
+
+  // ── !ingresos — resumen financiero del día ────────────────────────────────
+  if (/^!ingresos$/i.test(texto)) {
+    const pedidos    = getPedidosHoy();
+    const negocio    = getConfig("nombre_negocio") || "Tacos Javier";
+    const fecha      = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+    const confirmados = pedidos.filter(p => ["confirmado","listo","en_camino"].includes(p.estado));
+    const pendientes  = pedidos.filter(p => p.estado === "pendiente");
+    const domicilios  = confirmados.filter(p => p.tipo === "domicilio");
+    const mostradores = confirmados.filter(p => p.tipo === "mostrador");
+
+    const ventas         = confirmados.reduce((s, p) => s + (p.total || 0), 0);
+    const ventasDom      = domicilios.reduce((s, p) => s + (p.total || 0), 0);
+    const ventasMos      = mostradores.reduce((s, p) => s + (p.total || 0), 0);
+    const ticket         = confirmados.length ? Math.round(ventas / confirmados.length) : 0;
+    const ventasPend     = pendientes.reduce((s, p) => s + (p.total || 0), 0);
+
+    const metodos = {};
+    for (const p of confirmados) {
+      const m = (p.metodo_pago || "otro").toLowerCase();
+      metodos[m] = (metodos[m] || 0) + (p.total || 0);
+    }
+
+    let out = `💰 *INGRESOS DEL DÍA — ${negocio}*\n_${fecha}_\n━━━━━━━━━━━━━━━━━━\n`;
+    out += `💵 Total cobrado:   *$${Math.round(ventas)}*\n`;
+    if (ticket) out += `🎫 Ticket promedio:  *$${ticket}*\n`;
+    out += `\n🛵 Domicilio:  *${domicilios.length} pedidos — $${Math.round(ventasDom)}*\n`;
+    out += `🏪 Mostrador:  *${mostradores.length} pedidos — $${Math.round(ventasMos)}*\n`;
+
+    if (Object.keys(metodos).length) {
+      out += `\n💳 *Por método de pago:*\n`;
+      for (const [m, monto] of Object.entries(metodos).sort((a, b) => b[1] - a[1]))
+        out += `   ${m}: $${Math.round(monto)}\n`;
+    }
+
+    if (ventasPend > 0)
+      out += `\n⏳ En espera (${pendientes.length} pendiente${pendientes.length !== 1 ? "s" : ""}): *$${Math.round(ventasPend)}*\n`;
+
+    out += `━━━━━━━━━━━━━━━━━━`;
+    await msg.reply(out);
     return;
   }
 

@@ -155,6 +155,7 @@ tr:hover td{background:var(--surface2)}
     <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos</div>
     <div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
     <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos</div>
+    <div class="nav-item" onclick="showSection('reportes')" data-s="reportes"><span class="icon">📈</span> Reportes</div>
     <div class="nav-sep"></div>
     <div class="nav-item" onclick="showSection('horarios')" data-s="horarios"><span class="icon">🕐</span> Horarios</div>
     <div class="nav-item" onclick="showSection('banco')" data-s="banco"><span class="icon">💳</span> Datos Banco</div>
@@ -212,6 +213,7 @@ tr:hover td{background:var(--surface2)}
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
           <div class="card-title" style="margin:0">Todos los pedidos</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="form-input" id="buscar-pedido" placeholder="Buscar nombre o teléfono…" style="width:200px" oninput="filtrarPedidosTabla(this.value)">
             <select class="form-select" style="width:150px" id="filtro-estado" onchange="loadPedidos()">
               <option value="">Todos</option>
               <option value="pendiente">Pendientes</option>
@@ -232,14 +234,19 @@ tr:hover td{background:var(--surface2)}
     <!-- CLIENTES -->
     <div class="section" id="s-clientes">
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
           <div class="card-title" style="margin:0">Clientes registrados</div>
-          <button class="btn btn-primary btn-sm" onclick="openModalCliente()">+ Agregar cliente</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="form-input" id="buscar-cliente" placeholder="Buscar por nombre o teléfono…" style="width:240px" oninput="filtrarClientes(this.value)">
+            <button class="btn btn-secondary btn-sm" onclick="exportarClientesCSV()">⬇ CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="openModalCliente()">+ Agregar cliente</button>
+          </div>
         </div>
         <div class="table-wrap"><table id="clientes-table">
-          <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Dirección</th><th>Pedidos</th><th>Registro</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Pedidos</th><th>Registro</th><th></th></tr></thead>
           <tbody></tbody>
         </table></div>
+        <div id="clientes-count" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
       </div>
     </div>
 
@@ -251,6 +258,40 @@ tr:hover td{background:var(--surface2)}
           <button class="btn btn-primary btn-sm" onclick="openModalProducto()">+ Agregar</button>
         </div>
         <div class="table-wrap"><table id="productos-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Taco</th><th>Torta</th><th>$/100g</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- REPORTES -->
+    <div class="section" id="s-reportes">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+          <div class="card-title" style="margin:0">Rango de fechas</div>
+          <input type="date" class="form-input" id="rep-desde" style="width:160px">
+          <span style="color:var(--muted);font-size:13px">a</span>
+          <input type="date" class="form-input" id="rep-hasta" style="width:160px">
+          <button class="btn btn-primary btn-sm" onclick="generarReporte()">Generar reporte</button>
+          <button class="btn btn-secondary btn-sm" onclick="repAtajos('hoy')">Hoy</button>
+          <button class="btn btn-secondary btn-sm" onclick="repAtajos('semana')">7 días</button>
+          <button class="btn btn-secondary btn-sm" onclick="repAtajos('mes')">30 días</button>
+        </div>
+        <div id="rep-stats-grid" class="stats-grid" style="display:none"></div>
+        <div id="rep-desglose" style="display:none;margin-bottom:20px"></div>
+        <div id="rep-cortes" style="display:none;margin-bottom:20px"></div>
+        <div id="rep-grafico" style="display:none;margin-bottom:20px">
+          <div class="card-title">Ventas por día</div>
+          <div id="rep-grafico-barras"></div>
+        </div>
+        <div id="rep-tabla-wrap" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="card-title" style="margin:0">Pedidos del período</div>
+            <button class="btn btn-secondary btn-sm" onclick="exportarReporteCSV()">⬇ Exportar CSV</button>
+          </div>
+          <div class="table-wrap"><table id="rep-tabla">
+            <thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+        <div id="rep-empty" style="display:none" class="empty">Selecciona un rango de fechas y haz clic en <strong>Generar reporte</strong></div>
       </div>
     </div>
 
@@ -482,6 +523,7 @@ const sections = {
   pedidos:    { title:'Pedidos', sub:'Historial completo' },
   clientes:   { title:'Clientes', sub:'Base de clientes' },
   productos:  { title:'Productos', sub:'Menú y precios' },
+  reportes:   { title:'Reportes', sub:'Análisis por período' },
   horarios:   { title:'Horarios', sub:'Horario de servicio' },
   banco:      { title:'Datos Banco', sub:'Información de transferencia' },
   mensajes:   { title:'Mensajes Bot', sub:'Textos del bot' },
@@ -501,20 +543,23 @@ function showSection(name) {
 
 const loaders = {
   dashboard: loadDashboard, pedidos: loadPedidos, clientes: loadClientes,
-  productos: loadProductos, horarios: loadHorarios, banco: loadBanco,
-  mensajes: loadMensajes, config: loadConfig, onboarding: loadOnboarding,
+  productos: loadProductos, reportes: loadReportes, horarios: loadHorarios,
+  banco: loadBanco, mensajes: loadMensajes, config: loadConfig, onboarding: loadOnboarding,
 };
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones')]);
   document.getElementById('sidebar-negocio').textContent = stats.negocio;
+  const pct_dom = stats.confirmados > 0 ? Math.round(stats.domicilios_hoy / stats.confirmados * 100) : 0;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card"><div class="stat-num">${stats.pedidos_hoy}</div><div class="stat-label">Pedidos hoy</div></div>
     <div class="stat-card yellow"><div class="stat-num">${stats.pendientes}</div><div class="stat-label">Pendientes</div></div>
     <div class="stat-card green"><div class="stat-num">${stats.confirmados}</div><div class="stat-label">Confirmados</div></div>
     <div class="stat-card red"><div class="stat-num">${stats.cancelados+stats.rechazados}</div><div class="stat-label">Cancelados/Rechazados</div></div>
     <div class="stat-card blue"><div class="stat-num">$${Math.round(stats.total_ventas_hoy)}</div><div class="stat-label">Ventas hoy</div></div>
+    <div class="stat-card green"><div class="stat-num">${stats.ticket_promedio > 0 ? '$'+stats.ticket_promedio : '—'}</div><div class="stat-label">Ticket promedio</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:18px">🛵${stats.domicilios_hoy} / 🏪${stats.mostradores_hoy}</div><div class="stat-label">Domicilio / Mostrador</div></div>
     <div class="stat-card"><div class="stat-num">${stats.total_clientes}</div><div class="stat-label">Clientes totales</div></div>
     <div class="stat-card blue" style="cursor:pointer" onclick="document.getElementById('card-sesiones').scrollIntoView({behavior:'smooth'})">
       <div class="stat-num">${sesData.total||0}</div><div class="stat-label">Chats activos</div>
@@ -570,16 +615,27 @@ async function loadDashboard() {
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────────
-async function loadPedidos() {
-  const filtro  = document.getElementById('filtro-estado').value;
-  const desde   = document.getElementById('filtro-desde').value;
-  const hasta   = document.getElementById('filtro-hasta').value;
-  const pedidos = await api('/api/pedidos');
-  let lista = filtro ? pedidos.filter(p => p.estado === filtro) : pedidos;
-  if (desde) lista = lista.filter(p => (p.fecha || '') >= desde);
-  if (hasta) lista = lista.filter(p => (p.fecha || '') <= hasta + ' 23:59:59');
+let _pedidosTodos = [];
+
+function filtrarPedidosTabla(q) {
+  const query = (q || '').toLowerCase().trim();
+  const filtro = document.getElementById('filtro-estado')?.value || '';
+  const desde  = document.getElementById('filtro-desde')?.value || '';
+  const hasta  = document.getElementById('filtro-hasta')?.value || '';
+  let lista = _pedidosTodos;
+  if (filtro) lista = lista.filter(p => p.estado === filtro);
+  if (desde)  lista = lista.filter(p => (p.fecha||'') >= desde);
+  if (hasta)  lista = lista.filter(p => (p.fecha||'') <= hasta + ' 23:59:59');
+  if (query)  lista = lista.filter(p => {
+    const nombre = `${p.nombre||''} ${p.apellido||''}`.toLowerCase();
+    return nombre.includes(query) || (p.telefono||'').includes(query);
+  });
+  renderPedidosTabla(lista);
+}
+
+function renderPedidosTabla(lista) {
   window._pedidosData = lista;
-  const tbody   = document.querySelector('#pedidos-table tbody');
+  const tbody = document.querySelector('#pedidos-table tbody');
   tbody.innerHTML = lista.length ? lista.map(p => `
     <tr>
       <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
@@ -599,6 +655,11 @@ async function loadPedidos() {
         <button class="btn btn-danger btn-sm" onclick="deletePedido(${p.id})" title="Eliminar pedido">🗑 Eliminar</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="10" class="empty">No hay pedidos</td></tr>';
+}
+
+async function loadPedidos() {
+  _pedidosTodos = await api('/api/pedidos');
+  filtrarPedidosTabla(document.getElementById('buscar-pedido')?.value || '');
 }
 
 function exportarCSV() {
@@ -631,6 +692,165 @@ async function deletePedido(id) {
   }
 }
 
+// ── REPORTES ──────────────────────────────────────────────────────────────────
+let _repPedidos = [];
+
+function repAtajos(periodo) {
+  const hoy   = new Date();
+  const fmt   = d => d.toISOString().substring(0, 10);
+  const hasta = fmt(hoy);
+  let desde;
+  if (periodo === 'hoy') {
+    desde = hasta;
+  } else if (periodo === 'semana') {
+    const d = new Date(hoy); d.setDate(hoy.getDate() - 6); desde = fmt(d);
+  } else {
+    const d = new Date(hoy); d.setDate(hoy.getDate() - 29); desde = fmt(d);
+  }
+  document.getElementById('rep-desde').value = desde;
+  document.getElementById('rep-hasta').value = hasta;
+  generarReporte();
+}
+
+async function generarReporte() {
+  const desde = document.getElementById('rep-desde').value;
+  const hasta = document.getElementById('rep-hasta').value;
+  if (!desde || !hasta) { toast('Selecciona el rango de fechas', false); return; }
+  if (desde > hasta)    { toast('La fecha inicial debe ser antes que la final', false); return; }
+
+  const data = await api(`/api/reportes?desde=${desde}&hasta=${hasta}`);
+  if (data.error) { toast(data.error, false); return; }
+
+  const { stats, porDia } = data;
+  _repPedidos = [];
+
+  // Obtener pedidos del período para la tabla
+  const pedTodos = await api('/api/pedidos');
+  _repPedidos = pedTodos.filter(p => {
+    const d = (p.fecha||'').substring(0,10);
+    return d >= desde && d <= hasta;
+  });
+
+  // Stats cards
+  const sg = document.getElementById('rep-stats-grid');
+  sg.style.display = '';
+  sg.innerHTML = `
+    <div class="stat-card"><div class="stat-num">${stats.total}</div><div class="stat-label">Total pedidos</div></div>
+    <div class="stat-card green"><div class="stat-num">${stats.confirmados}</div><div class="stat-label">Confirmados</div></div>
+    <div class="stat-card red"><div class="stat-num">${stats.cancelados}</div><div class="stat-label">Cancelados</div></div>
+    <div class="stat-card blue"><div class="stat-num">$${stats.ventas}</div><div class="stat-label">Ventas totales</div></div>
+    <div class="stat-card green"><div class="stat-num">${stats.ticket > 0 ? '$'+stats.ticket : '—'}</div><div class="stat-label">Ticket promedio</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:18px">🛵${stats.domicilios} / 🏪${stats.mostradores}</div><div class="stat-label">Domicilio / Mostrador</div></div>
+  `;
+
+  // Desglose ventas por canal
+  if (stats.confirmados > 0) {
+    const dEl = document.getElementById('rep-desglose');
+    dEl.style.display = '';
+    dEl.innerHTML = `<div class="card-title">Ventas por canal</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px">
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--blue)">$${stats.ventasDomicilio}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">🛵 Domicilio (${stats.domicilios} pedidos)</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--green)">$${stats.ventasMostrador}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">🏪 Mostrador (${stats.mostradores} pedidos)</div>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById('rep-desglose').style.display = 'none';
+  }
+
+  // Cortes del período
+  const cortesEl = document.getElementById('rep-cortes');
+  const cortes   = stats.conteoCortes || {};
+  const cortesArr = Object.entries(cortes).filter(([,v]) => v > 0).sort(([,a],[,b]) => b-a);
+  if (cortesArr.length > 0) {
+    const totalC = cortesArr.reduce((s,[,v]) => s+v, 0);
+    cortesEl.style.display = '';
+    cortesEl.innerHTML = `<div class="card-title">Cortes del período</div>` +
+      cortesArr.map(([corte, cnt]) => {
+        const pct = Math.round(cnt/totalC*100);
+        return `<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+            <span style="text-transform:capitalize;font-weight:600">${corte}</span>
+            <span style="color:var(--muted)">${cnt} pedidos · ${pct}%</span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:8px">
+            <div style="background:var(--accent);width:${pct}%;height:8px;border-radius:4px"></div>
+          </div>
+        </div>`;
+      }).join('');
+  } else {
+    cortesEl.style.display = 'none';
+  }
+
+  // Gráfico de barras de ventas por día
+  const grafEl = document.getElementById('rep-grafico');
+  if (porDia.length > 1) {
+    grafEl.style.display = '';
+    const maxVenta = Math.max(...porDia.map(d => d.ventas || 0), 1);
+    document.getElementById('rep-grafico-barras').innerHTML = `
+      <div style="display:flex;align-items:flex-end;gap:4px;height:100px;overflow-x:auto;padding-bottom:4px">
+        ${porDia.map(d => {
+          const h = Math.max(Math.round((d.ventas||0)/maxVenta*90), 2);
+          return `<div style="flex:1;min-width:20px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default" title="${d.dia}: ${d.confirmados} pedidos · $${Math.round(d.ventas||0)}">
+            <span style="font-size:10px;color:var(--muted);writing-mode:initial">$${Math.round((d.ventas||0)/1000*10)/10}k</span>
+            <div style="background:var(--accent);width:100%;height:${h}px;border-radius:3px 3px 0 0;transition:opacity .2s;opacity:.85"></div>
+            <span style="font-size:9px;color:var(--muted)">${d.dia.substring(5)}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } else {
+    grafEl.style.display = 'none';
+  }
+
+  // Tabla de pedidos
+  document.getElementById('rep-tabla-wrap').style.display = '';
+  document.getElementById('rep-empty').style.display = 'none';
+  const tbody = document.querySelector('#rep-tabla tbody');
+  tbody.innerHTML = _repPedidos.length ? _repPedidos.map(p => `
+    <tr>
+      <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
+      <td>${p.nombre||''} ${p.apellido||''}<br><span style="color:var(--muted);font-size:11px">${p.telefono||''}</span></td>
+      <td>${p.tipo==='domicilio'?'🛵':'🏪'} ${p.tipo||''}</td>
+      <td style="max-width:180px;font-size:12px;color:var(--muted2)">${(p.orden||'').substring(0,60)}...</td>
+      <td><strong>$${Math.round(p.total||0)}</strong></td>
+      <td>${p.metodo_pago||''}</td>
+      <td>${badgeEstado(p.estado)}</td>
+      <td style="color:var(--muted);font-size:12px">${(p.fecha||'').substring(0,16)}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Sin pedidos en este período</td></tr>';
+}
+
+function exportarReporteCSV() {
+  if (!_repPedidos.length) { toast('Sin datos para exportar', false); return; }
+  const cols = ['id','nombre','apellido','telefono','tipo','orden','total','metodo_pago','estado','fecha'];
+  const enc  = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [cols.join(','), ..._repPedidos.map(p => cols.map(c => enc(p[c])).join(','))];
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = document.getElementById('rep-desde').value;
+  const h = document.getElementById('rep-hasta').value;
+  a.download = `reporte_${d}_al_${h}.csv`;
+  a.click();
+}
+
+function loadReportes() {
+  const hoy = new Date().toISOString().substring(0, 10);
+  if (!document.getElementById('rep-hasta').value) {
+    document.getElementById('rep-hasta').value = hoy;
+    document.getElementById('rep-desde').value = hoy;
+  }
+  document.getElementById('rep-empty').style.display = '';
+  document.getElementById('rep-stats-grid').style.display = 'none';
+  document.getElementById('rep-desglose').style.display = 'none';
+  document.getElementById('rep-cortes').style.display = 'none';
+  document.getElementById('rep-grafico').style.display = 'none';
+  document.getElementById('rep-tabla-wrap').style.display = 'none';
+}
+
 async function loadHistorico() {
   const periodo = document.getElementById('historico-periodo')?.value || 'semana';
   const filas   = await api(`/api/stats/historico?periodo=${periodo}`);
@@ -650,10 +870,12 @@ async function loadHistorico() {
 }
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
-async function loadClientes() {
-  const clientes = await api('/api/clientes');
-  const tbody    = document.querySelector('#clientes-table tbody');
-  tbody.innerHTML = clientes.length ? clientes.map(c => `
+let _clientesData = [];
+
+function renderClientes(lista) {
+  const tbody = document.querySelector('#clientes-table tbody');
+  const count = document.getElementById('clientes-count');
+  tbody.innerHTML = lista.length ? lista.map(c => `
     <tr>
       <td><code style="color:var(--muted);font-size:11px">#${c.id}</code></td>
       <td><strong>${c.nombre||''} ${c.apellido||''}</strong></td>
@@ -665,7 +887,29 @@ async function loadClientes() {
         <button class="btn btn-secondary btn-sm" onclick='openModalCliente(${JSON.stringify(c)})'>✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteCliente(${c.id})">🗑</button>
       </td>
-    </tr>`).join('') : '<tr><td colspan="8" class="empty">No hay clientes registrados</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay clientes registrados</td></tr>';
+  if (count) count.textContent = lista.length !== _clientesData.length
+    ? `Mostrando ${lista.length} de ${_clientesData.length} clientes`
+    : `${_clientesData.length} cliente${_clientesData.length !== 1 ? 's' : ''} registrados`;
+}
+
+function filtrarClientes(q) {
+  const query = q.toLowerCase().trim();
+  if (!query) { renderClientes(_clientesData); return; }
+  renderClientes(_clientesData.filter(c => {
+    const nombre = `${c.nombre||''} ${c.apellido||''}`.toLowerCase();
+    return nombre.includes(query) || (c.telefono||'').includes(query);
+  }));
+}
+
+async function loadClientes() {
+  _clientesData = await api('/api/clientes');
+  const q = document.getElementById('buscar-cliente')?.value || '';
+  filtrarClientes(q);
+}
+
+function exportarClientesCSV() {
+  window.open('/api/clientes/export', '_blank');
 }
 
 function openModalCliente(c=null) {
