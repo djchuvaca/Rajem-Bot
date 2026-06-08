@@ -87,8 +87,9 @@ function procesarItemJSON(item, precios) {
         if (i.presentacion === "pesos")  return `$${i.monto}${cs}`;
         return "";
       }).filter(Boolean).join(" + ");
-      const pg = item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
-      return `${item.grupos}x [${lg}] — $${pg} c/u`;
+      const total = item.grupos * item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
+      const label = item.grupos > 1 ? "platos" : "plato";
+      return `🍽️ ${item.grupos} ${label} (${lg}) — $${total}`;
     }
 
     case "plato_separado": {

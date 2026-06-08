@@ -10,6 +10,7 @@ function getPrecios() {
     pTaco:  parseInt(getConfig("precio_taco")  || "30"),
     pTorta: parseInt(getConfig("precio_torta") || "40"),
     p100g:  parseInt(getConfig("precio_100g")  || "32"),
+    pSalsa: parseInt(getConfig("precio_salsa") || "15"),
   };
 }
 

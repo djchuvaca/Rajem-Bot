@@ -57,7 +57,7 @@ function _textoRecordatorio(numero) {
                : item.presentacion === "torta"  ? `las ${item.cantidad} tortas`
                : item.presentacion === "gramos" ? `los ${item.gramos}g`
                : `los $${item.monto}`;
-    const listaCortes = getProductos().map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
+    const listaCortes = getProductos().filter(p => p.categoria === "corte" || !p.categoria).map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
     return `Hola! 👋 Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
   }
   if (esperandoTipoItem.has(numero)) {
@@ -163,12 +163,13 @@ function parsearSinCorteItems(texto) {
     { re: /\bun\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,          gramos: 1000 },
   ];
   const partes = texto
-    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
+    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)/i)
     .map(p => p.trim().replace(/^y\s+/i, ""))
     .filter(Boolean);
   const CORTES_ACTIVOS = getCortes(); // { surtido: "surtido", buche: "buche", ... } desde BD
   const palabrasCorteActivas = Object.keys(CORTES_ACTIVOS).join("|");
   const items = [];
+  let ultimoTipo = null;
   for (const parte of partes) {
     const tp = parte.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     let corte = null;
@@ -184,7 +185,12 @@ function parsearSinCorteItems(texto) {
       }
     }
     const matchPieza = tp.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
-    if (matchPieza) { items.push({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte }); continue; }
+    if (matchPieza) {
+      const pres = /taco/i.test(matchPieza[2]) ? "taco" : "torta";
+      items.push({ presentacion: pres, cantidad: parseInt(matchPieza[1]), corte });
+      ultimoTipo = pres;
+      continue;
+    }
     let encontroMedida = false;
     for (const medida of MEDIDAS_ITEMS) {
       if (medida.re.test(tp)) { items.push({ presentacion: "gramos", gramos: medida.gramos, corte }); encontroMedida = true; break; }
@@ -193,7 +199,11 @@ function parsearSinCorteItems(texto) {
     const matchGramos = tp.match(/\b(\d+)\s*g(?:ramos?)?\b/);
     if (matchGramos) { items.push({ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte }); continue; }
     const matchMonto = tp.match(/\b(\d+)\b/);
-    if (matchMonto && parseInt(matchMonto[1]) > 40) { items.push({ presentacion: "pesos", monto: parseInt(matchMonto[1]), corte }); continue; }
+    if (matchMonto) {
+      const n = parseInt(matchMonto[1]);
+      if (n > 40) { items.push({ presentacion: "pesos", monto: n, corte }); continue; }
+      if (corte && ultimoTipo) { items.push({ presentacion: ultimoTipo, cantidad: n, corte }); continue; }
+    }
   }
   return items.length > 0 ? { tipo: "pedido", items } : null;
 }

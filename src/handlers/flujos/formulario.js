@@ -15,7 +15,7 @@ const { SALUDO, MENU_FORMATO } = require("../../config");
 const { estaEnHorario, mensajeFueraDeHorario, getRangoHorario } = require("../../horario");
 const { detectarPreguntaFrecuente, calcularScore, detectarSinTipo, parsearPedidoSimple } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
-const { telefonosReales, replyConTyping, ordenPendientePreventa } = require("./utils");
+const { telefonosReales, replyConTyping, ordenPendientePreventa, enFlujoActivo } = require("./utils");
 
 // ── DETECCIÓN Y RESUMEN DE SEÑALES DE PEDIDO ─────────────────────────────────
 const _PRESUPUESTO_RE = /\bpor\s*\$\s*\d+|\$\s*\d+\s*(de|en)\b/i;
@@ -68,8 +68,12 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
   // Para clientes recurrentes con tipo de entrega en el primer mensaje,
   // handleTipoEntrega mostrará el saludo personalizado + menú. Evitar doble saludo.
   if (!tieneTipoEntrega || !primerNombre) {
-    const saludoFinal = primerNombre ? `Hola de nuevo, *${primerNombre}*! 🌮 ¿Qué te pongo hoy?` : SALUDO();
+    const saludoFinal = primerNombre ? `Hola de nuevo, *${primerNombre}*! 😊 Aquí te mando el menú:` : SALUDO();
     await replyConTyping(msg, saludoFinal);
+    if (primerNombre) {
+      await new Promise(r => setTimeout(r, 400));
+      await msg.reply(MENU_FORMATO());
+    }
   }
 
   // Guardar intento de pedido para retomarlo automáticamente tras el formulario
@@ -122,11 +126,13 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
 // ── 2. TIPO DE ENTREGA ────────────────────────────────────────────────────────
 async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, historial, esPreventa) {
   if (historial.length !== 0) return false;
+  if (enFlujoActivo(clienteNumero)) return false;
 
   const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const esMostradorLocal = /\bpara\s+llevar\b|\bpa[`']?\s*llevar\b|\bpaso\s+(yo\s+)?a\s+recoger\b|\bvoy\s+a?\s*recoger\b|\bme\s+(?:lo\s+)?llevo\b|\bpara\s+recoger\b|\blo\s+recojo\b|\byo\s+(recojo|paso\b)/.test(tNorm);
   const tipoEntrega = esMostradorLocal ? "mostrador" : await detectarTipoEntrega(textoOriginal);
   if (tipoEntrega === "ninguno") {
+    if (_tieneSeñalesDePedido(textoOriginal)) return false;
     await msg.reply("*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*");
     return true;
   }
@@ -243,6 +249,36 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   if (!ordenPreResumen.has(clienteNumero)) return false;
 
   const camposActualesFormulario = datosCampos.get(clienteNumero) || {};
+
+  // Capturar tipo de entrega si el flujo de orden corrió antes de preguntar
+  if (!camposActualesFormulario.tipoEntrega && !tipoEntregaCliente.has(clienteNumero)) {
+    const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const esDom = /\bdomicilio\b|\benv[íi]o\b|\ba\s+casa\b/.test(tNorm);
+    const esMos = /\bmostrador\b|\brecoger\b|\bpara\s+llevar\b|\bpa['`]?\s*llevar\b|\bpaso\b|\bvoy\s+a\s+recoger\b|\byo\s+paso\b/.test(tNorm);
+    if (esDom || esMos) {
+      const tipo = esDom ? "domicilio" : "mostrador";
+      tipoEntregaCliente.set(clienteNumero, tipo);
+      camposActualesFormulario.tipoEntrega = tipo;
+      // Pre-cargar datos del cliente frecuente si existen
+      const telGuardado = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero);
+      const telBuscar   = telGuardado || extraerTelefonoDeJID(clienteNumero);
+      const clienteBD   = telBuscar ? getCliente(telBuscar) : null;
+      if (clienteBD && clienteBD.nombre) {
+        camposActualesFormulario.nombre   = [clienteBD.nombre, clienteBD.apellido].filter(Boolean).join(" ");
+        camposActualesFormulario.telefono = clienteBD.telefono;
+        if (tipo === "domicilio") {
+          camposActualesFormulario.calle      = clienteBD.calle_numero || null;
+          camposActualesFormulario.colonia    = clienteBD.colonia      || null;
+          camposActualesFormulario.referencia = clienteBD.referencia   || null;
+        }
+      }
+      datosCampos.set(clienteNumero, camposActualesFormulario);
+    } else {
+      await msg.reply("Para confirmar tu pedido, *¿será para domicilio o pasas a recoger al mostrador?*");
+      return true;
+    }
+  }
+
   const esOrdenDomicilio = camposActualesFormulario.tipoEntrega === "domicilio"
     || (camposActualesFormulario.tipoEntrega == null && tipoEntregaCliente.get(clienteNumero) === "domicilio");
 

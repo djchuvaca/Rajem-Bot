@@ -26,14 +26,16 @@ function _datosBancoDefault() {
 function getMenuFormato() {
   try {
     const productos   = getProductos();
-    const cortes      = productos.filter(p => p.categoria !== "refresco");
+    const cortes      = productos.filter(p => p.categoria === "corte");
     const refrescos   = productos.filter(p => p.categoria === "refresco");
+    const salsas      = productos.filter(p => p.categoria === "salsa");
     const nombres     = cortes.length > 0
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
     const p          = cortes[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
     const domCosto   = getConfig("domicilio_costo") || "50";
     const negocio    = getConfig("nombre_negocio")  || "Tacos Javier";
+    const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
 
     let refrescosSeccion = "";
     if (refrescos.length > 0) {
@@ -41,6 +43,15 @@ function getMenuFormato() {
       refrescosSeccion =
         `🥤 *REFRESCOS* — $${refrescos[0].precio_taco} c/u\n` +
         `${refNombres}\n\n`;
+    }
+
+    let salsasSeccion = "";
+    if (salsas.length > 0) {
+      const salNombres = salsas.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ");
+      salsasSeccion =
+        `🌶️ *SALSAS EXTRA* — $${pSalsa} c/u\n` +
+        `${salNombres}\n` +
+        `_(Los tacos y tortas ya incluyen salsas gratis)_\n\n`;
     }
 
     return (
@@ -58,8 +69,8 @@ function getMenuFormato() {
       `_Incluye tortillas y salsas_\n\n` +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       refrescosSeccion +
+      salsasSeccion +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `🟢 Todos los tacos y tortas incluyen salsas\n` +
       `🛵 Domicilio: $${domCosto} extra\n\n` +
       `*¿Qué te vamos a preparar?* 😊\n`
     );

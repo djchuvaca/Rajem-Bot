@@ -34,7 +34,7 @@ function getCortes() {
     if (!productos || !productos.length) return _cortesDefault();
     const mapa = {};
     for (const p of productos) {
-      if (p.categoria === "refresco") continue;
+      if (p.categoria === "refresco" || p.categoria === "salsa") continue;
       const nombre = p.nombre.toLowerCase().trim();
       mapa[nombre] = nombre;
       // Plural simple: termina en vocal → +s, en consonante → +es
@@ -341,7 +341,7 @@ function extraerCorte(fragmento) {
 // ── DIVIDIR EN ÍTEMS ──────────────────────────────────────────────────────────
 function dividirEnItems(texto) {
   const partes = texto
-    .split(/\n+|,\s*(?:y\s+)?|\s+m[aá]s\s+(?=\d|\bun[ao]?\b|\bmedio\b)|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)/i)
+    .split(/\n+|,\s*(?:y\s+)?|\s+m[aá]s\s+(?=\d|\bun[ao]?\b|\bmedio\b)|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)/i)
     .map(p => p.trim().replace(/^(?:y|m[aá]s)\s+/i, ""))
     .filter(Boolean);
   return partes.length > 1 ? partes : [texto];

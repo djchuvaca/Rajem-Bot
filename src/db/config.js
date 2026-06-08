@@ -120,6 +120,10 @@ function getTelefonoReal(numeroWhatsApp) {
   return row ? row.valor : null;
 }
 
+function getGrupoId() {
+  return process.env.GRUPO_ID || getConfig("grupo_id") || null;
+}
+
 function guardarJIDReal(telefono, jid) {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
     [`jid_real_${telefono}`, jid]);
@@ -139,4 +143,5 @@ module.exports = {
   guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas, limpiarTodasLasSesionesDB,
   guardarTelefonoReal, getTelefonoReal,
   guardarJIDReal, getJIDReal,
+  getGrupoId,
 };

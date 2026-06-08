@@ -10,6 +10,7 @@ const { MENU_FORMATO } = require("../config");
 
 const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping, ordenPendientePreventa } = require("./flujos/utils");
 const botPausado = require("../estado/bot-pausado");
+const { getGrupoId } = require("../db");
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido } = require("./flujos/cancelacion");
 const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
@@ -51,7 +52,7 @@ async function handleMensaje(msg, client) {
         const { limpiarTodo } = require("../estado");
         limpiarTodo(clienteNumero);
         clientesNuevos.delete(clienteNumero);
-        const grupoId = process.env.GRUPO_ID;
+        const grupoId = getGrupoId();
         if (grupoId) {
           const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
           try {

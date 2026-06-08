@@ -1,6 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
-const { upsertCliente, registrarPedido, getMensaje } = require("../db");
+const { upsertCliente, registrarPedido, getMensaje, getGrupoId } = require("../db");
 const {
   esperandoCaptura,
   clientesNuevos,
@@ -25,7 +25,7 @@ async function handleImagen(msg, client) {
     fs.writeFileSync(path.join(CARPETA_CAPTURAS, nombreArchivo), Buffer.from(media.data, "base64"));
     console.log(`📸 Captura guardada: ${nombreArchivo}`);
 
-    const grupoId = process.env.GRUPO_ID;
+    const grupoId = getGrupoId();
     if (grupoId) {
       try {
         await client.sendMessage(grupoId,

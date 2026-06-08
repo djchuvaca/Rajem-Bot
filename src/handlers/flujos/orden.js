@@ -56,6 +56,87 @@ function _listaNombresSalsas() {
 }
 
 
+function _formatearSalsaExtra(nombres, cantidad, pSalsa) {
+  return `🌶️ ${cantidad} salsa${cantidad > 1 ? "s" : ""} extra (${nombres}) — $${cantidad * pSalsa}`;
+}
+
+async function _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTexto, esOrdenDom, esPreventa) {
+  esperandoExtras.delete(clienteNumero);
+  const subtotal = calcularSubtotal(ordenTexto);
+  const textoFinal = ordenTexto + "\n💰 Subtotal: $" + subtotal;
+  esperandoConfirmacionItem.set(clienteNumero, {
+    lineas: textoFinal,
+    _esOrdenFinalCompleta: true,
+    _esOrdenDom: esOrdenDom,
+    _esPreventa: esPreventa,
+  });
+  persistirEstado(clienteNumero);
+  historial.push({ role: "user", content: "" });
+  historial.push({ role: "assistant", content: textoFinal });
+  await msg.reply(textoFinal + "\n\n*¿Es correcto?*");
+}
+
+async function _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, refrescos, salsas, esOrdenDom, esPreventa) {
+  const precios = getPrecios();
+  const { texto: itemsTexto } = jsonALineas(json);
+  let ordenAcum = itemsTexto.split("\n")
+    .filter(l => l.trim() && !/subtotal/i.test(l))
+    .join("\n");
+
+  for (const ref of refrescos.filter(r => !r.esGenerico)) {
+    ordenAcum += "\n" + _formatearRefresco(ref);
+  }
+
+  const salsasEsp = salsas.filter(s => !s.esGenerico);
+  if (salsasEsp.length > 0) {
+    const nombres = salsasEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+    const cantTotal = salsasEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
+    ordenAcum += "\n" + _formatearSalsaExtra(nombres, cantTotal, precios.pSalsa);
+  }
+
+  const refGen = refrescos.find(r => r.esGenerico);
+  const salGen = salsas.find(s => s.esGenerico);
+
+  if (refGen) {
+    const listaRef = _listaNombresRefrescos();
+    const cantMsg = refGen.cantidad > 1 ? `${refGen.cantidad} refrescos` : "un refresco";
+    esperandoExtras.set(clienteNumero, {
+      ordenTexto: ordenAcum,
+      esOrdenDom, esPreventa,
+      tieneRefresco: refrescos.some(r => !r.esGenerico),
+      tieneSalsa: salsasEsp.length > 0,
+      fase: "especRefresco",
+      _cantidadRefPendiente: refGen.cantidad,
+      _cantidadSalPendiente: salGen ? salGen.cantidad : null,
+      _flujoUnificado: true,
+    });
+    persistirEstado(clienteNumero);
+    await msg.reply(`Quieres *${cantMsg}* 🥤 ¿Cuáles serían?\n\n*${listaRef}*`);
+    return;
+  }
+
+  if (salGen) {
+    const listaSalsas = _listaNombresSalsas();
+    const cantMsg = salGen.cantidad > 1 ? `${salGen.cantidad} salsas` : "una salsa";
+    esperandoExtras.set(clienteNumero, {
+      ordenTexto: ordenAcum,
+      esOrdenDom, esPreventa,
+      tieneRefresco: refrescos.some(r => !r.esGenerico),
+      tieneSalsa: false,
+      fase: "especSalsa",
+      _cantidadSalPendiente: salGen.cantidad,
+      _cantidadRefPendiente: null,
+      _flujoUnificado: true,
+    });
+    persistirEstado(clienteNumero);
+    await msg.reply(`También quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+    return;
+  }
+
+  pedidoJSONActual.set(clienteNumero, json);
+  await _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenAcum, esOrdenDom, esPreventa);
+}
+
 function _formatearRefresco(ref) {
   const nombreDisplay = ref.nombre.charAt(0).toUpperCase() + ref.nombre.slice(1);
   const precio = ref.precio * ref.cantidad;
@@ -76,10 +157,10 @@ async function _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, esOrdenDom,
     return;
   }
 
-  // Asegurarse de que tipoEntrega esté en datosCampos
+  // Asegurarse de que tipoEntrega esté en datosCampos (solo si ya se conoce)
   const campos = datosCampos.get(clienteNumero) || {};
-  if (!campos.tipoEntrega) {
-    campos.tipoEntrega = esOrdenDom ? "domicilio" : "mostrador";
+  if (!campos.tipoEntrega && tipoEntregaCliente.has(clienteNumero)) {
+    campos.tipoEntrega = tipoEntregaCliente.get(clienteNumero);
     datosCampos.set(clienteNumero, campos);
   }
 
@@ -148,9 +229,9 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
     persistirEstado(clienteNumero);
     await msg.reply(resultado.texto + "\n\n*¿Agrego esto a tu pedido?*");
   } else {
-    esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pendiente._refrescosPendientes || [], _salsasPendientes: pendiente._salsasPendientes || [] });
-    persistirEstado(clienteNumero);
-    await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
+    const esOrdDom = tipoEntregaCliente.get(clienteNumero) === "domicilio";
+    const esPrev   = clientesPreventa.has(clienteNumero);
+    await _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, pendiente._refrescosPendientes || [], pendiente._salsasPendientes || [], esOrdDom, esPrev);
   }
   console.log(`Bot: [SIN TIPO → ${tipo}] corte: ${pendiente.corte}, cantidad: ${pendiente.cantidad}`);
   return true;
@@ -298,6 +379,20 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       return true;
     }
 
+    // Orden completa resuelta (flujo unificado) → ir al formulario directamente
+    if (itemData._esOrdenFinalCompleta) {
+      const ordenCompleta = itemData.lineas.split("\n")
+        .filter(l => l.trim() && !/subtotal/i.test(l))
+        .join("\n");
+      const esPrev   = clientesPreventa.has(clienteNumero);
+      const esOrdDom = itemData._esOrdenDom !== undefined ? itemData._esOrdenDom : esOrdenDom;
+      historial.push({ role: "user",      content: "si, correcto" });
+      historial.push({ role: "assistant", content: itemData.lineas });
+      persistirEstado(clienteNumero);
+      await _iniciarFormPostOrden(msg, clienteNumero, ordenCompleta, esOrdDom, esPrev, historial);
+      return true;
+    }
+
     // ── Nuevo flujo extras o flujo legacy ─────────────────────────────────────
     const extrasCtx = esperandoExtras.has(clienteNumero) ? esperandoExtras.get(clienteNumero) : null;
     const ordenActual = extrasCtx ? extrasCtx.ordenTexto : (esperandoAgregarMas.get(clienteNumero) || "");
@@ -402,6 +497,78 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     return true;
   }
 
+  // Extras agregados desde el "¿Es correcto?" final (flujo unificado)
+  if (itemData._esOrdenFinalCompleta) {
+    const { textoLimpio, refrescos: refsDetectados, salsas: salsDetectados } = separarRefresco(textoOriginal);
+    const jsonExtra = textoLimpio.trim().length > 2 ? parsearPedidoSimple(textoLimpio) : null;
+    const tieneExtras = refsDetectados.length > 0 || salsDetectados.length > 0 || (jsonExtra?.tipo === "pedido");
+
+    if (tieneExtras) {
+      const esPrev   = clientesPreventa.has(clienteNumero);
+      const esOrdDom = itemData._esOrdenDom !== undefined ? itemData._esOrdenDom : esOrdenDom;
+      let nuevaBase  = itemData.lineas.split("\n")
+        .filter(l => l.trim() && !/subtotal/i.test(l))
+        .join("\n");
+
+      if (jsonExtra?.tipo === "pedido") {
+        const { texto: extraTexto } = jsonALineas(jsonExtra);
+        const extraLineas = extraTexto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+        nuevaBase += "\n" + extraLineas;
+      }
+
+      const refEsp = refsDetectados.filter(r => !r.esGenerico);
+      const salEsp = salsDetectados.filter(s => !s.esGenerico);
+      const refGen = refsDetectados.find(r => r.esGenerico);
+      const salGen = salsDetectados.find(s => s.esGenerico);
+
+      for (const ref of refEsp) nuevaBase += "\n" + _formatearRefresco(ref);
+      if (salEsp.length > 0) {
+        const precios  = getPrecios();
+        const nombres  = salEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+        const cant     = salEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
+        nuevaBase += "\n" + _formatearSalsaExtra(nombres, cant, precios.pSalsa);
+      }
+
+      esperandoConfirmacionItem.delete(clienteNumero);
+
+      if (refGen) {
+        const listaRef = _listaNombresRefrescos();
+        const cantMsg  = refGen.cantidad > 1 ? `${refGen.cantidad} refrescos` : "un refresco";
+        esperandoExtras.set(clienteNumero, {
+          ordenTexto: nuevaBase, esOrdenDom: esOrdDom, esPreventa: esPrev,
+          tieneRefresco: refEsp.length > 0, tieneSalsa: salEsp.length > 0,
+          fase: "especRefresco",
+          _cantidadRefPendiente: refGen.cantidad,
+          _cantidadSalPendiente: salGen ? salGen.cantidad : null,
+          _flujoUnificado: true,
+        });
+        persistirEstado(clienteNumero);
+        await msg.reply(`¿Cuál *${cantMsg}*? 🥤\n\n*${listaRef}*`);
+        return true;
+      }
+
+      if (salGen) {
+        const listaSal = _listaNombresSalsas();
+        const cantMsg  = salGen.cantidad > 1 ? `${salGen.cantidad} salsas` : "una salsa";
+        esperandoExtras.set(clienteNumero, {
+          ordenTexto: nuevaBase, esOrdenDom: esOrdDom, esPreventa: esPrev,
+          tieneRefresco: refEsp.length > 0, tieneSalsa: false,
+          fase: "especSalsa",
+          _cantidadSalPendiente: salGen.cantidad,
+          _cantidadRefPendiente: null,
+          _flujoUnificado: true,
+        });
+        persistirEstado(clienteNumero);
+        await msg.reply(`¿Cuál *${cantMsg}* extra? 🌶️\n\n*${listaSal}*`);
+        return true;
+      }
+
+      historial.push({ role: "user", content: textoOriginal });
+      await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaBase, esOrdDom, esPrev);
+      return true;
+    }
+  }
+
   // FAQ durante confirmación: responder y volver a pedir confirmación
   const faqConf = detectarPreguntaFrecuente(textoOriginal);
   if (faqConf && ["precio", "menu", "descripcion_corte", "domicilio"].includes(faqConf.tipo)) {
@@ -435,65 +602,44 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   // ── FASE: CONFIRMACIÓN DE MÚLTIPLES REFRESCOS ───────────────────────────────
   if (fase === "confirmMultiRefresco") {
     const pendRefs = ctx.pendientesRefrescos || [];
-    if (esSi) {
-      let nuevaOrden = ordenTexto;
-      for (const ref of pendRefs) nuevaOrden += "\n" + _formatearRefresco(ref);
-      if (!tieneSalsa) {
-        const listaSalsas = _listaNombresSalsas();
-        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendientesRefrescos: null });
-        persistirEstado(clienteNumero);
-        if (ctx._cantidadSalPendiente) {
-          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
-          await msg.reply(`Quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
-        } else {
-          await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
-        }
-      } else {
-        esperandoExtras.delete(clienteNumero);
-        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
-      }
-      return true;
+    let nuevaOrden = ordenTexto;
+    for (const ref of pendRefs) nuevaOrden += "\n" + _formatearRefresco(ref);
+    if (!tieneSalsa && ctx._cantidadSalPendiente) {
+      const listaSalsas = _listaNombresSalsas();
+      const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+      esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendientesRefrescos: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(`También quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+    } else if (!tieneSalsa && !ctx._flujoUnificado) {
+      const listaSalsas = _listaNombresSalsas();
+      esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendientesRefrescos: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(`Anotado! 🥤 ¿Quieres también alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+    } else {
+      await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     }
-    if (esNo) {
-      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco", pendientesRefrescos: null });
-      await msg.reply(`¿Cuántos refrescos y de cuáles? 🥤\n\n*${_listaNombresRefrescos()}*`);
-      return true;
-    }
-    const lineasPend = pendRefs.map(r => _formatearRefresco(r)).join("\n");
-    await msg.reply(lineasPend + "\n\n*¿Agrego estos refrescos a tu pedido?*");
     return true;
   }
 
   // ── FASE: CONFIRMACIÓN DE REFRESCO ──────────────────────────────────────────
   if (fase === "confirmRefresco") {
     const pendRef = ctx.pendienteRefresco;
-    if (esSi) {
-      const lineaRef = _formatearRefresco(pendRef);
-      const nuevaOrden = ordenTexto + "\n" + lineaRef;
-      if (!tieneSalsa) {
-        const listaSalsas = _listaNombresSalsas();
-        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendienteRefresco: null });
-        persistirEstado(clienteNumero);
-        if (ctx._cantidadSalPendiente) {
-          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
-          await msg.reply(`Quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
-        } else {
-          await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
-        }
-      } else {
-        esperandoExtras.delete(clienteNumero);
-        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
-      }
-      return true;
+    const lineaRef = _formatearRefresco(pendRef);
+    const nuevaOrden = ordenTexto + "\n" + lineaRef;
+    if (!tieneSalsa && ctx._cantidadSalPendiente) {
+      const listaSalsas = _listaNombresSalsas();
+      const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+      esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendienteRefresco: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(`También quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+    } else if (!tieneSalsa && !ctx._flujoUnificado) {
+      const listaSalsas = _listaNombresSalsas();
+      esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", pendienteRefresco: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(`Anotado! 🥤 ¿Quieres también alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+    } else {
+      await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     }
-    if (esNo) {
-      const listaRef = _listaNombresRefrescos();
-      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco", pendienteRefresco: null });
-      await msg.reply(`¿Cuántos refrescos y de cuáles? 🥤\n\n*${listaRef}*`);
-      return true;
-    }
-    const lineaRef2 = _formatearRefresco(pendRef);
-    await msg.reply(lineaRef2 + "\n\n*¿Agrego esto a tu pedido?*");
     return true;
   }
 
@@ -510,8 +656,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
           await msg.reply(`¿Quieres agregar alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
         }
       } else {
-        esperandoExtras.delete(clienteNumero);
-        await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+        await _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTexto, ctx.esOrdenDom, ctx.esPreventa);
       }
       return true;
     }
@@ -526,9 +671,21 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
           return true;
         }
         const lineasRef = distRef.map(r => _formatearRefresco(r)).join("\n");
-        esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmMultiRefresco", pendientesRefrescos: distRef, _cantidadRefPendiente: null });
-        persistirEstado(clienteNumero);
-        await msg.reply(lineasRef + "\n\n*¿Agrego estos refrescos a tu pedido?*");
+        let nuevaOrdenMulti = ordenTexto + "\n" + lineasRef;
+        if (!tieneSalsa && ctx._cantidadSalPendiente) {
+          const listaSalsas = _listaNombresSalsas();
+          const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+          esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrdenMulti, tieneRefresco: true, fase: "especSalsa", _cantidadRefPendiente: null, pendientesRefrescos: null });
+          persistirEstado(clienteNumero);
+          await msg.reply(`También quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+        } else if (!tieneSalsa && !ctx._flujoUnificado) {
+          const listaSalsas = _listaNombresSalsas();
+          esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrdenMulti, tieneRefresco: true, fase: "especSalsa", _cantidadRefPendiente: null, pendientesRefrescos: null });
+          persistirEstado(clienteNumero);
+          await msg.reply(`Anotado! 🥤 ¿Quieres también alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+        } else {
+          await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrdenMulti, ctx.esOrdenDom, ctx.esPreventa);
+        }
         return true;
       }
     }
@@ -539,9 +696,21 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
         ? ctx._cantidadRefPendiente : refresco.cantidad;
       const refFinal = cantFinal !== refresco.cantidad ? { ...refresco, cantidad: cantFinal } : refresco;
       const lineaRef = _formatearRefresco(refFinal);
-      esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refFinal, _cantidadRefPendiente: null });
-      persistirEstado(clienteNumero);
-      await msg.reply(lineaRef + "\n\n*¿Agrego esto a tu pedido?*");
+      const nuevaOrden = ordenTexto + "\n" + lineaRef;
+      if (!tieneSalsa && ctx._cantidadSalPendiente) {
+        const listaSalsas = _listaNombresSalsas();
+        const cantMsg = ctx._cantidadSalPendiente > 1 ? `${ctx._cantidadSalPendiente} salsas` : "una salsa";
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", _cantidadRefPendiente: null });
+        persistirEstado(clienteNumero);
+        await msg.reply(`También quieres *${cantMsg}* extra 🌶️ ¿Cuáles serían?\n\n*${listaSalsas}*`);
+      } else if (!tieneSalsa && !ctx._flujoUnificado) {
+        const listaSalsas = _listaNombresSalsas();
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneRefresco: true, fase: "especSalsa", _cantidadRefPendiente: null });
+        persistirEstado(clienteNumero);
+        await msg.reply(`Anotado! 🥤 ¿Quieres también alguna *Salsa* extra? 🌶️\n\n*${listaSalsas}*\n\n_(O escribe *no* si no quieres)_`);
+      } else {
+        await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
+      }
       return true;
     }
     const listaRef = _listaNombresRefrescos();
@@ -552,50 +721,50 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   // ── FASE: CONFIRMACIÓN DE SALSA ──────────────────────────────────────────────
   if (fase === "confirmSalsa") {
     const pendSalsa = ctx.pendienteSalsas;
-    if (esSi) {
-      const lineaSalsa = `🌶️ Salsas: ${pendSalsa.join(", ")}`;
-      const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
-      if (!tieneRefresco) {
-        const listaRef = _listaNombresRefrescos();
-        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneSalsa: true, fase: "especRefresco", pendienteSalsas: null });
-        persistirEstado(clienteNumero);
-        await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
-      } else {
-        esperandoExtras.delete(clienteNumero);
-        await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
-      }
-      return true;
+    const precios = getPrecios();
+    const cantSal = ctx._cantidadSalPendiente || pendSalsa.length;
+    const nombres = pendSalsa.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
+    const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, precios.pSalsa);
+    const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
+    if (!tieneRefresco && !ctx._flujoUnificado) {
+      const listaRef = _listaNombresRefrescos();
+      esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneSalsa: true, fase: "especRefresco", pendienteSalsas: null });
+      persistirEstado(clienteNumero);
+      await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
+    } else {
+      await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     }
-    if (esNo) {
-      const listaSalsas = _listaNombresSalsas();
-      esperandoExtras.set(clienteNumero, { ...ctx, fase: "especSalsa", pendienteSalsas: null });
-      await msg.reply(`¿Cuáles salsas deseas? 🌶️\n\n*${listaSalsas}*`);
-      return true;
-    }
-    const lineaSalsa2 = `🌶️ Salsas: ${pendSalsa.join(", ")}`;
-    await msg.reply(lineaSalsa2 + "\n\n*¿Agrego esto a tu pedido?*");
     return true;
   }
 
   // ── FASE: ESPECIFICAR SALSA ──────────────────────────────────────────────────
   if (fase === "especSalsa") {
     if (esNo) {
-      if (!tieneRefresco) {
+      if (!tieneRefresco && !ctx._flujoUnificado) {
         const listaRef = _listaNombresRefrescos();
         esperandoExtras.set(clienteNumero, { ...ctx, fase: "especRefresco" });
+        persistirEstado(clienteNumero);
         await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
       } else {
-        esperandoExtras.delete(clienteNumero);
-        await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+        await _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTexto, ctx.esOrdenDom, ctx.esPreventa);
       }
       return true;
     }
     const salsas = detectarSalsa(textoNorm);
     if (salsas && salsas.length > 0) {
-      const lineaSalsa = `🌶️ Salsas: ${salsas.join(", ")}`;
-      esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsas });
-      persistirEstado(clienteNumero);
-      await msg.reply(lineaSalsa + "\n\n*¿Agrego esto a tu pedido?*");
+      const precios = getPrecios();
+      const cantSal = ctx._cantidadSalPendiente || salsas.length;
+      const nombres = salsas.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
+      const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, precios.pSalsa);
+      const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
+      if (!tieneRefresco && !ctx._flujoUnificado) {
+        const listaRef = _listaNombresRefrescos();
+        esperandoExtras.set(clienteNumero, { ...ctx, ordenTexto: nuevaOrden, tieneSalsa: true, fase: "especRefresco", pendienteSalsas: null });
+        persistirEstado(clienteNumero);
+        await msg.reply(`¿Quieres agregar algún *Refresco*? 🥤\n\n*${listaRef}*\n\n_(O escribe *no* si no quieres)_`);
+      } else {
+        await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
+      }
       return true;
     }
     const listaSalsas = _listaNombresSalsas();
@@ -641,21 +810,18 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
     return true;
   }
 
-  // "no" → generar resumen
+  // "no" → mostrar confirmación final unificada
   if (esNo) {
-    esperandoExtras.delete(clienteNumero);
-    persistirEstado(clienteNumero);
-    await _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, ctx.esOrdenDom, ctx.esPreventa, historial);
+    await _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTexto, ctx.esOrdenDom, ctx.esPreventa);
     return true;
   }
 
   // Multi-refresco: "2 de fanta y 1 de sprite"
   const multiRefPregunta = parsearDistribucionRefrescos(textoNorm);
   if (multiRefPregunta) {
-    const lineasRef = multiRefPregunta.map(r => _formatearRefresco(r)).join("\n");
-    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmMultiRefresco", pendientesRefrescos: multiRefPregunta });
-    persistirEstado(clienteNumero);
-    await msg.reply(lineasRef + "\n\n*¿Agrego estos refrescos a tu pedido?*");
+    let nuevaOrdenMultiRef = ordenTexto;
+    for (const ref of multiRefPregunta) nuevaOrdenMultiRef += "\n" + _formatearRefresco(ref);
+    await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrdenMultiRef, ctx.esOrdenDom, ctx.esPreventa);
     return true;
   }
 
@@ -664,33 +830,30 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
 
   // Refresco + salsa en el mismo mensaje: "una coca y salsa picada"
   if (refrescoPregunta && salsasPregunta && salsasPregunta.length > 0) {
+    const precios    = getPrecios();
     const lineaRef   = _formatearRefresco(refrescoPregunta);
-    const lineaSalsa = `🌶️ Salsas: ${salsasPregunta.join(", ")}`;
-    const nuevaOrden = ordenTexto + "\n" + lineaRef + "\n" + lineaSalsa;
-    const refNombre  = refrescoPregunta.nombre.charAt(0).toUpperCase() + refrescoPregunta.nombre.slice(1);
     const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    esperandoExtras.delete(clienteNumero);
-    persistirEstado(clienteNumero);
-    await msg.reply(`Agregué *${refNombre}* y salsas (${salNombres}) a tu pedido! 🥤🌶️`);
-    await _iniciarFormPostOrden(msg, clienteNumero, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa, historial);
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, precios.pSalsa);
+    const nuevaOrden = ordenTexto + "\n" + lineaRef + "\n" + lineaSalsa;
+    await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;
   }
 
   // Refresco único
   if (refrescoPregunta) {
-    const lineaRef = _formatearRefresco(refrescoPregunta);
-    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmRefresco", pendienteRefresco: refrescoPregunta });
-    persistirEstado(clienteNumero);
-    await msg.reply(lineaRef + "\n\n*¿Agrego esto a tu pedido?*");
+    const lineaRef   = _formatearRefresco(refrescoPregunta);
+    const nuevaOrden = ordenTexto + "\n" + lineaRef;
+    await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;
   }
 
   // Salsa detectada
   if (salsasPregunta && salsasPregunta.length > 0) {
-    const lineaSalsa = `🌶️ Salsas: ${salsasPregunta.join(", ")}`;
-    esperandoExtras.set(clienteNumero, { ...ctx, fase: "confirmSalsa", pendienteSalsas: salsasPregunta });
-    persistirEstado(clienteNumero);
-    await msg.reply(lineaSalsa + "\n\n*¿Agrego esto a tu pedido?*");
+    const precios    = getPrecios();
+    const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, precios.pSalsa);
+    const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
+    await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;
   }
 
@@ -837,14 +1000,11 @@ async function handlePedidoSimple(msg, textoOriginal, clienteNumero, historial) 
   const jsonSimple = parsearPedidoSimple(textoLimpio);
   if (!jsonSimple || jsonSimple.tipo !== "pedido") return false;
 
-  pedidoJSONActual.set(clienteNumero, jsonSimple);
-  persistirEstado(clienteNumero);
-  const resultado = jsonALineas(jsonSimple);
-  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: refrescosPendientes, _salsasPendientes: salsasPendientes });
-  historial.push({ role: "user",      content: textoOriginal });
-  historial.push({ role: "assistant", content: resultado.texto });
-  await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
-  console.log(`Bot: [PARSER LOCAL] Subtotal: $${resultado.subtotal} — sin llamar a Groq`);
+  const esOrdenDom = tipoEntregaCliente.get(clienteNumero) === "domicilio";
+  const esPreventa = clientesPreventa.has(clienteNumero);
+  historial.push({ role: "user", content: textoOriginal });
+  await _avanzarExtrasOConfirmar(msg, clienteNumero, historial, jsonSimple, refrescosPendientes, salsasPendientes, esOrdenDom, esPreventa);
+  console.log(`Bot: [PARSER LOCAL] sin llamar a Groq`);
   return true;
 }
 
@@ -905,6 +1065,35 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
         }
       }
 
+      // Sub-caso B': "1 de carne y 1 de buche, 2 platos iguales" → N platos con misma composición
+      if (!nuevosItems) {
+        const NUMS_PLATOS = { dos: 2, tres: 3, cuatro: 4 };
+        const matchPlatos = textoOriginal.match(/\b(\d+|dos|tres|cuatro)\s+platos?\s*(?:iguales?|igual)?\b/i);
+        if (matchPlatos) {
+          const nStr = matchPlatos[1].toLowerCase();
+          const n = parseInt(nStr) || NUMS_PLATOS[nStr] || null;
+          if (n && n >= 2) {
+            const textoSinPlatos = textoOriginal.replace(matchPlatos[0], "").trim();
+            const distPorPlato = parsearDistribucionCortes(textoSinPlatos);
+            if (distPorPlato) {
+              const totalPorPlato = distPorPlato.reduce((s, d) => s + d.cantidad, 0);
+              if (n * totalPorPlato === itemDist.cantidad) {
+                _resetError(clienteNumero);
+                nuevosItems = [{
+                  presentacion: "grupo_repetido",
+                  grupos: n,
+                  items_por_grupo: distPorPlato.map(d => ({
+                    presentacion: itemDist.presentacion,
+                    cantidad: d.cantidad,
+                    corte: d.corte,
+                  })),
+                }];
+              }
+            }
+          }
+        }
+      }
+
       // Sub-caso B: "1 de carne, 2 de surtido, 1 de lengua" → distribución explícita
       if (!nuevosItems) {
         const distribucion = parsearDistribucionCortes(textoOriginal);
@@ -936,7 +1125,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       // Finalización compartida
       if (nuevosItems) {
         pedParcDist.items.splice(idxDist, 1, ...nuevosItems);
-        const siguienteIdx = pedParcDist.items.findIndex((item, i) => i >= idxDist + nuevosItems.length && !item.corte);
+        const siguienteIdx = pedParcDist.items.findIndex((item, i) => i >= idxDist + nuevosItems.length && !item.corte && item.presentacion !== "grupo_repetido");
         if (siguienteIdx !== -1) {
           pedParcDist._indiceActual = siguienteIdx;
           esperandoCorte.set(clienteNumero, pedParcDist);
@@ -1006,8 +1195,11 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   const t = textoOriginal.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const CORTES_MAP = getCortes();
   const palabrasCorteEsp = Object.keys(CORTES_MAP).join("|");
-  const matchCorteRespuesta = t.match(new RegExp(`\\b(${palabrasCorteEsp})\\b`));
-  let corteDetectado = matchCorteRespuesta ? CORTES_MAP[matchCorteRespuesta[1]] || null : null;
+  const allMatchesCorte = [...t.matchAll(new RegExp(`\\b(${palabrasCorteEsp})\\b`, "g"))];
+  const cortesEncontrados = [...new Set(allMatchesCorte.map(m => CORTES_MAP[m[1].toLowerCase()]).filter(Boolean))];
+  let corteDetectado = cortesEncontrados.length > 0
+    ? (cortesEncontrados.length === 1 ? cortesEncontrados[0] : cortesEncontrados.join(", "))
+    : null;
   // Fuzzy fallback para typos: "cueroo", "surtidoo", "lngua"
   if (!corteDetectado) {
     const DESCARTAR_FUZZY = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
@@ -1085,14 +1277,9 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   }
 
   const jsonCompletoCorte = { tipo: "pedido", items: pedidoParcial.items };
-  pedidoJSONActual.set(clienteNumero, jsonCompletoCorte);
-  persistirEstado(clienteNumero);
-  const resultado = jsonALineas(jsonCompletoCorte);
-  esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto, _refrescosPendientes: pedidoParcial._refrescosPendientes || [], _salsasPendientes: pedidoParcial._salsasPendientes || [] });
-  historial.push({ role: "user",      content: textoOriginal });
-  historial.push({ role: "assistant", content: resultado.texto });
-  await msg.reply(resultado.texto + "\n\n*¿Es correcto?*");
-  console.log(`Bot: [CORTE COMPLETADO] Subtotal: $${resultado.subtotal}`);
+  historial.push({ role: "user", content: textoOriginal });
+  await _avanzarExtrasOConfirmar(msg, clienteNumero, historial, jsonCompletoCorte, pedidoParcial._refrescosPendientes || [], pedidoParcial._salsasPendientes || [], esOrdenDom, esPreventa);
+  console.log(`Bot: [CORTE COMPLETADO]`);
   return true;
 }
 
@@ -1103,11 +1290,12 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
 
   const pedidoParcial = parsearSinCorteItems(textoLimpio);
   if (pedidoParcial) {
-    pedidoParcial._indiceActual = 0;
+    const primerSinCorte = pedidoParcial.items.findIndex(i => !i.corte);
+    pedidoParcial._indiceActual = primerSinCorte !== -1 ? primerSinCorte : 0;
     pedidoParcial._refrescosPendientes = refrescosPendientes;
     pedidoParcial._salsasPendientes      = salsasPendientes;
     esperandoCorte.set(clienteNumero, pedidoParcial);
-    const primerItem = pedidoParcial.items[0];
+    const primerItem = pedidoParcial.items[pedidoParcial._indiceActual];
     const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
                : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
                : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`

@@ -14,6 +14,17 @@ const {
 const { invalidarCacheCortes } = require("./pedidoParser");
 const botPausado = require("../estado/bot-pausado");
 
+// ── CONFIRMACIÓN DE GRUPO ADMIN ───────────────────────────────────────────────
+let _grupoPendiente = null; // { id, timeout }
+
+function setPendienteConfirmacionGrupo(grupoId) {
+  if (_grupoPendiente?.timeout) clearTimeout(_grupoPendiente.timeout);
+  _grupoPendiente = {
+    id: grupoId,
+    timeout: setTimeout(() => { _grupoPendiente = null; }, 5 * 60 * 1000),
+  };
+}
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function buscarCliente(numBuscar) {
   if (!numBuscar) {
@@ -77,6 +88,18 @@ function descripcionEstado(jid) {
 async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
+
+  // ── Confirmación de grupo admin (respuesta a la pregunta de auto-detección) ──
+  if (_grupoPendiente?.id === msg.from) {
+    if (/^(s[íi]|si|yes|ok|dale|claro|correcto|afirmativo)$/i.test(texto)) {
+      clearTimeout(_grupoPendiente.timeout);
+      _grupoPendiente = null;
+      setConfig("grupo_id", msg.from);
+      process.env.GRUPO_ID = msg.from;
+      await msg.reply("✅ ¡Listo! Este grupo queda configurado como grupo de administración.\nYa recibirás pedidos y notificaciones aquí.\n\nEscribe *!ayuda* para ver los comandos disponibles.");
+      return;
+    }
+  }
 
   const esComando = /^!(pedidos|confirmados|pendientes|cancelados|rechazados|confirmar|rechazar|stats|cliente|listo|en_camino|mostradores|domicilios|mensaje|pausar|reanudar|buscar|historial|cancelar|ayuda|reporte|sesiones|resetear|limpiar|pedido|agotado|disponible|cerrar|abrir|precios|precio|editar|top|estado|cortes|ingresos)/i.test(texto);
   if (!esComando) return;
@@ -287,16 +310,34 @@ async function handleComandos(msg, client) {
 
   // ── !confirmar [telefono] ─────────────────────────────────────────────────
   if (/^!confirmar/i.test(texto)) {
-    const partes        = texto.split(" ");
-    const numBuscar     = partes[1] ? partes[1].replace(/\D/g, "") : null;
-    const numeroCliente = buscarCliente(numBuscar);
+    const partes    = texto.split(" ");
+    const numBuscar = partes[1] ? partes[1].replace(/\D/g, "") : null;
+    let numeroCliente = buscarCliente(numBuscar);
+    let datos = numeroCliente ? pendientesConfirmacion.get(numeroCliente) : null;
 
-    if (!numeroCliente) {
+    // Fallback a BD cuando el mapa en memoria está vacío (ej: reinicio del bot)
+    if (!datos && numBuscar) {
+      const tel = numBuscar.slice(-10);
+      const cliente = getCliente(tel);
+      if (cliente) {
+        const pedidos = getPedidosPorCliente(tel);
+        const pedidoPend = pedidos.find(p => p.estado === "pendiente");
+        if (pedidoPend) {
+          datos = {
+            nombre:   [cliente.nombre, cliente.apellido].filter(Boolean).join(" ") || "Cliente",
+            tipo:     pedidoPend.tipo || "mostrador",
+            telefono: tel,
+          };
+          numeroCliente = construirJID(tel);
+        }
+      }
+    }
+
+    if (!datos) {
       await msg.reply("⚠️ No encontré ese pedido. Usa *!pendientes* para ver la lista.");
       return;
     }
 
-    const datos = pendientesConfirmacion.get(numeroCliente);
     let mensajeCliente = "";
 
     if (datos.tipo === "mostrador") {
@@ -1147,4 +1188,4 @@ async function handleComandos(msg, client) {
   }
 }
 
-module.exports = { handleComandos };
+module.exports = { handleComandos, setPendienteConfirmacionGrupo };

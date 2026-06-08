@@ -56,6 +56,7 @@ module.exports = {
   getTelefonoReal:     config.getTelefonoReal,
   guardarJIDReal:      config.guardarJIDReal,
   getJIDReal:          config.getJIDReal,
+  getGrupoId:          config.getGrupoId,
 
   // productos
   getProductos:        modelos.getProductos,

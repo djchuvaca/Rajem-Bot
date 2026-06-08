@@ -3,7 +3,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
   esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo,
 } = require("../../estado");
-const { actualizarEstadoPedido, getMensaje, getConfig } = require("../../db");
+const { actualizarEstadoPedido, getMensaje, getConfig, getGrupoId } = require("../../db");
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
@@ -56,7 +56,7 @@ async function handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero
 
   const datosCancelacion = esperandoMotivoCancelacion.get(clienteNumero);
   const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-  const grupoId = process.env.GRUPO_ID;
+  const grupoId = getGrupoId();
   if (grupoId && datosCancelacion.notificarGrupo) {
     try {
       await client.sendMessage(grupoId,

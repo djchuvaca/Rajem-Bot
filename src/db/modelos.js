@@ -52,6 +52,7 @@ function upsertCliente(datos) {
   return getCliente(datos.telefono);
 }
 function deleteCliente(id) {
+  run("UPDATE pedidos SET cliente_id = NULL WHERE cliente_id = ?", [id]);
   run("DELETE FROM clientes WHERE id = ?", [id]);
 }
 function guardarUltimoPedido(telefono, jsonObj) {

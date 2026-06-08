@@ -8,12 +8,15 @@ if (process.env.SENTRY_DSN) {
 
 // ── VALIDACIÓN DE VARIABLES DE ENTORNO ───────────────────────────────────────
 (function validarEnv() {
-  const requeridas = ["GROQ_API_KEY", "GRUPO_ID"];
+  const requeridas = ["GROQ_API_KEY"];
   const faltantes  = requeridas.filter(k => !process.env[k]);
   if (faltantes.length) {
     console.error("❌ Faltan variables de entorno requeridas:", faltantes.join(", "));
     console.error("   Copia .env.example como .env y completa los valores.");
     process.exit(1);
+  }
+  if (!process.env.GRUPO_ID) {
+    console.warn("⚠️  GRUPO_ID no está definido. Agrega el bot a tu grupo de WhatsApp para configurarlo automáticamente.");
   }
   if (!process.env.PANEL_SECRET) {
     console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto por defecto (inseguro en producción).");
@@ -26,10 +29,10 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 
 const logger             = require("./src/logger");
-const { handleComandos } = require("./src/handlers/comandos");
+const { handleComandos, setPendienteConfirmacionGrupo } = require("./src/handlers/comandos");
 const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
-const { initDB }         = require("./src/db");
+const { initDB, getConfig, getGrupoId } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
 const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
@@ -134,6 +137,23 @@ client.on("disconnected", (reason) => {
 });
 
 
+// ── Auto-detección del grupo admin ────────────────────────────────────────────
+client.on("group_join", async (notification) => {
+  try {
+    const botJid = client.info?.wid?._serialized;
+    if (!notification.recipientIds?.includes(botJid)) return;
+    if (getGrupoId()) return; // ya configurado, ignorar
+    const nombreNegocio = getConfig("nombre_negocio") || "el bot";
+    await client.sendMessage(
+      notification.chatId,
+      `¡Hola! Soy el bot de *${nombreNegocio}*.\n\n¿Este es el grupo de administración?\nResponde *sí* para configurarlo. Tienes 5 minutos.`
+    );
+    setPendienteConfirmacionGrupo(notification.chatId);
+  } catch (err) {
+    logger.warn(`Error en auto-detección de grupo: ${err.message}`);
+  }
+});
+
 const _msgProcesados = new Set();
 const _colaJID = new Map(); // cola de procesamiento por JID (evita concurrencia)
 
@@ -201,6 +221,19 @@ process.on("uncaughtException", (err) => {
 });
 
 process.on("unhandledRejection", (reason) => {
+  // Errores esperados del ciclo logout/reconexión en Windows — no son fallos reales.
+  if (reason instanceof Error) {
+    const esArchivoSesion = reason.message.includes(".wwebjs_auth");
+    const esFrameDetached = reason.message.includes("detached Frame") || reason.message.includes("Navigating frame was detached");
+    if ((reason.code === "EBUSY" || reason.code === "ENOTEMPTY") && esArchivoSesion) {
+      logger.warn(`Limpieza de sesión WA incompleta (ignorado): ${reason.message}`);
+      return;
+    }
+    if (esFrameDetached) {
+      logger.warn(`Frame de Puppeteer ya cerrado al reconectar (ignorado): ${reason.message}`);
+      return;
+    }
+  }
   const msg = reason instanceof Error ? `${reason.message}\n${reason.stack}` : String(reason);
   logger.error(`Promesa rechazada sin manejar: ${msg}`);
   if (reason instanceof Error) Sentry.captureException(reason);

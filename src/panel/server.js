@@ -11,7 +11,7 @@ const {
   getProductos, updateProducto, createProducto, deleteProducto,
   getAllClientes, getCliente, upsertCliente, deleteCliente,
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
-  getConfig, guardarTelefonoReal, getJIDReal,
+  getConfig, guardarTelefonoReal, getJIDReal, getGrupoId,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
 } = require("../db");
 const { queryOne } = require("../db/core");
@@ -320,7 +320,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
     }
 
     // Notificar al grupo
-    const grupoId = process.env.GRUPO_ID;
+    const grupoId = getGrupoId();
     if (grupoId && resultado.resumen) {
       try {
         const nombre = resultado.nombre || resultado.telefono || "Cliente";
@@ -432,7 +432,7 @@ const _pedidosAlertados = new Set();
 let _alertasInicializado = false;
 
 setInterval(async () => {
-  const grupoId = process.env.GRUPO_ID;
+  const grupoId = getGrupoId();
   if (!grupoId) return;
   const waClient = getWhatsappClient();
   if (!waClient) return;

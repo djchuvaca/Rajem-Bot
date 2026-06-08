@@ -10,7 +10,7 @@ const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pe
 const { parsearPedidoSimple, detectarSinCorte } = require("../pedidoParser");
 const {
   upsertCliente, registrarPedido, guardarTelefonoReal,
-  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje,
+  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId,
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
 const { getRangoHorario } = require("../../horario");
@@ -420,7 +420,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   }
 
   // ── 2. Notificar al grupo y confirmar al cliente ───────────────────────────
-  const grupoId = process.env.GRUPO_ID;
+  const grupoId = getGrupoId();
   if (grupoId) {
     try {
       await client.sendMessage(grupoId, `🆕 Pedido #${pedidoId}\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}\n!listo ${infoPedido.telefono}\n!en_camino ${pedidoId}`);
