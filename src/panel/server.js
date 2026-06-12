@@ -14,7 +14,7 @@ const {
   getConfig, guardarTelefonoReal, getJIDReal, getGrupoId,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
 } = require("../db");
-const { queryOne } = require("../db/core");
+const { queryOne, queryAll, run } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
@@ -471,6 +471,64 @@ setInterval(async () => {
     if (!idsActuales.has(id)) _pedidosAlertados.delete(id);
   }
 }, 5 * 60 * 1000).unref();
+
+// ── COLONIAS Y TARIFAS DE ENVÍO ───────────────────────────────────────────────
+app.get("/api/colonias", requireAuth, (req, res) => {
+  const colonias  = queryAll("SELECT * FROM colonias ORDER BY nombre");
+  const negLat    = parseFloat(getConfig("negocio_lat") || "0");
+  const negLon    = parseFloat(getConfig("negocio_lon") || "0");
+
+  if (negLat && negLon) {
+    const { haversine } = require("../geo");
+    const zonas = queryAll("SELECT * FROM tarifas_zonas ORDER BY distancia_max ASC");
+    return res.json(colonias.map(c => {
+      const d = Math.round(haversine(negLat, negLon, c.lat, c.lon) * 10) / 10;
+      let zona_actual = null;
+      for (const z of zonas) {
+        if (d <= z.distancia_max) { zona_actual = z.nombre_zona; break; }
+      }
+      if (!zona_actual && zonas.length) zona_actual = zonas[zonas.length - 1].nombre_zona;
+      return { ...c, distancia: d, zona_actual };
+    }));
+  }
+  res.json(colonias.map(c => ({ ...c, distancia: null, zona_actual: null })));
+});
+
+app.post("/api/colonias", requireAuth, (req, res) => {
+  const { nombre, lat, lon } = req.body;
+  if (!nombre || lat == null || lon == null) return res.status(400).json({ error: "Faltan campos" });
+  try {
+    run("INSERT INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, parseFloat(lat), parseFloat(lon)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put("/api/colonias/:id", requireAuth, (req, res) => {
+  const { nombre, lat, lon, activo } = req.body;
+  run("UPDATE colonias SET nombre=?, lat=?, lon=?, activo=? WHERE id=?",
+    [nombre, parseFloat(lat), parseFloat(lon), activo ?? 1, parseInt(req.params.id)]);
+  res.json({ ok: true });
+});
+
+app.delete("/api/colonias/:id", requireAuth, (req, res) => {
+  run("DELETE FROM colonias WHERE id=?", [parseInt(req.params.id)]);
+  res.json({ ok: true });
+});
+
+app.get("/api/tarifas-zonas", requireAuth, (req, res) => {
+  res.json(queryAll("SELECT * FROM tarifas_zonas ORDER BY distancia_max ASC"));
+});
+
+app.put("/api/tarifas-zonas", requireAuth, (req, res) => {
+  const { zonas } = req.body;
+  if (!Array.isArray(zonas)) return res.status(400).json({ error: "Formato inválido" });
+  run("DELETE FROM tarifas_zonas");
+  for (const z of zonas) {
+    run("INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)",
+      [z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa)]);
+  }
+  res.json({ ok: true });
+});
 
 function startPanel(port = 3000) {
   app.listen(port, () => {

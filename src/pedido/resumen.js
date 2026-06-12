@@ -6,6 +6,7 @@
 
 const { getPrecios, calcularPrecioItem, calcularSubtotal } = require("./precios");
 const { getConfig, getProductos } = require("../db");
+const { calcularTarifaDomicilio } = require("../geo");
 
 // ── HELPERS DE CONFIG ─────────────────────────────────────────────────────────
 function getNombreNegocio() {
@@ -138,12 +139,13 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   // Fuente de verdad: datosCampos.tipoEntrega > parámetro recibido
   if (c.tipoEntrega) esDomicilio = c.tipoEntrega === "domicilio";
 
-  const negocio  = getNombreNegocio();
-  const domCosto = getDomCosto();
-  const horaConf = horaEntregaPreventa.get(clienteNumero);
-  const esTransf = /transferencia/i.test(c.metodo || "");
-  const subtotal = calcularSubtotal(ordenTexto);
-  const total    = esDomicilio ? subtotal + domCosto : subtotal;
+  const negocio    = getNombreNegocio();
+  const tarifaInfo = esDomicilio ? calcularTarifaDomicilio(c.colonia) : null;
+  const domCosto   = tarifaInfo ? tarifaInfo.tarifa : getDomCosto();
+  const horaConf   = horaEntregaPreventa.get(clienteNumero);
+  const esTransf   = /transferencia/i.test(c.metodo || "");
+  const subtotal   = calcularSubtotal(ordenTexto);
+  const total      = esDomicilio ? subtotal + domCosto : subtotal;
   const ordenLimpia = ordenTexto.split("\n").filter(l => !/subtotal/i.test(l)).join("\n").trim();
 
   const nombreCap = (c.nombre || "—").replace(/\b\w/g, l => l.toUpperCase());
@@ -160,7 +162,8 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     resumen += `📍 *Dirección:* ${c.calle || "—"}, Col. ${c.colonia || "—"}\n`;
     resumen += `📌 *Referencia:* ${c.referencia && c.referencia !== "sin referencia" ? c.referencia : "sin referencia"}\n`;
     resumen += `💵 *Subtotal:* $${subtotal}\n`;
-    resumen += `🛵 *Tarifa domicilio:* $${domCosto}\n`;
+    const zonaLabel = tarifaInfo?.zona ? ` (${tarifaInfo.zona})` : '';
+    resumen += `🛵 *Tarifa domicilio${zonaLabel}:* $${domCosto}\n`;
   }
 
   resumen += `💰 *TOTAL: $${total}*\n`;

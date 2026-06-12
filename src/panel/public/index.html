@@ -161,6 +161,7 @@ tr:hover td{background:var(--surface2)}
     <div class="nav-item" onclick="showSection('banco')" data-s="banco"><span class="icon">💳</span> Datos Banco</div>
     <div class="nav-item" onclick="showSection('mensajes')" data-s="mensajes"><span class="icon">💬</span> Mensajes Bot</div>
     <div class="nav-item" onclick="showSection('config')" data-s="config"><span class="icon">⚙️</span> Configuración</div>
+    <div class="nav-item" onclick="showSection('envios')" data-s="envios"><span class="icon">🛵</span> Zonas Envío</div>
     <div class="nav-sep"></div>
     <div class="nav-item" onclick="showSection('onboarding')" data-s="onboarding"><span class="icon">⚡</span> Inicio rápido</div>
   </nav>
@@ -436,6 +437,80 @@ tr:hover td{background:var(--surface2)}
       </div>
     </div>
 
+    <!-- ZONAS DE ENVÍO -->
+    <div class="section" id="s-envios">
+      <div class="card">
+        <div class="card-title">📍 Ubicación del negocio</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Coordenadas del lugar donde se preparan los pedidos. Se usan para calcular la distancia a cada colonia.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Latitud</label>
+            <input class="form-input" id="negocio-lat" type="number" step="any" placeholder="21.4900000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitud</label>
+            <input class="form-input" id="negocio-lon" type="number" step="any" placeholder="-104.8900000">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveUbicacion()">Guardar ubicación</button>
+        <div class="hint" style="margin-top:8px">💡 En Google Maps haz clic derecho sobre tu negocio y copia las coordenadas.</div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">🛵 Tarifas por zona</div>
+          <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Agregar zona</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Define el costo de envío según distancia. Se evalúan en orden de menor a mayor km.</p>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:0 0 6px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+          <span>Nombre de zona</span><span>Máx km</span><span>Tarifa $</span><span></span>
+        </div>
+        <div id="zonas-list"></div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="saveZonas()">Guardar tarifas</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="card-title" style="margin:0">🏘️ Colonias registradas</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-input" id="buscar-colonia" placeholder="Buscar colonia…" style="width:190px" oninput="filtrarColonias(this.value)">
+            <button class="btn btn-secondary btn-sm" onclick="openModalColonia()">+ Nueva</button>
+          </div>
+        </div>
+        <div id="colonias-count" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+        <div class="table-wrap">
+          <table id="colonias-table">
+            <thead><tr><th>Colonia</th><th>Latitud</th><th>Longitud</th><th>Distancia</th><th>Zona asignada</th><th>Estado</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL COLONIA -->
+<div class="modal-overlay" id="modal-colonia">
+  <div class="modal">
+    <div class="modal-title" id="modal-col-title">Nueva colonia</div>
+    <input type="hidden" id="col-id">
+    <div class="form-group">
+      <label class="form-label">Nombre de la colonia</label>
+      <input class="form-input" id="col-nombre" placeholder="Ej: Aramara">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Latitud</label>
+        <input class="form-input" id="col-lat" type="number" step="any" placeholder="21.4900">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Longitud</label>
+        <input class="form-input" id="col-lon" type="number" step="any" placeholder="-104.8900">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-colonia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveColonia()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -603,6 +678,7 @@ const sections = {
   mensajes:   { title:'Mensajes Bot', sub:'Textos del bot' },
   config:     { title:'Configuración', sub:'Ajustes generales' },
   onboarding: { title:'Inicio rápido', sub:'Configura tu negocio en minutos' },
+  envios:     { title:'Zonas de Envío', sub:'Tarifas por distancia a colonia' },
 };
 
 function showSection(name) {
@@ -619,6 +695,7 @@ const loaders = {
   dashboard: loadDashboard, pedidos: loadPedidos, clientes: loadClientes,
   productos: loadProductos, reportes: loadReportes, horarios: loadHorarios,
   banco: loadBanco, mensajes: loadMensajes, config: loadConfig, onboarding: loadOnboarding,
+  envios: loadEnvios,
 };
 
 // ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
@@ -1333,6 +1410,130 @@ async function cambiarPassword() {
   const r = await api('/api/cambiar-password', 'POST', { password_actual: actual, password_nuevo: nueva });
   if (r.ok) { toast('Contraseña cambiada'); document.getElementById('cp-actual').value=''; document.getElementById('cp-nueva').value=''; }
   else toast(r.error || 'Error', false);
+}
+
+// ── ZONAS DE ENVÍO ────────────────────────────────────────────────────────────
+let _coloniasData = [];
+let _zonasData    = [];
+
+async function loadEnvios() {
+  const conf = await api('/api/config');
+  const get  = k => conf.find(c => c.clave === k)?.valor || '';
+  document.getElementById('negocio-lat').value = get('negocio_lat');
+  document.getElementById('negocio-lon').value = get('negocio_lon');
+  _zonasData    = await api('/api/tarifas-zonas');
+  _coloniasData = await api('/api/colonias');
+  renderZonas();
+  renderColonias(_coloniasData);
+}
+
+function renderZonas() {
+  const el = document.getElementById('zonas-list');
+  if (!_zonasData.length) { el.innerHTML = '<div class="empty">Sin zonas configuradas</div>'; return; }
+  el.innerHTML = _zonasData.map((z, i) => `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <input class="form-input" placeholder="Nombre de zona" value="${z.nombre_zona||''}" id="zona-nombre-${i}">
+      <input class="form-input" type="number" step="0.1" min="0.1" placeholder="km" value="${z.distancia_max}" id="zona-maxkm-${i}">
+      <input class="form-input" type="number" step="1" min="0" placeholder="$" value="${z.tarifa}" id="zona-tarifa-${i}">
+      <button class="btn btn-danger btn-sm" onclick="removeZonaRow(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addZonaRow() {
+  _zonasData.push({ nombre_zona: '', distancia_max: 5, tarifa: 50 });
+  renderZonas();
+}
+
+function removeZonaRow(i) {
+  _zonasData.splice(i, 1);
+  renderZonas();
+}
+
+async function saveZonas() {
+  const zonas = _zonasData.map((_, i) => ({
+    nombre_zona:   document.getElementById(`zona-nombre-${i}`)?.value?.trim() || '',
+    distancia_max: parseFloat(document.getElementById(`zona-maxkm-${i}`)?.value) || 0,
+    tarifa:        parseFloat(document.getElementById(`zona-tarifa-${i}`)?.value) || 0,
+  })).filter(z => z.nombre_zona && z.distancia_max > 0);
+  if (!zonas.length) return toast('Agrega al menos una zona', false);
+  const r = await api('/api/tarifas-zonas', 'PUT', { zonas });
+  if (r.ok) { toast('Tarifas guardadas ✅'); _zonasData = zonas; renderZonas(); }
+  else toast(r.error || 'Error al guardar', false);
+}
+
+async function saveUbicacion() {
+  const lat = document.getElementById('negocio-lat').value.trim();
+  const lon = document.getElementById('negocio-lon').value.trim();
+  if (!lat || !lon) return toast('Ingresa latitud y longitud', false);
+  if (isNaN(parseFloat(lat)) || isNaN(parseFloat(lon))) return toast('Coordenadas inválidas', false);
+  await api('/api/config', 'POST', { clave: 'negocio_lat', valor: lat });
+  await api('/api/config', 'POST', { clave: 'negocio_lon', valor: lon });
+  toast('Ubicación guardada ✅');
+  _coloniasData = await api('/api/colonias');
+  renderColonias(_coloniasData);
+}
+
+function renderColonias(lista) {
+  const tbody = document.querySelector('#colonias-table tbody');
+  const count = document.getElementById('colonias-count');
+  if (count) count.textContent = lista.length !== _coloniasData.length
+    ? `Mostrando ${lista.length} de ${_coloniasData.length} colonias`
+    : `${_coloniasData.length} colonias registradas`;
+  tbody.innerHTML = lista.length ? lista.map(c => `
+    <tr>
+      <td><strong>${c.nombre}</strong></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.lat}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.lon}</td>
+      <td>${c.distancia != null ? c.distancia + ' km' : '<span style="color:var(--muted)">—</span>'}</td>
+      <td>${c.zona_actual ? `<span class="badge badge-blue">${c.zona_actual}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><span class="badge ${c.activo ? 'badge-green' : 'badge-gray'}">${c.activo ? 'Activa' : 'Inactiva'}</span></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick='openModalColonia(${JSON.stringify(c)})'>✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteColonia(${c.id})">🗑</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay colonias registradas</td></tr>';
+}
+
+function filtrarColonias(q) {
+  const query = q.toLowerCase().trim();
+  if (!query) { renderColonias(_coloniasData); return; }
+  renderColonias(_coloniasData.filter(c => c.nombre.toLowerCase().includes(query)));
+}
+
+function openModalColonia(c = null) {
+  document.getElementById('modal-col-title').textContent = c ? 'Editar colonia' : 'Nueva colonia';
+  document.getElementById('col-id').value     = c?.id     || '';
+  document.getElementById('col-nombre').value = c?.nombre || '';
+  document.getElementById('col-lat').value    = c?.lat    || '';
+  document.getElementById('col-lon').value    = c?.lon    || '';
+  document.getElementById('modal-colonia').classList.add('show');
+}
+
+async function saveColonia() {
+  const id     = document.getElementById('col-id').value;
+  const nombre = document.getElementById('col-nombre').value.trim();
+  const lat    = parseFloat(document.getElementById('col-lat').value);
+  const lon    = parseFloat(document.getElementById('col-lon').value);
+  if (!nombre || isNaN(lat) || isNaN(lon)) return toast('Completa todos los campos', false);
+  const r = id
+    ? await api(`/api/colonias/${id}`, 'PUT',  { nombre, lat, lon, activo: 1 })
+    : await api('/api/colonias',       'POST', { nombre, lat, lon });
+  if (r.ok) {
+    closeModal('modal-colonia');
+    toast('Colonia guardada ✅');
+    _coloniasData = await api('/api/colonias');
+    renderColonias(_coloniasData);
+  } else toast(r.error || 'Error al guardar', false);
+}
+
+async function deleteColonia(id) {
+  if (!confirm('¿Eliminar esta colonia?')) return;
+  const r = await api(`/api/colonias/${id}`, 'DELETE');
+  if (r.ok) {
+    toast('Colonia eliminada');
+    _coloniasData = await api('/api/colonias');
+    renderColonias(_coloniasData);
+  }
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────

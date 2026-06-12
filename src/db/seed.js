@@ -87,6 +87,21 @@ async function seedDB() {
   try { db.run("ALTER TABLE productos ADD COLUMN sinonimos TEXT DEFAULT ''"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
 
+  // ── TABLAS PARA ZONAS DE ENVÍO ────────────────────────────────────────────
+  try { run(`CREATE TABLE IF NOT EXISTS colonias (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre      TEXT UNIQUE NOT NULL,
+    lat         REAL NOT NULL,
+    lon         REAL NOT NULL,
+    activo      INTEGER DEFAULT 1
+  )`); } catch (_) {}
+  try { run(`CREATE TABLE IF NOT EXISTS tarifas_zonas (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre_zona   TEXT NOT NULL,
+    distancia_max REAL NOT NULL,
+    tarifa        REAL NOT NULL
+  )`); } catch (_) {}
+
   // ── SEED PRODUCTOS ─────────────────────────────────────────────────────────
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
@@ -256,6 +271,124 @@ async function seedDB() {
     db.run("INSERT INTO usuarios_panel (usuario, password) VALUES (?,?)", ["admin", hash]);
     console.log("✅ Usuario panel creado: admin / admin123");
   }
+
+  // ── SEED COLONIAS (solo si la tabla está vacía) ────────────────────────────
+  const countCol = queryOne("SELECT COUNT(*) as c FROM colonias")?.c || 0;
+  if (countCol === 0) {
+    const colonias = [
+      ["12 de Diciembre",21.4897071,-104.8767138],["15 de Mayo",21.4777308,-104.8897911],
+      ["18 de Agosto",21.5028469,-104.878283],["20 de Noviembre",21.5636606,-104.8848843],
+      ["26 de Septiembre",21.4725834,-104.8821049],["2 de Agosto",21.4775149,-104.8681551],
+      ["4 Milpas",21.4906163,-104.8769032],["5 de Febrero",21.5175888,-104.8905277],
+      ["Acayapan",21.5253526,-104.9033261],["Adolfo López Mateos",21.5271945,-104.9053069],
+      ["Alaska",21.5217487,-104.9236036],["Amado Nervo",21.4641084,-104.8020015],
+      ["América Manríquez",21.4968898,-104.8935537],["Ampliación Tierra y Libertad",21.5051932,-104.8766765],
+      ["Aramara",21.496545,-104.874594],["Arboledas",21.5338386,-104.8771689],
+      ["Aves del Paraíso",21.5061112,-104.9145698],["Aviación",21.4834919,-104.8834844],
+      ["Aztlán Solidaridad",21.5254698,-104.9326656],["Benito Juárez",21.598246,-105.0032223],
+      ["Bethel",21.4790067,-104.9107681],["Bonaterra",21.465546,-104.8438497],
+      ["Brisas de San Juan",21.5146917,-104.92743],["Buenos Aires",21.4943654,-104.8864777],
+      ["Bugambilias",21.533677,-104.8650027],["Burócrata Estatal",21.4881008,-104.9007732],
+      ["Caja de Agua",21.4957981,-104.8958893],["Caminera",21.4723149,-104.8866707],
+      ["Camino Real",21.492647,-104.8515084],["Castilla",21.4681625,-104.8801163],
+      ["Chapultepec",21.5384608,-104.8775115],["Ciudad del Valle",21.4906425,-104.8859141],
+      ["Ciudad Industrial",21.4783454,-104.8425406],["Colinas del Rey",21.4879517,-104.9072064],
+      ["Colonial",21.4784242,-104.8719046],["Cora",21.5021018,-104.9177896],
+      ["Cuauhtémoc",21.4849586,-104.9062944],["Del Bosque",21.4925407,-104.9036646],
+      ["Del Sol",21.504771,-104.8693631],["Ejidal",21.4492568,-104.8225308],
+      ["El Aguacate",21.515633,-104.944309],["El Armadillo",21.4627119,-104.8506567],
+      ["Electricistas",21.5002674,-104.9026711],["El Mirador INFONAVIT",21.52069,-104.8882629],
+      ["El Paraíso",21.537816,-104.8748006],["El Pedregal",21.4978364,-104.9179655],
+      ["El Puerto",21.1786158,-105.1385487],["El Punto",21.5354451,-104.8941569],
+      ["El Rodeo",21.5151712,-104.9177875],["El Tecolote",21.5003164,-104.9090082],
+      ["El Tecolote INFONAVIT",21.5018942,-104.9025563],["Emiliano Zapata",21.5354409,-104.9391245],
+      ["Estadios",21.5120513,-104.9017981],["Esteban Baca Calderón",21.4957969,-104.895321],
+      ["Félix Peña",21.4785824,-104.8976305],["Flamingos",21.4959122,-104.8735196],
+      ["Florencia",21.4897795,-104.8854245],["Flores Magón",21.5359048,-104.9005161],
+      ["Francisco Villa",21.5139975,-104.8747851],["Gardenias",21.4714809,-104.8912384],
+      ["Genaro Vázquez",21.5076848,-104.8739105],["Gilberto Flores Muñoz",21.53055,-104.8851598],
+      ["Gobernadores",21.4865263,-104.8732954],["Guadalupe",21.5452354,-104.9616754],
+      ["Gustavo Díaz Ordaz",21.5339755,-104.906199],["Heriberto Casas",21.5261273,-104.8860085],
+      ["Heriberto Jara",21.525095,-104.8870458],["Hermosa Provincia",21.4817692,-104.8790277],
+      ["IMSS",21.5137043,-104.910322],["INDECO",21.5279131,-104.9029136],
+      ["Independencia",21.5031003,-104.9079024],["Insurgentes",21.4725843,-104.8941058],
+      ["Jacarandas",21.5119293,-104.9035474],["Jardines de La Cruz",21.4957265,-104.8976922],
+      ["Jazmines",21.4684862,-104.8010861],["Jesús García",21.5028367,-104.882688],
+      ["Juan Escutia",21.4726928,-104.8882778],["Juventud",21.4944007,-104.8775494],
+      ["La Esperanza",21.5105144,-104.9020127],["Lagos del Country",21.4791736,-104.8617885],
+      ["La Huerta",21.5190659,-104.9140766],["La Joya",21.4754149,-104.8706501],
+      ["La Loma",21.5045434,-104.9046382],["Las Aves",21.494261,-104.8803564],
+      ["Las Brisas",21.5171403,-104.9223755],["Las Flores",21.5250189,-104.9039925],
+      ["Las Islas",21.4733035,-104.8641538],["Las Palomas",21.4592452,-104.8549914],
+      ["Lázaro Cárdenas",21.578056,-104.785],["Leyva Medina",21.4766442,-104.8931076],
+      ["Lindavista",21.5108316,-104.920733],["Lirios",21.5293234,-104.8717261],
+      ["Loma Hermosa",21.4938086,-104.8552653],["Lomas Bonitas",21.5127001,-104.8722082],
+      ["Lomas de La Cruz",21.5213286,-104.8782872],["Lomas del Valle",21.4931741,-104.8550535],
+      ["Lomas de San Juan",21.5024345,-104.921219],["Los Arcos",21.5644843,-104.8817036],
+      ["Los Colomos",21.5006049,-104.8790488],["Los Fresnos",21.4843588,-104.8913197],
+      ["Los Fresnos INFONAVIT",21.478631,-104.877652],["Los Llanitos",21.4927662,-104.8787313],
+      ["Los Pinos",21.5219197,-104.8983565],["Los Sauces",21.4675084,-104.8729784],
+      ["Los Sauces INFONAVIT",21.4658462,-104.8652809],["Luis Donaldo Colosio",21.5091672,-104.881886],
+      ["Luis Donaldo Colosio Murrieta",21.502987,-104.878622],["México",21.5853426,-104.8351876],
+      ["Miguel Hidalgo",21.4738421,-104.8671785],["Miravalles",21.4744881,-104.8915054],
+      ["Moctezuma",21.487149,-104.8973348],["Molinos del Rey",21.4899809,-104.8482855],
+      ["Mololoa",21.6403868,-104.9306884],["Morelos",21.4967585,-104.9030532],
+      ["Niños Héroes",21.513429,-104.8680243],["Nueva Alemania",21.4977676,-104.9110023],
+      ["Nuevas Delicias",21.5229017,-104.9380876],["Nuevas Palomas",21.4690902,-104.8576951],
+      ["Nuevo Progreso",21.5429173,-104.8638528],["Ojo de Agua",21.4871545,-104.8743883],
+      ["Olimpo",21.5115309,-104.920337],["Oriental",21.4889424,-104.8711099],
+      ["Parque Ecológico",21.4908945,-104.8611709],["Paseo del Valle Real",21.4620045,-104.8615386],
+      ["Plan de Ayala",21.5219162,-104.9103534],["Primero de Mayo",21.5647348,-104.8808548],
+      ["Puente de San Cayetano",21.469774,-104.8550347],["Puerta Encanto",21.4866843,-104.8442074],
+      ["Reforma",21.4790265,-104.8849524],["Revolución",21.503991,-104.874033],
+      ["Rey Nayar",21.5054909,-104.9190418],["Rinconada Residencial",21.5239805,-104.9255107],
+      ["Rincón de San Juan",21.5020564,-104.9128623],["Rivas Allende",21.5304027,-104.9062938],
+      ["Rodeo de La Punta",21.5195306,-104.9243106],["San Antonio",21.5005945,-104.8943932],
+      ["Sandino",21.5079499,-104.8810617],["San José",21.5165826,-104.8951009],
+      ["San Juan",21.4955799,-104.9167115],["San Juanito",21.5154105,-104.871144],
+      ["Santa Cecilia",21.5135365,-104.8687384],["Santa Teresita",21.522197,-104.8998254],
+      ["Tepic Centro",21.451849,-104.8210334],["Tierra y Libertad",21.5051932,-104.8766765],
+      ["Tulipanes",21.5294835,-104.8713718],["Universidad Autónoma de Nayarit",21.4919338,-104.8923585],
+      ["Valle de La Cruz",21.4988651,-104.893561],["Valle del Country",21.4838842,-104.8629467],
+      ["Valle de Matatipac",21.4899304,-104.8460405],["Valle de Nayarit",21.4791099,-104.9081184],
+      ["Valle de Zaragoza",21.4483532,-104.8410652],["Valle Dorado",21.4847178,-104.9034968],
+      ["Valle Magno",21.4629947,-104.8513475],["Valle Verde",21.5239578,-104.9362256],
+      ["Venceremos",21.4689001,-104.870808],["Versalles Sur",21.5042805,-104.9130899],
+      ["Villas de La Cantera",21.4900872,-104.8399047],["Villas de La Paz",21.4817258,-104.8903603],
+      ["Villas del Molino",21.4892156,-104.8442653],["Villas del Parque",21.4914501,-104.8543798],
+      ["Villas de San Juan",21.5032516,-104.9186352],["Vistas de La Cantera",21.5097812,-104.8170025],
+      ["Zapopan",21.5222158,-104.8758651],["Zitacua",21.5045837,-104.8702415],
+      ["Ampliación El Paraíso",21.537816,-104.8748006],["Ampliación Santa Teresita",21.522197,-104.8998254],
+      ["El Faisán",21.4945515,-104.8812101],["El Rubí",21.4638491,-104.8464047],
+      ["FOVISSSTE 1a Etapa",21.5158841,-104.9259392],["FOVISSSTE 2a Etapa",21.5158841,-104.9259392],
+      ["La Lomita",21.5232365,-104.8739294],["Residencial La Loma",21.5045434,-104.9046382],
+      ["Residencial los Olivos",21.4951731,-104.8161051],
+    ];
+    for (const [nombre, lat, lon] of colonias) {
+      try { run("INSERT INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, lat, lon]); } catch (_) {}
+    }
+    console.log(`✅ ${colonias.length} colonias insertadas`);
+  }
+
+  // ── SEED TARIFAS ZONAS (solo si está vacío) ────────────────────────────────
+  const countZonas = queryOne("SELECT COUNT(*) as c FROM tarifas_zonas")?.c || 0;
+  if (countZonas === 0) {
+    const zonas = [
+      ["Zona 1 — Cerca",  3,    30],
+      ["Zona 2 — Media",  6,    50],
+      ["Zona 3 — Lejos",  10,   70],
+      ["Zona 4 — Muy lejos", 9999, 100],
+    ];
+    for (const [nombre_zona, distancia_max, tarifa] of zonas) {
+      run("INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)",
+        [nombre_zona, distancia_max, tarifa]);
+    }
+    console.log("✅ Zonas de tarifa iniciales insertadas");
+  }
+
+  // Config: coordenadas del negocio (solo si no existen)
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_lat', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_lon', '')");
 
   guardarDB();
   console.log("✅ Base de datos lista");
