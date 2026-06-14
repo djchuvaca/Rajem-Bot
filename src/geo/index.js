@@ -41,6 +41,13 @@ function normalizar(texto) {
     .trim();
 }
 
+// Verifica que `needle` aparezca como palabra(s) completa(s) dentro de `haystack`
+// Evita que "lomas" coincida con "palomas" o "valle" con "miravalles"
+function _esPalabraEn(haystack, needle) {
+  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)${esc}(?:\\s|$)`).test(haystack);
+}
+
 // ── Búsqueda con scoring ──────────────────────────────────────────────────────
 function buscarColonia(nombre) {
   if (!nombre) return null;
@@ -54,19 +61,19 @@ function buscarColonia(nombre) {
     if (normalizar(c.nombre) === norm) return c;
   }
 
-  // 2. Coincidencia parcial con puntaje
-  // - cn.includes(norm): cliente escribió fragmento del nombre → puntaje = norm.length / cn.length
-  // - norm.includes(cn): cliente escribió más que el nombre → puntaje = cn.length / norm.length
-  // Se elige el match con mayor puntaje (más específico). Umbral mínimo 0.4.
+  // 2. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos
+  // - norm aparece como palabras completas dentro de cn → puntaje = norm.length / cn.length
+  // - cn aparece como palabras completas dentro de norm → puntaje = cn.length / norm.length
+  // Umbral mínimo 0.5: filtra inputs muy cortos o ambiguos ("infonavit", "lomas", "san")
   let mejorMatch = null;
   let mejorPuntaje = 0;
 
   for (const c of todas) {
     const cn = normalizar(c.nombre);
     let puntaje = 0;
-    if (cn.includes(norm)) {
+    if (_esPalabraEn(cn, norm)) {
       puntaje = norm.length / cn.length;
-    } else if (norm.includes(cn)) {
+    } else if (_esPalabraEn(norm, cn)) {
       puntaje = cn.length / norm.length;
     }
     if (puntaje > mejorPuntaje) {
@@ -75,7 +82,7 @@ function buscarColonia(nombre) {
     }
   }
 
-  return mejorPuntaje >= 0.4 ? mejorMatch : null;
+  return mejorPuntaje >= 0.5 ? mejorMatch : null;
 }
 
 // ── Cálculo de tarifa ─────────────────────────────────────────────────────────
