@@ -87,9 +87,11 @@ function buscarColonia(nombre) {
   }
 
   // 2. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos
-  // Umbral 0.5: descarta inputs ambiguos ("infonavit", "lomas", "san")
+  // Umbral 0.5 normal; excepción: si hay exactamente UN candidato con word-boundary
+  // (p.ej. "aztlan" → Aztlán Solidaridad) se devuelve aunque el score sea bajo.
   let mejorMatch = null;
   let mejorPuntaje = 0;
+  let candidatos = 0;
 
   for (const c of todas) {
     const cn = normalizar(c.nombre);
@@ -99,13 +101,14 @@ function buscarColonia(nombre) {
     } else if (_esPalabraEn(norm, cn)) {
       puntaje = cn.length / norm.length;
     }
+    if (puntaje > 0) candidatos++;
     if (puntaje > mejorPuntaje) {
       mejorPuntaje = puntaje;
       mejorMatch = c;
     }
   }
 
-  return mejorPuntaje >= 0.5 ? mejorMatch : null;
+  return (mejorPuntaje >= 0.5 || (mejorPuntaje > 0 && candidatos === 1)) ? mejorMatch : null;
 }
 
 // ── Cálculo de tarifa ─────────────────────────────────────────────────────────
