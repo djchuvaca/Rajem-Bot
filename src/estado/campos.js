@@ -18,7 +18,7 @@ const { eliminarSesion }  = require("../db");
 const { getRangoHorario } = require("../horario");
 
 // ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
-const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|spei|deposito|dep[oó]sito|cash|mostrador|domicilio|recoger|colonia|calle|correo|referencia|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|priv|interior|entre|junto|frente|cerca|casa|fraccionamiento|fracc|unidad|lote)$/i;
+const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|spei|deposito|dep[oó]sito|cash|mostrador|domicilio|recoger|colonia|calle|correo|referencia|sin|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|priv|interior|entre|junto|frente|cerca|casa|fraccionamiento|fracc|unidad|lote)$/i;
 
 // ── EXTRACCIÓN DE TELÉFONO ────────────────────────────────────────────────────
 function extraerTelefono(texto) {
@@ -233,10 +233,13 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
       if (!campos.colonia && /col\.|colonia\s+\w|^col\s/i.test(l)) {
         campos.colonia = l.replace(/^col\.?\s*/i, "").trim(); continue;
       }
-      if (!campos.referencia && /referencia|entre\s+calle|cerca\s+de|a\s+un\s+lado|frente\s+a|casa\s+de|edificio|piso\s+\d|depto|departamento|local\s+\d/i.test(l)) {
+      if (!campos.referencia && /referencia|sin\s+referencia|entre\s+calle|cerca\s+de|a\s+un\s+lado|frente\s+a|casa\s+de|edificio|piso\s+\d|depto|departamento|local\s+\d/i.test(l)) {
         campos.referencia = l.replace(/^referencia:?\s*/i, "").trim(); continue;
       }
-      if (campos.calle && !campos.colonia && /^[a-záéíóúüñ0-9\s]{3,40}$/i.test(l) && !PALABRAS_NO_NOMBRE.test(l)) {
+      if (campos.calle && !campos.colonia &&
+          /^[a-záéíóúüñ0-9\s]{3,40}$/i.test(l) &&
+          !PALABRAS_NO_NOMBRE.test(l) &&
+          !/^sin\s+\w+|cerca\s+de|frente\s+a|junto\s+a|entre\s+(las?\s+)?calle/i.test(l)) {
         campos.colonia = l.trim(); continue;
       }
     }

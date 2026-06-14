@@ -16,6 +16,7 @@ const {
 } = require("../db");
 const { queryOne, queryAll, run } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
+const { invalidarCacheColonias } = require("../geo");
 
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
 const botPausado = require("../estado/bot-pausado");
@@ -499,6 +500,7 @@ app.post("/api/colonias", requireAuth, (req, res) => {
   if (!nombre || lat == null || lon == null) return res.status(400).json({ error: "Faltan campos" });
   try {
     run("INSERT INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, parseFloat(lat), parseFloat(lon)]);
+    invalidarCacheColonias();
     res.json({ ok: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -507,11 +509,13 @@ app.put("/api/colonias/:id", requireAuth, (req, res) => {
   const { nombre, lat, lon, activo } = req.body;
   run("UPDATE colonias SET nombre=?, lat=?, lon=?, activo=? WHERE id=?",
     [nombre, parseFloat(lat), parseFloat(lon), activo ?? 1, parseInt(req.params.id)]);
+  invalidarCacheColonias();
   res.json({ ok: true });
 });
 
 app.delete("/api/colonias/:id", requireAuth, (req, res) => {
   run("DELETE FROM colonias WHERE id=?", [parseInt(req.params.id)]);
+  invalidarCacheColonias();
   res.json({ ok: true });
 });
 
