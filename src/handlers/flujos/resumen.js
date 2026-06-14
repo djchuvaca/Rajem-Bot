@@ -7,7 +7,7 @@ const {
   detectarEdicion, aplicarEdicion, limpiarTodo, extraerTelefonoDeJID,
 } = require("../../estado");
 const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pedido/resumen");
-const { parsearPedidoSimple, detectarSinCorte } = require("../pedidoParser");
+const { parsearPedidoSimple, detectarSinCorte, detectarModificacion } = require("../pedidoParser");
 const {
   upsertCliente, registrarPedido, guardarTelefonoReal,
   guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId,
@@ -30,7 +30,26 @@ async function handleEdicionResumen(msg, textoOriginal, clienteNumero, historial
   }
 
   const edicion = detectarEdicion(textoOriginal);
-  if (!edicion) return false;
+  if (!edicion) {
+    const mod = detectarModificacion(textoOriginal);
+    if (mod && mod.tipo === 'cambiar_corte') {
+      const pendienteActual = resumenPendiente.get(clienteNumero);
+      const ordenExtraida   = extraerOrdenDeResumen(pendienteActual.texto);
+      const reViejo = new RegExp(`\\b${mod.de}\\b`, 'gi');
+      if (!reViejo.test(ordenExtraida)) {
+        await msg.reply(`No encontré *${mod.de}* en tu pedido. ¿Cuál corte deseas cambiar?`);
+        return true;
+      }
+      const esOrdenDomMod  = historial.some(h => h.content && h.content.includes("domicilio"));
+      const ordenModificada = ordenExtraida.replace(new RegExp(`\\b${mod.de}\\b`, 'gi'), mod.por);
+      const resumenNuevo    = generarResumen(clienteNumero, ordenModificada, esOrdenDomMod, esPreventa);
+      resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
+      persistirEstado(clienteNumero);
+      await msg.reply("Listo! Aquí está tu pedido actualizado:\n\n" + resumenNuevo.texto);
+      return true;
+    }
+    return false;
+  }
 
   const pendienteActual = resumenPendiente.get(clienteNumero);
   const ordenExtraida   = extraerOrdenDeResumen(pendienteActual.texto);
