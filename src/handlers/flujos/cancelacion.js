@@ -7,7 +7,7 @@ const { actualizarEstadoPedido, getMensaje, getConfig, getGrupoId } = require(".
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
-const RE_CANCELAR = /\bcancelar\b|\bcancela\b|\bcancel\b|\bcancelo\b|\bcancelame\b|\bcancelado\b|^ya\s+no\s+quiero\s*$|^ya\s+no\s*$/i;
+const RE_CANCELAR = /\bcancelar\b|\bcancela\b|\bcancel\b|\bcancelo\b|\bcancelame\b|\bcancelado\b|^ya\s+no\s+quiero\s*$|^ya\s+no\s*$|^no\s+quiero\s+nada\s*$|^no\s+(lo|la)\s+quiero\s*$|^olv[ií]d[ae](lo|la|nos|me)?\s*$|^olv[ií]da\s+(todo|mi\s+pedido)\s*$|^mejor\s+no\s*$|^no\s+va\s*$/i;
 const RE_NUEVO    = /\b(empez(?:ar|emos)\s+de\s+(?:nuevo|cero)|comenzar\s+de\s+cero|reinici(?:ar|o)|volver\s+a\s+empezar|otro\s+pedido|nuevo\s+pedido|quiero\s+(?:hacer\s+)?otro\s+pedido|olvida(?:mos)?\s+(?:todo|mi\s+pedido)|borremos?\s+todo)\b/i;
 
 // ── CANCELACIÓN DE PEDIDO CONFIRMADO ─────────────────────────────────────────

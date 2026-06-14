@@ -427,9 +427,9 @@ function detectarEdicion(texto) {
     return { campo: "hora", preguntar: true, pregunta: `*¿A qué hora deseas tu pedido?* (entre ${getRangoHorario()})` };
 
   // CALLE con valor
-  const mCalleVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?calle\s+(?:a|por)\s+(.+)/i);
+  const mCalleVal = texto.match(/cambia(?:r|me)?\s+(?:(?:la|mi|el)\s+)?calle\s+(?:a|por)\s+(.+)/i);
   if (mCalleVal) return { campo: "calle", valor: mCalleVal[1].trim(), preguntar: false };
-  if (/cambia(?:r|me)?\s+(?:la\s+)?calle$/i.test(t))
+  if (/cambia(?:r|me)?\s+(?:(?:la|mi|el)\s+)?calle$/i.test(t))
     return { campo: "calle", preguntar: true, pregunta: "*¿Cuál es tu nueva calle?*" };
 
   // NÚMERO DE DIRECCIÓN con valor (antes que teléfono para no confundir)
@@ -439,9 +439,9 @@ function detectarEdicion(texto) {
     return { campo: "numero", preguntar: true, pregunta: "*¿Cuál es tu nuevo número de dirección?*" };
 
   // COLONIA con valor
-  const mColVal = texto.match(/cambia(?:r|me)?\s+(?:la\s+)?colonia\s+(?:a|por)\s+(.+)/i);
+  const mColVal = texto.match(/cambia(?:r|me)?\s+(?:(?:la|mi|el)\s+)?colonia\s+(?:a|por)\s+(.+)/i);
   if (mColVal) return { campo: "colonia", valor: mColVal[1].trim(), preguntar: false };
-  if (/cambia(?:r|me)?\s+(?:la\s+)?colonia$/i.test(t))
+  if (/cambia(?:r|me)?\s+(?:(?:la|mi|el)\s+)?colonia$/i.test(t))
     return { campo: "colonia", preguntar: true, pregunta: "*¿Cuál es tu nueva colonia?*" };
 
   // REFERENCIA con valor
