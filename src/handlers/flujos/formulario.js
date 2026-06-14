@@ -16,6 +16,10 @@ const { estaEnHorario, mensajeFueraDeHorario, getRangoHorario } = require("../..
 const { detectarPreguntaFrecuente, calcularScore, detectarSinTipo, parsearPedidoSimple } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 const { telefonosReales, replyConTyping, ordenPendientePreventa, enFlujoActivo } = require("./utils");
+const { buscarColonia } = require("../../geo");
+
+// Contador de intentos fallidos de colonia por cliente (vive solo en memoria, se limpia al aceptar)
+const _intentosColonia = new Map();
 
 // ── DETECCIÓN Y RESUMEN DE SEÑALES DE PEDIDO ─────────────────────────────────
 const _PRESUPUESTO_RE = /\bpor\s*\$\s*\d+|\$\s*\d+\s*(de|en)\b/i;
@@ -324,6 +328,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
     return true;
   }
 
+  const coloniaAntes = (datosCampos.get(clienteNumero) || {}).colonia;
   const campos = interpretarCampos(clienteNumero, textoOriginal, esOrdenDomicilio, esPreventa);
 
   if (esPreventa && campos._horaFueraRango) {
@@ -367,6 +372,40 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
     }
   }
   acumularDatos(clienteNumero, textoOriginal);
+
+  // ── Validar colonia recién capturada en este mensaje ─────────────────────────
+  if (esOrdenDomicilio && !coloniaAntes) {
+    const caVal = datosCampos.get(clienteNumero) || {};
+    if (caVal.colonia && !caVal._coloniaNoVerificada) {
+      const encontrada = buscarColonia(caVal.colonia);
+      if (!encontrada) {
+        const intentos = _intentosColonia.get(clienteNumero) || 0;
+        if (intentos < 2) {
+          const coloniaEscrita = caVal.colonia;
+          caVal.colonia = null;
+          datosCampos.set(clienteNumero, caVal);
+          persistirEstado(clienteNumero);
+          _intentosColonia.set(clienteNumero, intentos + 1);
+          const form = mostrarFormularioProgresivo(clienteNumero, true, esPreventa);
+          const aviso = intentos === 0
+            ? `No reconocí la colonia *"${coloniaEscrita}"*.\n¿Puedes escribir solo el nombre de tu colonia? _Ej: Los Fresnos, San Juan, Centro..._`
+            : `Aún no encuentro *"${coloniaEscrita}"* en nuestras colonias.\nEscribe solo el nombre de tu colonia, sin calle ni número.`;
+          await msg.reply(form + '\n\n' + aviso);
+          return true;
+        } else {
+          // Tercer intento fallido — aceptar el texto crudo y marcar para revisión
+          caVal._coloniaNoVerificada = true;
+          datosCampos.set(clienteNumero, caVal);
+          _intentosColonia.delete(clienteNumero);
+        }
+      } else {
+        // Encontrada — normalizar al nombre canónico
+        caVal.colonia = encontrada.nombre;
+        datosCampos.set(clienteNumero, caVal);
+        _intentosColonia.delete(clienteNumero);
+      }
+    }
+  }
 
   if (camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);

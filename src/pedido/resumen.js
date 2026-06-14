@@ -162,7 +162,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     const coloniaMostrar = tarifaInfo?.coloniaNombre || c.colonia || "—";
     resumen += `📍 *Dirección:* ${c.calle || "—"}, Col. ${coloniaMostrar}\n`;
     if (c.colonia && tarifaInfo && !tarifaInfo.encontrada) {
-      resumen += `⚠️ _Colonia no reconocida — confirma con el cliente_\n`;
+      resumen += `⚠️ _Colonia no reconocida — la tarifa de envío se ajustará al verificar tu dirección_\n`;
     }
     resumen += `📌 *Referencia:* ${c.referencia && c.referencia !== "sin referencia" ? c.referencia : "sin referencia"}\n`;
     resumen += `💵 *Subtotal:* $${subtotal}\n`;

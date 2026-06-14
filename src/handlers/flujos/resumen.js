@@ -379,6 +379,8 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   // ── 1. Guardar en BD antes de confirmar ────────────────────────────────────
   let dbError = false;
   let pedidoId = null;
+  let _coloniaNoVerif = false;
+  let _coloniaTxt = '';
   try {
     const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
     const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
@@ -388,6 +390,8 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     else if (partes.length === 2) { nombre = partes[0];                   apellido = partes[1]; }
     else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
     const camposCliente = datosCampos.get(clienteNumero) || {};
+    _coloniaNoVerif = !!camposCliente._coloniaNoVerificada;
+    _coloniaTxt     = camposCliente.colonia || '';
     const calle_numero  = camposCliente.calle || null;
     const colonia       = camposCliente.colonia || null;
     const referencia    = (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null;
@@ -425,6 +429,11 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     try {
       await client.sendMessage(grupoId, `🆕 Pedido #${pedidoId}\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}\n!listo ${infoPedido.telefono}\n!en_camino ${pedidoId}`);
     } catch (e) { console.error("Error al notificar grupo:", e.message); }
+    if (_coloniaNoVerif && _coloniaTxt) {
+      try {
+        await client.sendMessage(grupoId, `⚠️ *Pedido #${pedidoId} — colonia sin verificar*\nEl cliente indicó: "${_coloniaTxt}" pero no coincide con ninguna colonia registrada.\nConfirma la dirección y ajusta la tarifa de envío antes de salir.`);
+      } catch (e) { console.error("Error al notificar colonia no verificada:", e.message); }
+    }
   }
 
   pendientesConfirmacion.set(clienteNumero, { ...infoPedido, resumen: pendiente.texto, hora: horaVenta });
