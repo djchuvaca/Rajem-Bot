@@ -75,6 +75,9 @@ tr:hover td{background:var(--surface2)}
 .btn-danger:hover{background:rgba(239,68,68,0.2)}
 .btn-sm{padding:5px 10px;font-size:12px}
 .badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500}
+#colonias-table th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+#colonias-table th.sortable:hover{color:var(--primary)}
+#colonias-table th.sort-active{color:var(--primary)}
 .badge-green{background:rgba(34,197,94,0.12);color:var(--green)}
 .badge-yellow{background:rgba(245,158,11,0.12);color:var(--yellow)}
 .badge-red{background:rgba(239,68,68,0.12);color:var(--red)}
@@ -478,7 +481,14 @@ tr:hover td{background:var(--surface2)}
         <div id="colonias-count" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
         <div class="table-wrap">
           <table id="colonias-table">
-            <thead><tr><th>Colonia</th><th>Latitud</th><th>Longitud</th><th>Distancia</th><th>Zona asignada</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr>
+              <th class="sortable" onclick="ordenarColonias('nombre')">Colonia <span id="si-nombre"></span></th>
+              <th>Latitud</th><th>Longitud</th>
+              <th class="sortable" onclick="ordenarColonias('distancia')">Distancia <span id="si-distancia"></span></th>
+              <th class="sortable" onclick="ordenarColonias('zona_actual')">Zona asignada <span id="si-zona_actual"></span></th>
+              <th class="sortable" onclick="ordenarColonias('activo')">Estado <span id="si-activo"></span></th>
+              <th></th>
+            </tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1415,6 +1425,8 @@ async function cambiarPassword() {
 // ── ZONAS DE ENVÍO ────────────────────────────────────────────────────────────
 let _coloniasData = [];
 let _zonasData    = [];
+let _sortField    = 'nombre';
+let _sortDir      = 1; // 1 asc, -1 desc
 
 async function loadEnvios() {
   const conf = await api('/api/config');
@@ -1424,7 +1436,10 @@ async function loadEnvios() {
   _zonasData    = await api('/api/tarifas-zonas');
   _coloniasData = await api('/api/colonias');
   renderZonas();
-  renderColonias(_coloniasData);
+  // Inicializar indicador de sort por defecto
+  const siNombre = document.getElementById('si-nombre');
+  if (siNombre) { siNombre.textContent = ' ▲'; siNombre.closest('th').classList.add('sort-active'); }
+  filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
 }
 
 function renderZonas() {
@@ -1470,7 +1485,7 @@ async function saveUbicacion() {
   await api('/api/config', 'POST', { clave: 'negocio_lon', valor: lon });
   toast('Ubicación guardada ✅');
   _coloniasData = await api('/api/colonias');
-  renderColonias(_coloniasData);
+  filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
 }
 
 function renderColonias(lista) {
@@ -1494,10 +1509,47 @@ function renderColonias(lista) {
     </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay colonias registradas</td></tr>';
 }
 
+function ordenarColonias(field) {
+  _sortDir = (_sortField === field) ? -_sortDir : 1;
+  _sortField = field;
+  // Actualizar indicadores visuales en headers
+  ['nombre','distancia','zona_actual','activo'].forEach(f => {
+    const th  = document.getElementById('si-' + f)?.closest('th');
+    const ind = document.getElementById('si-' + f);
+    if (!th || !ind) return;
+    th.classList.toggle('sort-active', f === field);
+    ind.textContent = f === field ? (_sortDir === 1 ? ' ▲' : ' ▼') : '';
+  });
+  filtrarColonias(document.getElementById('buscar-colonia').value);
+}
+
+function _aplicarSort(lista) {
+  return [...lista].sort((a, b) => {
+    let va = a[_sortField] ?? '';
+    let vb = b[_sortField] ?? '';
+    // distancia: null al final
+    if (_sortField === 'distancia') {
+      if (va === '' || va == null) return 1;
+      if (vb === '' || vb == null) return -1;
+      return (va - vb) * _sortDir;
+    }
+    // activo: activa primero por defecto
+    if (_sortField === 'activo') return (vb - va) * _sortDir;
+    // zona_actual: sin zona al final
+    if (_sortField === 'zona_actual') {
+      if (!va && vb) return 1;
+      if (va && !vb) return -1;
+    }
+    return String(va).localeCompare(String(vb), 'es', { sensitivity: 'base' }) * _sortDir;
+  });
+}
+
 function filtrarColonias(q) {
-  const query = q.toLowerCase().trim();
-  if (!query) { renderColonias(_coloniasData); return; }
-  renderColonias(_coloniasData.filter(c => c.nombre.toLowerCase().includes(query)));
+  const query = (q || '').toLowerCase().trim();
+  const filtrada = query
+    ? _coloniasData.filter(c => c.nombre.toLowerCase().includes(query))
+    : _coloniasData;
+  renderColonias(_aplicarSort(filtrada));
 }
 
 function openModalColonia(c = null) {
@@ -1522,7 +1574,7 @@ async function saveColonia() {
     closeModal('modal-colonia');
     toast('Colonia guardada ✅');
     _coloniasData = await api('/api/colonias');
-    renderColonias(_coloniasData);
+    filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
   } else toast(r.error || 'Error al guardar', false);
 }
 
@@ -1532,7 +1584,7 @@ async function deleteColonia(id) {
   if (r.ok) {
     toast('Colonia eliminada');
     _coloniasData = await api('/api/colonias');
-    renderColonias(_coloniasData);
+    filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
   }
 }
 
