@@ -29,6 +29,28 @@ function invalidarCacheColonias() {
   _cacheTs = 0;
 }
 
+// ── Caché de config geo (TTL 60s) ─────────────────────────────────────────────
+let _cfg = null;
+let _cfgTs = 0;
+
+function _geoConfig() {
+  const now = Date.now();
+  if (!_cfg || now - _cfgTs > CACHE_TTL) {
+    _cfg = {
+      fallback: parseInt(getConfig('domicilio_costo') || '50'),
+      lat:      parseFloat(getConfig('negocio_lat')   || '0'),
+      lon:      parseFloat(getConfig('negocio_lon')   || '0'),
+    };
+    _cfgTs = now;
+  }
+  return _cfg;
+}
+
+function invalidarCacheConfig() {
+  _cfg = null;
+  _cfgTs = 0;
+}
+
 // ── Normalización ─────────────────────────────────────────────────────────────
 function normalizar(texto) {
   return (texto || '')
@@ -38,11 +60,14 @@ function normalizar(texto) {
     .replace(/^(?:la|el|los|las)\s+(?=col(?:onia)?[\s.]|fracc(?:ionamiento)?[\s.]|residencial\s|unidad\s|privada\s|ampl(?:iacion)?[\s.])/i, '')
     // Prefijos de colonia (incluyendo "col " sin punto)
     .replace(/^(?:col(?:onia)?\.?\s+|fracc(?:ionamiento)?\.?\s+|residencial\s+|unidad\s+|privada\s+|ampl(?:iacion)?\.?\s+)/i, '')
+    // Puntuación residual al final (coma, punto, punto-y-coma, etc.)
+    .replace(/[,;:.!?]+$/, '')
+    // Colapsar espacios múltiples
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 // Verifica que `needle` aparezca como palabra(s) completa(s) dentro de `haystack`
-// Evita que "lomas" coincida con "palomas" o "valle" con "miravalles"
 function _esPalabraEn(haystack, needle) {
   const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?:^|\\s)${esc}(?:\\s|$)`).test(haystack);
@@ -62,9 +87,7 @@ function buscarColonia(nombre) {
   }
 
   // 2. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos
-  // - norm aparece como palabras completas dentro de cn → puntaje = norm.length / cn.length
-  // - cn aparece como palabras completas dentro de norm → puntaje = cn.length / norm.length
-  // Umbral mínimo 0.5: filtra inputs muy cortos o ambiguos ("infonavit", "lomas", "san")
+  // Umbral 0.5: descarta inputs ambiguos ("infonavit", "lomas", "san")
   let mejorMatch = null;
   let mejorPuntaje = 0;
 
@@ -87,18 +110,16 @@ function buscarColonia(nombre) {
 
 // ── Cálculo de tarifa ─────────────────────────────────────────────────────────
 function calcularTarifaDomicilio(nombreColonia) {
-  const fallback   = parseInt(getConfig('domicilio_costo') || '50');
-  const negocioLat = parseFloat(getConfig('negocio_lat')  || '0');
-  const negocioLon = parseFloat(getConfig('negocio_lon')  || '0');
+  const { fallback, lat: negocioLat, lon: negocioLon } = _geoConfig();
 
   if (!negocioLat || !negocioLon) {
     console.warn('[GEO] negocio_lat/negocio_lon no configurados — todos los domicilios usan tarifa plana');
-    return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false };
+    return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
   }
 
   const colonia = buscarColonia(nombreColonia);
   if (!colonia) {
-    return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false };
+    return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
   }
 
   const distancia = haversine(negocioLat, negocioLon, colonia.lat, colonia.lon);
@@ -112,6 +133,7 @@ function calcularTarifaDomicilio(nombreColonia) {
         distancia: Math.round(distancia * 10) / 10,
         encontrada: true,
         fueraDeCobertura: false,
+        coloniaNombre: colonia.nombre,
       };
     }
   }
@@ -125,10 +147,11 @@ function calcularTarifaDomicilio(nombreColonia) {
       distancia: Math.round(distancia * 10) / 10,
       encontrada: true,
       fueraDeCobertura: true,
+      coloniaNombre: colonia.nombre,
     };
   }
 
-  return { tarifa: fallback, zona: null, distancia: Math.round(distancia * 10) / 10, encontrada: false, fueraDeCobertura: false };
+  return { tarifa: fallback, zona: null, distancia: Math.round(distancia * 10) / 10, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
 }
 
-module.exports = { haversine, buscarColonia, calcularTarifaDomicilio, invalidarCacheColonias };
+module.exports = { haversine, normalizar, buscarColonia, calcularTarifaDomicilio, invalidarCacheColonias, invalidarCacheConfig };

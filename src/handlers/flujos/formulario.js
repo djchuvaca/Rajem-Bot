@@ -7,7 +7,7 @@ const {
   acumularDatos, interpretarCampos, mostrarFormularioProgresivo,
   siguienteCampoFaltante, manejarOpcional, camposCompletos, camposATexto,
   persistirEstado, detectarEdicion, aplicarEdicion, extraerTelefonoDeJID,
-  resumenPendiente,
+  sanitizarColonia, resumenPendiente,
 } = require("../../estado");
 const { generarResumen } = require("../../pedido/resumen");
 const { getCliente, getTelefonoReal } = require("../../db");
@@ -149,7 +149,7 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
       telefono:   clienteBD.telefono,
       metodo:     null,
       calle:      tipoEntrega === "domicilio" ? (clienteBD.calle_numero || null) : null,
-      colonia:    tipoEntrega === "domicilio" ? (clienteBD.colonia || null) : null,
+      colonia:    tipoEntrega === "domicilio" ? (sanitizarColonia(clienteBD.colonia) || null) : null,
       referencia: tipoEntrega === "domicilio" ? (clienteBD.referencia || "sin referencia") : null,
       hora:       null,
       tipoEntrega,
@@ -228,7 +228,7 @@ async function handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNume
       const clienteBD = getCliente(telActual);
       if (clienteBD) {
         if (!camposActuales.calle)      camposActuales.calle      = clienteBD.calle_numero || null;
-        if (!camposActuales.colonia)    camposActuales.colonia    = clienteBD.colonia      || null;
+        if (!camposActuales.colonia)    camposActuales.colonia    = sanitizarColonia(clienteBD.colonia) || null;
         if (!camposActuales.referencia) camposActuales.referencia = clienteBD.referencia   || null;
       }
     }
@@ -268,7 +268,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
         camposActualesFormulario.telefono = clienteBD.telefono;
         if (tipo === "domicilio") {
           camposActualesFormulario.calle      = clienteBD.calle_numero || null;
-          camposActualesFormulario.colonia    = clienteBD.colonia      || null;
+          camposActualesFormulario.colonia    = sanitizarColonia(clienteBD.colonia) || null;
           camposActualesFormulario.referencia = clienteBD.referencia   || null;
         }
       }
@@ -356,7 +356,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   {
     const ca = datosCampos.get(clienteNumero) || {};
     if (ca.tipoEntrega === "domicilio" && !ca.calle && !ca.colonia) {
-      const matchComa = textoOriginal.match(/^(.+?),\s*(.+)$/);
+      const matchComa = textoOriginal.match(/^([^,]+),\s*([^,]+)$/);
       if (matchComa) {
         const parte1       = matchComa[1].trim();
         const coloniaLimpia = matchComa[2].trim().replace(/^col(?:onia)?\.?\s*/i, "").trim();

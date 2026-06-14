@@ -54,6 +54,13 @@ function extraerTelefonoDeJID(jid) {
   return null;
 }
 
+// ── SANITIZACIÓN DE COLONIA ───────────────────────────────────────────────────
+function sanitizarColonia(texto) {
+  if (!texto) return null;
+  const r = texto.replace(/[,;:.!?]+$/, '').replace(/\s{2,}/g, ' ').trim();
+  return r.length >= 2 ? r : null;
+}
+
 // ── FUNCIONES BASE ────────────────────────────────────────────────────────────
 function getHistorial(numero) {
   if (!conversaciones.has(numero)) conversaciones.set(numero, []);
@@ -173,6 +180,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
       if (!campos.colonia) {
         parteColonia = parteColonia
+          .replace(/,.*$/, '')
           .replace(/efectivo|tarjeta|transferencia/gi, "")
           .replace(/\ba\s+las?\s+\d{1,2}(?::\d{2})?/gi, "")
           .replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)/gi, "")
@@ -231,7 +239,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
         campos.calle = l; continue;
       }
       if (!campos.colonia && /col\.|colonia\s+\w|^col\s/i.test(l)) {
-        campos.colonia = l.replace(/^col\.?\s*/i, "").trim(); continue;
+        campos.colonia = sanitizarColonia(l.replace(/^col\.?\s*/i, "").trim()); continue;
       }
       if (!campos.referencia && /referencia|sin\s+referencia|entre\s+calle|cerca\s+de|a\s+un\s+lado|frente\s+a|casa\s+de|edificio|piso\s+\d|depto|departamento|local\s+\d/i.test(l)) {
         campos.referencia = l.replace(/^referencia:?\s*/i, "").trim(); continue;
@@ -240,7 +248,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
           /^[a-záéíóúüñ0-9\s]{3,40}$/i.test(l) &&
           !PALABRAS_NO_NOMBRE.test(l) &&
           !/^sin\s+\w+|cerca\s+de|frente\s+a|junto\s+a|entre\s+(las?\s+)?calle/i.test(l)) {
-        campos.colonia = l.trim(); continue;
+        campos.colonia = sanitizarColonia(l.trim()); continue;
       }
     }
   }
@@ -341,7 +349,7 @@ function datosCompletos(texto, esPreventa = false, esDomicilio = false) {
     || /\ba\s+las?\s+\d{1,2}/i.test(texto)
     || /\bpaso\s+a\s+las?\s+\d{1,2}/i.test(texto)
     || /\n\d{1,2}(:\d{2})?\s*$/.test(texto);
-  const tieneDireccion = /calle|col\.|colonia|av\.|blvd|#\s*\d|no\.\s*\d|\bn[uú]m/i.test(texto);
+  const tieneDireccion = /calle\s+\w|col\.\s*\w|colonia\s+\w|av\.\s*\w|blvd\s*\w|#\s*\d|no\.\s*\d|\bn[uú]m\s*\d/i.test(texto);
   if (esDomicilio && esPreventa) return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora && tieneDireccion;
   if (esDomicilio)  return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneDireccion;
   if (esPreventa)   return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora;
@@ -485,6 +493,7 @@ function aplicarEdicion(clienteNumero, edicion) {
 module.exports = {
   PALABRAS_NO_NOMBRE,
   getHistorial, limpiarTodo, acumularDatos,
+  sanitizarColonia,
   interpretarCampos, mostrarFormularioProgresivo, siguienteCampoFaltante,
   manejarOpcional, camposCompletos, camposATexto,
   datosCompletos, pareceFragmentoDatos, extraerDatosPedido,

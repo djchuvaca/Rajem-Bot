@@ -16,7 +16,7 @@ const {
 } = require("../db");
 const { queryOne, queryAll, run } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
-const { invalidarCacheColonias } = require("../geo");
+const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
 
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
 const botPausado = require("../estado/bot-pausado");
@@ -81,6 +81,9 @@ app.post("/api/cambiar-password", requireAuth, (req, res) => {
 app.get("/api/config", requireAuth, (req, res) => res.json(getAllConfig()));
 app.post("/api/config", requireAuth, (req, res) => {
   setConfig(req.body.clave, req.body.valor);
+  if (['negocio_lat', 'negocio_lon', 'domicilio_costo'].includes(req.body.clave)) {
+    invalidarCacheConfig();
+  }
   res.json({ ok: true });
 });
 

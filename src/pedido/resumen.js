@@ -159,7 +159,11 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   resumen += `📋 *Orden:*\n${ordenLimpia}\n\n`;
 
   if (esDomicilio) {
-    resumen += `📍 *Dirección:* ${c.calle || "—"}, Col. ${c.colonia || "—"}\n`;
+    const coloniaMostrar = tarifaInfo?.coloniaNombre || c.colonia || "—";
+    resumen += `📍 *Dirección:* ${c.calle || "—"}, Col. ${coloniaMostrar}\n`;
+    if (c.colonia && tarifaInfo && !tarifaInfo.encontrada) {
+      resumen += `⚠️ _Colonia no reconocida — confirma con el cliente_\n`;
+    }
     resumen += `📌 *Referencia:* ${c.referencia && c.referencia !== "sin referencia" ? c.referencia : "sin referencia"}\n`;
     resumen += `💵 *Subtotal:* $${subtotal}\n`;
     const zonaLabel = tarifaInfo?.zona ? ` (${tarifaInfo.zona})` : '';
