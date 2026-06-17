@@ -99,6 +99,7 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
 
   if (aceptaPreventa) {
     clientesPreventa.add(clienteNumero);
+    persistirEstado(clienteNumero);
     await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO());
     return true;
   }
@@ -361,7 +362,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   // Extrae calle + colonia de mensajes como "Av. Reforma 456, Col. Centro"
   {
     const ca = datosCampos.get(clienteNumero) || {};
-    if (ca.tipoEntrega === "domicilio" && !ca.calle && !ca.colonia) {
+    if ((ca.tipoEntrega === "domicilio" || tipoEntregaCliente.get(clienteNumero) === "domicilio") && !ca.calle && !ca.colonia) {
       const matchComa = textoOriginal.match(/^([^,]+),\s*([^,]+)$/);
       if (matchComa) {
         const parte1       = matchComa[1].trim();

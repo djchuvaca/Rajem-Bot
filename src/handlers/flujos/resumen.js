@@ -392,8 +392,11 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   }
 
   if (pendiente.esTransferencia) {
-    // Transferencia tradicional (MP no configurado o falló)
-    esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono });
+    // Transferencia tradicional (MP no configurado o falló).
+    // Si registrarPedido ya tuvo éxito en el bloque MP, pasamos el ID para
+    // que imagenes.js no vuelva a registrar el mismo pedido (duplicado).
+    const _pedidoMpId = typeof pedidoMpId !== "undefined" ? pedidoMpId : null;
+    esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono, pedidoId: _pedidoMpId });
     resumenPendiente.delete(clienteNumero);
     await msg.reply(DATOS_BANCO());
     return true;
