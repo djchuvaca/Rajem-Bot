@@ -390,6 +390,27 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_lat', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_lon', '')");
 
+  // Config: dirección y grupo de mandaditos
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_calle', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_colonia', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_referencia', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupo_mandaditos_id', '')");
+
+  // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
+  run(`CREATE TABLE IF NOT EXISTS despachos_programados (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    pedido_id       INTEGER NOT NULL,
+    cliente_nombre  TEXT    NOT NULL,
+    cliente_tel     TEXT    NOT NULL,
+    cliente_calle   TEXT,
+    cliente_colonia TEXT,
+    cliente_ref     TEXT,
+    total_orden     TEXT,
+    tarifa          INTEGER,
+    hora_despacho   TEXT    NOT NULL,
+    ejecutado       INTEGER NOT NULL DEFAULT 0
+  )`);
+
   guardarDB();
   console.log("✅ Base de datos lista");
 }

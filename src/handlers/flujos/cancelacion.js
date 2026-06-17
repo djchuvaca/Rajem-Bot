@@ -45,6 +45,7 @@ async function handleCancelacionConfirmada(msg, client, textoOriginal, clienteNu
     pedidosConfirmados.delete(clienteNumero);
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
+    ordenPendientePreventa.delete(clienteNumero);
     await replyConTyping(msg, SALUDO());
   }
   return true;
@@ -101,6 +102,7 @@ async function handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)
     esperandoTipoItem.delete(clienteNumero);
     esperandoExtras.delete(clienteNumero);
     ordenPreResumen.delete(clienteNumero);
+    ordenPendientePreventa.delete(clienteNumero);
     await msg.reply("Listo! Empezamos de nuevo. 😊\n\n*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*");
     return true;
   }

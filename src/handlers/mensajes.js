@@ -51,6 +51,7 @@ async function handleMensaje(msg, client) {
         esperandoCaptura.delete(clienteNumero);
         const { limpiarTodo } = require("../estado");
         limpiarTodo(clienteNumero);
+        ordenPendientePreventa.delete(clienteNumero);
         clientesNuevos.delete(clienteNumero);
         const grupoId = getGrupoId();
         if (grupoId) {

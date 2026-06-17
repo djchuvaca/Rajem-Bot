@@ -29,10 +29,11 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 
 const logger             = require("./src/logger");
-const { handleComandos, setPendienteConfirmacionGrupo } = require("./src/handlers/comandos");
+const { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes } = require("./src/handlers/comandos");
 const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
-const { initDB, getConfig, getGrupoId } = require("./src/db");
+const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
+const { initDB, getConfig, getGrupoId, getGrupoMandaditosId } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
 const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
@@ -61,6 +62,7 @@ client.on("qr", (qr) => {
 client.on("ready", () => {
   _reintentos = 0;
   setWhatsappClient(client);
+  reanudarDespachosPendientes(client).catch(e => logger.error("Error al reanudar despachos:", e.message));
   logger.info("Bot de Tacos Javier conectado y listo.")
   console.log("✅ Bot de Tacos Javier conectado y listo!");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -180,7 +182,12 @@ client.on("message", async (msg) => {
   }
 
   if (msg.from.endsWith("@g.us")) {
-    await handleComandos(msg, client);
+const mandaditosId = getGrupoMandaditosId();
+    if (mandaditosId && msg.from === mandaditosId) {
+      await handleMensajeMandaditos(msg, client);
+    } else {
+      await handleComandos(msg, client);
+    }
     return;
   }
 

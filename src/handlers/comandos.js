@@ -10,11 +10,13 @@ const {
   getCliente, getAllClientes, getTopClientes,
   getProductos, getProducto, setProductoActivo, updateProductoPrecio,
   upsertCliente, getConfig, setConfig, getJIDReal, limpiarTodasLasSesionesDB,
+  guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes,
 } = require("../db");
 const { invalidarCacheCortes } = require("./pedidoParser");
 const botPausado = require("../estado/bot-pausado");
 const { enviarDespachoMandaditos } = require("./mandaditos");
 const { calcularTarifaDomicilio } = require("../geo");
+const { ordenPendientePreventa } = require("./flujos/utils");
 
 // ── CONFIRMACIÓN DE GRUPO ADMIN ───────────────────────────────────────────────
 let _grupoPendiente = null; // { id, timeout }
@@ -97,7 +99,10 @@ function _parsearHoraEntrega(horaStr) {
   if (/p\.m\./i.test(m[3]) && h < 12) h += 12;
   if (/a\.m\./i.test(m[3]) && h === 12) h = 0;
   const hoy = new Date();
-  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), h, min, 0, 0);
+  const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), h, min, 0, 0);
+  // Si la hora de entrega ya pasó hoy, la entrega es mañana
+  if (fecha.getTime() < Date.now()) fecha.setDate(fecha.getDate() + 1);
+  return fecha;
 }
 
 // ── HANDLER PRINCIPAL ─────────────────────────────────────────────────────────
@@ -382,7 +387,7 @@ async function handleComandos(msg, client) {
         try {
           const tel10     = (datos.telefono || "").replace(/\D/g, "").slice(-10);
           const clienteBD = getCliente(tel10);
-          const pedidoBD  = getPedidosHoy().find(p => p.telefono === tel10 && p.estado === "confirmado");
+          const pedidoBD  = getPedidosPorCliente(tel10).find(p => p.estado === "confirmado");
           if (clienteBD && pedidoBD) {
             const tarifaInfo = calcularTarifaDomicilio(clienteBD.colonia);
             const tarifa     = tarifaInfo ? tarifaInfo.tarifa : 50;
@@ -405,11 +410,16 @@ async function handleComandos(msg, client) {
 
               if (horaDespacho && msRestantes > 0) {
                 const horaStr = horaDespacho.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+                const despachoId = guardarDespachoProgramado({
+                  ...despachoData,
+                  horaDespacho: horaDespacho.toISOString(),
+                });
                 setTimeout(() => {
                   enviarDespachoMandaditos(client, despachoData)
+                    .then(() => marcarDespachoEjecutado(despachoId))
                     .catch(e => console.error("[Mandaditos] Error en despacho programado:", e.message));
                 }, msRestantes);
-                console.log(`[Mandaditos] Despacho preventa #${pedidoBD.id} programado para las ${horaStr}`);
+                console.log(`[Mandaditos] Despacho preventa #${pedidoBD.id} (db #${despachoId}) programado para las ${horaStr}`);
                 replyAdmin += `\n🕐 Despacho a mandaditos programado para las *${horaStr}* (1h antes de entrega a las ${pedidoBD.hora_entrega})`;
               } else {
                 // La hora ya pasó (admin confirmó tarde): despachar de inmediato
@@ -1109,6 +1119,7 @@ async function handleComandos(msg, client) {
     }
 
     limpiarTodo(jid);
+    ordenPendientePreventa.delete(jid);
     clientesNuevos.delete(jid);
 
     await msg.reply(`🗑️ Sesión de *${telRaw}* eliminada. El cliente puede iniciar de nuevo cuando escriba.`);
@@ -1143,6 +1154,7 @@ async function handleComandos(msg, client) {
 
     for (const jid of jidsActivos) {
       limpiarTodo(jid);
+      ordenPendientePreventa.delete(jid);
       clientesNuevos.delete(jid);
     }
     // Borrar también sesiones huérfanas en BD (no cargadas en memoria)
@@ -1255,4 +1267,43 @@ async function handleComandos(msg, client) {
   }
 }
 
-module.exports = { handleComandos, setPendienteConfirmacionGrupo };
+// ── REANUDAR DESPACHOS TRAS REINICIO ─────────────────────────────────────────
+async function reanudarDespachosPendientes(client) {
+  const pendientes = getDespachosPendientes();
+  if (!pendientes.length) return;
+
+  console.log(`[Mandaditos] Reanudando ${pendientes.length} despacho(s) programado(s) tras reinicio...`);
+
+  for (const d of pendientes) {
+    const horaDespacho = new Date(d.hora_despacho);
+    const msRestantes  = horaDespacho.getTime() - Date.now();
+    const despachoData = {
+      pedidoId:          d.pedido_id,
+      clienteNombre:     d.cliente_nombre,
+      clienteTelefono:   d.cliente_tel,
+      clienteCalle:      d.cliente_calle,
+      clienteColonia:    d.cliente_colonia,
+      clienteReferencia: d.cliente_ref,
+      totalOrden:        d.total_orden,
+      tarifaDomicilio:   d.tarifa,
+    };
+
+    if (msRestantes > 0) {
+      const horaStr = horaDespacho.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+      console.log(`[Mandaditos] Despacho db #${d.id} (pedido #${d.pedido_id}) reprogramado para las ${horaStr}`);
+      setTimeout(() => {
+        enviarDespachoMandaditos(client, despachoData)
+          .then(() => marcarDespachoEjecutado(d.id))
+          .catch(e => console.error(`[Mandaditos] Error en despacho db #${d.id}:`, e.message));
+      }, msRestantes);
+    } else {
+      // La hora pasó mientras el bot estaba apagado → despachar de inmediato
+      console.log(`[Mandaditos] Despacho db #${d.id} atrasado, enviando ahora...`);
+      enviarDespachoMandaditos(client, despachoData)
+        .then(() => marcarDespachoEjecutado(d.id))
+        .catch(e => console.error(`[Mandaditos] Error en despacho db #${d.id}:`, e.message));
+    }
+  }
+}
+
+module.exports = { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes };

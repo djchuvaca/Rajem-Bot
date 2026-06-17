@@ -459,6 +459,23 @@ tr:hover td{background:var(--surface2)}
         <div class="hint" style="margin-top:8px">💡 En Google Maps haz clic derecho sobre tu negocio y copia las coordenadas.</div>
       </div>
       <div class="card">
+        <div class="card-title">🏠 Dirección del negocio</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Dirección completa del punto de recolección. Se envía al repartidor cuando toma un pedido a domicilio.</p>
+        <div class="form-group">
+          <label class="form-label">Calle y número</label>
+          <input class="form-input" id="negocio-calle" placeholder="Ej: Av. Insurgentes 123">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Colonia</label>
+          <input class="form-input" id="negocio-colonia" placeholder="Ej: Centro">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Referencia <span style="color:var(--muted)">(opcional)</span></label>
+          <input class="form-input" id="negocio-referencia" placeholder="Ej: Junto a la farmacia Similares">
+        </div>
+        <button class="btn btn-primary" onclick="saveDireccionNegocio()">Guardar dirección</button>
+      </div>
+      <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div class="card-title" style="margin:0">🛵 Tarifas por zona</div>
           <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Agregar zona</button>
@@ -1431,8 +1448,11 @@ let _sortDir      = 1; // 1 asc, -1 desc
 async function loadEnvios() {
   const conf = await api('/api/config');
   const get  = k => conf.find(c => c.clave === k)?.valor || '';
-  document.getElementById('negocio-lat').value = get('negocio_lat');
-  document.getElementById('negocio-lon').value = get('negocio_lon');
+  document.getElementById('negocio-lat').value       = get('negocio_lat');
+  document.getElementById('negocio-lon').value       = get('negocio_lon');
+  document.getElementById('negocio-calle').value     = get('negocio_calle');
+  document.getElementById('negocio-colonia').value   = get('negocio_colonia');
+  document.getElementById('negocio-referencia').value = get('negocio_referencia');
   _zonasData    = await api('/api/tarifas-zonas');
   _coloniasData = await api('/api/colonias');
   renderZonas();
@@ -1474,6 +1494,17 @@ async function saveZonas() {
   const r = await api('/api/tarifas-zonas', 'PUT', { zonas });
   if (r.ok) { toast('Tarifas guardadas ✅'); _zonasData = zonas; renderZonas(); }
   else toast(r.error || 'Error al guardar', false);
+}
+
+async function saveDireccionNegocio() {
+  const calle     = document.getElementById('negocio-calle').value.trim();
+  const colonia   = document.getElementById('negocio-colonia').value.trim();
+  const referencia = document.getElementById('negocio-referencia').value.trim();
+  if (!calle || !colonia) return toast('Ingresa calle y colonia', false);
+  await api('/api/config', 'POST', { clave: 'negocio_calle',     valor: calle });
+  await api('/api/config', 'POST', { clave: 'negocio_colonia',   valor: colonia });
+  await api('/api/config', 'POST', { clave: 'negocio_referencia', valor: referencia });
+  toast('Dirección guardada ✅');
 }
 
 async function saveUbicacion() {

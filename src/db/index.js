@@ -56,7 +56,8 @@ module.exports = {
   getTelefonoReal:     config.getTelefonoReal,
   guardarJIDReal:      config.guardarJIDReal,
   getJIDReal:          config.getJIDReal,
-  getGrupoId:          config.getGrupoId,
+  getGrupoId:              config.getGrupoId,
+  getGrupoMandaditosId:    config.getGrupoMandaditosId,
 
   // productos
   getProductos:        modelos.getProductos,
@@ -94,4 +95,9 @@ module.exports = {
   obtenerPagoPendiente:             modelos.obtenerPagoPendiente,
   eliminarPagoPendiente:            modelos.eliminarPagoPendiente,
   limpiarPagosPendientesExpirados:  modelos.limpiarPagosPendientesExpirados,
+
+  // despachos programados (preventa)
+  guardarDespachoProgramado:  modelos.guardarDespachoProgramado,
+  marcarDespachoEjecutado:    modelos.marcarDespachoEjecutado,
+  getDespachosPendientes:     modelos.getDespachosPendientes,
 };

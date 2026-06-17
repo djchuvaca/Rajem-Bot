@@ -124,6 +124,10 @@ function getGrupoId() {
   return process.env.GRUPO_ID || getConfig("grupo_id") || null;
 }
 
+function getGrupoMandaditosId() {
+  return process.env.GRUPO_MANDADITOS_ID || getConfig("grupo_mandaditos_id") || null;
+}
+
 function guardarJIDReal(telefono, jid) {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
     [`jid_real_${telefono}`, jid]);
@@ -143,5 +147,5 @@ module.exports = {
   guardarSesion, eliminarSesion, cargarTodasLasSesiones, limpiarSesionesAntiguas, limpiarTodasLasSesionesDB,
   guardarTelefonoReal, getTelefonoReal,
   guardarJIDReal, getJIDReal,
-  getGrupoId,
+  getGrupoId, getGrupoMandaditosId,
 };

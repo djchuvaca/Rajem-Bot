@@ -230,6 +230,27 @@ function limpiarPagosPendientesExpirados() {
   run("DELETE FROM pagos_pendientes WHERE expira_en <= datetime('now')");
 }
 
+// ─── DESPACHOS PROGRAMADOS ────────────────────────────────────────────────────
+function guardarDespachoProgramado(data) {
+  const result = run(
+    `INSERT INTO despachos_programados
+     (pedido_id, cliente_nombre, cliente_tel, cliente_calle, cliente_colonia, cliente_ref, total_orden, tarifa, hora_despacho)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [data.pedidoId, data.clienteNombre, data.clienteTelefono, data.clienteCalle,
+     data.clienteColonia, data.clienteReferencia, data.totalOrden, data.tarifaDomicilio,
+     data.horaDespacho]
+  );
+  return result.lastInsertRowid;
+}
+
+function marcarDespachoEjecutado(id) {
+  run("UPDATE despachos_programados SET ejecutado = 1 WHERE id = ?", [id]);
+}
+
+function getDespachosPendientes() {
+  return queryAll("SELECT * FROM despachos_programados WHERE ejecutado = 0");
+}
+
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
@@ -237,4 +258,5 @@ module.exports = {
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha, getStatsReporte,
   setProductoActivo, updateProductoPrecio, getTopClientes,
   guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
+  guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes,
 };

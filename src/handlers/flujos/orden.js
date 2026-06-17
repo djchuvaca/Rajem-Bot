@@ -164,7 +164,16 @@ async function _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, esOrdenDom,
     datosCampos.set(clienteNumero, campos);
   }
 
+  // Guardar la orden ANTES de preguntar el tipo, para que handleFormularioProgresivo
+  // pueda activarse en la siguiente respuesta del cliente.
   ordenPreResumen.set(clienteNumero, ordenTexto);
+
+  // Si el tipo de entrega aún no se conoce, preguntarlo antes del formulario
+  if (!campos.tipoEntrega && !tipoEntregaCliente.has(clienteNumero)) {
+    persistirEstado(clienteNumero);
+    await msg.reply("Para confirmar tu pedido, *¿será para domicilio o pasas a recoger al mostrador?*");
+    return;
+  }
 
   const esCompleto = camposCompletos(clienteNumero, esOrdenDom, esPreventa);
   if (esCompleto) {
