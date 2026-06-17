@@ -64,7 +64,7 @@ function _textoRecordatorio(numero) {
     const d = esperandoTipoItem.get(numero);
     return `Hola! 👋 Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían tacos o tortas?*`;
   }
-  if (datosCampos.has(numero) || clientesNuevos.has(numero)) {
+  if (datosCampos.has(numero)) {
     return "Hola! 👋 Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*";
   }
   return null;

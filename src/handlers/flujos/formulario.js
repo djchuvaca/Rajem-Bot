@@ -49,6 +49,7 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
   if (clientesNuevos.has(clienteNumero)) return false;
 
   clientesNuevos.add(clienteNumero);
+  _intentosColonia.delete(clienteNumero); // Resetear contador de intentos de sesión anterior
   if (!estaEnHorario()) {
     if (_tieneSeñalesDePedido(textoOriginal)) {
       ordenPendientePreventa.set(clienteNumero, textoOriginal);

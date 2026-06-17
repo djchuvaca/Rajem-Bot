@@ -285,7 +285,9 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
     }
     resumenPendiente.delete(clienteNumero);
     if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
-    return false; // cae al bloque de esperandoAgregarMas
+    persistirEstado(clienteNumero);
+    await msg.reply("*¿Qué más deseas agregar?*\n\n" + MENU_FORMATO());
+    return true;
   }
 
   if (esNoConContenido) {
@@ -308,7 +310,9 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
     }
     resumenPendiente.delete(clienteNumero);
     if (ordenExtraida) esperandoAgregarMas.set(clienteNumero, ordenExtraida);
-    return false;
+    persistirEstado(clienteNumero);
+    await msg.reply("*¿Qué más deseas agregar?*\n\n" + MENU_FORMATO());
+    return true;
   }
 
   return false;

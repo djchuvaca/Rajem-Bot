@@ -3,7 +3,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
   esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo,
 } = require("../../estado");
-const { actualizarEstadoPedido, getMensaje, getConfig, getGrupoId } = require("../../db");
+const { actualizarEstadoPedido, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId } = require("../../db");
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
@@ -71,7 +71,10 @@ async function handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero
   esperandoExtras.delete(clienteNumero);
   ordenPreResumen.delete(clienteNumero);
   ordenPendientePreventa.delete(clienteNumero);
+  // Intentar cancelar desde estado 'pendiente', luego desde 'confirmado'
+  // (el admin pudo haber confirmado mientras el cliente decidía cancelar)
   try { actualizarEstadoPedido(datosCancelacion.telefono, "cancelado"); } catch (e) {}
+  try { actualizarEstadoConfirmado(datosCancelacion.telefono, "cancelado"); } catch (e) {}
   const msgCancelacion = getMensaje("cancelacion_enviada") || "Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!";
   await msg.reply(msgCancelacion);
   return true;
@@ -83,6 +86,7 @@ async function handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)
   const quiereEmpezarDeNuevo = RE_NUEVO.test(textoOriginal);
 
   if (quiereCancelar) {
+    if (!enFlujoActivo(clienteNumero) && !clientesNuevos.has(clienteNumero)) return false;
     clientesNuevos.delete(clienteNumero);
     limpiarTodo(clienteNumero);
     esperandoTipoItem.delete(clienteNumero);
