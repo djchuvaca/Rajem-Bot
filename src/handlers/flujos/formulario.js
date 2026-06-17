@@ -240,6 +240,7 @@ async function handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNume
     }
   }
   datosCampos.set(clienteNumero, camposActuales);
+  persistirEstado(clienteNumero);
   const formActualizado = mostrarFormularioProgresivo(clienteNumero, esCambioDomicilio, esPreventa);
   const sfaltante = siguienteCampoFaltante(clienteNumero, esCambioDomicilio, esPreventa);
   await msg.reply(
@@ -279,6 +280,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
         }
       }
       datosCampos.set(clienteNumero, camposActualesFormulario);
+      persistirEstado(clienteNumero);
     } else {
       await msg.reply("Para confirmar tu pedido, *¿será para domicilio o pasas a recoger al mostrador?*");
       return true;
@@ -343,6 +345,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
     await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre " + rango + ")");
     delete campos._horaFueraRango;
     datosCampos.set(clienteNumero, campos);
+    persistirEstado(clienteNumero);
     return true;
   }
 

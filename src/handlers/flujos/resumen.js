@@ -232,6 +232,7 @@ async function handleCambioMetodoDesdeResumen(msg, textoOriginal, clienteNumero,
       || (tipoEntregaCliente.get(clienteNumero) == null && historial.some(h => h.content && h.content.includes("domicilio")));
     const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, esOrdenDomAux, esPreventa);
     resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
+    persistirEstado(clienteNumero);
     await msg.reply(resumenNuevo.texto);
   }
   return true;
