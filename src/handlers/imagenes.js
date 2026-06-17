@@ -1,6 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
-const { upsertCliente, registrarPedido, getMensaje, getGrupoId } = require("../db");
+const { upsertCliente, registrarPedido, getMensaje, getGrupoId, guardarTelefonoReal, guardarJIDReal } = require("../db");
 const {
   esperandoCaptura,
   clientesNuevos,
@@ -8,7 +8,11 @@ const {
   pendientesConfirmacion,
   extraerDatosPedido,
   CARPETA_CAPTURAS,
+  datosCampos,
+  horaEntregaPreventa,
+  persistirEstado,
 } = require("../estado");
+const { ordenPendientePreventa, telefonosReales } = require("./flujos/utils");
 
 async function handleImagen(msg, client) {
   if (!msg.hasMedia || (msg.type !== "image" && msg.type !== "document")) return false;
@@ -38,16 +42,55 @@ async function handleImagen(msg, client) {
       } catch (e) { console.error("❌ Error al enviar al grupo:", e.message); }
     }
 
-    const infoPedido = extraerDatosPedido(datos.resumen);
+    const infoPedido    = extraerDatosPedido(datos.resumen);
+    const camposCliente = datosCampos.get(clienteNumero) || {};
+    const hora_entrega  = horaEntregaPreventa.get(clienteNumero) || null;
+
+    // Guardar pedido en BD (el flujo banco retorna temprano en handleConfirmacionFinal
+    // sin llamar registrarPedido, así que lo hacemos aquí al recibir el comprobante)
+    let pedidoId = null;
+    try {
+      const telefonoLimpio = infoPedido.telefono || datos.telefono || null;
+      const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
+      const partes = nombreCompleto.split(/\s+/);
+      let nombre, apellido;
+      if (partes.length === 1)      { nombre = partes[0];                    apellido = null; }
+      else if (partes.length === 2) { nombre = partes[0];                    apellido = partes[1]; }
+      else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
+      const cliente = upsertCliente({
+        nombre, apellido, telefono: telefonoLimpio,
+        calle_numero: camposCliente.calle    || null,
+        colonia:      camposCliente.colonia  || null,
+        referencia:   (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null,
+      });
+      const total = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
+      pedidoId = registrarPedido({
+        cliente_id: cliente ? cliente.id : null,
+        tipo:        infoPedido.tipo || "mostrador",
+        orden:       (datos.resumen || "").substring(0, 500),
+        total, metodo_pago: "transferencia", estado: "pendiente", hora_entrega,
+      });
+      if (telefonoLimpio) {
+        telefonosReales.set(clienteNumero, telefonoLimpio);
+        try { guardarTelefonoReal(clienteNumero, telefonoLimpio); } catch (_) {}
+        try { guardarJIDReal(telefonoLimpio, clienteNumero); } catch (_) {}
+      }
+    } catch (e) {
+      console.error("[BD] Error guardando pedido de transferencia:", e.message);
+    }
+
+    esperandoCaptura.delete(clienteNumero);
+    ordenPendientePreventa.delete(clienteNumero);
+    clientesNuevos.delete(clienteNumero);
+    limpiarTodo(clienteNumero);
+
+    // Después de limpiarTodo para que no sea borrado inmediatamente
     pendientesConfirmacion.set(clienteNumero, {
       ...infoPedido,
       resumen: datos.resumen,
       hora: horaVenta,
     });
-
-    esperandoCaptura.delete(clienteNumero);
-    clientesNuevos.delete(clienteNumero);
-    limpiarTodo(clienteNumero);
+    persistirEstado(clienteNumero);
 
     const msgComprobante = getMensaje("comprobante_recibido")
       || "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏";

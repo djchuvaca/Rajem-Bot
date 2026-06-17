@@ -77,19 +77,16 @@ async function handleEdicionPendiente(msg, textoOriginal, clienteNumero, histori
   } else if (edicionPendiente.contexto === "extras") {
     const { esperandoExtras } = require("../../estado");
     if (edicionPendiente.extrasCtx) esperandoExtras.set(clienteNumero, { ...edicionPendiente.extrasCtx, fase: "pregunta" });
-    const ca = datosCampos.get(clienteNumero) || {};
-    const esDomAg = ca.tipoEntrega === "domicilio";
+    const esDomAg = tipoEntregaCliente.get(clienteNumero) === "domicilio";
     const formEdAg = mostrarFormularioProgresivo(clienteNumero, esDomAg, esPreventa);
     await msg.reply("Perfecto! Datos actualizados:\n\n" + formEdAg + "\n\n¿Deseas agregar algún *Refresco* o *Salsa* extra?");
   } else if (edicionPendiente.contexto === "agregarMas") {
     if (edicionPendiente.ordenTexto !== undefined) esperandoAgregarMas.set(clienteNumero, edicionPendiente.ordenTexto);
-    const ca = datosCampos.get(clienteNumero) || {};
-    const esDomAg = ca.tipoEntrega === "domicilio";
+    const esDomAg = tipoEntregaCliente.get(clienteNumero) === "domicilio";
     const formEdAg = mostrarFormularioProgresivo(clienteNumero, esDomAg, esPreventa);
     await msg.reply("Perfecto! Datos actualizados:\n\n" + formEdAg + "\n\n*¿Qué deseas ordenar?*");
   } else if (edicionPendiente.contexto === "formulario") {
-    const ca = datosCampos.get(clienteNumero) || {};
-    const esDomForm = ca.tipoEntrega === "domicilio";
+    const esDomForm = tipoEntregaCliente.get(clienteNumero) === "domicilio";
     const formActualizado = mostrarFormularioProgresivo(clienteNumero, esDomForm, esPreventa);
     await msg.reply("Perfecto! Datos actualizados:\n\n" + formActualizado + "\n\n*¿Son correctos los datos?*");
   }

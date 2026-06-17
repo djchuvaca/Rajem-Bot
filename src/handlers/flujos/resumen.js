@@ -459,7 +459,6 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     }
   }
 
-  pendientesConfirmacion.set(clienteNumero, { ...infoPedido, resumen: pendiente.texto, hora: horaVenta });
   pedidosConfirmados.set(clienteNumero, {
     nombre: infoPedido.nombre, telefono: infoPedido.telefono,
     total: infoPedido.total, resumen: pendiente.texto, confirmadoEn: Date.now(),
@@ -475,6 +474,9 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   clientesNuevos.delete(clienteNumero);
   limpiarTodo(clienteNumero);
   clientesNuevos.add(clienteNumero);
+  // Después de limpiarTodo para que persista y !confirmar (sin tel) pueda encontrarlo
+  pendientesConfirmacion.set(clienteNumero, { ...infoPedido, resumen: pendiente.texto, hora: horaVenta });
+  persistirEstado(clienteNumero);
   const msgConfirmacion = getMensaje("confirmacion_pedido") || "Listo! Tu pedido fue recibido y esta en espera de confirmacion de nuestro equipo.\nEn breve te avisamos. Gracias por tu preferencia!\n\n_Si deseas cancelar tu pedido escribe *cancelar*._";
   await msg.reply(msgConfirmacion + (pedidoId ? `\n\n_📋 Pedido #${pedidoId}_` : ""));
   return true;
