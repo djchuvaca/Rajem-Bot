@@ -13,6 +13,8 @@ const {
 } = require("../db");
 const { invalidarCacheCortes } = require("./pedidoParser");
 const botPausado = require("../estado/bot-pausado");
+const { enviarDespachoMandaditos } = require("./mandaditos");
+const { calcularTarifaDomicilio } = require("../geo");
 
 // ── CONFIRMACIÓN DE GRUPO ADMIN ───────────────────────────────────────────────
 let _grupoPendiente = null; // { id, timeout }
@@ -82,6 +84,20 @@ function descripcionEstado(jid) {
   if (datosCampos.has(jid))                 return "llenando formulario";
   if (clientesNuevos.has(jid))              return "inicio del flujo";
   return "activo";
+}
+
+// ── HELPERS MANDADITOS ────────────────────────────────────────────────────────
+// Parsea "8:00 a.m." / "12:30 p.m." a un Date de hoy
+function _parsearHoraEntrega(horaStr) {
+  if (!horaStr) return null;
+  const m = horaStr.match(/(\d{1,2}):(\d{2})\s*(a\.m\.|p\.m\.)/i);
+  if (!m) return null;
+  let h = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  if (/p\.m\./i.test(m[3]) && h < 12) h += 12;
+  if (/a\.m\./i.test(m[3]) && h === 12) h = 0;
+  const hoy = new Date();
+  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), h, min, 0, 0);
 }
 
 // ── HANDLER PRINCIPAL ─────────────────────────────────────────────────────────
@@ -358,7 +374,58 @@ async function handleComandos(msg, client) {
       await client.sendMessage(numeroCliente, mensajeCliente);
       try { actualizarEstadoPedido(datos.telefono, "confirmado"); } catch (e) { console.error("BD Error:", e.message); }
       pendientesConfirmacion.delete(numeroCliente);
-      await msg.reply(`✅ Confirmación enviada a *${datos.nombre}* (${datos.telefono})`);
+
+      let replyAdmin = `✅ Confirmación enviada a *${datos.nombre}* (${datos.telefono})`;
+
+      // Despacho al grupo de mandaditos (solo pedidos a domicilio)
+      if (datos.tipo === "domicilio") {
+        try {
+          const tel10     = (datos.telefono || "").replace(/\D/g, "").slice(-10);
+          const clienteBD = getCliente(tel10);
+          const pedidoBD  = getPedidosHoy().find(p => p.telefono === tel10 && p.estado === "confirmado");
+          if (clienteBD && pedidoBD) {
+            const tarifaInfo = calcularTarifaDomicilio(clienteBD.colonia);
+            const tarifa     = tarifaInfo ? tarifaInfo.tarifa : 50;
+            const despachoData = {
+              pedidoId:          pedidoBD.id,
+              clienteNombre:     datos.nombre,
+              clienteTelefono:   tel10,
+              clienteCalle:      clienteBD.calle_numero,
+              clienteColonia:    clienteBD.colonia,
+              clienteReferencia: clienteBD.referencia,
+              totalOrden:        `$${pedidoBD.total}`,
+              tarifaDomicilio:   tarifa,
+            };
+
+            if (pedidoBD.hora_entrega) {
+              // Preventa: despachar 1 hora antes de la hora de entrega
+              const horaEntrega  = _parsearHoraEntrega(pedidoBD.hora_entrega);
+              const horaDespacho = horaEntrega ? new Date(horaEntrega.getTime() - 60 * 60 * 1000) : null;
+              const msRestantes  = horaDespacho ? horaDespacho.getTime() - Date.now() : 0;
+
+              if (horaDespacho && msRestantes > 0) {
+                const horaStr = horaDespacho.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+                setTimeout(() => {
+                  enviarDespachoMandaditos(client, despachoData)
+                    .catch(e => console.error("[Mandaditos] Error en despacho programado:", e.message));
+                }, msRestantes);
+                console.log(`[Mandaditos] Despacho preventa #${pedidoBD.id} programado para las ${horaStr}`);
+                replyAdmin += `\n🕐 Despacho a mandaditos programado para las *${horaStr}* (1h antes de entrega a las ${pedidoBD.hora_entrega})`;
+              } else {
+                // La hora ya pasó (admin confirmó tarde): despachar de inmediato
+                enviarDespachoMandaditos(client, despachoData)
+                  .catch(e => console.error("[Mandaditos] Error al despachar:", e.message));
+              }
+            } else {
+              // Pedido normal (no preventa): despacho inmediato
+              enviarDespachoMandaditos(client, despachoData)
+                .catch(e => console.error("[Mandaditos] Error al despachar:", e.message));
+            }
+          }
+        } catch (e) { console.error("[Mandaditos] Error preparando despacho:", e.message); }
+      }
+
+      await msg.reply(replyAdmin);
       console.log(`✅ Pedido confirmado para ${numeroCliente}`);
     } catch (e) {
       await msg.reply(`❌ Error al enviar confirmación: ${e.message}`);
