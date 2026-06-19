@@ -12,7 +12,7 @@ const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping, ord
 const botPausado = require("../estado/bot-pausado");
 const { getGrupoId } = require("../db");
 
-const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido } = require("./flujos/cancelacion");
+const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido, handleCancelacionPagoMP } = require("./flujos/cancelacion");
 const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
 const { handleEdicionPendiente, handleConfirmacionDatos } = require("./flujos/edicion");
 const {
@@ -140,6 +140,7 @@ async function handleMensaje(msg, client) {
   }
 
   // ── FLUJOS PRINCIPALES (en orden de prioridad) ───────────────────────────────
+  if (await handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero)) return;
   if (await handleCancelacionConfirmada(msg, client, textoOriginal, clienteNumero)) return;
   if (await handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero)) return;
   if (await handlePrimerMensaje(msg, textoOriginal, clienteNumero)) return;

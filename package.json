@@ -13,7 +13,8 @@
     "pm2:logs": "pm2 logs carnitas-bot",
     "reset-password": "node scripts/reset-password.js",
     "onboarding": "node scripts/onboarding.js",
-    "nuevo-tenant": "node scripts/nuevo-tenant.js"
+    "nuevo-tenant": "node scripts/nuevo-tenant.js",
+    "ngrok": "node scripts/ngrok-start.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

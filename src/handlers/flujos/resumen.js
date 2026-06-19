@@ -4,7 +4,7 @@ const {
   esperandoConfirmacionItem, esperandoCorte, datosCampos, tipoEntregaCliente,
   horaEntregaPreventa, pedidoJSONActual, pendientesConfirmacion, clientesNuevos,
   pedidosConfirmados, ordenPreResumen, getHistorial, extraerDatosPedido, persistirEstado,
-  detectarEdicion, aplicarEdicion, limpiarTodo, extraerTelefonoDeJID,
+  detectarEdicion, aplicarEdicion, limpiarTodo, extraerTelefonoDeJID, esperandoPagoMP,
 } = require("../../estado");
 const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pedido/resumen");
 const { parsearPedidoSimple, detectarSinCorte, detectarModificacion } = require("../pedidoParser");
@@ -379,6 +379,12 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
         resumenPendiente.delete(clienteNumero);
         limpiarTodo(clienteNumero);
         clientesNuevos.delete(clienteNumero);
+        esperandoPagoMP.set(clienteNumero, {
+          pedidoId: pedidoMpId,
+          telefono: infoPedido.telefono,
+          nombre:   infoPedido.nombre,
+          expiraEn: Date.now() + 30 * 60 * 1000,
+        });
         await msg.reply(
           `✅ ¡Pedido recibido! Para confirmar tu lugar, realiza el pago aquí:\n\n` +
           `💳 ${enlace}\n\n` +

@@ -311,6 +311,11 @@ app.post("/webhook/mercadopago", async (req, res) => {
     // Actualizar estado en BD
     try { actualizarEstadoPorId(resultado.pedidoId, "confirmado"); } catch (_) {}
 
+    // Limpiar estado de espera de pago en memoria
+    if (resultado.jid) {
+      try { require("../estado").esperandoPagoMP.delete(resultado.jid); } catch (_) {}
+    }
+
     const waClient = getWhatsappClient();
     if (!waClient) return;
 

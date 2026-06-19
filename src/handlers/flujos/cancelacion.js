@@ -1,9 +1,11 @@
 // src/handlers/flujos/cancelacion.js
 const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
-  esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo,
+  esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo, esperandoPagoMP,
 } = require("../../estado");
 const { actualizarEstadoPedido, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId } = require("../../db");
+const { detectarPreguntaFrecuente } = require("../pedidoParser");
+const { generarRespuestaAutomatica } = require("../respuestas");
 const { SALUDO } = require("../../config");
 const { replyConTyping, enFlujoActivo, ordenPendientePreventa } = require("./utils");
 
@@ -109,4 +111,55 @@ async function handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)
   return false;
 }
 
-module.exports = { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido };
+// ── CANCELACIÓN / RECORDATORIO DURANTE ESPERA DE PAGO MP ─────────────────────
+async function handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero) {
+  if (!esperandoPagoMP.has(clienteNumero)) return false;
+
+  const datos   = esperandoPagoMP.get(clienteNumero);
+  const expirado = Date.now() > datos.expiraEn;
+
+  // Link expirado: cancelar en BD y limpiar
+  if (expirado) {
+    esperandoPagoMP.delete(clienteNumero);
+    limpiarTodo(clienteNumero);
+    try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (_) {}
+    await msg.reply("El link de pago ya venció (30 minutos). Si quieres hacer un nuevo pedido, escríbeme cuando gustes.");
+    return true;
+  }
+
+  // Cancelación explícita
+  const RE_CANCELAR = /\bcancelar\b|\bcancela\b|\bcancel\b|\bcancelo\b|\bya\s+no\s+quiero\b|\bya\s+no\b|\bmejor\s+no\b/i;
+  if (RE_CANCELAR.test(textoOriginal)) {
+    esperandoPagoMP.delete(clienteNumero);
+    limpiarTodo(clienteNumero);
+    try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (_) {}
+    const grupoId = getGrupoId();
+    if (grupoId) {
+      const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      try {
+        await client.sendMessage(grupoId,
+          `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: ${datos.nombre || "—"}\nTelefono: ${datos.telefono || "—"}\nMotivo: Canceló durante espera de pago MercadoPago`
+        );
+      } catch (e) { console.error("[MP] Error notificando cancelacion:", e.message); }
+    }
+    await msg.reply("Tu pedido ha sido cancelado. Cuando gustes ordenar, aqui estaremos. Hasta pronto!");
+    return true;
+  }
+
+  // FAQ: responder y recordar el link pendiente
+  const pregFaq = detectarPreguntaFrecuente(textoOriginal);
+  if (pregFaq) {
+    const respFaq = generarRespuestaAutomatica(pregFaq, { esDomicilio: false });
+    if (respFaq) {
+      await replyConTyping(msg, respFaq);
+      await replyConTyping(msg, "Recuerda que tienes un pago pendiente. Usa el link que te enviamos para confirmar tu pedido.\n\n_Si deseas cancelar, escribe *cancelar*._");
+      return true;
+    }
+  }
+
+  // Cualquier otro mensaje: recordar el pago pendiente
+  await msg.reply("Tu pedido está pendiente de pago. Usa el link que te enviamos para completarlo. 💳\n\n_Si deseas cancelar, escribe *cancelar*._");
+  return true;
+}
+
+module.exports = { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido, handleCancelacionPagoMP };

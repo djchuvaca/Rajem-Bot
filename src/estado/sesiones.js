@@ -10,7 +10,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
-  esperandoExtras, ordenPreResumen,
+  esperandoExtras, ordenPreResumen, esperandoPagoMP,
 } = require("./maps");
 
 function serializarEstado(numero) {
@@ -37,6 +37,7 @@ function serializarEstado(numero) {
   if (pendientesConfirmacion.has(numero))     estado.pendienteConfirmacion = pendientesConfirmacion.get(numero);
   if (esperandoExtras.has(numero))            estado.esperandoExtras       = esperandoExtras.get(numero);
   if (ordenPreResumen.has(numero))            estado.ordenPreResumen       = ordenPreResumen.get(numero);
+  if (esperandoPagoMP.has(numero))            estado.esperandoPagoMP       = esperandoPagoMP.get(numero);
   return estado;
 }
 
@@ -64,6 +65,7 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.pendienteConfirmacion)   pendientesConfirmacion.set(numero, estado.pendienteConfirmacion);
   if (estado.esperandoExtras)         esperandoExtras.set(numero, estado.esperandoExtras);
   if (estado.ordenPreResumen)         ordenPreResumen.set(numero, estado.ordenPreResumen);
+  if (estado.esperandoPagoMP)         esperandoPagoMP.set(numero, estado.esperandoPagoMP);
   if (historial.length > 0)           conversaciones.set(numero, historial);
 }
 
@@ -84,7 +86,7 @@ const _CLAVES_FLUJO_ACTIVO = new Set([
   "resumenPendiente", "esperandoCaptura", "esperandoConfirmItem",
   "esperandoAgregarMas", "esperandoConfirmDatos", "esperandoEdicion",
   "esperandoCorte", "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
-  "ordenPreResumen", "pendienteConfirmacion",
+  "ordenPreResumen", "pendienteConfirmacion", "esperandoPagoMP",
 ]);
 
 function _tieneFlujoActivo(estado) {

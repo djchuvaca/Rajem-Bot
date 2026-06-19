@@ -33,6 +33,7 @@ module.exports = {
   esperandoTipoItem:          maps.esperandoTipoItem,
   esperandoExtras:            maps.esperandoExtras,
   ordenPreResumen:            maps.ordenPreResumen,
+  esperandoPagoMP:            maps.esperandoPagoMP,
   CARPETA_CAPTURAS:           maps.CARPETA_CAPTURAS,
 
   // ── Sesiones ───────────────────────────────────────────────────────────────
