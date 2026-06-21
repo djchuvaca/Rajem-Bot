@@ -1,4 +1,4 @@
-// src/handlers/respuestas.js
+﻿// src/handlers/respuestas.js
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
@@ -75,12 +75,11 @@ function respuestaPrecio(producto = null) {
       );
     }
 
-    // Verificar si todos los cortes tienen el mismo precio
-    const todosIguales = cortes.every(p =>
-      parseInt(p.precio_taco)  === precios.pTaco &&
-      parseInt(p.precio_torta) === precios.pTorta &&
-      parseInt(p.precio_100g)  === precios.p100g
-    );
+    // Verificar si todos los cortes tienen el mismo precio efectivo (aplicando fallback a globales)
+    const todosIguales = !cortes.length || cortes.every(p => {
+      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
+      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
+    });
 
     if (todosIguales || !cortes.length) {
       const nombres = cortes.length
@@ -96,17 +95,19 @@ function respuestaPrecio(producto = null) {
       );
     }
 
-    // Precios diferentes por corte — mostrar desglose
+    // Precios diferentes por corte — mostrar desglose usando precio efectivo (con fallback global)
     let resp = `💰 *Precios en ${negocio}:*\n\n`;
     for (const p of cortes) {
       const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
+      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
       resp += `🥩 *${nombre}*\n`;
-      resp += `   🌮 $${parseInt(p.precio_taco)} · 🥖 $${parseInt(p.precio_torta)} · ⚖️ $${parseInt(p.precio_100g)}/100g\n\n`;
+      resp += `   🌮 $${pc.pTaco} · 🥖 $${pc.pTorta} · ⚖️ $${pc.p100g}/100g\n\n`;
     }
     const se = productos.find(p => p.nombre === "surtido especial");
     if (se) {
+      const sePc = precios.porCorte["surtido especial"] || precios;
       resp += `🌟 *Surtido especial* (combinación a tu gusto)\n`;
-      resp += `   🌮 $${parseInt(se.precio_taco)} · 🥖 $${parseInt(se.precio_torta)} · ⚖️ $${parseInt(se.precio_100g)}/100g\n\n`;
+      resp += `   🌮 $${sePc.pTaco} · 🥖 $${sePc.pTorta} · ⚖️ $${sePc.p100g}/100g\n\n`;
     }
     resp += `_Los precios incluyen tortillas y salsas_ 😊`;
     return resp;
@@ -159,11 +160,10 @@ function respuestaMenu() {
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
 
-    const preciosUniformes = !cortes.length || cortes.every(p =>
-      parseInt(p.precio_taco)  === precios.pTaco &&
-      parseInt(p.precio_torta) === precios.pTorta &&
-      parseInt(p.precio_100g)  === precios.p100g
-    );
+    const preciosUniformes = !cortes.length || cortes.every(p => {
+      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
+      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
+    });
 
     let seccionPrecios;
     if (preciosUniformes) {
@@ -176,9 +176,9 @@ function respuestaMenu() {
         `Cualquier pieza o combinación\n` +
         `_Incluye tortillas y salsas_\n\n`;
     } else {
-      const minTaco  = Math.min(...cortes.map(p => parseInt(p.precio_taco)  || precios.pTaco));
-      const minTorta = Math.min(...cortes.map(p => parseInt(p.precio_torta) || precios.pTorta));
-      const min100g  = Math.min(...cortes.map(p => parseInt(p.precio_100g)  || precios.p100g));
+      const minTaco  = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTaco));
+      const minTorta = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTorta));
+      const min100g  = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).p100g));
       seccionPrecios =
         `🌮 *TACOS* — desde $${minTaco} c/u\n` +
         `🥖 *TORTAS* — desde $${minTorta} c/u\n` +
@@ -245,10 +245,18 @@ function aplicarQuitarUno(ordenTexto, corteEspecificado = null) {
       if (!m) continue;
       if (filtroCorte && !arr[i].toLowerCase().includes(filtroCorte.toLowerCase())) continue;
       const cantActual = parseInt(m[1]);
-      if (cantActual <= 1) return null;
+      // Si este ítem ya tiene qty=1, seguir buscando hacia atrás (no cortar el loop)
+      if (cantActual <= 1) continue;
+      const nuevoQty = cantActual - 1;
+      // Actualizar cantidad
       arr[i] = arr[i].replace(/\d+\s+(tacos?|tortas?)/i, (match) => {
         const partes = match.split(/\s+/);
-        return `${parseInt(partes[0]) - 1} ${partes.slice(1).join(" ")}`;
+        return `${nuevoQty} ${partes.slice(1).join(" ")}`;
+      });
+      // Actualizar precio (precio unitario = precio_total / cantActual)
+      arr[i] = arr[i].replace(/[—\-]\s*\$(\d+)\s*$/, (_, oldPriceStr) => {
+        const precioUnitario = Math.round(parseInt(oldPriceStr) / cantActual);
+        return `— $${nuevoQty * precioUnitario}`;
       });
       return arr.join("\n");
     }

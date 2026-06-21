@@ -1,4 +1,5 @@
-const { getConfig, getBanco, getMensaje, getProductos } = require("./db");
+﻿const { getConfig, getBanco, getMensaje, getProductos } = require("./db");
+const { getPrecios } = require("./pedido/precios");
 const { getRangoHorario } = require("./horario");
 
 // ── DATOS BANCO ───────────────────────────────────────────────────────────────
@@ -34,22 +35,21 @@ function getMenuFormato() {
       : "Surtido · Carne · Buche · Cuero · Lengua";
     const negocio    = getConfig("nombre_negocio")  || "Tacos Javier";
     const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
-    const pRef       = cortes[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
-    const preciosUniformes = cortes.length === 0 || cortes.every(c =>
-      parseInt(c.precio_taco)  === parseInt(pRef.precio_taco) &&
-      parseInt(c.precio_torta) === parseInt(pRef.precio_torta) &&
-      parseInt(c.precio_100g)  === parseInt(pRef.precio_100g)
-    );
+    const precios    = getPrecios();
+    const preciosUniformes = cortes.length === 0 || cortes.every(c => {
+      const pc = precios.porCorte[c.nombre.toLowerCase()] || precios;
+      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
+    });
     let seccionPrecios;
     if (preciosUniformes) {
       seccionPrecios =
-        `🌮 *TACOS* — $${pRef.precio_taco} c/u\n_(combinaciones al gusto)_\n\n` +
-        `🥖 *TORTAS* — $${pRef.precio_torta} c/u\n_(combinaciones al gusto)_\n\n` +
-        `⚖️ *POR GRAMOS* — $${pRef.precio_100g} / 100g\nCualquier pieza o combinación\n_Incluye tortillas y salsas_\n\n`;
+        `🌮 *TACOS* — $${precios.pTaco} c/u\n_(combinaciones al gusto)_\n\n` +
+        `🥖 *TORTAS* — $${precios.pTorta} c/u\n_(combinaciones al gusto)_\n\n` +
+        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\nCualquier pieza o combinación\n_Incluye tortillas y salsas_\n\n`;
     } else {
-      const minTaco  = Math.min(...cortes.map(c => parseInt(c.precio_taco)  || parseInt(pRef.precio_taco)));
-      const minTorta = Math.min(...cortes.map(c => parseInt(c.precio_torta) || parseInt(pRef.precio_torta)));
-      const min100g  = Math.min(...cortes.map(c => parseInt(c.precio_100g)  || parseInt(pRef.precio_100g)));
+      const minTaco  = Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios).pTaco));
+      const minTorta = Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios).pTorta));
+      const min100g  = Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios).p100g));
       seccionPrecios =
         `🌮 *TACOS* — desde $${minTaco} c/u\n` +
         `🥖 *TORTAS* — desde $${minTorta} c/u\n` +
