@@ -23,32 +23,35 @@ const TIMEOUT_RECORDATORIO_MS = 20 * 60 * 1000; // 20 min → recordatorio
 const TIMEOUT_SESION_MS       = 35 * 60 * 1000; // 35 min → limpiar sesión
 
 function _textoRecordatorio(numero) {
+  const primerNombre = (datosCampos.get(numero) || {}).nombre?.split(" ")[0] || null;
+  const saludo = primerNombre ? `Hola *${primerNombre}*! 👋` : "Hola! 👋";
+
   if (resumenPendiente.has(numero)) {
     const p = resumenPendiente.get(numero);
-    return `Hola! 👋 Tienes un pedido pendiente de confirmar:\n\n${p.texto}\n\n*¿Lo confirmamos?* Responde *sí* para confirmar o *cancelar* para cancelarlo.`;
+    return `${saludo} Tienes un pedido pendiente de confirmar:\n\n${p.texto}\n\n*¿Lo confirmamos?* Responde *sí* para confirmar o *cancelar* para cancelarlo.`;
   }
   if (esperandoConfirmacionItem.has(numero)) {
     const d = esperandoConfirmacionItem.get(numero);
-    return `Hola! 👋 Quedamos pendientes aquí:\n\n${d.lineas}\n\n*¿Es correcto?*`;
+    return `${saludo} Quedamos pendientes aquí:\n\n${d.lineas}\n\n*¿Es correcto?*`;
   }
   if (esperandoExtras.has(numero)) {
     const extCtx = esperandoExtras.get(numero);
     if (extCtx && extCtx.ordenTexto) {
       const lineas = extCtx.ordenTexto.split("\n").filter(l => l.trim() && !/^💰|subtotal/i.test(l.trim())).join("\n");
-      return `Hola! 👋 ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algún Refresco o Salsa extra?*`;
+      return `${saludo} ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algún refresco o salsa extra?*`;
     }
-    return "Hola! 👋 ¿Sigues ahí? ¿Deseas agregar algo a tu pedido?";
+    return `${saludo} ¿Sigues ahí? ¿Deseas agregar algo a tu pedido?`;
   }
   if (ordenPreResumen.has(numero)) {
-    return "Hola! 👋 Quedamos pendientes de completar tus datos para confirmar tu pedido. *¿Sigues ahí?*";
+    return `${saludo} Quedamos pendientes de completar tus datos para confirmar tu pedido. *¿Sigues ahí?*`;
   }
   if (esperandoAgregarMas.has(numero)) {
     const ordAcum = esperandoAgregarMas.get(numero);
     if (ordAcum) {
       const lineas = ordAcum.split("\n").filter(l => l.trim() && !/^💰|subtotal/i.test(l.trim())).join("\n");
-      return `Hola! 👋 ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algo más o ya es todo?*`;
+      return `${saludo} ¿Sigues ahí?\n\nLlevas en tu pedido:\n${lineas}\n\n*¿Deseas agregar algo más o ya es todo?*`;
     }
-    return "Hola! 👋 ¿Sigues ahí? ¿Deseas agregar algo más a tu pedido o ya es todo?";
+    return `${saludo} ¿Sigues ahí? ¿Deseas agregar algo más a tu pedido o ya es todo?`;
   }
   if (esperandoCorte.has(numero)) {
     const ped  = esperandoCorte.get(numero);
@@ -57,15 +60,15 @@ function _textoRecordatorio(numero) {
                : item.presentacion === "torta"  ? `las ${item.cantidad} tortas`
                : item.presentacion === "gramos" ? `los ${item.gramos}g`
                : `los $${item.monto}`;
-    const listaCortes = getProductos().filter(p => p.categoria === "corte" || !p.categoria).map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
-    return `Hola! 👋 Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
+    const listaCortes = getProductos().filter(p => (p.categoria === "corte" || !p.categoria) && p.nombre !== "surtido especial").map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
+    return `${saludo} Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
   }
   if (esperandoTipoItem.has(numero)) {
     const d = esperandoTipoItem.get(numero);
-    return `Hola! 👋 Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían tacos o tortas?*`;
+    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían tacos o tortas?*`;
   }
   if (datosCampos.has(numero)) {
-    return "Hola! 👋 Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*";
+    return `${saludo} Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*`;
   }
   return null;
 }
@@ -270,7 +273,7 @@ function validarHora(texto) {
 
 function listaCortes() {
   const cortes = getCortes();
-  const unicos = [...new Set(Object.values(cortes))];
+  const unicos = [...new Set(Object.values(cortes))].filter(c => c !== "surtido especial");
   return unicos.length > 0
     ? unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(", ")
     : "Surtido, Carne, Buche, Cuero, Lengua";

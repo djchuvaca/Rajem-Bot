@@ -26,16 +26,36 @@ function _datosBancoDefault() {
 function getMenuFormato() {
   try {
     const productos   = getProductos();
-    const cortes      = productos.filter(p => p.categoria === "corte");
+    const cortes      = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
     const refrescos   = productos.filter(p => p.categoria === "refresco");
     const salsas      = productos.filter(p => p.categoria === "salsa");
     const nombres     = cortes.length > 0
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
-    const p          = cortes[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
-    const domCosto   = getConfig("domicilio_costo") || "50";
     const negocio    = getConfig("nombre_negocio")  || "Tacos Javier";
     const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
+    const pRef       = cortes[0] || { precio_taco: 30, precio_torta: 40, precio_100g: 32 };
+    const preciosUniformes = cortes.length === 0 || cortes.every(c =>
+      parseInt(c.precio_taco)  === parseInt(pRef.precio_taco) &&
+      parseInt(c.precio_torta) === parseInt(pRef.precio_torta) &&
+      parseInt(c.precio_100g)  === parseInt(pRef.precio_100g)
+    );
+    let seccionPrecios;
+    if (preciosUniformes) {
+      seccionPrecios =
+        `🌮 *TACOS* — $${pRef.precio_taco} c/u\n_(combinaciones al gusto)_\n\n` +
+        `🥖 *TORTAS* — $${pRef.precio_torta} c/u\n_(combinaciones al gusto)_\n\n` +
+        `⚖️ *POR GRAMOS* — $${pRef.precio_100g} / 100g\nCualquier pieza o combinación\n_Incluye tortillas y salsas_\n\n`;
+    } else {
+      const minTaco  = Math.min(...cortes.map(c => parseInt(c.precio_taco)  || parseInt(pRef.precio_taco)));
+      const minTorta = Math.min(...cortes.map(c => parseInt(c.precio_torta) || parseInt(pRef.precio_torta)));
+      const min100g  = Math.min(...cortes.map(c => parseInt(c.precio_100g)  || parseInt(pRef.precio_100g)));
+      seccionPrecios =
+        `🌮 *TACOS* — desde $${minTaco} c/u\n` +
+        `🥖 *TORTAS* — desde $${minTorta} c/u\n` +
+        `⚖️ *POR GRAMOS* — desde $${min100g} / 100g\n` +
+        `_(El precio varía por corte — escribe *precios* para ver el desglose)_\n\n`;
+    }
 
     let refrescosSeccion = "";
     if (refrescos.length > 0) {
@@ -48,8 +68,16 @@ function getMenuFormato() {
     let salsasSeccion = "";
     if (salsas.length > 0) {
       const salNombres = salsas.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ");
+      // Si todas las salsas tienen precio_taco = 0 en BD, usar el global como fallback
+      const precioRef = salsas.every(s => s.precio_taco === 0) ? pSalsa : null;
+      const todosIgual = !precioRef && salsas.every(s => s.precio_taco === salsas[0].precio_taco);
+      const precioDisplay = precioRef
+        ? `$${precioRef} c/u`
+        : todosIgual
+          ? `$${salsas[0].precio_taco} c/u`
+          : `precio variable`;
       salsasSeccion =
-        `🌶️ *SALSAS EXTRA* — $${pSalsa} c/u\n` +
+        `🌶️ *SALSAS EXTRA* — ${precioDisplay}\n` +
         `${salNombres}\n` +
         `_(Los tacos y tortas ya incluyen salsas gratis)_\n\n`;
     }
@@ -57,13 +85,7 @@ function getMenuFormato() {
     return (
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
-      `🌮 *TACOS* — $${p.precio_taco} c/u\n` +
-      `_(combinaciones al gusto)_\n\n` +
-      `🥖 *TORTAS* — $${p.precio_torta} c/u\n` +
-      `_(combinaciones al gusto)_\n\n` +
-      `⚖️ *POR GRAMOS* — $${p.precio_100g} / 100g\n` +
-      `Cualquier pieza o combinación\n` +
-      `_Incluye tortillas y salsas_\n\n` +
+      seccionPrecios +
       `💵 *POR CANTIDAD EN $*\n` +
       `Tú decides cuánto gastar, nosotros pesamos\n` +
       `_Incluye tortillas y salsas_\n\n` +
@@ -71,7 +93,7 @@ function getMenuFormato() {
       refrescosSeccion +
       salsasSeccion +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `🛵 Domicilio: $${domCosto} extra\n\n` +
+      `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
       `*¿Qué te vamos a preparar?* 😊\n`
     );
   } catch (e) { return _menuDefault(); }

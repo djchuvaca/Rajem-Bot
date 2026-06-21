@@ -142,6 +142,20 @@ async function seedDB() {
     }
   }
 
+  // ── MIGRACIÓN: SURTIDO ESPECIAL ───────────────────────────────────────────────
+  {
+    const yaSE = queryOne("SELECT id FROM productos WHERE nombre = 'surtido especial'");
+    if (!yaSE) {
+      const surtido = queryOne("SELECT precio_taco, precio_torta, precio_100g FROM productos WHERE nombre = 'surtido'");
+      const pt  = surtido ? surtido.precio_taco  : 30;
+      const por = surtido ? surtido.precio_torta : 40;
+      const pg  = surtido ? surtido.precio_100g  : 32;
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        ["surtido especial", "Combinación personalizada de cortes a elección del cliente.", pt, por, pg, "", "corte"]);
+      console.log("✅ Producto 'surtido especial' insertado");
+    }
+  }
+
   // ── SEED REFRESCOS ─────────────────────────────────────────────────────────
   const refrescosData = [
     ["coca cola", "Refresco Coca-Cola bien frío 🥤", 20, 20, 0, "coca,coke,cola,coca-cola", "refresco"],

@@ -102,9 +102,12 @@ tr:hover td{background:var(--surface2)}
 .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
 .hint{font-size:11px;color:var(--muted);margin-top:4px}
 @keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
 .dot-conectado{background:var(--green)!important;animation:pulse-green 2s infinite}
 .dot-iniciando{background:var(--yellow)!important}
 .dot-desconectado{background:var(--red)!important}
+.dot-pausado{background:var(--yellow)!important}
+.spinning{animation:spin .8s linear infinite;display:inline-block}
 /* ── WIZARD ── */
 .wz-wrap{max-width:620px;margin:0 auto}
 .wz-steps{display:flex;align-items:center;gap:0;margin-bottom:32px}
@@ -210,6 +213,7 @@ tr:hover td{background:var(--surface2)}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div class="card-title" style="margin:0">Pedidos de hoy</div>
           <span id="dashboard-ts" style="font-size:11px;color:var(--muted)"></span>
+          <span id="dash-spin" class="spinning" style="font-size:13px;color:var(--muted);margin-left:5px;display:none">↻</span>
         </div>
         <div class="table-wrap"><table id="pedidos-hoy-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Pago</th><th>Estado</th><th>Hora</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
@@ -273,12 +277,26 @@ tr:hover td{background:var(--surface2)}
 
     <!-- PRODUCTOS -->
     <div class="section" id="s-productos">
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="card-title" style="margin:0">🥩 Cortes</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalProducto(null,'corte')">+ Agregar</button>
+        </div>
+        <div class="table-wrap"><table id="cortes-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Taco</th><th>Torta</th><th>$/100g</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="card-title" style="margin:0">🥤 Bebidas</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalProducto(null,'refresco')">+ Agregar</button>
+        </div>
+        <div class="table-wrap"><table id="bebidas-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Precio</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div class="card-title" style="margin:0">Productos del menú</div>
-          <button class="btn btn-primary btn-sm" onclick="openModalProducto()">+ Agregar</button>
+          <div class="card-title" style="margin:0">🌶️ Salsas extras</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalProducto(null,'salsa')">+ Agregar</button>
         </div>
-        <div class="table-wrap"><table id="productos-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Taco</th><th>Torta</th><th>$/100g</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="table-wrap"><table id="salsas-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Precio extra</th><th>Activo</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
     </div>
 
@@ -583,6 +601,7 @@ tr:hover td{background:var(--surface2)}
   <div class="modal">
     <div class="modal-title" id="modal-prod-title">Nuevo producto</div>
     <input type="hidden" id="prod-id">
+    <input type="hidden" id="prod-categoria">
     <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="prod-nombre" type="text"></div>
     <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-textarea" id="prod-desc"></textarea></div>
     <div class="form-group">
@@ -590,10 +609,15 @@ tr:hover td{background:var(--surface2)}
       <input class="form-input" id="prod-sinonimos" type="text" placeholder="carnitas,carnita,maciza">
       <div class="hint">Palabras que el bot reconoce como este producto. Separadas por coma, sin espacios.</div>
     </div>
-    <div class="form-row-3">
-      <div class="form-group"><label class="form-label">Precio taco</label><input class="form-input" id="prod-taco" type="number"></div>
-      <div class="form-group"><label class="form-label">Precio torta</label><input class="form-input" id="prod-torta" type="number"></div>
-      <div class="form-group"><label class="form-label">$/100g</label><input class="form-input" id="prod-100g" type="number"></div>
+    <div id="prod-precios-corte">
+      <div class="form-row-3">
+        <div class="form-group"><label class="form-label">Precio taco</label><input class="form-input" id="prod-taco" type="number"></div>
+        <div class="form-group"><label class="form-label">Precio torta</label><input class="form-input" id="prod-torta" type="number"></div>
+        <div class="form-group"><label class="form-label">$/100g</label><input class="form-input" id="prod-100g" type="number"></div>
+      </div>
+    </div>
+    <div id="prod-precio-unico" style="display:none">
+      <div class="form-group"><label class="form-label" id="prod-precio-label">Precio</label><input class="form-input" id="prod-precio-unit" type="number"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
@@ -766,6 +790,8 @@ async function togglePausa() {
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 let _dashLastUpdate = 0;
 async function loadDashboard() {
+  const spinEl = document.getElementById('dash-spin');
+  if (spinEl) spinEl.style.display = '';
   const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones'), loadNegocioEstado()]);
   document.getElementById('sidebar-negocio').textContent = stats.negocio;
   const pct_dom = stats.confirmados > 0 ? Math.round(stats.domicilios_hoy / stats.confirmados * 100) : 0;
@@ -825,6 +851,7 @@ async function loadDashboard() {
   _dashLastUpdate = Date.now();
   const tsEl = document.getElementById('dashboard-ts');
   if (tsEl) tsEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  if (spinEl) spinEl.style.display = 'none';
 
   loadHistorico();
   const pedidos = await api('/api/pedidos?hoy=1');
@@ -893,6 +920,9 @@ function renderPedidosTabla(lista) {
 async function loadPedidos() {
   _pedidosTodos = await api('/api/pedidos');
   filtrarPedidosTabla(document.getElementById('buscar-pedido')?.value || '');
+  const nPend = _pedidosTodos.filter(p => p.estado === 'pendiente').length;
+  const navBadge = document.getElementById('nav-badge-pendientes');
+  if (navBadge) { navBadge.textContent = nPend; navBadge.style.display = nPend > 0 ? '' : 'none'; }
 }
 
 function exportarCSV() {
@@ -1266,24 +1296,39 @@ async function deleteCliente(id) {
 let _productosCache = [];
 async function loadProductos() {
   _productosCache = await api('/api/productos');
-  const tbody = document.querySelector('#productos-table tbody');
-  tbody.innerHTML = _productosCache.length ? _productosCache.map(p => `
-    <tr>
-      <td><strong>${p.nombre}</strong></td>
-      <td style="font-size:12px;color:var(--muted2);max-width:200px">${(p.descripcion||'').substring(0,60)}…</td>
-      <td>$${p.precio_taco}</td>
-      <td>$${p.precio_torta}</td>
-      <td>$${p.precio_100g}</td>
-      <td>
-        <span class="badge ${p.activo?'badge-green':'badge-red'}" style="cursor:pointer" title="${p.activo?'Clic para marcar agotado':'Clic para marcar disponible'}" onclick="toggleProductoActivo(${p.id},${p.activo?0:1})">
-          ${p.activo?'✓ Activo':'✗ Agotado'}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick='openModalProducto(${JSON.stringify(p)})'>✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProducto(${p.id})">🗑</button>
-      </td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay productos</td></tr>';
+  const cortes  = _productosCache.filter(p => p.categoria === 'corte');
+  const bebidas = _productosCache.filter(p => p.categoria === 'refresco');
+  const salsas  = _productosCache.filter(p => p.categoria === 'salsa');
+
+  const badgeActivo = p => `<span class="badge ${p.activo?'badge-green':'badge-red'}" style="cursor:pointer" title="${p.activo?'Clic para marcar agotado':'Clic para marcar disponible'}" onclick="toggleProductoActivo(${p.id},${p.activo?0:1})">${p.activo?'✓ Activo':'✗ Agotado'}</span>`;
+  const acciones = p => `<button class="btn btn-secondary btn-sm" onclick='openModalProducto(${JSON.stringify(p)})'>✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteProducto(${p.id})">🗑</button>`;
+
+  document.querySelector('#cortes-table tbody').innerHTML = cortes.length
+    ? cortes.map(p => `<tr>
+        <td><strong>${p.nombre}</strong></td>
+        <td style="font-size:12px;color:var(--muted2);max-width:180px">${(p.descripcion||'').substring(0,50)}…</td>
+        <td>$${p.precio_taco}</td><td>$${p.precio_torta}</td><td>$${p.precio_100g}</td>
+        <td>${badgeActivo(p)}</td><td>${acciones(p)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No hay cortes</td></tr>';
+
+  document.querySelector('#bebidas-table tbody').innerHTML = bebidas.length
+    ? bebidas.map(p => `<tr>
+        <td><strong>${p.nombre}</strong></td>
+        <td style="font-size:12px;color:var(--muted2);max-width:220px">${(p.descripcion||'').substring(0,60)}…</td>
+        <td>$${p.precio_taco}</td>
+        <td>${badgeActivo(p)}</td><td>${acciones(p)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No hay bebidas</td></tr>';
+
+  document.querySelector('#salsas-table tbody').innerHTML = salsas.length
+    ? salsas.map(p => `<tr>
+        <td><strong>${p.nombre}</strong></td>
+        <td style="font-size:12px;color:var(--muted2);max-width:220px">${(p.descripcion||'').substring(0,60)}…</td>
+        <td>${p.precio_taco > 0 ? '$' + p.precio_taco : 'Gratis'}</td>
+        <td>${badgeActivo(p)}</td><td>${acciones(p)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No hay salsas</td></tr>';
 }
 
 async function toggleProductoActivo(id, nuevoActivo) {
@@ -1294,29 +1339,49 @@ async function toggleProductoActivo(id, nuevoActivo) {
   loadProductos();
 }
 
-function openModalProducto(p=null) {
+function openModalProducto(p=null, defaultCategoria='corte') {
+  const cat = p?.categoria || defaultCategoria;
+  const esCorte = cat === 'corte';
   document.getElementById('modal-prod-title').textContent = p ? 'Editar producto' : 'Nuevo producto';
-  document.getElementById('prod-id').value        = p?.id          || '';
-  document.getElementById('prod-nombre').value    = p?.nombre      || '';
-  document.getElementById('prod-desc').value      = p?.descripcion || '';
-  document.getElementById('prod-sinonimos').value = p?.sinonimos   || '';
-  document.getElementById('prod-taco').value      = p?.precio_taco  || 30;
-  document.getElementById('prod-torta').value     = p?.precio_torta || 40;
-  document.getElementById('prod-100g').value      = p?.precio_100g  || 32;
+  document.getElementById('prod-id').value         = p?.id          || '';
+  document.getElementById('prod-categoria').value  = cat;
+  document.getElementById('prod-nombre').value     = p?.nombre      || '';
+  document.getElementById('prod-desc').value       = p?.descripcion || '';
+  document.getElementById('prod-sinonimos').value  = p?.sinonimos   || '';
+  document.getElementById('prod-precios-corte').style.display = esCorte ? '' : 'none';
+  document.getElementById('prod-precio-unico').style.display  = esCorte ? 'none' : '';
+  if (esCorte) {
+    document.getElementById('prod-taco').value  = p?.precio_taco  || 30;
+    document.getElementById('prod-torta').value = p?.precio_torta || 40;
+    document.getElementById('prod-100g').value  = p?.precio_100g  || 32;
+  } else {
+    document.getElementById('prod-precio-label').textContent = cat === 'salsa' ? 'Precio extra' : 'Precio';
+    document.getElementById('prod-precio-unit').value = p?.precio_taco || (cat === 'salsa' ? 0 : 20);
+  }
   document.getElementById('modal-producto').classList.add('show');
 }
 
 async function saveProducto() {
-  const id    = document.getElementById('prod-id').value;
+  const id  = document.getElementById('prod-id').value;
+  const cat = document.getElementById('prod-categoria').value || 'corte';
+  const esCorte = cat === 'corte';
   const datos = {
-    nombre:       document.getElementById('prod-nombre').value,
-    descripcion:  document.getElementById('prod-desc').value,
-    sinonimos:    document.getElementById('prod-sinonimos').value.trim().toLowerCase(),
-    precio_taco:  parseFloat(document.getElementById('prod-taco').value),
-    precio_torta: parseFloat(document.getElementById('prod-torta').value),
-    precio_100g:  parseFloat(document.getElementById('prod-100g').value),
-    activo:       1,
+    nombre:      document.getElementById('prod-nombre').value,
+    descripcion: document.getElementById('prod-desc').value,
+    sinonimos:   document.getElementById('prod-sinonimos').value.trim().toLowerCase(),
+    activo:      1,
+    categoria:   cat,
   };
+  if (esCorte) {
+    datos.precio_taco  = parseFloat(document.getElementById('prod-taco').value);
+    datos.precio_torta = parseFloat(document.getElementById('prod-torta').value);
+    datos.precio_100g  = parseFloat(document.getElementById('prod-100g').value);
+  } else {
+    const precio = parseFloat(document.getElementById('prod-precio-unit').value) || 0;
+    datos.precio_taco  = precio;
+    datos.precio_torta = precio;
+    datos.precio_100g  = 0;
+  }
   if (id) await api(`/api/productos/${id}`, 'PUT', datos);
   else    await api('/api/productos', 'POST', datos);
   closeModal('modal-producto');
@@ -1628,15 +1693,24 @@ async function checkWaStatus() {
   const dot   = document.getElementById('wa-dot');
   const label = document.getElementById('wa-label');
   try {
-    const s = await api('/api/status');
+    const [s, n] = await Promise.all([api('/api/status'), api('/api/negocio/estado')]);
     const estado = s.wa_estado || 'desconectado';
-    dot.className = `dot-${estado}`;
-    label.textContent = estado === 'conectado'    ? 'WhatsApp conectado'
-                      : estado === 'iniciando'    ? 'WhatsApp iniciando…'
-                      : 'WhatsApp desconectado';
+    if (estado === 'conectado' && n.pausado) {
+      dot.className = 'dot-pausado';
+      label.textContent = '⏸ Bot pausado';
+    } else if (estado === 'conectado') {
+      dot.className = 'dot-conectado';
+      label.textContent = '✅ Bot activo';
+    } else if (estado === 'iniciando') {
+      dot.className = 'dot-iniciando';
+      label.textContent = 'WhatsApp iniciando…';
+    } else {
+      dot.className = 'dot-desconectado';
+      label.textContent = 'WhatsApp desconectado';
+    }
     const mins = Math.floor((s.uptime_segundos || 0) / 60);
     document.getElementById('wa-status-badge').title =
-      `Tenant: ${s.tenant} · Uptime: ${mins} min`;
+      `Tenant: ${s.tenant} · Uptime: ${mins} min` + (n.pausado ? ' · BOT PAUSADO' : '');
   } catch (_) {
     dot.className = 'dot-desconectado';
     label.textContent = 'Sin conexión';

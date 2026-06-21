@@ -59,11 +59,14 @@ function formatearHora(horaTexto) {
 
 // ── PROCESAR ITEM JSON → TEXTO ────────────────────────────────────────────────
 function procesarItemJSON(item, precios) {
-  const { pTaco, pTorta, p100g } = precios;
+  const pc = (item.corte && precios.porCorte && precios.porCorte[item.corte])
+    ? precios.porCorte[item.corte] : precios;
+  const { pTaco, pTorta, p100g } = pc;
   const producto = getNombreProducto();
   const tipo     = getTipoNegocio();
   const corte    = Array.isArray(item.corte) ? item.corte.join(" con ") : (item.corte || "");
-  const corteStr = corte ? ` de ${corte}` : "";
+  const combinacion = item.combinacion ? ` (${item.combinacion})` : "";
+  const corteStr = corte ? ` de ${corte}${combinacion}` : "";
 
   switch (item.presentacion) {
     case "taco":

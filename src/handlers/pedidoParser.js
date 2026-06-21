@@ -132,7 +132,7 @@ function _cortesDefault() {
 
 function getRegexCortes() {
   const cortes = getCortes();
-  const palabras = Object.keys(cortes).join("|");
+  const palabras = Object.keys(cortes).sort((a, b) => b.length - a.length).join("|");
   return new RegExp(`(?:de\\s*|\\b)(${palabras})\\b`, "gi");
 }
 
@@ -281,7 +281,8 @@ function buscarCorteFuzzy(palabra) {
 function getCortesRegex() {
   const ahora = Date.now();
   if (_cortesRegexCache && ahora - _cortesRegexCacheTs < _CORTES_TTL) return _cortesRegexCache;
-  const palabras = Object.keys(getCortes()).join("|");
+  // Ordenar de más largo a más corto para que "surtido especial" sea probado antes que "surtido"
+  const palabras = Object.keys(getCortes()).sort((a, b) => b.length - a.length).join("|");
   _cortesRegexCache = new RegExp(`\\b(${palabras})\\b`, "i");
   _cortesRegexCacheTs = Date.now();
   return _cortesRegexCache;
@@ -518,6 +519,18 @@ function detectarModificacion(texto) {
   return null;
 }
 
+// ── COMBINAR CORTES → SURTIDO ESPECIAL ───────────────────────────────────────
+// Cuando un item tiene 2+ cortes separados por ", ", lo convierte a "surtido especial"
+// y guarda la combinación en item.combinacion para mostrarla al admin.
+function _aplicarSurtidoEspecial(item) {
+  if (!item || !item.corte) return item;
+  if (typeof item.corte === "string" && item.corte.includes(", ")) {
+    item.combinacion = item.corte.split(", ").join(" con ");
+    item.corte = "surtido especial";
+  }
+  return item;
+}
+
 // ── MEJORA 1 (sesión anterior): PARSEAR MITAD/MITAD ──────────────────────────
 const PATRON_MITAD_CAPTURA = /(?:la\s+)?mitad\s+(?:de\s+)?(\w+)\s+(?:y\s+)?(?:la\s+otra\s+)?mitad\s+(?:de\s+)?(\w+)|medio\s+(\w+)\s+y\s+medio\s+(\w+)/i;
 
@@ -532,15 +545,15 @@ function parsearMitadMitad(texto) {
 
   const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
   if (matchPieza)
-    return { tipo: "pedido", items: [{ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr }] };
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr })] };
 
   for (const medida of MEDIDAS)
     if (medida.re.test(t))
-      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, corte: corteStr }] };
+      return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: medida.gramos, corte: corteStr })] };
 
   const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
   if (matchGramos)
-    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr }] };
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr })] };
 
   return null;
 }
@@ -554,22 +567,22 @@ function parsearTodoMenosCorte(texto) {
   if (!m) return null;
   const excluido = buscarCorteFuzzy(m[1] || m[2]);
   if (!excluido) return null;
-  const todosCortes = [...new Set(Object.values(getCortes()))];
+  const todosCortes = [...new Set(Object.values(getCortes()))].filter(c => c !== "surtido especial");
   const cortesResultantes = todosCortes.filter(c => c !== excluido);
   if (!cortesResultantes.length) return null;
   const corteStr = cortesResultantes.join(", ");
 
   const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
   if (matchPieza)
-    return { tipo: "pedido", items: [{ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr }] };
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr })] };
 
   for (const medida of MEDIDAS)
     if (medida.re.test(t))
-      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, corte: corteStr }] };
+      return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: medida.gramos, corte: corteStr })] };
 
   const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
   if (matchGramos)
-    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr }] };
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr })] };
 
   return null;
 }
@@ -626,40 +639,43 @@ function parsearPedidoSimple(texto) {
       if (!item && ultimoTipo) item = parsearItemHeredado(parte, ultimoTipo);
       if (!item || item._sinCorte) return null;
       if (item.presentacion === "taco" || item.presentacion === "torta") ultimoTipo = item.presentacion;
-      items.push(item);
+      items.push(_aplicarSurtidoEspecial(item));
     }
     if (items.length > 0) return { tipo: "pedido", items };
     return null;
   }
 
-  const corte = extraerCorte(texto);
+  const corteRaw = extraerCorte(texto);
+  const corteInfo = (corteRaw && corteRaw.includes(", "))
+    ? { corte: "surtido especial", combinacion: corteRaw.split(", ").join(" con ") }
+    : { corte: corteRaw };
 
   const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
   if (matchPieza) {
     const cantidad = parseInt(matchPieza[1]);
     const esTaco   = /taco/i.test(matchPieza[2]);
-    if (!corte) return null;
-    return { tipo: "pedido", items: [{ presentacion: esTaco ? "taco" : "torta", cantidad, corte }] };
+    if (!corteRaw) return null;
+    return { tipo: "pedido", items: [{ presentacion: esTaco ? "taco" : "torta", cantidad, ...corteInfo }] };
   }
 
   for (const medida of MEDIDAS) {
     if (medida.re.test(t)) {
-      if (!corte) return null;
-      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, corte }] };
+      if (!corteRaw) return null;
+      return { tipo: "pedido", items: [{ presentacion: "gramos", gramos: medida.gramos, ...corteInfo }] };
     }
   }
 
   const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
   if (matchGramos) {
     const gramos = parseInt(matchGramos[1]);
-    if (!corte) return null;
-    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos, corte }] };
+    if (!corteRaw) return null;
+    return { tipo: "pedido", items: [{ presentacion: "gramos", gramos, ...corteInfo }] };
   }
 
   const matchMonto = t.match(/\b(\d+)\b/);
   if (matchMonto) {
     const num = parseInt(matchMonto[1]);
-    if (num > 40 && corte) return { tipo: "pedido", items: [{ presentacion: "pesos", monto: num, corte }] };
+    if (num > 40 && corteRaw) return { tipo: "pedido", items: [{ presentacion: "pesos", monto: num, ...corteInfo }] };
     if (num <= 100) return null;
   }
 

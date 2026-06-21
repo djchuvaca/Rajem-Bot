@@ -56,8 +56,24 @@ function _listaNombresSalsas() {
 }
 
 
-function _formatearSalsaExtra(nombres, cantidad, pSalsa) {
-  return `🌶️ ${cantidad} salsa${cantidad > 1 ? "s" : ""} extra (${nombres}) — $${cantidad * pSalsa}`;
+// Calcula el precio total de salsas usando el precio individual de cada una desde la BD.
+// items: array de strings (nombres) o array de {nombre, cantidad}.
+// Cae al precio global (precios.pSalsa) si la salsa no tiene precio configurado.
+function _calcularPrecioSalsas(items, cantTotal, precios) {
+  const salsasDB = getSalsas();
+  const getPrecio = nombre => {
+    const sal = salsasDB.find(s => s.nombre === nombre.toLowerCase());
+    return (sal && sal.precio_taco > 0) ? sal.precio_taco : precios.pSalsa;
+  };
+  if (items.length > 0 && typeof items[0] === "object") {
+    return items.reduce((acc, s) => acc + (s.cantidad || 1) * getPrecio(s.nombre), 0);
+  }
+  if (items.length === 1) return cantTotal * getPrecio(items[0]);
+  return items.reduce((acc, nombre) => acc + getPrecio(nombre), 0);
+}
+
+function _formatearSalsaExtra(nombres, cantidad, precioTotal) {
+  return `🌶️ ${cantidad} salsa${cantidad > 1 ? "s" : ""} extra (${nombres}) — $${precioTotal}`;
 }
 
 async function _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTexto, esOrdenDom, esPreventa) {
@@ -89,9 +105,9 @@ async function _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, ref
 
   const salsasEsp = salsas.filter(s => !s.esGenerico);
   if (salsasEsp.length > 0) {
-    const nombres = salsasEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
+    const nombres   = salsasEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
     const cantTotal = salsasEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
-    ordenAcum += "\n" + _formatearSalsaExtra(nombres, cantTotal, precios.pSalsa);
+    ordenAcum += "\n" + _formatearSalsaExtra(nombres, cantTotal, _calcularPrecioSalsas(salsasEsp, cantTotal, precios));
   }
 
   const refGen = refrescos.find(r => r.esGenerico);
@@ -535,7 +551,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         const precios  = getPrecios();
         const nombres  = salEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
         const cant     = salEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
-        nuevaBase += "\n" + _formatearSalsaExtra(nombres, cant, precios.pSalsa);
+        nuevaBase += "\n" + _formatearSalsaExtra(nombres, cant, _calcularPrecioSalsas(salEsp, cant, precios));
       }
 
       esperandoConfirmacionItem.delete(clienteNumero);
@@ -733,7 +749,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
     const precios = getPrecios();
     const cantSal = ctx._cantidadSalPendiente || pendSalsa.length;
     const nombres = pendSalsa.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, precios.pSalsa);
+    const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(pendSalsa, cantSal, precios));
     const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
     if (!tieneRefresco && !ctx._flujoUnificado) {
       const listaRef = _listaNombresRefrescos();
@@ -764,7 +780,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       const precios = getPrecios();
       const cantSal = ctx._cantidadSalPendiente || salsas.length;
       const nombres = salsas.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-      const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, precios.pSalsa);
+      const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(salsas, cantSal, precios));
       const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
       if (!tieneRefresco && !ctx._flujoUnificado) {
         const listaRef = _listaNombresRefrescos();
@@ -842,7 +858,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
     const precios    = getPrecios();
     const lineaRef   = _formatearRefresco(refrescoPregunta);
     const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, precios.pSalsa);
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length, precios));
     const nuevaOrden = ordenTexto + "\n" + lineaRef + "\n" + lineaSalsa;
     await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;
@@ -860,7 +876,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   if (salsasPregunta && salsasPregunta.length > 0) {
     const precios    = getPrecios();
     const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, precios.pSalsa);
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length, precios));
     const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
     await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;

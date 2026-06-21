@@ -5,17 +5,37 @@
  */
 
 function getPrecios() {
-  const { getConfig } = require("../db");
-  return {
-    pTaco:  parseInt(getConfig("precio_taco")  || "30"),
-    pTorta: parseInt(getConfig("precio_torta") || "40"),
-    p100g:  parseInt(getConfig("precio_100g")  || "32"),
-    pSalsa: parseInt(getConfig("precio_salsa") || "15"),
-  };
+  const { getConfig, getProductos } = require("../db");
+  const pTaco  = parseInt(getConfig("precio_taco")  || "30");
+  const pTorta = parseInt(getConfig("precio_torta") || "40");
+  const p100g  = parseInt(getConfig("precio_100g")  || "32");
+  const pSalsa = parseInt(getConfig("precio_salsa") || "15");
+
+  const porCorte = {};
+  try {
+    const productos = getProductos();
+    for (const p of (productos || [])) {
+      if (p.categoria === "refresco" || p.categoria === "salsa") continue;
+      porCorte[p.nombre.toLowerCase()] = {
+        pTaco:  parseInt(p.precio_taco  || pTaco),
+        pTorta: parseInt(p.precio_torta || pTorta),
+        p100g:  parseInt(p.precio_100g  || p100g),
+      };
+    }
+  } catch (_) {}
+
+  return { pTaco, pTorta, p100g, pSalsa, porCorte };
+}
+
+function _preciosParaCorte(item, precios) {
+  const corte = item && item.corte;
+  if (corte && precios.porCorte && precios.porCorte[corte]) return precios.porCorte[corte];
+  return precios;
 }
 
 function calcularPrecioItem(item, precios) {
-  const { pTaco, pTorta, p100g } = precios;
+  const pc = _preciosParaCorte(item, precios);
+  const { pTaco, pTorta, p100g } = pc;
   switch (item.presentacion) {
     case "taco":    return item.cantidad * pTaco;
     case "torta":   return item.cantidad * pTorta;

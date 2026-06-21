@@ -62,28 +62,54 @@ function respuestaPrecio(producto = null) {
     const precios  = getPrecios();
     const negocio  = getNegocio();
     const productos = getProductos();
-    const nombres  = productos.length
-      ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
-      : "Surtido, Carne, Buche, Cuero, Lengua";
+    const cortes   = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
 
     if (producto) {
+      const pc = (precios.porCorte && precios.porCorte[producto.toLowerCase()]) || precios;
       return (
         `💰 *Precios en ${negocio}:*\n\n` +
-        `🌮 Taco de ${producto}: *$${precios.pTaco}*\n` +
-        `🥖 Torta de ${producto}: *$${precios.pTorta}*\n` +
-        `⚖️ Por 100g de ${producto}: *$${precios.p100g}*\n\n` +
+        `🌮 Taco de ${producto}: *$${pc.pTaco}*\n` +
+        `🥖 Torta de ${producto}: *$${pc.pTorta}*\n` +
+        `⚖️ Por 100g de ${producto}: *$${pc.p100g}*\n\n` +
         `_Los precios incluyen tortillas y salsas_ 😊`
       );
     }
 
-    return (
-      `💰 *Precios en ${negocio}:*\n\n` +
-      `🌮 *Tacos* — $${precios.pTaco} c/u\n` +
-      `🥖 *Tortas* — $${precios.pTorta} c/u\n` +
-      `⚖️ *Por gramos* — $${precios.p100g} / 100g\n\n` +
-      `🥩 Piezas disponibles: ${nombres}\n\n` +
-      `_Los precios incluyen tortillas y salsas_ 😊`
+    // Verificar si todos los cortes tienen el mismo precio
+    const todosIguales = cortes.every(p =>
+      parseInt(p.precio_taco)  === precios.pTaco &&
+      parseInt(p.precio_torta) === precios.pTorta &&
+      parseInt(p.precio_100g)  === precios.p100g
     );
+
+    if (todosIguales || !cortes.length) {
+      const nombres = cortes.length
+        ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
+        : "Surtido, Carne, Buche, Cuero, Lengua";
+      return (
+        `💰 *Precios en ${negocio}:*\n\n` +
+        `🌮 *Tacos* — $${precios.pTaco} c/u\n` +
+        `🥖 *Tortas* — $${precios.pTorta} c/u\n` +
+        `⚖️ *Por gramos* — $${precios.p100g} / 100g\n\n` +
+        `🥩 Piezas disponibles: ${nombres}\n\n` +
+        `_Los precios incluyen tortillas y salsas_ 😊`
+      );
+    }
+
+    // Precios diferentes por corte — mostrar desglose
+    let resp = `💰 *Precios en ${negocio}:*\n\n`;
+    for (const p of cortes) {
+      const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
+      resp += `🥩 *${nombre}*\n`;
+      resp += `   🌮 $${parseInt(p.precio_taco)} · 🥖 $${parseInt(p.precio_torta)} · ⚖️ $${parseInt(p.precio_100g)}/100g\n\n`;
+    }
+    const se = productos.find(p => p.nombre === "surtido especial");
+    if (se) {
+      resp += `🌟 *Surtido especial* (combinación a tu gusto)\n`;
+      resp += `   🌮 $${parseInt(se.precio_taco)} · 🥖 $${parseInt(se.precio_torta)} · ⚖️ $${parseInt(se.precio_100g)}/100g\n\n`;
+    }
+    resp += `_Los precios incluyen tortillas y salsas_ 😊`;
+    return resp;
   } catch (e) {
     return "Ahorita no tengo los precios disponibles. ¿Me dices qué quieres y te digo cuánto es?";
   }
@@ -115,7 +141,7 @@ function respuestaDomicilio() {
 
   let resp = `🛵 *Servicio a domicilio de ${negocio}:*\n\n`;
   resp += `✅ Sí hacemos domicilio\n`;
-  resp += `💵 Costo: *$${domCosto}*\n`;
+  resp += `💵 Costo: _El precio se ajusta a la distancia de tu colonia_ 📍\n`;
   if (zonaCobertura) resp += `📍 Zona de cobertura: ${zonaCobertura}\n`;
   resp += `\n_¿Te hacemos un pedido a domicilio?_ 😊`;
 
@@ -128,28 +154,49 @@ function respuestaMenu() {
     const precios   = getPrecios();
     const negocio   = getNegocio();
     const productos = getProductos();
-    const domCosto  = getDomCosto();
-    const nombres   = productos.length
-      ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
+    const cortes    = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
+    const nombres   = cortes.length
+      ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
+
+    const preciosUniformes = !cortes.length || cortes.every(p =>
+      parseInt(p.precio_taco)  === precios.pTaco &&
+      parseInt(p.precio_torta) === precios.pTorta &&
+      parseInt(p.precio_100g)  === precios.p100g
+    );
+
+    let seccionPrecios;
+    if (preciosUniformes) {
+      seccionPrecios =
+        `🌮 *TACOS* — $${precios.pTaco} c/u\n` +
+        `_(combinaciones al gusto)_\n\n` +
+        `🥖 *TORTAS* — $${precios.pTorta} c/u\n` +
+        `_(combinaciones al gusto)_\n\n` +
+        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n` +
+        `Cualquier pieza o combinación\n` +
+        `_Incluye tortillas y salsas_\n\n`;
+    } else {
+      const minTaco  = Math.min(...cortes.map(p => parseInt(p.precio_taco)  || precios.pTaco));
+      const minTorta = Math.min(...cortes.map(p => parseInt(p.precio_torta) || precios.pTorta));
+      const min100g  = Math.min(...cortes.map(p => parseInt(p.precio_100g)  || precios.p100g));
+      seccionPrecios =
+        `🌮 *TACOS* — desde $${minTaco} c/u\n` +
+        `🥖 *TORTAS* — desde $${minTorta} c/u\n` +
+        `⚖️ *POR GRAMOS* — desde $${min100g} / 100g\n` +
+        `_(El precio varía por corte — escribe *precios* para ver el desglose)_\n\n`;
+    }
 
     return (
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
-      `🌮 *TACOS* — $${precios.pTaco} c/u\n` +
-      `_(combinaciones al gusto)_\n\n` +
-      `🥖 *TORTAS* — $${precios.pTorta} c/u\n` +
-      `_(combinaciones al gusto)_\n\n` +
-      `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n` +
-      `Cualquier pieza o combinación\n` +
-      `_Incluye tortillas y salsas_\n\n` +
+      seccionPrecios +
       `💵 *POR CANTIDAD EN $*\n` +
       `Tú decides cuánto gastar, nosotros pesamos\n` +
       `_Incluye tortillas y salsas_\n\n` +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
       `🟢 Todos los tacos y tortas incluyen salsas\n` +
-      `🛵 Domicilio: $${domCosto} extra\n\n` +
+      `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
       `*¿Qué te vamos a preparar?* 😊\n`
     );
   } catch (e) {

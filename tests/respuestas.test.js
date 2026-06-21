@@ -82,9 +82,9 @@ describe("respuestaDomicilio", () => {
     assert.match(r, /domicilio|sí/i);
   });
 
-  test("incluye costo en pesos", () => {
+  test("menciona ajuste por distancia", () => {
     const r = respuestaDomicilio();
-    assert.match(r, /\$\d+/);
+    assert.match(r, /distancia|colonia/i);
   });
 });
 

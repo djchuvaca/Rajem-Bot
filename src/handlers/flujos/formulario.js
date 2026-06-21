@@ -106,13 +106,13 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
     clientesPreventa.add(clienteNumero);
     _menuEnviado.add(clienteNumero); // SALUDO() ya fue enviado; handleTipoEntrega no repite el saludo
     persistirEstado(clienteNumero);
-    await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO());
+    await msg.reply(`¡Perfecto! Tomamos tu pedido en preventa.\nTu orden estará lista a partir de *${getRangoHorario().split(" a ")[0]}* al inicio de nuestro horario. 😊\n\n` + SALUDO());
     return true;
   }
   if (rechazaPreventa) {
     clientesNuevos.delete(clienteNumero);
     ordenPendientePreventa.delete(clienteNumero);
-    await msg.reply("Esta bien! Cuando gustes pedir, aqui estaremos. Hasta pronto!");
+    await msg.reply("¡Está bien! Cuando gustes pedir, aquí estaremos. ¡Hasta pronto! 😊");
     return true;
   }
   if (_tieneSeñalesDePedido(textoOriginal)) {

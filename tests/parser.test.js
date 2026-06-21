@@ -287,8 +287,9 @@ describe("parsearPedidoSimple — mitad/mitad", () => {
   test("4 tacos mitad surtido y mitad buche", () => {
     const r = parsearPedidoSimple("4 tacos mitad surtido y mitad buche");
     assert.equal(r?.tipo, "pedido");
-    assert.ok(r?.items[0]?.corte?.includes("surtido"));
-    assert.ok(r?.items[0]?.corte?.includes("buche"));
+    assert.equal(r?.items[0]?.corte, "surtido especial");
+    assert.ok(r?.items[0]?.combinacion?.includes("surtido"));
+    assert.ok(r?.items[0]?.combinacion?.includes("buche"));
   });
   test("medio kilo mitad carne y mitad cuero", () => {
     const r = parsearPedidoSimple("medio kilo mitad carne y mitad cuero");
