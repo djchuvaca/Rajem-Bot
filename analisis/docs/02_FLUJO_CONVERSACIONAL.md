@@ -91,33 +91,34 @@ Cada mensaje entrante se pasa por los handlers en este orden exacto. El primero 
 ```
  1. handleCancelacionConfirmada    → "cancelar" en cualquier etapa
  2. handleMotivoCancelacion        → esperando motivo de cancelación
- 3. handlePrimerMensaje            → primer mensaje del cliente
- 4. handleFueraDeHorario           → detectar si es fuera de horario
- 5. handleEdicionPendiente         → esperandoEdicion activo
- 6. handleConfirmacionDatos        → cliente frecuente confirmando sus datos
- 7. handleTipoEntrega              → detectar domicilio/mostrador
- 8. handleCancelacionDurantePedido → "cancelar" durante toma de pedido
- 9. handleCambioTipoDuranteFormulario → cambio de tipo durante formulario
-10. handleFormularioProgresivo     → llenar campos faltantes uno a uno
-11. handleEdicionResumen           → editar algo desde el resumen
-12. handleCambiosTipoDesdeResumen  → cambiar a domicilio/mostrador desde resumen
-13. handleCambioMetodoDesdeResumen → cambiar método de pago desde resumen
-14. handleAgregarDesdeResumen      → agregar ítem desde resumen
-15. handleConfirmacionFinal        → "sí" cuando hay resumenPendiente
-16. handleCatchAllResumen          → cualquier cosa con resumenPendiente (re-muestra)
-17. handleEsperandoTipoItem        ← ESTADO BLOQUEANTE: taco o torta
-18. handleEsperandoCorte           ← ESTADO BLOQUEANTE: tipo de carne
-19. handleCambioTipoDuranteTomaPedido → cambio de tipo durante pedido
-20. handleConfirmacionItem         ← ESTADO BLOQUEANTE: ¿es correcto?
-21. handleAgregarMas               ← ESTADO BLOQUEANTE: ¿algo más?
-22. handleFAQDurantePedido         → FAQs de precio/menú durante toma de pedido
-23. handleRepetirPedido            → "lo mismo de siempre"
-24. handlePedidoSimple             → parser local completo
-25. handleSinCorte                 → detecta pedido sin corte
-26. handleSinTipo                  → detecta pedido sin tipo (taco/torta)
-27. handleModificacionAgregarMas   → modificar ítem en el acumulado
-28. handlePresupuestoInverso       → "¿cuántos tacos con $100?"
-29. handleGroqFallback             → último recurso (IA)
+ 3. handleCancelacionPagoMP        → mensajes durante espera de link de pago MP (link expirado, FAQs, recordatorio)
+ 4. handlePrimerMensaje            → primer mensaje del cliente
+ 5. handleFueraDeHorario           → detectar si es fuera de horario
+ 6. handleEdicionPendiente         → esperandoEdicion activo
+ 7. handleConfirmacionDatos        → cliente frecuente confirmando sus datos
+ 8. handleTipoEntrega              → detectar domicilio/mostrador
+ 9. handleCancelacionDurantePedido → "cancelar" durante toma de pedido
+10. handleCambioTipoDuranteFormulario → cambio de tipo durante formulario
+11. handleFormularioProgresivo     → llenar campos faltantes uno a uno
+12. handleEdicionResumen           → editar algo desde el resumen
+13. handleCambiosTipoDesdeResumen  → cambiar a domicilio/mostrador desde resumen
+14. handleCambioMetodoDesdeResumen → cambiar método de pago desde resumen
+15. handleAgregarDesdeResumen      → agregar ítem desde resumen
+16. handleConfirmacionFinal        → "sí" cuando hay resumenPendiente
+17. handleCatchAllResumen          → cualquier cosa con resumenPendiente (re-muestra)
+18. handleEsperandoTipoItem        ← ESTADO BLOQUEANTE: taco o torta
+19. handleEsperandoCorte           ← ESTADO BLOQUEANTE: tipo de carne
+20. handleCambioTipoDuranteTomaPedido → cambio de tipo durante pedido
+21. handleConfirmacionItem         ← ESTADO BLOQUEANTE: ¿es correcto?
+22. handleAgregarMas               ← ESTADO BLOQUEANTE: ¿algo más?
+23. handleFAQDurantePedido         → FAQs de precio/menú durante toma de pedido
+24. handleRepetirPedido            → "lo mismo de siempre"
+25. handlePedidoSimple             → parser local completo
+26. handleSinCorte                 → detecta pedido sin corte
+27. handleSinTipo                  → detecta pedido sin tipo (taco/torta)
+28. handleModificacionAgregarMas   → modificar ítem en el acumulado
+29. handlePresupuestoInverso       → "¿cuántos tacos con $100?"
+30. handleGroqFallback             → último recurso (IA)
 ```
 
 ---
@@ -127,7 +128,9 @@ Cada mensaje entrante se pasa por los handlers en este orden exacto. El primero 
 ### SALUDO (primer mensaje)
 
 **Trigger:** El cliente escribe por primera vez (no está en `clientesNuevos`).  
-**Acción:** El bot responde con el mensaje de bienvenida de la BD (`saludo`) y pregunta si es para domicilio o mostrador.  
+**Acción (cliente nuevo):** El bot responde con el mensaje de bienvenida de la BD (`saludo`) y pregunta si es para domicilio o mostrador.  
+**Acción (cliente frecuente):** El bot saluda por nombre ("Hola de nuevo, Juan 👋") y pregunta si es para domicilio o mostrador **antes** de mostrar el menú. Antes de este fix (Jun 20), el bot mostraba el menú inmediatamente sin preguntar el tipo de entrega.  
+**Coordinación `_menuEnviado`:** Un Set local en `formulario.js` evita que `handleTipoEntrega` repita el saludo si el primer mensaje ya incluía el tipo de entrega.  
 **Transición:** `clientesNuevos.add(numero)` → pasa a TIPO_ENTREGA.
 
 ---
@@ -225,7 +228,8 @@ Cuando el bot entra en uno de estos estados, **solo acepta la respuesta esperada
 7. msg.reply("Tu pedido fue recibido...")
 ```
 
-**Si es transferencia:** No confirma aún. Activa `esperandoCaptura` y pide la captura de pantalla.
+**Si es transferencia con MercadoPago activo:** `resumen.js` genera el link de pago, lo envía al cliente y guarda el contexto en `esperandoPagoMP` (Map con `pedidoId`, `telefono`, `nombre`, `expiraEn` 30 min). El cliente queda en estado de espera de pago. `handleCancelacionPagoMP` maneja mensajes durante esta ventana: avisa si el link expiró, responde FAQs y recuerda al cliente completar el pago. El webhook de MercadoPago (`POST /webhook/mercadopago`) limpia `esperandoPagoMP` al recibir confirmación.  
+**Si es transferencia sin MP configurado:** No confirma aún. Activa `esperandoCaptura` y pide la captura de pantalla.
 
 ---
 
@@ -251,9 +255,10 @@ Cuando el bot entra en uno de estos estados, **solo acepta la respuesta esperada
 ### Preventa (fuera de horario)
 
 Si el cliente escribe fuera del horario de atención:
-1. Bot informa el horario y ofrece preventa
+1. Bot informa el horario (incluye hora concreta de inicio, ej. "abrimos a las 7:00 a.m.") y ofrece preventa
 2. Si acepta → `clientesPreventa.add(numero)` → flujo normal pero solicita **hora de entrega**
 3. La hora se guarda en `horaEntregaPreventa` y se incluye en el resumen
+4. Al confirmar el pedido (`!confirmar` en el grupo), `comandos.js` llama a `mandaditos.js` que programa un aviso al grupo de repartidores 1h antes de la `hora_entrega`. El despacho se persiste en `despachos_programados` para sobrevivir reinicios.
 
 ### Repetir pedido anterior
 

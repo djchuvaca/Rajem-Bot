@@ -171,7 +171,7 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 
 ---
 
-## Estado actual del proyecto (1 Junio 2026)
+## Estado actual del proyecto (21 Junio 2026)
 
 ### Lo que está implementado y funcionando
 
@@ -217,16 +217,43 @@ Solo español. El parser, las FAQs y todos los mensajes al cliente están en esp
 
 **Pagos:**
 - MercadoPago (opt-in): genera link de cobro al confirmar pedido de transferencia
-- Webhook automático: confirma pedido en BD y notifica al cliente y grupo
+- Nuevo estado `esperandoPagoMP`: rastrea la ventana de 30 min del link, serializado en BD para sobrevivir reinicios
+- `handleCancelacionPagoMP`: maneja FAQs, recordatorio y cancelación durante la espera de pago
+- `scripts/ngrok-start.js`: activa MP en local con un solo comando (`npm run ngrok`) sin configuración manual
+- Webhook automático: confirma pedido en BD, notifica al cliente y grupo, limpia `esperandoPagoMP`
 - Fallback transparente al flujo banco + comprobante de imagen si MP no está configurado
+
+**Preventa y mandaditos:**
+- Al confirmar pedidos de preventa (`!confirmar`), el bot programa automáticamente un aviso al grupo de repartidores 1h antes de la hora de entrega (`mandaditos.js`)
+- Los despachos se persisten en `despachos_programados` y se restauran con `reanudarDespachosPendientes()` tras reinicio
+- El mensaje de preventa incluye la hora concreta de apertura (ya no solo el rango)
+
+**Precios y productos:**
+- Precios configurables por corte (taco/torta/100g) con fallback al global si precio=0
+- Producto virtual "surtido especial" para combinaciones de 2+ cortes; filtrado del menú visible
+- Menú muestra "desde $X" cuando hay variación de precios entre cortes
+- Panel con 3 tablas separadas de productos: Cortes, Bebidas, Salsas
+
+**Flujo de saludo mejorado:**
+- Cliente frecuente recibe saludo por nombre y pregunta de tipo de entrega antes del menú
+- Set `_menuEnviado` evita duplicados en la secuencia de saludo
+
+### Tests actuales (Jun 21 2026)
+
+| Archivo | Casos | Cobertura |
+|---|---|---|
+| `tests/parser.test.js` | ~60 | `pedidoParser.js`: score, fuzzy, multi-ítem, modificaciones, FAQs |
+| `tests/respuestas.test.js` | ~80 | `respuestas.js`: FAQs, `aplicarModificacion`, `aplicarQuitarUno`, precios |
+| `tests/precios.test.js` | 37 | `precios.js`: `getPrecios`, `calcularPrecioItem`, `calcularSubtotal` |
+| `tests/resumen.test.js` | 33 | `resumen.js`: `formatearHora`, `procesarItemJSON`, `jsonALineas`, `extraerOrdenDeResumen` |
 
 ### Pendiente (oportunidades de mejora)
 
-- Tests automatizados ampliados (unitarios y de integración de extremo a extremo)
 - Soporte de botones/listas interactivas de WhatsApp (requiere API oficial de Meta)
-- Validación de zona de cobertura geográfica
+- Validación de zona de cobertura geográfica con cálculo de tarifa real por distancia
 - Soporte de horarios partidos (ej. 7:00-12:00 y 16:00-20:00)
 - Provisioning automatizado de tenants con interfaz web (hoy solo CLI via `scripts/nuevo-tenant.js`)
+- Tests de integración de extremo a extremo (flujo completo de pedido)
 
 ---
 

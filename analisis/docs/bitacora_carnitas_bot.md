@@ -1,7 +1,214 @@
 # Bitácora del Proyecto: Bot WhatsApp Tacos Javier
 **Versión actual:** carnitas-bot 1.4  
-**Fecha:** 1 Junio 2026 (último commit: c26f8b4)  
+**Fecha:** 21 Junio 2026 (último commit: 1e39203)  
 **Stack:** Node.js, whatsapp-web.js, Groq (llama-3.3-70b), **better-sqlite3** (SQLite nativo), Express panel admin, Winston, PM2, Sentry, MercadoPago
+
+---
+
+## Sesión 21 Junio 2026 — Fix emojiPresentacion + script simulador de pedido
+
+### Fix `emojiPresentacion()` (`src/pedido/resumen.js`)
+
+**Problema:** `tipo_negocio` llegaba de la BD como texto libre ("Taquería Javier", "Pizzería Don Pepe") y no hacía match exacto con las claves del mapa `EMOJIS` (`"taqueria"`, `"pizzeria"`, `"hamburguesa"`), por lo que siempre caía al default.
+
+**Fix:** Normalización con regex antes de buscar en el mapa:
+```javascript
+const clave = /taqueria|tacos|carnitas/i.test(tipo) ? "taqueria"
+  : /pizza|pizzeria/i.test(tipo)                    ? "pizzeria"
+  : /hamburguesa|burger/i.test(tipo)                ? "hamburguesa"
+  : tipo;
+```
+
+### Nuevo script `scripts/simular-pedido.js`
+
+Simulador de conversación interactivo desde la línea de comandos. Permite probar el flujo completo del bot (parser, precios, resumen) sin necesitar WhatsApp conectado.
+
+---
+
+## Sesión 21 Junio 2026 — Tests nuevos + 3 bugs corregidos
+
+### Nuevos archivos de tests
+
+| Archivo | Casos | Qué cubre |
+|---|---|---|
+| `tests/precios.test.js` | 37 | `getPrecios()`, `calcularPrecioItem()`, `calcularSubtotal()` |
+| `tests/resumen.test.js` | 33 | `formatearHora()`, `procesarItemJSON()`, `jsonALineas()`, `extraerOrdenDeResumen()` |
+| `tests/respuestas.test.js` | +36 nuevos | `aplicarModificacion()` para `quitar_uno`/`cambiar_corte`, bugs de precio 0 |
+
+### Bugs corregidos
+
+**1. `aplicarQuitarUno` ignoraba ítems anteriores con qty > 1**
+- Antes: cuando el ítem objetivo tenía qty > 1, se hacía `return null` al no encontrarlo por índice → los ítems anteriores se ignoraban
+- Fix: `return null` → `continue` para seguir iterando hacia ítems anteriores
+
+**2. `aplicarQuitarUno` no actualizaba el precio al reducir cantidad**
+- Antes: 3 tacos de surtido a $90 → al quitar uno → "2 tacos de surtido — $90" (precio incorrecto)
+- Fix: recalcula el precio de la línea según la cantidad resultante
+
+**3. Precios en FAQs podían mostrar $0**
+- `respuestaPrecio()`, `respuestaMenu()`, `getMenuFormato()` usaban precio crudo de BD que podía ser 0
+- Fix: ahora usan precio efectivo de `porCorte` con fallback al precio global de configuración
+
+---
+
+## Sesión 20 Junio 2026 — Precios por corte, surtido especial, mejoras UX
+
+### Precios configurables por corte (`src/pedido/precios.js`, `src/config.js`)
+
+- Cada producto en BD tiene su propio precio (taco/torta/100g); si el precio es 0, se usa el precio global de configuración como fallback
+- `getPrecios()` retorna un objeto `porCorte` indexado por nombre de corte
+- El menú muestra "desde $X" cuando hay variación de precios entre cortes
+
+### Surtido especial
+
+- Nuevo producto virtual en BD: "surtido especial"
+- Se activa automáticamente en `resumen.js` cuando el cliente combina 2+ cortes distintos en un ítem (mitad/mitad, todo menos, etc.)
+- Guarda la combinación real como metadata en el texto del resumen
+- Se filtra del menú visible al cliente y de las listas de cortes en el bot (el cliente nunca ve "surtido especial" como opción explícita)
+
+### UX del bot
+
+- **Recordatorio de inactividad personalizado:** incluye el nombre del cliente cuando está disponible en `datosCampos` ("Hola Juan, ¿sigues ahí?")
+- **Preventa:** el mensaje de fuera de horario ahora incluye la hora concreta de apertura ("abrimos a las 7:00 a.m.") usando `getRangoHorario()`
+- **Precio de domicilio:** la respuesta FAQ de domicilio dice "precio según distancia a tu colonia" en lugar de un monto fijo, reflejando el sistema de tarifas por zona
+- **"Surtido especial"** se filtra automáticamente del menú y de las listas de cortes mostradas al cliente
+- Tildes y ortografía corregidas en mensajes hardcodeados (confirmación, preventa)
+
+### Panel web (`src/panel/public/index.html`)
+
+- Badge en topbar muestra estado real del bot en tiempo real: `🟢 activo` / `⏸ pausado` / `🔴 desconectado`
+- Spinner animado en "Pedidos de hoy" mientras se cargan los datos
+- Badge de pedidos pendientes en sidebar se actualiza también al navegar a la sección Pedidos
+- Sección Productos dividida en 3 tablas: **Cortes** (precio taco/torta/100g), **Bebidas** (precio unitario), **Salsas** (toggle activo/gratis)
+
+### Archivos modificados
+
+| Archivo | Cambios principales |
+|---|---|
+| `src/config.js` | `getPrecios()` con `porCorte` indexado, `getMenuFormato()` con "desde $X" |
+| `src/db/seed.js` | Datos iniciales para bebidas (coca, fanta, sprite) y salsas (picada, cebolla, suave, roja, limones) |
+| `src/handlers/flujos/formulario.js` | Fix menor en detección de tipo de entrega |
+| `src/handlers/flujos/orden.js` | Precios de ítem individuales desde `porCorte` |
+| `src/handlers/flujos/resumen.js` | Activación de "surtido especial" al detectar 2+ cortes |
+| `src/handlers/flujos/utils.js` | Recordatorio con nombre del cliente |
+| `src/handlers/pedidoParser.js` | Filtro de "surtido especial" en listas de cortes |
+| `src/handlers/respuestas.js` | `respuestaPrecio()` y `respuestaMenu()` con `porCorte` |
+| `src/panel/public/index.html` | 3 tablas de productos, badge topbar, spinner |
+| `src/pedido/precios.js` | `calcularPrecioItem()` con `porCorte` y fallback global |
+| `src/pedido/resumen.js` | `emojiPresentacion()` con normalización de tipo_negocio (también en commit Jun 21) |
+
+---
+
+## Sesión 20 Junio 2026 — Fix saludo cliente frecuente
+
+### Problema
+
+Al escribir su primer mensaje del día, el cliente frecuente recibía el menú inmediatamente sin que el bot preguntara cómo quería recibir el pedido (domicilio o mostrador).
+
+### Fix (`src/handlers/flujos/formulario.js`)
+
+**`handlePrimerMensaje`:** Cuando el cliente existe en BD (cliente frecuente), ahora el bot envía un saludo personalizado por nombre + pregunta de tipo de entrega, sin mostrar el menú todavía.
+
+**`handleTipoEntrega`:** Detecta si el saludo ya fue enviado en este ciclo (via `_menuEnviado` Set) y responde:
+- Si ya se envió el saludo → "¡Perfecto! [menú]"
+- Si el primer mensaje ya traía tipo de entrega → "¡Hola de nuevo, [nombre]! [menú]"
+
+**`handleFueraDeHorario`:** Marca `_menuEnviado` al aceptar la preventa, para que `handleTipoEntrega` no repita el saludo cuando el cliente luego elige tipo de entrega.
+
+**`_menuEnviado`:** Set local en `formulario.js` (no persistido entre reinicios). Solo vive durante la sesión actual.
+
+---
+
+## Sesión 19 Junio 2026 — MercadoPago automático con ngrok
+
+### `scripts/ngrok-start.js` (nuevo)
+
+Script que encadena 3 pasos en un solo comando (`npm run ngrok`):
+1. Levanta ngrok en el puerto del panel (3000 por defecto)
+2. Extrae la URL pública HTTPS generada por ngrok
+3. Sobreescribe `APP_URL=` en `.env` con la nueva URL
+4. Arranca el bot (`npm start`)
+
+Esto elimina la necesidad de copiar/pegar la URL de ngrok manualmente y volver a arrancar el bot cada vez que cambia.
+
+### Nuevo Map `esperandoPagoMP` (`src/estado/maps.js`)
+
+Estructura: `{ pedidoId, telefono, nombre, expiraEn }` (expiraEn = Date.now() + 30 min)
+
+- Se guarda en `resumen.js` inmediatamente después de enviar el link de MP al cliente
+- Se serializa en `sesiones_activas` para sobrevivir reinicios del bot
+- Se elimina cuando llega la confirmación del webhook o cuando el cliente cancela
+
+### `handleCancelacionPagoMP` (`src/handlers/flujos/cancelacion.js`)
+
+Nuevo handler que se encadena en `mensajes.js` con alta prioridad (antes de `handlePrimerMensaje`) cuando el cliente tiene `esperandoPagoMP` activo:
+- Link expirado → avisa y ofrece generar uno nuevo
+- Cancelación explícita → limpia el estado y confirma cancelación
+- FAQs → responde y recuerda completar el pago
+- Cualquier otro mensaje → recordatorio del link con tiempo restante
+
+### Webhook de MP (`src/panel/server.js`)
+
+El webhook ya existía, pero ahora también:
+- Limpia `esperandoPagoMP` del Map en memoria al recibir confirmación de pago
+- Esto evita que el cliente reciba recordatorios de pago después de ya haber pagado
+
+### Archivos modificados
+
+| Archivo | Cambios |
+|---|---|
+| `package.json` | Nuevo script `"ngrok": "node scripts/ngrok-start.js"` |
+| `scripts/ngrok-start.js` | Nuevo — automatización ngrok |
+| `src/estado/maps.js` | `esperandoPagoMP` Map nuevo |
+| `src/estado/index.js` | Re-exporta `esperandoPagoMP` |
+| `src/estado/sesiones.js` | Serializa/restaura `esperandoPagoMP` |
+| `src/handlers/flujos/cancelacion.js` | `handleCancelacionPagoMP` nuevo |
+| `src/handlers/flujos/resumen.js` | Guarda contexto en `esperandoPagoMP` tras enviar link |
+| `src/handlers/mensajes.js` | Encadena `handleCancelacionPagoMP` con prioridad alta |
+| `src/panel/server.js` | Webhook limpia `esperandoPagoMP` al confirmar pago |
+
+---
+
+## Sesión 17 Junio 2026 — Mandaditos programados + fixes preventa
+
+### Mandaditos (despacho programado para preventa)
+
+**Flujo:**
+1. Cliente hace pedido de preventa con hora de entrega (ej. "para las 10am")
+2. Admin ejecuta `!confirmar [tel]` en el grupo
+3. `comandos.js` detecta que el pedido tiene `hora_entrega` → llama a `mandaditos.js`
+4. `mandaditos.js` calcula `hora_despacho = hora_entrega - 1h` y programa un `setTimeout`
+5. Al dispararse el timeout → envía alerta al grupo con datos del cliente: nombre, dirección, colonia, referencia, total, tarifa
+6. El despacho se marca como `ejecutado=1` en BD
+
+**Persistencia de despachos:** `despachos_programados` tabla en BD. Al reiniciar el bot, `reanudarDespachosPendientes()` (llamada en evento `ready` de `index.js`) lee todos los despachos con `ejecutado=0` y recrea los `setTimeout`.
+
+### Fixes de estado
+
+- `cancelacion.js`: `ordenPendientePreventa.delete()` en todos los paths de cancelación — antes podía quedar un estado huérfano si el cliente cancelaba en preventa
+- `mensajes.js`: idem en el path de cancelación durante espera de captura de transferencia
+- `orden.js`: correcciones de flujo detectadas en auditoría de estados
+
+### Nuevas funciones en `src/db/modelos.js`
+
+- `guardarDespachoProgramado(datos)` → INSERT en `despachos_programados`
+- `marcarDespachoEjecutado(id)` → UPDATE ejecutado=1
+- `getDespachosPendientes()` → SELECT WHERE ejecutado=0
+
+### Archivos modificados/creados
+
+| Archivo | Cambios |
+|---|---|
+| `index.js` | Llama `reanudarDespachosPendientes()` en evento `ready` |
+| `src/db/config.js` | Funciones auxiliares para mandaditos |
+| `src/db/modelos.js` | 3 nuevas funciones CRUD de despachos |
+| `src/db/seed.js` | Tabla `despachos_programados` |
+| `src/handlers/comandos.js` | `!confirmar` programa despacho en preventas |
+| `src/handlers/flujos/cancelacion.js` | Fix `ordenPendientePreventa.delete()` |
+| `src/handlers/flujos/orden.js` | Fixes de flujo de auditoría |
+| `src/handlers/mandaditos.js` | **Nuevo** — lógica de despacho programado |
+| `src/handlers/mensajes.js` | Fix `ordenPendientePreventa.delete()` en espera captura |
+| `src/panel/public/index.html` | Mejoras de UI panel |
 
 ---
 

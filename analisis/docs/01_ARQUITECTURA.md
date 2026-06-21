@@ -97,12 +97,15 @@ Cada archivo maneja una etapa del ciclo de vida del pedido:
 
 | Archivo | Responsabilidad |
 |---|---|
-| `formulario.js` | Bienvenida, tipo de entrega, formulario progresivo de datos |
+| `formulario.js` | Bienvenida, tipo de entrega, formulario progresivo de datos. Set `_menuEnviado` coordina el saludo entre handlers |
 | `orden.js` | Toma de pedido, preguntar corte/tipo, confirmación de ítem, Groq |
-| `resumen.js` | Resumen final, edición desde resumen, confirmación, guardar en BD, MercadoPago |
+| `resumen.js` | Resumen final, edición desde resumen, confirmación, guardar en BD, MercadoPago + `esperandoPagoMP` |
 | `edicion.js` | Modificación de campos durante formulario o resumen |
-| `cancelacion.js` | Cancelación en cualquier etapa del flujo |
+| `cancelacion.js` | Cancelación en cualquier etapa del flujo; incluye `handleCancelacionPagoMP` para la ventana de pago MP |
 | `utils.js` | Helpers compartidos + rate limiting WA (2s/JID) + timeout bifásico (20/35 min) |
+
+**Archivo adicional (fuera de `flujos/`):**
+- `src/handlers/mandaditos.js` — despachos programados para preventa: cuando el admin confirma un pedido de preventa, programa el aviso al grupo de repartidores 1h antes de la hora de entrega. `reanudarDespachosPendientes()` en `index.js` restaura los timeouts pendientes tras reinicio.
 
 ### Capa 4 — NLU (pedidoParser.js + respuestas.js)
 
@@ -174,6 +177,8 @@ Costo y latencia. Groq tiene rate limits y latencia de red. El parser local resp
 ### ¿Por qué MercadoPago como módulo opcional?
 
 Para que el negocio pueda empezar con el flujo de banco + comprobante (sin costo) y activar los pagos con link cuando esté listo. `estaConfigurado()` verifica las variables de entorno en tiempo de ejecución — si no están definidas, `resumen.js` cae al flujo tradicional.
+
+**ngrok automático (`scripts/ngrok-start.js`):** Para activar MP en desarrollo/local sin servidor público, `npm run ngrok` levanta ngrok automáticamente, extrae la URL pública generada y sobreescribe `APP_URL` en `.env` antes de arrancar el bot. Esto evita tener que copiar y pegar la URL de ngrok manualmente cada vez.
 
 ---
 

@@ -1,5 +1,5 @@
 # Mapeo de FAQs — Bot Tacos Javier
-**Fecha:** 1 Junio 2026  
+**Fecha:** 21 Junio 2026  
 **Archivo fuente:** `src/handlers/pedidoParser.js` + `src/handlers/respuestas.js` + `src/handlers/flujos/orden.js`
 
 ---
@@ -28,14 +28,16 @@ El bot detecta **8 tipos** de preguntas frecuentes (antes 6). Cada tipo tiene su
 ```
 💰 *Precios en Tacos Javier:*
 
-🌮 *Tacos* — $[precio] c/u
-🥖 *Tortas* — $[precio] c/u
+🌮 *Tacos* — desde $[precio_min] c/u
+🥖 *Tortas* — desde $[precio_min] c/u
 ⚖️ *Por gramos* — $[precio] / 100g
 
 🥩 Piezas disponibles: Surtido, Carne, Buche, Cuero, Lengua
 
 _Los precios incluyen tortillas y salsas_ 😊
 ```
+
+**Nota:** Si hay variación de precios entre cortes, muestra "desde $X". Si todos los cortes tienen el mismo precio, muestra el precio único. Los precios provienen de `getPrecios().porCorte` con fallback al precio global de `configuracion`.
 
 **Respuesta del bot (con corte, ej. "¿cuánto cuesta el buche?"):**
 ```
@@ -90,14 +92,15 @@ _¡Te esperamos!_ 😊
 ```
 🛵 *Servicio a domicilio de Tacos Javier:*
 
-
 ✅ Sí hacemos domicilio
-💵 Costo: *$[costo]*
+💵 Costo: precio según distancia a tu colonia
 📍 Zona de cobertura: [zona] (si está configurada)
-⏳ Tiempo aproximado de entrega: 60 minutos como Maximo
+⏳ Tiempo aproximado de entrega: 60 minutos como máximo
 
-_Te lo llevamos has la Luna de ser necesario_ 😊
+_Te lo llevamos hasta la Luna de ser necesario_ 😊
 ```
+
+**Nota (Jun 20):** El costo ya no muestra un monto fijo — dice "precio según distancia a tu colonia" porque el sistema de tarifas por zona permite precios variables según colonia.
 
 ---
 
@@ -321,6 +324,18 @@ _Nos Adaptamos al de tu preferencia_ 😊
 | FAQ | Preguntas que responde                                         | Respuesta del bot                            |
 |:----|:---------------------------------------------------------------|:---------------------------------------------|
 | Todas| Cualquier FAQ registrada                                      | Respuesta + *"Recuerda mandarnos tu captura"* |
+
+---
+
+### Etapa 9 — Esperando pago con link de MercadoPago (`esperandoPagoMP`)
+> Manejo vía `handleCancelacionPagoMP`. El cliente recibió el link de pago y tiene 30 min para pagarlo.
+
+| Mensaje del cliente | Respuesta del bot |
+|:----|:---|
+| Cualquier FAQ | Responde la FAQ + recuerda completar el pago con el tiempo restante |
+| "cancelar" | Cancela el pedido, limpia `esperandoPagoMP` |
+| Si el link ya expiró (>30 min) | Avisa del vencimiento y ofrece generar uno nuevo |
+| Cualquier otro mensaje | Recordatorio del link + tiempo restante |
 
 ---
 

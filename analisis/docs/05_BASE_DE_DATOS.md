@@ -82,7 +82,15 @@ CREATE TABLE productos (
 | `precio_100g` | Precio por 100 gramos en pesos |
 | `activo` | 1 = disponible, 0 = eliminado (soft delete) |
 
-**Datos iniciales (seed):**
+**Categorías de productos (panel admin los divide en 3 tablas):**
+
+| Categoría | Cómo se detecta | Columnas relevantes |
+|---|---|---|
+| Cortes | nombre no es bebida ni salsa | precio_taco, precio_torta, precio_100g |
+| Bebidas | nombre en lista de bebidas (coca cola, fanta, sprite…) | precio_taco (= precio unitario) |
+| Salsas | precio_taco = 0 y precio_torta = 0 | precio_taco (= precio individual, si 0 = gratis) |
+
+**Datos iniciales (seed) — cortes:**
 
 | nombre | precio_taco | precio_torta | precio_100g |
 |---|---|---|---|
@@ -91,6 +99,11 @@ CREATE TABLE productos (
 | buche | $30 | $40 | $32 |
 | cuero | $30 | $40 | $32 |
 | lengua | $30 | $40 | $32 |
+| surtido especial | $30 | $40 | $32 |
+
+**`surtido especial`:** Producto virtual que se activa automáticamente cuando el cliente combina 2+ cortes distintos en un ítem (ej: "mitad carne mitad buche"). Guarda la combinación real en el resumen como metadata. Se filtra del menú visible al cliente y de las listas de cortes en el bot.
+
+**Precios por corte:** Cada corte puede tener su propio precio (taco/torta/100g). `precios.js` usa `porCorte` con fallback al precio global de configuración si el corte tiene precio 0. El menú muestra "desde $X" cuando hay variación de precios entre cortes.
 
 **CRUD en `modelos.js`:**
 
@@ -420,3 +433,41 @@ try {
 ```
 
 Al agregar una nueva columna a una tabla existente, se agrega una línea similar al bloque de migraciones en `seedDB()`. La función se llama en cada arranque, así que la migración se aplica automáticamente al primer reinicio.
+
+---
+
+### Tablas adicionales (creadas en versiones recientes)
+
+#### `tarifas_zonas`
+Tarifas de domicilio configurables por colonia o zona geográfica. La respuesta de FAQ "domicilio" ahora dice "precio según distancia a tu colonia" en lugar de un monto fijo.
+
+#### `colonias`
+Catálogo de colonias con coordenadas geográficas. Base para el cálculo de tarifas por distancia.
+
+#### `pagos_pendientes`
+Registro de pagos con MercadoPago que están en proceso. Complementa el Map `esperandoPagoMP` en memoria para el caso de reinicio con un pago activo.
+
+#### `despachos_programados`
+
+```sql
+CREATE TABLE despachos_programados (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id       INTEGER NOT NULL,
+  cliente_nombre  TEXT    NOT NULL,
+  cliente_tel     TEXT    NOT NULL,
+  cliente_calle   TEXT,
+  cliente_colonia TEXT,
+  cliente_ref     TEXT,
+  total_orden     TEXT,
+  tarifa          INTEGER,
+  hora_despacho   TEXT    NOT NULL,    -- ISO string del momento de aviso al repartidor
+  ejecutado       INTEGER NOT NULL DEFAULT 0
+);
+```
+
+Persiste los despachos programados para preventas. Al confirmar un pedido de preventa (`!confirmar`), `comandos.js` registra aquí el despacho y programa un `setTimeout` 1h antes de `hora_entrega`. Si el bot reinicia, `reanudarDespachosPendientes()` (llamada en `ready` de `index.js`) restaura los timeouts pendientes desde esta tabla.
+
+**CRUD en `modelos.js`:**
+- `guardarDespachoProgramado(datos)` → INSERT
+- `marcarDespachoEjecutado(id)` → UPDATE ejecutado=1
+- `getDespachosPendientes()` → SELECT WHERE ejecutado=0

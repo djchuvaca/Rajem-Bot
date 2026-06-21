@@ -142,6 +142,11 @@ function requireAuth(req, res, next) {
 
 **Nota:** Cualquier cambio en productos llama a `invalidarCacheCortes()` en `pedidoParser.js`. Esto garantiza que el bot detecte los cortes actualizados en el próximo mensaje, sin necesitar reiniciar.
 
+**Categorías en el panel:** La sección Productos muestra 3 tablas separadas:
+- **Cortes** — con columnas precio_taco, precio_torta, precio_100g
+- **Bebidas** — con columna precio unitario
+- **Salsas** — con toggle activo/inactivo (precio generalmente 0 = incluida)
+
 ### Clientes
 
 | Método | Ruta | Descripción |
@@ -415,6 +420,11 @@ El panel completo está en un solo archivo HTML con CSS y JavaScript incrustado 
 **Auto-refresh:** Cada 20 segundos, la SPA llama a `/api/pedidos?hoy=1` y `/api/stats` para actualizar el dashboard sin recargar la página.
 
 **Autenticación en la SPA:** Si cualquier llamada a la API retorna HTTP 401, la SPA muestra el formulario de login y bloquea el resto de la interfaz.
+
+**Mejoras de UI recientes (Jun 20):**
+- Badge en la barra superior muestra el estado real del bot en tiempo real: `🟢 activo` / `⏸ pausado` / `🔴 desconectado`
+- Spinner animado en la tabla "Pedidos de hoy" mientras se cargan los datos
+- Badge de pedidos pendientes en el sidebar se actualiza también al navegar a la sección Pedidos (no solo en el Dashboard)
 
 ---
 

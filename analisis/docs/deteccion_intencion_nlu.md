@@ -1,5 +1,5 @@
 # Detección de Intención en Lenguaje Natural — Bot Tacos Javier
-**Fecha:** 1 Junio 2026  
+**Fecha:** 21 Junio 2026  
 **Archivos fuente:** `src/handlers/mensajes.js` · `src/handlers/flujos/*.js` · `src/handlers/pedidoParser.js` · `src/estado/campos.js`
 
 ---
@@ -454,6 +454,8 @@ buche    (alias: buchito, buchon, buchones)
 cuero    (alias: cueros, cueritos, cuerito)
 lengua   (alias: lenguita, lenguitas)
 ```
+
+**Nota:** "surtido especial" es un producto interno (combinación de 2+ cortes); **no aparece** en las listas de cortes mostradas al cliente ni en la caché de detección.
 
 ### Sin Tipo — `detectarSinTipo()`
 

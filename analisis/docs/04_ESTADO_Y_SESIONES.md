@@ -28,6 +28,12 @@ Archivo fuente: `src/estado/maps.js`
 | `referenciaPreguntas` | Se preguntó por referencia de dirección |
 | `clientesPreventa` | Cliente en flujo de preventa (fuera de horario) |
 
+**Set local en `formulario.js` (no persistido):**
+
+| Set | Descripción |
+|---|---|
+| `_menuEnviado` | Números a los que ya se envió el menú en el saludo actual. Evita que `handleTipoEntrega` repita el menú si el primer mensaje ya incluía domicilio/mostrador |
+
 ### Maps de flujo principal — valor = datos del estado
 
 | Map | Tipo de valor | Descripción |
@@ -55,7 +61,8 @@ Archivo fuente: `src/estado/maps.js`
 | Map | Tipo de valor | Descripción |
 |---|---|---|
 | `resumenPendiente` | `{ texto, esTransferencia, datos... }` | Resumen generado esperando confirmación final |
-| `esperandoCaptura` | `{ pedidoId, datos... }` | Esperando comprobante de transferencia |
+| `esperandoCaptura` | `{ pedidoId, datos... }` | Esperando comprobante de transferencia (flujo sin MP) |
+| `esperandoPagoMP` | `{ pedidoId, telefono, nombre, expiraEn }` | Link de MP enviado, esperando confirmación del webhook. Serializado en sesiones; se limpia al recibir pago o al expirar (30 min) |
 | `pendientesConfirmacion` | `{ pedidoId, datos... }` | Pedido registrado esperando `!confirmar` del admin |
 | `pedidosConfirmados` | Object | Pedido ya confirmado (para referencia) |
 
@@ -197,6 +204,7 @@ Todos los Maps del sistema se serializan. La tabla muestra la clave JSON usada:
 | `esperandoEdicion.get()` | `esperandoEdicion` |
 | `esperandoTipoItem.get()` | `esperandoTipoItem` |
 | `pendientesConfirmacion.get()` | `pendienteConfirmacion` |
+| `esperandoPagoMP.get()` | `esperandoPagoMP` |
 | `conversaciones.get()` | historial_json (columna separada) |
 
 ---
@@ -207,7 +215,7 @@ Archivo fuente: `src/handlers/flujos/utils.js`
 
 Un `setInterval` de 10 minutos revisa todos los clientes en `ultimaActividad`.
 
-Los tiempos reducidos (antes 30/45 min) buscan liberar sesiones zombie más rápido y evitar confusión al cliente si regresa después de mucho tiempo.
+Los tiempos buscan liberar sesiones zombie más rápido y evitar confusión al cliente si regresa después de mucho tiempo. El recordatorio incluye el nombre del cliente cuando está disponible en `datosCampos`.
 
 ```
 Cada 10 minutos:

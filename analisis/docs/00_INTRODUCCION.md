@@ -2,7 +2,7 @@
 
 **Versión:** carnitas-bot 1.4  
 **Stack:** Node.js · whatsapp-web.js · Groq · better-sqlite3 · Express · Winston · PM2  
-**Fecha documento:** 24 Mayo 2026
+**Fecha documento:** 21 Junio 2026
 
 ---
 
@@ -86,11 +86,12 @@ carnitas-bot 1.4/
 ├── src/
 │   ├── logger.js               ← Winston logger (consola + archivos)
 │   ├── handlers/
-│   │   ├── mensajes.js         ← Router principal de mensajes (~178 líneas)
+│   │   ├── mensajes.js         ← Router principal de mensajes
 │   │   ├── pedidoParser.js     ← Parser NLU local con sistema de score
 │   │   ├── respuestas.js       ← Respuestas FAQ sin Groq
 │   │   ├── imagenes.js         ← Procesamiento de comprobantes de pago
 │   │   ├── comandos.js         ← Comandos del grupo admin (!pedidos, !confirmar, !limpiar…)
+│   │   ├── mandaditos.js       ← Despachos programados: envía alerta al grupo de repartidores
 │   │   └── flujos/
 │   │       ├── formulario.js   ← Primer mensaje, tipo de entrega, formulario
 │   │       ├── orden.js        ← Toma de pedido, corte, tipo ítem, Groq
@@ -137,7 +138,9 @@ carnitas-bot 1.4/
 │   ├── backup-db.js            ← Backup de la BD a data/backups/ (se corre cada 6h)
 │   ├── onboarding.js           ← Asistente CLI de configuración inicial
 │   ├── reset-password.js       ← Resetear contraseña del panel sin saber la actual
-│   └── nuevo-tenant.js         ← Provisionar nueva instancia (SaaS)
+│   ├── nuevo-tenant.js         ← Provisionar nueva instancia (SaaS)
+│   ├── ngrok-start.js          ← Levanta ngrok, actualiza APP_URL en .env y arranca el bot
+│   └── simular-pedido.js       ← Simulador de pedidos para pruebas desde la línea de comandos
 │
 └── analisis/
     ├── bitacora_carnitas_bot.md
@@ -189,6 +192,9 @@ npm run dev
 # 6. (Opcional) Configurar el negocio con el wizard
 #    Abre el panel → el wizard aparece automáticamente al primer login
 #    O usa la CLI: node scripts/onboarding.js
+
+# --- Alternativa: arrancar con ngrok (expone el bot a internet para MercadoPago) ---
+npm run ngrok    # levanta ngrok, actualiza APP_URL en .env y arranca el bot
 
 # --- Producción con PM2 ---
 npm install -g pm2
