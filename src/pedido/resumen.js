@@ -36,7 +36,12 @@ function emojiPresentacion(presentacion, tipoNegocio) {
     hamburguesa:{ taco: "🍔", torta: "🍔", gramos: "⚖️", pesos: "⚖️", default: "🍔" },
     default:    { taco: "🍽️", torta: "🍽️", gramos: "⚖️", pesos: "⚖️", default: "🍽️" },
   };
-  const set = EMOJIS[tipo] || EMOJIS.default;
+  // Normalizar tipo_negocio de texto libre a clave del mapa
+  const clave = /taqueria|tacos|carnitas/i.test(tipo) ? "taqueria"
+    : /pizza|pizzeria/i.test(tipo)                    ? "pizzeria"
+    : /hamburguesa|burger/i.test(tipo)                ? "hamburguesa"
+    : tipo;
+  const set = EMOJIS[clave] || EMOJIS.default;
   return set[presentacion] || set.default;
 }
 
