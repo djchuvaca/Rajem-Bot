@@ -20,6 +20,8 @@ const { buscarColonia } = require("../../geo");
 
 // Contador de intentos fallidos de colonia por cliente (vive solo en memoria, se limpia al aceptar)
 const _intentosColonia = new Map();
+// Clientes a los que ya se les envió el menú en handlePrimerMensaje (evita doble saludo en handleTipoEntrega)
+const _menuEnviado = new Set();
 
 // ── DETECCIÓN Y RESUMEN DE SEÑALES DE PEDIDO ─────────────────────────────────
 const _PRESUPUESTO_RE = /\bpor\s*\$\s*\d+|\$\s*\d+\s*(de|en)\b/i;
@@ -50,6 +52,7 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
 
   clientesNuevos.add(clienteNumero);
   _intentosColonia.delete(clienteNumero); // Resetear contador de intentos de sesión anterior
+  _menuEnviado.delete(clienteNumero); // Resetear flag de menú enviado de sesión anterior
   if (!estaEnHorario()) {
     if (_tieneSeñalesDePedido(textoOriginal)) {
       ordenPendientePreventa.set(clienteNumero, textoOriginal);
@@ -70,14 +73,16 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
   const clienteConocido = telKnown ? getCliente(telKnown) : null;
   const primerNombre    = clienteConocido?.nombre?.split(" ")[0] || null;
 
-  // Para clientes recurrentes con tipo de entrega en el primer mensaje,
-  // handleTipoEntrega mostrará el saludo personalizado + menú. Evitar doble saludo.
+  // Para clientes recurrentes sin tipo de entrega en el primer mensaje:
+  // saludar por nombre y preguntar tipo de entrega; el menú se envía después en handleTipoEntrega.
+  // Para clientes recurrentes con tipo de entrega en el primer mensaje:
+  // handleTipoEntrega mostrará el saludo + menú (returns false aquí, cae al siguiente handler).
   if (!tieneTipoEntrega || !primerNombre) {
-    const saludoFinal = primerNombre ? `Hola de nuevo, *${primerNombre}*! 😊 Aquí te mando el menú:` : SALUDO();
-    await replyConTyping(msg, saludoFinal);
     if (primerNombre) {
-      await new Promise(r => setTimeout(r, 400));
-      await msg.reply(MENU_FORMATO());
+      await replyConTyping(msg, `Hola de nuevo, *${primerNombre}*! 😊 ¿Tu pedido será para domicilio o pasas a recoger al mostrador?`);
+      _menuEnviado.add(clienteNumero); // marca que el saludo ya fue enviado; handleTipoEntrega no lo repite
+    } else {
+      await replyConTyping(msg, SALUDO());
     }
   }
 
@@ -99,6 +104,7 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
 
   if (aceptaPreventa) {
     clientesPreventa.add(clienteNumero);
+    _menuEnviado.add(clienteNumero); // SALUDO() ya fue enviado; handleTipoEntrega no repite el saludo
     persistirEstado(clienteNumero);
     await msg.reply("Perfecto! Tomamos tu pedido en preventa.\nTu orden estara lista al inicio de nuestro servicio.\n\n" + SALUDO());
     return true;
@@ -188,8 +194,16 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
 
   persistirEstado(clienteNumero);
   const primerNombre = clienteBD?.nombre?.split(" ")[0] || null;
-  if (primerNombre) {
+  const saludoYaEnviado = _menuEnviado.has(clienteNumero);
+  _menuEnviado.delete(clienteNumero);
+  if (primerNombre && !saludoYaEnviado) {
+    // Primer mensaje del cliente ya incluía tipo de entrega — saludar aquí
     await replyConTyping(msg, `Hola de nuevo *${primerNombre}*! 😊 Aquí te mando el menú:`);
+    await new Promise(r => setTimeout(r, 400));
+  } else {
+    // Saludo ya fue enviado en handlePrimerMensaje — solo confirmar tipo de entrega
+    const intro = tipoEntrega === "domicilio" ? "Perfecto! 🛵 Aquí te mando el menú:" : "Perfecto! Aquí te mando el menú:";
+    await replyConTyping(msg, intro);
     await new Promise(r => setTimeout(r, 400));
   }
   await msg.reply(MENU_FORMATO());
