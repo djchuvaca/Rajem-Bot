@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel — Tacos Javier</title>
+<title>Panel de Control</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -128,6 +128,33 @@ tr:hover td{background:var(--surface2)}
 .hor-row span{width:80px;font-size:13px;flex-shrink:0}
 .hor-times{display:flex;align-items:center;gap:8px;font-size:13px}
 .wz-progress{font-size:12px;color:var(--muted)}
+/* ── RESPONSIVE ──────────────────────────────────────────────── */
+.sidebar-toggle{display:none;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:0;line-height:1;margin-right:12px;flex-shrink:0}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9}
+.sidebar-overlay.show{display:block}
+@media(max-width:768px){
+  .sidebar{position:fixed;top:0;left:-240px;width:240px;height:100vh;transition:left .25s ease;z-index:20}
+  .sidebar.open{left:0;box-shadow:4px 0 32px rgba(0,0,0,.6)}
+  .sidebar-toggle{display:inline-flex;align-items:center}
+  .topbar{padding:12px 16px}
+  .topbar-sub{display:none}
+  .topbar-title{font-size:16px}
+  .content{padding:14px 12px}
+  .form-row,.form-row-3{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .login-box{width:92vw;max-width:380px;padding:24px 16px}
+  .card{padding:14px}
+  .modal{padding:20px 14px}
+  .wcard{padding:20px 14px}
+  .wz-wrap{padding:0}
+  #toast{left:12px;right:12px;width:auto;text-align:center}
+  #wa-label{display:none}
+}
+@media(max-width:480px){
+  .stat-num{font-size:22px}
+  .stats-grid{gap:8px}
+  .btn{padding:7px 12px}
+}
 </style>
 </head>
 <body>
@@ -137,7 +164,7 @@ tr:hover td{background:var(--surface2)}
     <div class="login-logo">
       <div class="icon">🌮</div>
       <h1>Panel de Control</h1>
-      <p>Tacos Javier — Administración</p>
+      <p id="login-negocio-sub">Administración</p>
     </div>
     <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
     <div class="form-group"><label class="form-label">Usuario</label>
@@ -176,10 +203,14 @@ tr:hover td{background:var(--surface2)}
     <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
   </div>
 </div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div class="main">
   <div class="topbar">
-    <div><div class="topbar-title" id="page-title">Dashboard</div><div class="topbar-sub" id="page-sub">Resumen del día</div></div>
+    <div style="display:flex;align-items:center">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
+      <div><div class="topbar-title" id="page-title">Dashboard</div><div class="topbar-sub" id="page-sub">Resumen del día</div></div>
+    </div>
     <div style="display:flex;align-items:center;gap:14px">
       <div id="wa-status-badge" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)" title="Estado del bot de WhatsApp">
         <span id="wa-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0"></span>
@@ -718,6 +749,11 @@ document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key==
 async function doLogout() { await api('/api/logout', 'POST'); location.reload(); }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+
 const sections = {
   dashboard:  { title:'Dashboard', sub:'Resumen del día' },
   pedidos:    { title:'Pedidos', sub:'Historial completo' },
@@ -739,6 +775,10 @@ function showSection(name) {
   document.querySelector(`[data-s="${name}"]`).classList.add('active');
   document.getElementById('page-title').textContent = sections[name].title;
   document.getElementById('page-sub').textContent   = sections[name].sub;
+  if (window.innerWidth <= 768) {
+    document.querySelector('.sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  }
   loaders[name]?.();
 }
 
@@ -794,6 +834,7 @@ async function loadDashboard() {
   if (spinEl) spinEl.style.display = '';
   const [stats, sesData] = await Promise.all([api('/api/stats'), api('/api/sesiones'), loadNegocioEstado()]);
   document.getElementById('sidebar-negocio').textContent = stats.negocio;
+  document.title = `Panel — ${stats.negocio}`;
   const pct_dom = stats.confirmados > 0 ? Math.round(stats.domicilios_hoy / stats.confirmados * 100) : 0;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card"><div class="stat-num">${stats.pedidos_hoy}</div><div class="stat-label">Pedidos hoy</div></div>
@@ -1446,6 +1487,10 @@ const mensajeLabels = {
   fuera_horario_antes:'Fuera de horario — Antes de abrir',
   fuera_horario_despues:'Fuera de horario — Después de cerrar',
   confirmacion_pedido:'Confirmación de pedido', cancelacion_enviada:'Cancelación enviada',
+  comprobante_recibido:'Comprobante de pago recibido',
+  menu_nota_precios:'Menú — nota de precios (pie)', menu_taco_nota:'Menú — descripción tacos/tortas',
+  menu_gramos_nota:'Menú — descripción por gramos', menu_salsas_nota:'Menú — nota salsas incluidas',
+  menu_por_cantidad:'Menú — descripción por cantidad en $', menu_pie_salsas:'Menú — pie de sección salsas',
 };
 
 async function loadMensajes() {
@@ -1472,7 +1517,10 @@ const configLabels = {
   domicilio_costo:'Costo de domicilio ($)', moneda:'Símbolo de moneda',
   grupo_id:'ID del grupo de WhatsApp',
   precio_taco:'Precio por taco ($)', precio_torta:'Precio por torta ($)',
-  precio_100g:'Precio por 100g ($)', tiempo_cancelacion:'Tiempo para cancelar (minutos)',
+  precio_100g:'Precio por 100g ($)', precio_salsa:'Precio salsa extra ($)',
+  tiempo_cancelacion:'Tiempo para cancelar (min)',
+  timeout_recordatorio_min:'Recordatorio de inactividad (min)',
+  timeout_sesion_min:'Limpiar sesión inactiva (min)',
 };
 
 async function loadConfig() {
@@ -1838,6 +1886,9 @@ async function loadOnboarding() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function initApp() {
+  fetch('/api/negocio').then(r=>r.json()).then(d=>{
+    if(d.nombre){ document.title=`Panel — ${d.nombre}`; const el=document.getElementById('login-negocio-sub'); if(el) el.textContent=`${d.nombre} — Administración`; }
+  }).catch(()=>{});
   const me = await api('/api/me');
   if (!me.usuario) { document.getElementById('login-screen').style.display='flex'; return; }
   document.getElementById('login-screen').style.display = 'none';

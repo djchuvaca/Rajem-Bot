@@ -30,6 +30,9 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+if (!process.env.PANEL_SECRET) {
+  console.warn("[SEGURIDAD] PANEL_SECRET no está definido en .env — usando secreto por defecto (INSEGURO en producción)");
+}
 app.use(session({
   secret:            process.env.PANEL_SECRET || "tacos-javier-secret-2024",
   resave:            false,
@@ -37,6 +40,10 @@ app.use(session({
   cookie:            { maxAge: 8 * 60 * 60 * 1000 },
 }));
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/api/negocio", (req, res) => {
+  res.json({ nombre: getConfig("nombre_negocio") || "el negocio" });
+});
 
 function requireAuth(req, res, next) {
   if (req.session && req.session.usuario) return next();

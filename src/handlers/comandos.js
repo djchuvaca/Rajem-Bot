@@ -201,7 +201,8 @@ async function handleComandos(msg, client) {
       rechazado:   todos.filter(p => p.estado === "rechazado"),
     };
 
-    let msg_text = `📊 *PEDIDOS DEL DÍA — Tacos Javier*\n━━━━━━━━━━━━━━━━━━\n`;
+    const negocio = getConfig("nombre_negocio") || "el negocio";
+    let msg_text = `📊 *PEDIDOS DEL DÍA — ${negocio.toUpperCase()}*\n━━━━━━━━━━━━━━━━━━\n`;
     msg_text += `🟡 Pendientes: ${porEstado.pendiente.length}   `;
     msg_text += `✅ Confirmados: ${porEstado.confirmado.length}\n`;
     msg_text += `❌ Cancelados: ${porEstado.cancelado.length}   `;

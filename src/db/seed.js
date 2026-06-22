@@ -202,10 +202,13 @@ async function seedDB() {
       ["precio_taco",       "30"],
       ["precio_torta",      "40"],
       ["precio_100g",       "32"],
-      ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
-      ["metodos_domicilio", "efectivo o transferencia"],
-      ["tipo_negocio",       "carnitas de puerco"],
-      ["tiempo_cancelacion", "15"],
+      ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
+      ["metodos_domicilio",        "efectivo o transferencia"],
+      ["tipo_negocio",             "carnitas de puerco"],
+      ["tiempo_cancelacion",       "15"],
+      ["precio_salsa",             "15"],
+      ["timeout_recordatorio_min", "20"],
+      ["timeout_sesion_min",       "35"],
     ];
     for (const [clave, valor] of config) {
       db.run("INSERT INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -213,13 +216,16 @@ async function seedDB() {
     console.log("✅ Configuración inicial insertada");
   } else {
     const nuevos = [
-      ["precio_taco",       "30"],
-      ["precio_torta",      "40"],
-      ["precio_100g",       "32"],
-      ["metodos_mostrador", "efectivo, tarjeta o transferencia"],
-      ["metodos_domicilio", "efectivo o transferencia"],
-      ["tipo_negocio",        "carnitas de puerco"],
-      ["tiempo_cancelacion",  "15"],
+      ["precio_taco",              "30"],
+      ["precio_torta",             "40"],
+      ["precio_100g",              "32"],
+      ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
+      ["metodos_domicilio",        "efectivo o transferencia"],
+      ["tipo_negocio",             "carnitas de puerco"],
+      ["tiempo_cancelacion",       "15"],
+      ["precio_salsa",             "15"],
+      ["timeout_recordatorio_min", "20"],
+      ["timeout_sesion_min",       "35"],
     ];
     for (const [clave, valor] of nuevos) {
       db.run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -272,6 +278,12 @@ async function seedDB() {
   // Migración: claves nuevas en mensajes_bot (INSERT OR IGNORE para instancias existentes)
   const nuevosMsgs = [
     ["comprobante_recibido", "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏"],
+    ["menu_nota_precios",  "_Los precios incluyen tortillas y salsas_ 😊"],
+    ["menu_taco_nota",     "_(combinaciones al gusto)_"],
+    ["menu_gramos_nota",   "Cualquier pieza o combinación\n_Incluye tortillas y salsas_"],
+    ["menu_salsas_nota",   "_(Los tacos y tortas ya incluyen salsas gratis)_"],
+    ["menu_por_cantidad",  "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_"],
+    ["menu_pie_salsas",    "🟢 Todos los tacos y tortas incluyen salsas"],
   ];
   for (const [clave, valor] of nuevosMsgs) {
     db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);

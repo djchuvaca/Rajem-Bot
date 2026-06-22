@@ -24,7 +24,7 @@ const {
 } = require("./utils");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const GROQ_TIMEOUT_MS = 15000;
+const GROQ_TIMEOUT_MS = parseInt(process.env.GROQ_TIMEOUT_MS || "15000");
 
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
 const _erroresConsec = new Map();

@@ -33,9 +33,13 @@ function getMenuFormato() {
     const nombres     = cortes.length > 0
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
-    const negocio    = getConfig("nombre_negocio")  || "Tacos Javier";
+    const negocio    = getConfig("nombre_negocio")  || "el negocio";
     const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
     const precios    = getPrecios();
+    const notaTaco     = getMensaje("menu_taco_nota")    || "_(combinaciones al gusto)_";
+    const notaGramos   = getMensaje("menu_gramos_nota")  || "Cualquier pieza o combinación\n_Incluye tortillas y salsas_";
+    const notaSalsas   = getMensaje("menu_salsas_nota")  || "_(Los tacos y tortas ya incluyen salsas gratis)_";
+    const notaCantidad = getMensaje("menu_por_cantidad") || "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_";
     const preciosUniformes = cortes.length === 0 || cortes.every(c => {
       const pc = precios.porCorte[c.nombre.toLowerCase()] || precios;
       return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
@@ -43,9 +47,9 @@ function getMenuFormato() {
     let seccionPrecios;
     if (preciosUniformes) {
       seccionPrecios =
-        `🌮 *TACOS* — $${precios.pTaco} c/u\n_(combinaciones al gusto)_\n\n` +
-        `🥖 *TORTAS* — $${precios.pTorta} c/u\n_(combinaciones al gusto)_\n\n` +
-        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\nCualquier pieza o combinación\n_Incluye tortillas y salsas_\n\n`;
+        `🌮 *TACOS* — $${precios.pTaco} c/u\n${notaTaco}\n\n` +
+        `🥖 *TORTAS* — $${precios.pTorta} c/u\n${notaTaco}\n\n` +
+        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`;
     } else {
       const minTaco  = Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios).pTaco));
       const minTorta = Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios).pTorta));
@@ -79,16 +83,14 @@ function getMenuFormato() {
       salsasSeccion =
         `🌶️ *SALSAS EXTRA* — ${precioDisplay}\n` +
         `${salNombres}\n` +
-        `_(Los tacos y tortas ya incluyen salsas gratis)_\n\n`;
+        `${notaSalsas}\n\n`;
     }
 
     return (
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
       seccionPrecios +
-      `💵 *POR CANTIDAD EN $*\n` +
-      `Tú decides cuánto gastar, nosotros pesamos\n` +
-      `_Incluye tortillas y salsas_\n\n` +
+      `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       refrescosSeccion +
       salsasSeccion +
@@ -100,7 +102,9 @@ function getMenuFormato() {
 }
 
 function _menuDefault() {
-  return `\n🌮 *MENÚ TACOS JAVIER* 🌮\n━━━━━━━━━━━━━━━━━━\n\n🌮 *TACOS* — $30 c/u\nSurtido · Carne · Buche · Cuero · Lengua\n\n🥖 *TORTAS* — $40 c/u\n\n⚖️ *POR GRAMOS* — $32 / 100g\n\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
+  const negocio = getConfig("nombre_negocio") || "el negocio";
+  const precios = getPrecios();
+  return `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n━━━━━━━━━━━━━━━━━━\n\n🌮 *TACOS* — $${precios.pTaco} c/u\nSurtido · Carne · Buche · Cuero · Lengua\n\n🥖 *TORTAS* — $${precios.pTorta} c/u\n\n⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
 }
 
 // ── FORMULARIOS ───────────────────────────────────────────────────────────────

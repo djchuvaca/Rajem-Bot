@@ -2,7 +2,7 @@
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
-const { getConfig, getProductos, getHorarios, getBanco } = require("../db");
+const { getConfig, getMensaje, getProductos, getHorarios, getBanco } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
 
@@ -63,6 +63,7 @@ function respuestaPrecio(producto = null) {
     const negocio  = getNegocio();
     const productos = getProductos();
     const cortes   = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
+    const notaPrecios = getMensaje("menu_nota_precios") || "_Los precios incluyen tortillas y salsas_ 😊";
 
     if (producto) {
       const pc = (precios.porCorte && precios.porCorte[producto.toLowerCase()]) || precios;
@@ -71,7 +72,7 @@ function respuestaPrecio(producto = null) {
         `🌮 Taco de ${producto}: *$${pc.pTaco}*\n` +
         `🥖 Torta de ${producto}: *$${pc.pTorta}*\n` +
         `⚖️ Por 100g de ${producto}: *$${pc.p100g}*\n\n` +
-        `_Los precios incluyen tortillas y salsas_ 😊`
+        notaPrecios
       );
     }
 
@@ -91,7 +92,7 @@ function respuestaPrecio(producto = null) {
         `🥖 *Tortas* — $${precios.pTorta} c/u\n` +
         `⚖️ *Por gramos* — $${precios.p100g} / 100g\n\n` +
         `🥩 Piezas disponibles: ${nombres}\n\n` +
-        `_Los precios incluyen tortillas y salsas_ 😊`
+        notaPrecios
       );
     }
 
@@ -109,7 +110,7 @@ function respuestaPrecio(producto = null) {
       resp += `🌟 *Surtido especial* (combinación a tu gusto)\n`;
       resp += `   🌮 $${sePc.pTaco} · 🥖 $${sePc.pTorta} · ⚖️ $${sePc.p100g}/100g\n\n`;
     }
-    resp += `_Los precios incluyen tortillas y salsas_ 😊`;
+    resp += notaPrecios;
     return resp;
   } catch (e) {
     return "Ahorita no tengo los precios disponibles. ¿Me dices qué quieres y te digo cuánto es?";
@@ -159,6 +160,10 @@ function respuestaMenu() {
     const nombres   = cortes.length
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
       : "Surtido · Carne · Buche · Cuero · Lengua";
+    const notaTaco     = getMensaje("menu_taco_nota")    || "_(combinaciones al gusto)_";
+    const notaGramos   = getMensaje("menu_gramos_nota")  || "Cualquier pieza o combinación\n_Incluye tortillas y salsas_";
+    const notaCantidad = getMensaje("menu_por_cantidad") || "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_";
+    const notaPie      = getMensaje("menu_pie_salsas")   || "🟢 Todos los tacos y tortas incluyen salsas";
 
     const preciosUniformes = !cortes.length || cortes.every(p => {
       const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
@@ -168,13 +173,9 @@ function respuestaMenu() {
     let seccionPrecios;
     if (preciosUniformes) {
       seccionPrecios =
-        `🌮 *TACOS* — $${precios.pTaco} c/u\n` +
-        `_(combinaciones al gusto)_\n\n` +
-        `🥖 *TORTAS* — $${precios.pTorta} c/u\n` +
-        `_(combinaciones al gusto)_\n\n` +
-        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n` +
-        `Cualquier pieza o combinación\n` +
-        `_Incluye tortillas y salsas_\n\n`;
+        `🌮 *TACOS* — $${precios.pTaco} c/u\n${notaTaco}\n\n` +
+        `🥖 *TORTAS* — $${precios.pTorta} c/u\n${notaTaco}\n\n` +
+        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`;
     } else {
       const minTaco  = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTaco));
       const minTorta = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTorta));
@@ -190,12 +191,10 @@ function respuestaMenu() {
       `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
       seccionPrecios +
-      `💵 *POR CANTIDAD EN $*\n` +
-      `Tú decides cuánto gastar, nosotros pesamos\n` +
-      `_Incluye tortillas y salsas_\n\n` +
+      `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `🟢 Todos los tacos y tortas incluyen salsas\n` +
+      `${notaPie}\n` +
       `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
       `*¿Qué te vamos a preparar?* 😊\n`
     );

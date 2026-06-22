@@ -85,12 +85,30 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 GROQ_API_KEY=gsk_...          # Requerida
 GRUPO_ID=521XXXXXXXXXX@g.us   # Requerida — JID del grupo de administración
 PANEL_PORT=3000                # Opcional, default 3000
-PANEL_SECRET=...               # Recomendado en producción
+PANEL_SECRET=...               # Recomendado en producción (sin esto, el panel usa un secreto inseguro)
 TENANT_ID=carnitas-bot         # Identificador de instancia (sesión WA)
 SENTRY_DSN=                    # Opcional — activa Sentry si se define
 MERCADOPAGO_ACCESS_TOKEN=      # Opcional — activa pagos con link
 APP_URL=https://mi-servidor.com # Necesario si MP está activo (webhook)
+GROQ_TIMEOUT_MS=15000          # Opcional — timeout para llamadas a Groq (default 15000ms)
 ```
+
+## Configuración desde BD (tabla `configuracion`)
+Claves editables desde el panel web (sección Configuración):
+| Clave | Default | Descripción |
+|---|---|---|
+| `nombre_negocio` | Tacos Javier | Nombre del negocio |
+| `tipo_negocio` | carnitas de puerco | Tipo de negocio (usado en Groq) |
+| `precio_taco` | 30 | Precio global por taco |
+| `precio_torta` | 40 | Precio global por torta |
+| `precio_100g` | 32 | Precio global por 100g |
+| `precio_salsa` | 15 | Precio de salsa extra |
+| `domicilio_costo` | 50 | Costo fijo de domicilio |
+| `metodos_mostrador` | efectivo, tarjeta o transferencia | Métodos en mostrador |
+| `metodos_domicilio` | efectivo o transferencia | Métodos a domicilio |
+| `tiempo_cancelacion` | 15 | Minutos para cancelar tras confirmar |
+| `timeout_recordatorio_min` | 20 | Minutos de inactividad antes del recordatorio |
+| `timeout_sesion_min` | 35 | Minutos de inactividad antes de limpiar sesión |
 
 ## Reconnección automática (`index.js`)
 Cuando WhatsApp se desconecta, el bot reintenta con **backoff exponencial**:

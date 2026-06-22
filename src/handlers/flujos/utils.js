@@ -8,7 +8,7 @@ const {
   esperandoExtras, ordenPreResumen, datosCampos, limpiarTodo,
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
-const { getProductos } = require("../../db");
+const { getProductos, getConfig } = require("../../db");
 const { textoANumero, getCortes, buscarCorteFuzzy } = require("../pedidoParser");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
@@ -18,9 +18,9 @@ const ultimaActividad    = new Map();
 const recordatorioEnviado    = new Map(); // numero → timestamp del recordatorio
 const ordenPendientePreventa = new Map(); // texto del primer mensaje con pedido fuera de horario
 
-// ── Timeouts de inactividad ────────────────────────────────────────────────────
-const TIMEOUT_RECORDATORIO_MS = 20 * 60 * 1000; // 20 min → recordatorio
-const TIMEOUT_SESION_MS       = 35 * 60 * 1000; // 35 min → limpiar sesión
+// ── Timeouts de inactividad (configurables desde BD: timeout_recordatorio_min, timeout_sesion_min) ──
+function _getTimeoutRecordatorio() { return parseInt(getConfig("timeout_recordatorio_min") || "20") * 60 * 1000; }
+function _getTimeoutSesion()       { return parseInt(getConfig("timeout_sesion_min")       || "35") * 60 * 1000; }
 
 function _textoRecordatorio(numero) {
   const primerNombre = (datosCampos.get(numero) || {}).nombre?.split(" ")[0] || null;
@@ -76,11 +76,13 @@ function _textoRecordatorio(numero) {
 setInterval(async () => {
   const client = getWhatsappClient();
   const ahora  = Date.now();
+  const TIMEOUT_RECORDATORIO_MS = _getTimeoutRecordatorio();
+  const TIMEOUT_SESION_MS       = _getTimeoutSesion();
 
   for (const [numero, ts] of ultimaActividad.entries()) {
     const inactivo = ahora - ts;
 
-    // Fase 2 — limpiar sesión (45 min sin respuesta tras recordatorio)
+    // Fase 2 — limpiar sesión
     if (inactivo > TIMEOUT_SESION_MS) {
       const estaActivo = enFlujoActivo(numero)
         || clientesNuevos.has(numero)
