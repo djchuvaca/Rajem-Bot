@@ -101,6 +101,21 @@ tr:hover td{background:var(--surface2)}
 .section{display:none}.section.active{display:block}
 .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
 .hint{font-size:11px;color:var(--muted);margin-top:4px}
+.msg-var-chip{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-family:'DM Mono',monospace;background:var(--accent-dim);color:var(--accent);cursor:pointer;margin:0 4px 4px 0;border:1px solid rgba(255,107,43,0.25);transition:background .15s;user-select:none}.msg-var-chip:hover{background:rgba(255,107,43,0.22)}
+.msg-separador{border:none;border-top:1px solid var(--border);margin:4px 0 20px}
+.nav-group-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:8px 20px 4px}
+@keyframes badge-pop{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
+.badge-pulso{animation:badge-pop .35s ease-out}
+.btn-accion{display:inline-flex;align-items:center;gap:3px;padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s;white-space:nowrap;margin:1px}
+.btn-accion-green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}.btn-accion-green:hover{background:rgba(34,197,94,.28)}
+.btn-accion-blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.25)}.btn-accion-blue:hover{background:rgba(59,130,246,.28)}
+.btn-accion-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}.btn-accion-red:hover{background:rgba(239,68,68,.22)}
+.bulk-bar{display:none;align-items:center;gap:10px;padding:8px 14px;background:var(--accent-dim);border:1px solid rgba(255,107,43,.2);border-radius:8px;margin-bottom:10px;font-size:13px}
+.bulk-bar.visible{display:flex}
+.topbar-ctrl-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s;white-space:nowrap}
+.topbar-ctrl-btn:hover{border-color:var(--border2);color:var(--text)}.topbar-ctrl-btn.pausado{border-color:var(--yellow);color:var(--yellow)}.topbar-ctrl-btn.cerrado{border-color:var(--red);color:var(--red)}
+.empty-state{text-align:center;padding:48px 24px;color:var(--muted)}.empty-state-icon{font-size:36px;margin-bottom:10px}.empty-state-title{font-size:14px;font-weight:600;color:var(--muted2);margin-bottom:4px}.empty-state-sub{font-size:12px}
+@media(max-width:900px){#pedidos-table th:nth-child(5),#pedidos-table td:nth-child(5),#pedidos-table th:nth-child(7),#pedidos-table td:nth-child(7),#pedidos-table th:nth-child(9),#pedidos-table td:nth-child(9){display:none}}
 @keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .dot-conectado{background:var(--green)!important;animation:pulse-green 2s infinite}
@@ -184,19 +199,20 @@ tr:hover td{background:var(--surface2)}
     <div class="logo-sub">Panel de Control</div>
   </div>
   <nav class="sidebar-nav">
+    <div class="nav-group-label">Operación</div>
     <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
     <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos <span id="nav-badge-pendientes" style="display:none;background:var(--red);color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px"></span></div>
     <div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
-    <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos</div>
     <div class="nav-item" onclick="showSection('reportes')" data-s="reportes"><span class="icon">📈</span> Reportes</div>
-    <div class="nav-sep"></div>
+    <div class="nav-group-label" style="margin-top:8px">Configuración</div>
+    <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos</div>
     <div class="nav-item" onclick="showSection('horarios')" data-s="horarios"><span class="icon">🕐</span> Horarios</div>
     <div class="nav-item" onclick="showSection('banco')" data-s="banco"><span class="icon">💳</span> Datos Banco</div>
     <div class="nav-item" onclick="showSection('mensajes')" data-s="mensajes"><span class="icon">💬</span> Mensajes Bot</div>
     <div class="nav-item" onclick="showSection('config')" data-s="config"><span class="icon">⚙️</span> Configuración</div>
     <div class="nav-item" onclick="showSection('envios')" data-s="envios"><span class="icon">🛵</span> Zonas Envío</div>
-    <div class="nav-sep"></div>
-    <div class="nav-item" onclick="showSection('onboarding')" data-s="onboarding"><span class="icon">⚡</span> Inicio rápido</div>
+    <div class="nav-sep" id="nav-sep-onboarding"></div>
+    <div class="nav-item" id="nav-item-onboarding" onclick="showSection('onboarding')" data-s="onboarding"><span class="icon">⚡</span> Inicio rápido</div>
   </nav>
   <div class="sidebar-footer">
     <div class="user-info">👤 <span id="sidebar-user">admin</span></div>
@@ -211,7 +227,11 @@ tr:hover td{background:var(--surface2)}
       <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <div><div class="topbar-title" id="page-title">Dashboard</div><div class="topbar-sub" id="page-sub">Resumen del día</div></div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="topbar-negocio-ctrls" style="display:flex;gap:6px">
+        <button id="topbar-btn-cierre" class="topbar-ctrl-btn" onclick="toggleCierre()" title="Abrir o cerrar el negocio manualmente">🔓 Abierto</button>
+        <button id="topbar-btn-pausa"  class="topbar-ctrl-btn" onclick="togglePausa()"  title="Pausar o reanudar el bot">▶ Bot activo</button>
+      </div>
       <div id="wa-status-badge" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)" title="Estado del bot de WhatsApp">
         <span id="wa-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0"></span>
         <span id="wa-label">Verificando...</span>
@@ -282,8 +302,16 @@ tr:hover td{background:var(--surface2)}
             <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">⬇ CSV</button>
           </div>
         </div>
-        <!-- ↓ CAMBIO 1: se agregó columna "Eliminar" -->
-        <div class="table-wrap"><table id="pedidos-table"><thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th><th>Cambiar estado</th><th>Eliminar</th></tr></thead><tbody></tbody></table></div>
+        <div id="bulk-bar" class="bulk-bar">
+          <input type="checkbox" id="chk-todos" onchange="seleccionarTodos(this.checked)" title="Seleccionar todos">
+          <span id="bulk-count" style="color:var(--accent);font-weight:600">0 seleccionados</span>
+          <button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)" onclick="confirmarSeleccionados()">✅ Confirmar seleccionados</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Actualizado: <span id="pedidos-ts">—</span></div>
+        <div class="table-wrap"><table id="pedidos-table"><thead><tr>
+          <th style="width:32px"><input type="checkbox" id="chk-todos-h" onchange="seleccionarTodos(this.checked)"></th>
+          <th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+        </tr></thead><tbody></tbody></table></div>
       </div>
     </div>
 
@@ -308,6 +336,17 @@ tr:hover td{background:var(--surface2)}
 
     <!-- PRODUCTOS -->
     <div class="section" id="s-productos">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">💰 Precios base</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Se usan cuando un corte no tiene precio propio asignado.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group"><label class="form-label">Precio por taco ($)</label><input class="form-input" id="pb-taco" type="number" min="0"></div>
+          <div class="form-group"><label class="form-label">Precio por torta ($)</label><input class="form-input" id="pb-torta" type="number" min="0"></div>
+          <div class="form-group"><label class="form-label">Precio por 100g ($)</label><input class="form-input" id="pb-100g" type="number" min="0"></div>
+          <div class="form-group"><label class="form-label">Salsa extra ($)</label><input class="form-input" id="pb-salsa" type="number" min="0"></div>
+        </div>
+        <button class="btn btn-primary" onclick="savePreciosBase()">Guardar precios base</button>
+      </div>
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div class="card-title" style="margin:0">🥩 Cortes</div>
@@ -387,11 +426,23 @@ tr:hover td{background:var(--surface2)}
 
     <!-- MENSAJES -->
     <div class="section" id="s-mensajes">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">🤝 Atención al cliente</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Mensajes que el bot envía durante la atención normal de un pedido.</p>
+        <div id="msg-grupo-atencion"></div>
+        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('atencion')">Guardar</button>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">🕐 Fuera de horario</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Se envían automáticamente cuando el cliente escribe fuera del horario de servicio.</p>
+        <div id="msg-grupo-horario"></div>
+        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('horario')">Guardar</button>
+      </div>
       <div class="card">
-        <div class="card-title">Mensajes del bot</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Variables: <code style="color:var(--accent)">{negocio}</code> <code style="color:var(--accent)">{hora_inicio}</code> <code style="color:var(--accent)">{hora_fin}</code></p>
-        <div id="mensajes-list"></div>
-        <button class="btn btn-primary" style="margin-top:8px" onclick="saveMensajes()">Guardar mensajes</button>
+        <div class="card-title">📋 Menú</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Textos que complementan el menú cuando el cliente lo solicita.</p>
+        <div id="msg-grupo-menu"></div>
+        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('menu')">Guardar</button>
       </div>
     </div>
 
@@ -523,6 +574,12 @@ tr:hover td{background:var(--surface2)}
           <input class="form-input" id="negocio-referencia" placeholder="Ej: Junto a la farmacia Similares">
         </div>
         <button class="btn btn-primary" onclick="saveDireccionNegocio()">Guardar dirección</button>
+      </div>
+      <div class="card" style="max-width:480px">
+        <div class="card-title">🛵 Costo de domicilio fijo</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Se aplica cuando no hay tarifas por zona configuradas o el cliente queda fuera de todas las zonas.</p>
+        <div class="form-group"><label class="form-label">Costo fijo ($)</label><input class="form-input" id="env-domicilio-costo" type="number" min="0" placeholder="50"></div>
+        <button class="btn btn-primary" onclick="saveDomicilioCosto()">Guardar</button>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -792,24 +849,37 @@ const loaders = {
 // ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
 async function loadNegocioEstado() {
   const n = await api('/api/negocio/estado');
-  const bc = document.getElementById('ctrl-badge-cierre');
-  const bp = document.getElementById('ctrl-badge-pausa');
+  // Badges y botones del card en dashboard
+  const bc  = document.getElementById('ctrl-badge-cierre');
+  const bp  = document.getElementById('ctrl-badge-pausa');
   const bc2 = document.getElementById('ctrl-btn-cierre');
   const bp2 = document.getElementById('ctrl-btn-pausa');
-  if (!bc) return;
-  if (n.cerrado) {
-    bc.textContent = '🔒 Cerrado'; bc.style.background = 'rgba(239,68,68,.15)'; bc.style.color = 'var(--red)';
-    bc2.textContent = '🔓 Abrir negocio'; bc2.className = 'btn btn-sm btn-secondary';
-  } else {
-    bc.textContent = '🔓 Abierto'; bc.style.background = 'rgba(34,197,94,.15)'; bc.style.color = 'var(--green)';
-    bc2.textContent = '🔒 Cerrar hoy'; bc2.className = 'btn btn-sm btn-secondary';
+  if (bc) {
+    if (n.cerrado) {
+      bc.textContent = '🔒 Cerrado'; bc.style.background = 'rgba(239,68,68,.15)'; bc.style.color = 'var(--red)';
+      bc2.textContent = '🔓 Abrir negocio'; bc2.className = 'btn btn-sm btn-secondary';
+    } else {
+      bc.textContent = '🔓 Abierto'; bc.style.background = 'rgba(34,197,94,.15)'; bc.style.color = 'var(--green)';
+      bc2.textContent = '🔒 Cerrar hoy'; bc2.className = 'btn btn-sm btn-secondary';
+    }
+    if (n.pausado) {
+      bp.textContent = '⏸ Bot pausado'; bp.style.background = 'rgba(245,158,11,.15)'; bp.style.color = 'var(--yellow)';
+      bp2.textContent = '▶ Reanudar bot'; bp2.className = 'btn btn-sm btn-secondary';
+    } else {
+      bp.textContent = '▶ Bot activo'; bp.style.background = 'rgba(34,197,94,.1)'; bp.style.color = 'var(--green)';
+      bp2.textContent = '⏸ Pausar bot'; bp2.className = 'btn btn-sm btn-secondary';
+    }
   }
-  if (n.pausado) {
-    bp.textContent = '⏸ Bot pausado'; bp.style.background = 'rgba(245,158,11,.15)'; bp.style.color = 'var(--yellow)';
-    bp2.textContent = '▶ Reanudar bot'; bp2.className = 'btn btn-sm btn-secondary';
-  } else {
-    bp.textContent = '▶ Bot activo'; bp.style.background = 'rgba(34,197,94,.1)'; bp.style.color = 'var(--green)';
-    bp2.textContent = '⏸ Pausar bot'; bp2.className = 'btn btn-sm btn-secondary';
+  // Botones del topbar (siempre visibles)
+  const tbc = document.getElementById('topbar-btn-cierre');
+  const tbp = document.getElementById('topbar-btn-pausa');
+  if (tbc) {
+    tbc.textContent = n.cerrado ? '🔒 Cerrado'   : '🔓 Abierto';
+    tbc.className   = 'topbar-ctrl-btn' + (n.cerrado ? ' cerrado' : '');
+  }
+  if (tbp) {
+    tbp.textContent = n.pausado ? '⏸ Bot pausado' : '▶ Bot activo';
+    tbp.className   = 'topbar-ctrl-btn' + (n.pausado ? ' pausado' : '');
   }
   return n;
 }
@@ -884,9 +954,7 @@ async function loadDashboard() {
     cardCortes.style.display = 'none';
   }
   // Badge de pendientes en sidebar
-  const nPend = stats.pendientes || 0;
-  const navBadge = document.getElementById('nav-badge-pendientes');
-  if (navBadge) { navBadge.textContent = nPend; navBadge.style.display = nPend > 0 ? '' : 'none'; }
+  _actualizarBadgePendientes(stats.pendientes || 0);
 
   // Timestamp actualización
   _dashLastUpdate = Date.now();
@@ -934,36 +1002,49 @@ function filtrarPedidosTabla(q) {
   renderPedidosTabla(lista);
 }
 
+function _accionesPedido(p) {
+  switch (p.estado) {
+    case 'pendiente':
+      return `<button class="btn-accion btn-accion-green" onclick="accionPedido(${p.id},'confirmado')">✅ Confirmar</button><button class="btn-accion btn-accion-red" onclick="accionPedido(${p.id},'rechazado')">⛔ Rechazar</button>`;
+    case 'confirmado':
+      return p.tipo === 'domicilio'
+        ? `<button class="btn-accion btn-accion-blue" onclick="accionPedido(${p.id},'en_camino')">🛵 En camino</button><button class="btn-accion btn-accion-red" onclick="accionPedido(${p.id},'cancelado')">❌ Cancelar</button>`
+        : `<button class="btn-accion btn-accion-blue" onclick="accionPedido(${p.id},'listo')">🍽 Listo</button><button class="btn-accion btn-accion-red" onclick="accionPedido(${p.id},'cancelado')">❌ Cancelar</button>`;
+    case 'listo':
+      return `<button class="btn-accion btn-accion-blue" onclick="accionPedido(${p.id},'en_camino')">🛵 En camino</button>`;
+    default:
+      return `<button class="btn-accion btn-accion-red" onclick="deletePedido(${p.id})" title="Eliminar">🗑</button>`;
+  }
+}
+
 function renderPedidosTabla(lista) {
   window._pedidosData = lista;
   const tbody = document.querySelector('#pedidos-table tbody');
-  tbody.innerHTML = lista.length ? lista.map(p => `
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin pedidos</div><div class="empty-state-sub">Cuando llegue el primer pedido aparecerá aquí</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map(p => `
     <tr>
+      <td><input type="checkbox" class="pedido-check" data-id="${p.id}" data-estado="${p.estado}" onchange="_actualizarBulkBar()"></td>
       <td><code style="color:var(--muted);font-size:11px">#${p.id}</code></td>
       <td>${p.nombre||''} ${p.apellido||''}<br><span style="color:var(--muted);font-size:11px">${p.telefono||''}</span></td>
       <td>${p.tipo==='domicilio'?'🛵':'🏪'} ${p.tipo||''}</td>
-      <td style="max-width:200px;font-size:12px;color:var(--muted2)">${(p.orden||'').substring(0,80)}...</td>
+      <td style="max-width:200px;font-size:12px;color:var(--muted2)">${(p.orden||'').substring(0,80)}…</td>
       <td><strong>$${Math.round(p.total||0)}</strong></td>
       <td>${p.metodo_pago||''}</td>
       <td>${badgeEstado(p.estado)}</td>
       <td style="color:var(--muted);font-size:12px">${(p.fecha||'').substring(0,16)}</td>
-      <td>
-        <select onchange="cambiarEstadoPedido(${p.id},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px;font-size:12px">
-          ${['pendiente','confirmado','cancelado','rechazado'].map(e=>`<option ${p.estado===e?'selected':''}>${e}</option>`).join('')}
-        </select>
-      </td>
-      <td>
-        <button class="btn btn-danger btn-sm" onclick="deletePedido(${p.id})" title="Eliminar pedido">🗑 Eliminar</button>
-      </td>
-    </tr>`).join('') : '<tr><td colspan="10" class="empty">No hay pedidos</td></tr>';
+      <td style="white-space:nowrap">${_accionesPedido(p)}</td>
+    </tr>`).join('');
 }
 
 async function loadPedidos() {
   _pedidosTodos = await api('/api/pedidos');
   filtrarPedidosTabla(document.getElementById('buscar-pedido')?.value || '');
-  const nPend = _pedidosTodos.filter(p => p.estado === 'pendiente').length;
-  const navBadge = document.getElementById('nav-badge-pendientes');
-  if (navBadge) { navBadge.textContent = nPend; navBadge.style.display = nPend > 0 ? '' : 'none'; }
+  _actualizarBadgePendientes(_pedidosTodos.filter(p => p.estado === 'pendiente').length);
+  const ts = document.getElementById('pedidos-ts');
+  if (ts) ts.textContent = new Date().toLocaleTimeString('es-MX');
 }
 
 function exportarCSV() {
@@ -977,6 +1058,71 @@ function exportarCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `pedidos_${new Date().toISOString().substring(0, 10)}.csv`;
   a.click();
+}
+
+// ── BADGE, SONIDO Y DETECCIÓN DE PEDIDOS NUEVOS ──────────────────────────────
+let _ultimoContPendientes = -1;
+
+function _actualizarBadgePendientes(nPend) {
+  const el = document.getElementById('nav-badge-pendientes');
+  if (!el) return;
+  el.textContent = nPend;
+  el.style.display = nPend > 0 ? '' : 'none';
+  if (_ultimoContPendientes >= 0 && nPend > _ultimoContPendientes) {
+    _reproducirBeep();
+    el.classList.remove('badge-pulso');
+    void el.offsetWidth;
+    el.classList.add('badge-pulso');
+    el.addEventListener('animationend', () => el.classList.remove('badge-pulso'), { once: true });
+  }
+  _ultimoContPendientes = nPend;
+}
+
+function _reproducirBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.18].forEach(t => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; o.type = 'sine';
+      g.gain.setValueAtTime(0.22, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.3);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.35);
+    });
+  } catch(e) {}
+}
+
+// ── ACCIONES EN LOTE ──────────────────────────────────────────────────────────
+function _actualizarBulkBar() {
+  const checks = [...document.querySelectorAll('.pedido-check:checked')];
+  const bar = document.getElementById('bulk-bar');
+  const cnt = document.getElementById('bulk-count');
+  const chkH = document.getElementById('chk-todos-h');
+  if (!bar) return;
+  bar.classList.toggle('visible', checks.length > 0);
+  if (cnt) cnt.textContent = `${checks.length} seleccionado${checks.length !== 1 ? 's' : ''}`;
+  if (chkH) chkH.indeterminate = checks.length > 0 && checks.length < document.querySelectorAll('.pedido-check').length;
+}
+
+function seleccionarTodos(checked) {
+  document.querySelectorAll('.pedido-check').forEach(c => c.checked = checked);
+  _actualizarBulkBar();
+}
+
+async function confirmarSeleccionados() {
+  const ids = [...document.querySelectorAll('.pedido-check:checked')].map(c => +c.dataset.id);
+  if (!ids.length) return;
+  await Promise.all(ids.map(id => api(`/api/pedidos/${id}/estado`, 'PUT', { estado: 'confirmado' })));
+  toast(`✅ ${ids.length} pedido${ids.length !== 1 ? 's' : ''} confirmado${ids.length !== 1 ? 's' : ''}`);
+  loadPedidos();
+}
+
+// ── ACCIÓN CONTEXTUAL DE PEDIDO ───────────────────────────────────────────────
+async function accionPedido(id, estado) {
+  await api(`/api/pedidos/${id}/estado`, 'PUT', { estado });
+  toast('Estado actualizado — cliente notificado');
+  loadPedidos();
+  if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
 }
 
 async function cambiarEstadoPedido(id, estado) {
@@ -1335,7 +1481,25 @@ async function deleteCliente(id) {
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
 let _productosCache = [];
+async function loadPreciosBase() {
+  const conf = await api('/api/config');
+  const get  = k => conf.find(c => c.clave === k)?.valor || '';
+  document.getElementById('pb-taco').value  = get('precio_taco');
+  document.getElementById('pb-torta').value = get('precio_torta');
+  document.getElementById('pb-100g').value  = get('precio_100g');
+  document.getElementById('pb-salsa').value = get('precio_salsa');
+}
+
+async function savePreciosBase() {
+  await api('/api/config', 'POST', { clave: 'precio_taco',  valor: document.getElementById('pb-taco').value });
+  await api('/api/config', 'POST', { clave: 'precio_torta', valor: document.getElementById('pb-torta').value });
+  await api('/api/config', 'POST', { clave: 'precio_100g',  valor: document.getElementById('pb-100g').value });
+  await api('/api/config', 'POST', { clave: 'precio_salsa', valor: document.getElementById('pb-salsa').value });
+  toast('Precios base guardados ✅');
+}
+
 async function loadProductos() {
+  loadPreciosBase();
   _productosCache = await api('/api/productos');
   const cortes  = _productosCache.filter(p => p.categoria === 'corte');
   const bebidas = _productosCache.filter(p => p.categoria === 'refresco');
@@ -1482,42 +1646,82 @@ async function saveBanco() {
 }
 
 // ── MENSAJES ──────────────────────────────────────────────────────────────────
-const mensajeLabels = {
-  saludo:'Saludo de bienvenida', fuera_horario_lunes:'Fuera de horario — Lunes',
-  fuera_horario_antes:'Fuera de horario — Antes de abrir',
-  fuera_horario_despues:'Fuera de horario — Después de cerrar',
-  confirmacion_pedido:'Confirmación de pedido', cancelacion_enviada:'Cancelación enviada',
-  comprobante_recibido:'Comprobante de pago recibido',
-  menu_nota_precios:'Menú — nota de precios (pie)', menu_taco_nota:'Menú — descripción tacos/tortas',
-  menu_gramos_nota:'Menú — descripción por gramos', menu_salsas_nota:'Menú — nota salsas incluidas',
-  menu_por_cantidad:'Menú — descripción por cantidad en $', menu_pie_salsas:'Menú — pie de sección salsas',
+const MSG_META = {
+  saludo:                { label:'Saludo de bienvenida',              desc:'Se envía cuando el cliente escribe por primera vez o inicia una nueva sesión.',         vars:['{negocio}'] },
+  confirmacion_pedido:   { label:'Confirmación de pedido',            desc:'Se envía cuando el pedido queda registrado y confirmado.',                              vars:['{negocio}'] },
+  cancelacion_enviada:   { label:'Cancelación enviada',               desc:'Se envía cuando el cliente cancela su pedido.',                                         vars:['{negocio}'] },
+  comprobante_recibido:  { label:'Comprobante de pago recibido',      desc:'Se envía cuando el cliente manda foto del comprobante de transferencia.',               vars:['{negocio}'] },
+  fuera_horario_antes:   { label:'Antes de abrir',                    desc:'Se envía cuando el cliente escribe antes de la hora de apertura del día.',              vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
+  fuera_horario_despues: { label:'Después de cerrar',                 desc:'Se envía cuando el cliente escribe después de la hora de cierre.',                      vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
+  fuera_horario_lunes:   { label:'Día de descanso (lunes)',           desc:'Se envía cuando el cliente escribe en el día de descanso configurado.',                 vars:['{negocio}','{hora_inicio}'] },
+  menu_taco_nota:        { label:'Descripción — tacos y tortas',      desc:'Texto descriptivo que aparece en la sección de tacos y tortas del menú.',               vars:[] },
+  menu_gramos_nota:      { label:'Descripción — por gramos',          desc:'Texto que aparece en la sección de venta por peso (100g).',                            vars:[] },
+  menu_salsas_nota:      { label:'Nota — inicio sección salsas',      desc:'Texto introductorio de la sección de salsas en el menú.',                              vars:[] },
+  menu_pie_salsas:       { label:'Pie — sección salsas',              desc:'Texto al final de la sección de salsas.',                                              vars:[] },
+  menu_nota_precios:     { label:'Nota de precios (pie del menú)',    desc:'Se muestra al final del menú completo.',                                                vars:['{negocio}'] },
+  menu_por_cantidad:     { label:'Descripción — precio por cantidad', desc:'Explica cómo funciona el precio cuando se pide por cantidad en pesos.',                 vars:[] },
 };
+
+const GRUPOS_MENSAJES = {
+  atencion: ['saludo','confirmacion_pedido','cancelacion_enviada','comprobante_recibido'],
+  horario:  ['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'],
+  menu:     ['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad'],
+};
+
+function autoResizeMsg(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function insertarVariable(id, variable) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const s = el.selectionStart, e = el.selectionEnd;
+  el.value = el.value.slice(0, s) + variable + el.value.slice(e);
+  el.selectionStart = el.selectionEnd = s + variable.length;
+  el.focus();
+  autoResizeMsg(el);
+}
+
+function renderMsgGrupo(containerId, claves, map) {
+  document.getElementById(containerId).innerHTML = claves.map((clave, i) => {
+    const meta  = MSG_META[clave] || { label: clave, desc: '', vars: [] };
+    const valor = (map[clave] || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const chips = meta.vars.map(v =>
+      `<span class="msg-var-chip" onclick="insertarVariable('msg-${clave}','${v}')">${v}</span>`
+    ).join('');
+    return `${i > 0 ? '<hr class="msg-separador">' : ''}
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">${meta.label}</label>
+        ${meta.desc ? `<p style="font-size:11px;color:var(--muted);margin:2px 0 6px">${meta.desc}</p>` : ''}
+        ${chips ? `<div style="margin-bottom:8px">${chips}</div>` : ''}
+        <textarea class="form-textarea" id="msg-${clave}" oninput="autoResizeMsg(this)" style="min-height:70px;resize:none;overflow:hidden">${valor}</textarea>
+      </div>`;
+  }).join('');
+}
 
 async function loadMensajes() {
   const msgs = await api('/api/mensajes');
-  document.getElementById('mensajes-list').innerHTML = msgs.map(m => `
-    <div class="form-group">
-      <label class="form-label">${mensajeLabels[m.clave] || m.clave}</label>
-      <textarea class="form-textarea" id="msg-${m.clave}" style="min-height:60px">${m.valor}</textarea>
-    </div>`).join('');
+  const map  = Object.fromEntries(msgs.map(m => [m.clave, m.valor]));
+  renderMsgGrupo('msg-grupo-atencion', GRUPOS_MENSAJES.atencion, map);
+  renderMsgGrupo('msg-grupo-horario',  GRUPOS_MENSAJES.horario,  map);
+  renderMsgGrupo('msg-grupo-menu',     GRUPOS_MENSAJES.menu,     map);
+  document.querySelectorAll('#s-mensajes .form-textarea').forEach(autoResizeMsg);
 }
 
-async function saveMensajes() {
-  const msgs = await api('/api/mensajes');
-  for (const m of msgs) {
-    const el = document.getElementById(`msg-${m.clave}`);
-    if (el) await api('/api/mensajes', 'POST', { clave: m.clave, valor: el.value });
+async function saveGrupoMensajes(grupo) {
+  for (const clave of GRUPOS_MENSAJES[grupo]) {
+    const el = document.getElementById(`msg-${clave}`);
+    if (el) await api('/api/mensajes', 'POST', { clave, valor: el.value });
   }
-  toast('Mensajes guardados');
+  toast('Mensajes guardados ✅');
 }
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const configLabels = {
   nombre_negocio:'Nombre del negocio', tipo_negocio:'Tipo de negocio (para el bot)',
-  domicilio_costo:'Costo de domicilio ($)', moneda:'Símbolo de moneda',
+  moneda:'Símbolo de moneda',
   grupo_id:'ID del grupo de WhatsApp',
-  precio_taco:'Precio por taco ($)', precio_torta:'Precio por torta ($)',
-  precio_100g:'Precio por 100g ($)', precio_salsa:'Precio salsa extra ($)',
   tiempo_cancelacion:'Tiempo para cancelar (min)',
   timeout_recordatorio_min:'Recordatorio de inactividad (min)',
   timeout_sesion_min:'Limpiar sesión inactiva (min)',
@@ -1558,14 +1762,21 @@ let _zonasData    = [];
 let _sortField    = 'nombre';
 let _sortDir      = 1; // 1 asc, -1 desc
 
+async function saveDomicilioCosto() {
+  const valor = document.getElementById('env-domicilio-costo').value;
+  await api('/api/config', 'POST', { clave: 'domicilio_costo', valor });
+  toast('Costo de domicilio guardado ✅');
+}
+
 async function loadEnvios() {
   const conf = await api('/api/config');
   const get  = k => conf.find(c => c.clave === k)?.valor || '';
-  document.getElementById('negocio-lat').value       = get('negocio_lat');
-  document.getElementById('negocio-lon').value       = get('negocio_lon');
-  document.getElementById('negocio-calle').value     = get('negocio_calle');
-  document.getElementById('negocio-colonia').value   = get('negocio_colonia');
-  document.getElementById('negocio-referencia').value = get('negocio_referencia');
+  document.getElementById('env-domicilio-costo').value = get('domicilio_costo');
+  document.getElementById('negocio-lat').value         = get('negocio_lat');
+  document.getElementById('negocio-lon').value         = get('negocio_lon');
+  document.getElementById('negocio-calle').value       = get('negocio_calle');
+  document.getElementById('negocio-colonia').value     = get('negocio_colonia');
+  document.getElementById('negocio-referencia').value  = get('negocio_referencia');
   _zonasData    = await api('/api/tarifas-zonas');
   _coloniasData = await api('/api/colonias');
   renderZonas();
@@ -1894,8 +2105,15 @@ async function initApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('sidebar-user').textContent = me.usuario;
   checkWaStatus();
-  // auto-show wizard on first run
-  if (!localStorage.getItem('setup_done')) {
+  loadNegocioEstado();
+  // Ocultar "Inicio rápido" del sidebar si el setup ya se completó
+  if (localStorage.getItem('setup_done')) {
+    const navOb = document.getElementById('nav-item-onboarding');
+    const navSep = document.getElementById('nav-sep-onboarding');
+    if (navOb)  navOb.style.display  = 'none';
+    if (navSep) navSep.style.display = 'none';
+  } else {
+    // auto-show wizard on first run
     const conf  = await api('/api/config');
     const nombre = conf.find(c => c.clave === 'nombre_negocio')?.valor || '';
     if (nombre === 'Tacos Javier' || nombre === '') {
@@ -1906,9 +2124,16 @@ async function initApp() {
   loadDashboard();
 }
 
-setInterval(() => {
-  if (document.querySelector('[data-s="dashboard"]').classList.contains('active')) loadDashboard();
-  if (document.querySelector('[data-s="pedidos"]').classList.contains('active')) loadPedidos();
+setInterval(async () => {
+  const enDash = document.querySelector('[data-s="dashboard"]').classList.contains('active');
+  const enPed  = document.querySelector('[data-s="pedidos"]').classList.contains('active');
+  if (enDash) { loadDashboard(); return; }
+  if (enPed)  { loadPedidos();  return; }
+  // En cualquier otra sección: verificar nuevos pendientes silenciosamente
+  try {
+    const st = await api('/api/stats');
+    _actualizarBadgePendientes(st.pendientes || 0);
+  } catch(e) {}
 }, 10000);
 
 setInterval(checkWaStatus, 30000);
