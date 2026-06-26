@@ -123,26 +123,9 @@ tr:hover td{background:var(--surface2)}
 .dot-desconectado{background:var(--red)!important}
 .dot-pausado{background:var(--yellow)!important}
 .spinning{animation:spin .8s linear infinite;display:inline-block}
-/* ── WIZARD ── */
-.wz-wrap{max-width:620px;margin:0 auto}
-.wz-steps{display:flex;align-items:center;gap:0;margin-bottom:32px}
-.wz-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex:1}
-.wz-step:last-child{flex:0}
-.wz-bubble{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted);flex-shrink:0;transition:all .2s}
-.wz-step.done .wz-bubble{background:var(--green);border-color:var(--green);color:white}
-.wz-step.active .wz-bubble{background:var(--accent);border-color:var(--accent);color:white}
-.wz-line{flex:1;height:2px;background:var(--border2);margin:0 6px}
-.wz-step.done .wz-line{background:var(--green)}
-.wz-label{white-space:nowrap;display:none}
-@media(min-width:500px){.wz-label{display:inline}}
-.wcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;margin-bottom:20px}
-.wcard-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
-.wcard-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
-.wz-nav{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
 .hor-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .hor-row span{width:80px;font-size:13px;flex-shrink:0}
 .hor-times{display:flex;align-items:center;gap:8px;font-size:13px}
-.wz-progress{font-size:12px;color:var(--muted)}
 /* ── RESPONSIVE ──────────────────────────────────────────────── */
 .sidebar-toggle{display:none;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:0;line-height:1;margin-right:12px;flex-shrink:0}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9}
@@ -160,9 +143,7 @@ tr:hover td{background:var(--surface2)}
   .login-box{width:92vw;max-width:380px;padding:24px 16px}
   .card{padding:14px}
   .modal{padding:20px 14px}
-  .wcard{padding:20px 14px}
-  .wz-wrap{padding:0}
-  #toast{left:12px;right:12px;width:auto;text-align:center}
+#toast{left:12px;right:12px;width:auto;text-align:center}
   #wa-label{display:none}
 }
 @media(max-width:480px){
@@ -211,8 +192,7 @@ tr:hover td{background:var(--surface2)}
     <div class="nav-item" onclick="showSection('mensajes')" data-s="mensajes"><span class="icon">💬</span> Mensajes Bot</div>
     <div class="nav-item" onclick="showSection('config')" data-s="config"><span class="icon">⚙️</span> Configuración</div>
     <div class="nav-item" onclick="showSection('envios')" data-s="envios"><span class="icon">🛵</span> Zonas Envío</div>
-    <div class="nav-sep" id="nav-sep-onboarding"></div>
-    <div class="nav-item" id="nav-item-onboarding" onclick="showSection('onboarding')" data-s="onboarding"><span class="icon">⚡</span> Inicio rápido</div>
+
   </nav>
   <div class="sidebar-footer">
     <div class="user-info">👤 <span id="sidebar-user">admin</span></div>
@@ -458,85 +438,6 @@ tr:hover td{background:var(--surface2)}
         <div class="form-group"><label class="form-label">Contraseña actual</label><input class="form-input" id="cp-actual" type="password"></div>
         <div class="form-group"><label class="form-label">Nueva contraseña</label><input class="form-input" id="cp-nueva" type="password"></div>
         <button class="btn btn-primary" onclick="cambiarPassword()">Cambiar</button>
-      </div>
-    </div>
-
-    <!-- ONBOARDING -->
-    <div class="section" id="s-onboarding">
-      <div class="wz-wrap">
-        <!-- step indicator -->
-        <div class="wz-steps" id="wz-steps">
-          <div class="wz-step active" id="wz-s1"><div class="wz-bubble">1</div><span class="wz-label">Negocio</span></div>
-          <div class="wz-line"></div>
-          <div class="wz-step" id="wz-s2"><div class="wz-bubble">2</div><span class="wz-label">Horarios</span></div>
-          <div class="wz-line"></div>
-          <div class="wz-step" id="wz-s3"><div class="wz-bubble">3</div><span class="wz-label">Banco</span></div>
-          <div class="wz-line"></div>
-          <div class="wz-step" id="wz-s4"><div class="wz-bubble">4</div><span class="wz-label">Menú</span></div>
-          <div class="wz-line"></div>
-          <div class="wz-step" id="wz-s5"><div class="wz-bubble">5</div><span class="wz-label">Acceso</span></div>
-        </div>
-
-        <!-- paso 1 — negocio -->
-        <div id="wz-p1" class="wcard">
-          <div class="wcard-title">Tu negocio</div>
-          <div class="wcard-sub">Configura el nombre y tipo de tu negocio. El bot usará estos datos en sus mensajes.</div>
-          <div class="form-group"><label class="form-label">Nombre del negocio</label><input class="form-input" id="wz-nombre" type="text" placeholder="Tacos Javier"></div>
-          <div class="form-group"><label class="form-label">Descripción breve (para el bot de IA)</label><input class="form-input" id="wz-tipo" type="text" placeholder="taquería de carnitas en Guadalajara"></div>
-          <div class="form-group"><label class="form-label">Costo de domicilio ($)</label><input class="form-input" id="wz-domicilio" type="number" min="0" placeholder="25"></div>
-        </div>
-
-        <!-- paso 2 — horarios -->
-        <div id="wz-p2" class="wcard" style="display:none">
-          <div class="wcard-title">Horario de servicio</div>
-          <div class="wcard-sub">Activa los días que trabajas y define el rango de horas.</div>
-          <div id="wz-horarios-list"></div>
-        </div>
-
-        <!-- paso 3 — banco -->
-        <div id="wz-p3" class="wcard" style="display:none">
-          <div class="wcard-title">Datos bancarios</div>
-          <div class="wcard-sub">El bot mostrará estos datos cuando el cliente elija pagar por transferencia.</div>
-          <div class="form-group"><label class="form-label">Banco</label><input class="form-input" id="wz-banco" type="text" placeholder="BBVA"></div>
-          <div class="form-group"><label class="form-label">Nombre del beneficiario</label><input class="form-input" id="wz-benef" type="text" placeholder="Javier Hernández"></div>
-          <div class="form-group"><label class="form-label">CLABE interbancaria</label><input class="form-input" id="wz-clabe" type="text" placeholder="012345678901234567" maxlength="18"></div>
-        </div>
-
-        <!-- paso 4 — menú -->
-        <div id="wz-p4" class="wcard" style="display:none">
-          <div class="wcard-title">Precios del menú</div>
-          <div class="wcard-sub">Ajusta los precios que el bot usará al calcular pedidos.</div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Precio por taco ($)</label><input class="form-input" id="wz-taco" type="number" min="1" placeholder="25"></div>
-            <div class="form-group"><label class="form-label">Precio por torta ($)</label><input class="form-input" id="wz-torta" type="number" min="1" placeholder="55"></div>
-          </div>
-          <div class="form-group"><label class="form-label">Precio por 100g ($)</label><input class="form-input" id="wz-100g" type="number" min="1" placeholder="60"></div>
-        </div>
-
-        <!-- paso 5 — contraseña -->
-        <div id="wz-p5" class="wcard" style="display:none">
-          <div class="wcard-title">Cambia tu contraseña</div>
-          <div class="wcard-sub">La contraseña actual es <code style="color:var(--accent)">admin123</code>. Te recomendamos cambiarla ahora.</div>
-          <div class="form-group"><label class="form-label">Contraseña actual</label><input class="form-input" id="wz-pass-actual" type="password" placeholder="admin123"></div>
-          <div class="form-group"><label class="form-label">Nueva contraseña</label><input class="form-input" id="wz-pass-nueva" type="password" placeholder="mínimo 6 caracteres"></div>
-          <div class="form-group"><label class="form-label">Confirmar contraseña</label><input class="form-input" id="wz-pass-conf" type="password" placeholder="repite la nueva contraseña"></div>
-          <div class="hint" style="margin-top:4px">Si no quieres cambiarla ahora, deja los campos vacíos y haz clic en <em>Finalizar</em>.</div>
-        </div>
-
-        <!-- confirmación final -->
-        <div id="wz-p6" class="wcard" style="display:none;text-align:center;padding:48px 28px">
-          <div style="font-size:48px;margin-bottom:16px">🎉</div>
-          <div class="wcard-title" style="text-align:center">¡Todo listo!</div>
-          <p style="color:var(--muted);font-size:14px;margin:12px 0 28px">Tu negocio está configurado. El bot ya puede atender pedidos.</p>
-          <button class="btn btn-primary" style="font-size:15px;padding:12px 32px" onclick="showSection('dashboard')">Ir al dashboard</button>
-        </div>
-
-        <!-- navegación -->
-        <div class="wz-nav" id="wz-nav">
-          <button class="btn btn-secondary" id="wz-btn-prev" onclick="wzPrev()" style="visibility:hidden">← Anterior</button>
-          <span class="wz-progress" id="wz-prog">Paso 1 de 5</span>
-          <button class="btn btn-primary" id="wz-btn-next" onclick="wzNext()">Siguiente →</button>
-        </div>
       </div>
     </div>
 
@@ -821,8 +722,7 @@ const sections = {
   banco:      { title:'Datos Banco', sub:'Información de transferencia' },
   mensajes:   { title:'Mensajes Bot', sub:'Textos del bot' },
   config:     { title:'Configuración', sub:'Ajustes generales' },
-  onboarding: { title:'Inicio rápido', sub:'Configura tu negocio en minutos' },
-  envios:     { title:'Zonas de Envío', sub:'Tarifas por distancia a colonia' },
+envios:     { title:'Zonas de Envío', sub:'Tarifas por distancia a colonia' },
 };
 
 function showSection(name) {
@@ -842,7 +742,7 @@ function showSection(name) {
 const loaders = {
   dashboard: loadDashboard, pedidos: loadPedidos, clientes: loadClientes,
   productos: loadProductos, reportes: loadReportes, horarios: loadHorarios,
-  banco: loadBanco, mensajes: loadMensajes, config: loadConfig, onboarding: loadOnboarding,
+  banco: loadBanco, mensajes: loadMensajes, config: loadConfig,
   envios: loadEnvios,
 };
 
@@ -1976,125 +1876,6 @@ async function checkWaStatus() {
   }
 }
 
-// ── WIZARD ────────────────────────────────────────────────────────────────────
-let _wzStep = 1;
-const WZ_TOTAL = 5;
-
-function wzGoto(n) {
-  for (let i = 1; i <= WZ_TOTAL + 1; i++) {
-    const p = document.getElementById(`wz-p${i}`);
-    if (p) p.style.display = i === n ? '' : 'none';
-  }
-  document.getElementById('wz-nav').style.display = n > WZ_TOTAL ? 'none' : '';
-  for (let i = 1; i <= WZ_TOTAL; i++) {
-    const s = document.getElementById(`wz-s${i}`);
-    if (!s) continue;
-    s.classList.remove('active','done');
-    if (i < n)      s.classList.add('done');
-    else if (i===n) s.classList.add('active');
-  }
-  const prevBtn = document.getElementById('wz-btn-prev');
-  const nextBtn = document.getElementById('wz-btn-next');
-  prevBtn.style.visibility = n > 1 ? 'visible' : 'hidden';
-  nextBtn.textContent = n === WZ_TOTAL ? 'Finalizar ✓' : 'Siguiente →';
-  document.getElementById('wz-prog').textContent = `Paso ${n} de ${WZ_TOTAL}`;
-  _wzStep = n;
-}
-
-async function wzSaveStep(step) {
-  if (step === 1) {
-    const nombre = document.getElementById('wz-nombre').value.trim();
-    const tipo   = document.getElementById('wz-tipo').value.trim();
-    const costo  = document.getElementById('wz-domicilio').value.trim();
-    if (!nombre) { toast('El nombre del negocio es obligatorio', false); return false; }
-    await api('/api/config', 'POST', { clave: 'nombre_negocio', valor: nombre });
-    if (tipo)  await api('/api/config', 'POST', { clave: 'tipo_negocio', valor: tipo });
-    if (costo) await api('/api/config', 'POST', { clave: 'domicilio_costo', valor: costo });
-    document.getElementById('sidebar-negocio').textContent = nombre;
-  } else if (step === 2) {
-    const horarios = await api('/api/horarios');
-    for (const h of horarios) {
-      await api(`/api/horarios/${h.dia}`, 'POST', {
-        abierto:     document.getElementById(`wh-open-${h.dia}`)?.checked,
-        hora_inicio: document.getElementById(`wh-ini-${h.dia}`)?.value,
-        hora_fin:    document.getElementById(`wh-fin-${h.dia}`)?.value,
-      });
-    }
-  } else if (step === 3) {
-    const banco = document.getElementById('wz-banco').value.trim();
-    const benef = document.getElementById('wz-benef').value.trim();
-    const clabe = document.getElementById('wz-clabe').value.trim();
-    if (banco || benef || clabe) {
-      await api('/api/banco', 'POST', { banco, beneficiario: benef, clabe });
-    }
-  } else if (step === 4) {
-    const taco  = document.getElementById('wz-taco').value.trim();
-    const torta = document.getElementById('wz-torta').value.trim();
-    const g100  = document.getElementById('wz-100g').value.trim();
-    if (taco)  await api('/api/config', 'POST', { clave: 'precio_taco',  valor: taco });
-    if (torta) await api('/api/config', 'POST', { clave: 'precio_torta', valor: torta });
-    if (g100)  await api('/api/config', 'POST', { clave: 'precio_100g',  valor: g100 });
-  } else if (step === 5) {
-    const actual = document.getElementById('wz-pass-actual').value;
-    const nueva  = document.getElementById('wz-pass-nueva').value;
-    const conf   = document.getElementById('wz-pass-conf').value;
-    if (actual || nueva || conf) {
-      if (!actual || !nueva) { toast('Completa contraseña actual y nueva', false); return false; }
-      if (nueva !== conf)    { toast('Las contraseñas no coinciden', false); return false; }
-      const r = await api('/api/cambiar-password', 'POST', { password_actual: actual, password_nuevo: nueva });
-      if (!r.ok) { toast(r.error || 'Contraseña actual incorrecta', false); return false; }
-    }
-    localStorage.setItem('setup_done', '1');
-  }
-  return true;
-}
-
-async function wzNext() {
-  const ok = await wzSaveStep(_wzStep);
-  if (!ok) return;
-  if (_wzStep >= WZ_TOTAL) { wzGoto(WZ_TOTAL + 1); return; }
-  wzGoto(_wzStep + 1);
-}
-
-function wzPrev() {
-  if (_wzStep > 1) wzGoto(_wzStep - 1);
-}
-
-async function loadOnboarding() {
-  wzGoto(1);
-  // prefill step 1
-  const conf = await api('/api/config');
-  const get  = k => conf.find(c => c.clave === k)?.valor || '';
-  document.getElementById('wz-nombre').value    = get('nombre_negocio');
-  document.getElementById('wz-tipo').value      = get('tipo_negocio');
-  document.getElementById('wz-domicilio').value = get('domicilio_costo');
-  // prefill step 3
-  const b = await api('/api/banco');
-  document.getElementById('wz-banco').value = b?.banco        || '';
-  document.getElementById('wz-benef').value = b?.beneficiario || '';
-  document.getElementById('wz-clabe').value = b?.clabe        || '';
-  // prefill step 4
-  document.getElementById('wz-taco').value  = get('precio_taco')  || '25';
-  document.getElementById('wz-torta').value = get('precio_torta') || '55';
-  document.getElementById('wz-100g').value  = get('precio_100g')  || '60';
-  // step 5 — no prefill passwords
-  document.getElementById('wz-pass-actual').value = '';
-  document.getElementById('wz-pass-nueva').value  = '';
-  document.getElementById('wz-pass-conf').value   = '';
-  // render step 2 horarios
-  const horarios = await api('/api/horarios');
-  document.getElementById('wz-horarios-list').innerHTML = horarios.map(h => `
-    <div class="hor-row">
-      <label class="toggle"><input type="checkbox" id="wh-open-${h.dia}" ${h.abierto?'checked':''}><span class="toggle-slider"></span></label>
-      <span>${h.nombre_dia}</span>
-      <div class="hor-times">
-        <input class="form-input" id="wh-ini-${h.dia}" type="time" value="${h.hora_inicio}" style="width:105px">
-        <span style="color:var(--muted)">a</span>
-        <input class="form-input" id="wh-fin-${h.dia}" type="time" value="${h.hora_fin}" style="width:105px">
-      </div>
-    </div>`).join('');
-}
-
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function initApp() {
   fetch('/api/negocio').then(r=>r.json()).then(d=>{
@@ -2106,21 +1887,6 @@ async function initApp() {
   document.getElementById('sidebar-user').textContent = me.usuario;
   checkWaStatus();
   loadNegocioEstado();
-  // Ocultar "Inicio rápido" del sidebar si el setup ya se completó
-  if (localStorage.getItem('setup_done')) {
-    const navOb = document.getElementById('nav-item-onboarding');
-    const navSep = document.getElementById('nav-sep-onboarding');
-    if (navOb)  navOb.style.display  = 'none';
-    if (navSep) navSep.style.display = 'none';
-  } else {
-    // auto-show wizard on first run
-    const conf  = await api('/api/config');
-    const nombre = conf.find(c => c.clave === 'nombre_negocio')?.valor || '';
-    if (nombre === 'Tacos Javier' || nombre === '') {
-      showSection('onboarding');
-      return;
-    }
-  }
   loadDashboard();
 }
 
