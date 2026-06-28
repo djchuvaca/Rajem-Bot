@@ -11,10 +11,6 @@ function getNegocio() {
   return getConfig("nombre_negocio") || "el negocio";
 }
 
-function getDomCosto() {
-  return parseInt(getConfig("domicilio_costo") || "50");
-}
-
 function getUbicacion() {
   return getConfig("ubicacion") || getConfig("direccion") || null;
 }
@@ -63,7 +59,7 @@ function respuestaPrecio(producto = null) {
     const negocio  = getNegocio();
     const productos = getProductos();
     const cortes   = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
-    const notaPrecios = getMensaje("menu_nota_precios") || "_Los precios incluyen tortillas y salsas_ 😊";
+    const notaPrecios = (getMensaje("menu_nota_precios") || "_Los precios incluyen tortillas y salsas_ 😊").replace(/{negocio}/g, negocio);
 
     if (producto) {
       const pc = (precios.porCorte && precios.porCorte[producto.toLowerCase()]) || precios;
@@ -138,7 +134,6 @@ function respuestaHorario() {
 // ── RESPUESTA: DOMICILIO ──────────────────────────────────────────────────────
 function respuestaDomicilio() {
   const negocio  = getNegocio();
-  const domCosto = getDomCosto();
   const zonaCobertura = getConfig("zona_cobertura") || null;
 
   let resp = `🛵 *Servicio a domicilio de ${negocio}:*\n\n`;

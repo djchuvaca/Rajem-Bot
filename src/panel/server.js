@@ -194,6 +194,7 @@ app.get("/api/pedidos", requireAuth, (req, res) => {
 const MSGS_ESTADO = {
   confirmado: "✅ Tu pedido ha sido *confirmado*. ¡Pronto estará listo!",
   rechazado:  "❌ Tu pedido fue *rechazado*. Contáctanos si tienes dudas.",
+  cancelado:  "❌ Tu pedido ha sido *cancelado*. Si tienes alguna duda, contáctanos.",
   en_camino:  "🛵 Tu pedido ya va *en camino*. ¡Prepárate para recibirlo!",
   listo:      "🏪 Tu pedido ya está *listo* para recoger en el mostrador. ¡Te esperamos! 😊",
 };

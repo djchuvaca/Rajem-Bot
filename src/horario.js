@@ -55,7 +55,8 @@ function mensajeFueraDeHorario() {
     let msg = getMensaje(esHoy_cerrado ? "fuera_horario_lunes" : esAntesDe ? "fuera_horario_antes" : "fuera_horario_despues")
       || "⏰ Por el momento nos encontramos fuera de servicio.\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?";
 
-    msg = msg.replace(/{hora_inicio}/g, hora_inicio).replace(/{hora_fin}/g, hora_fin);
+    const _negocio = getConfig("nombre_negocio") || "el negocio";
+    msg = msg.replace(/{negocio}/g, _negocio).replace(/{hora_inicio}/g, hora_inicio).replace(/{hora_fin}/g, hora_fin);
     if (proximoDia) msg = msg.replace(/{proximo_dia}/g, proximoDia.nombre_dia);
 
     return msg;

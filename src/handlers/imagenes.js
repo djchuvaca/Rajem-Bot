@@ -1,6 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
-const { upsertCliente, registrarPedido, getMensaje, getGrupoId, guardarTelefonoReal, guardarJIDReal } = require("../db");
+const { upsertCliente, registrarPedido, getMensaje, getConfig, getGrupoId, guardarTelefonoReal, guardarJIDReal } = require("../db");
 const {
   esperandoCaptura,
   clientesNuevos,
@@ -94,8 +94,9 @@ async function handleImagen(msg, client) {
     });
     persistirEstado(clienteNumero);
 
-    const msgComprobante = getMensaje("comprobante_recibido")
-      || "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏";
+    const _negocio = getConfig("nombre_negocio") || "el negocio";
+    const msgComprobante = (getMensaje("comprobante_recibido")
+      || "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏").replace(/{negocio}/g, _negocio);
     await msg.reply(msgComprobante);
   } catch (e) {
     console.error("❌ Error al procesar captura:", e.message);

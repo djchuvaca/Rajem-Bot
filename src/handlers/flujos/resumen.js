@@ -10,7 +10,7 @@ const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pe
 const { parsearPedidoSimple, detectarSinCorte, detectarModificacion } = require("../pedidoParser");
 const {
   upsertCliente, registrarPedido, guardarTelefonoReal,
-  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId,
+  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId, getConfig,
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
 const { getRangoHorario } = require("../../horario");
@@ -487,7 +487,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   // Después de limpiarTodo para que persista y !confirmar (sin tel) pueda encontrarlo
   pendientesConfirmacion.set(clienteNumero, { ...infoPedido, resumen: pendiente.texto, hora: horaVenta });
   persistirEstado(clienteNumero);
-  const msgConfirmacion = getMensaje("confirmacion_pedido") || "¡Listo! Tu pedido fue recibido y está en espera de confirmación de nuestro equipo.\nEn breve te avisamos. ¡Gracias por tu preferencia! 🙏\n\n_Si deseas cancelar tu pedido escribe *cancelar*._";
+  const msgConfirmacion = (getMensaje("confirmacion_pedido") || "¡Listo! Tu pedido fue recibido y está en espera de confirmación de nuestro equipo.\nEn breve te avisamos. ¡Gracias por tu preferencia! 🙏\n\n_Si deseas cancelar tu pedido escribe *cancelar*._").replace(/{negocio}/g, getConfig("nombre_negocio") || "el negocio");
   await msg.reply(msgConfirmacion + (pedidoId ? `\n\n_📋 Pedido #${pedidoId}_` : ""));
   return true;
 }

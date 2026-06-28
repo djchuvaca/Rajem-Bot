@@ -33,8 +33,9 @@ before(async () => {
 describe("respuestaPrecio", () => {
   test("incluye texto de tacos y tortas", () => {
     const r = respuestaPrecio();
-    assert.match(r, /taco/i);
-    assert.match(r, /torta/i);
+    // En formato uniforme aparece el texto; en formato desglose se usan emojis 🌮/🥖
+    assert.match(r, /taco|🌮/u);
+    assert.match(r, /torta|🥖/u);
   });
 
   test("incluye símbolo de peso", () => {

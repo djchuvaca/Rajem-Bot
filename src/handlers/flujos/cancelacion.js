@@ -78,7 +78,7 @@ async function handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero
   // (el admin pudo haber confirmado mientras el cliente decidía cancelar)
   try { actualizarEstadoPedido(datosCancelacion.telefono, "cancelado"); } catch (e) {}
   try { actualizarEstadoConfirmado(datosCancelacion.telefono, "cancelado"); } catch (e) {}
-  const msgCancelacion = getMensaje("cancelacion_enviada") || "Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!";
+  const msgCancelacion = (getMensaje("cancelacion_enviada") || "Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!").replace(/{negocio}/g, getConfig("nombre_negocio") || "el negocio");
   await msg.reply(msgCancelacion);
   return true;
 }
