@@ -446,6 +446,7 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_config', '{}')");
 
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('alerta_pedido_min', '10')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('bot_pausado', '0')");
 
   // Config: modalidad de notificaciones — configurada por super-admin
   // "grupo"   → grupo WA de admins  (requiere 2 dispositivos)

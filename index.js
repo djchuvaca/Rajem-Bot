@@ -249,6 +249,12 @@ initDB().then(() => {
   console.log("🌮 Iniciando Bot de Tacos Javier...");
   console.log("─────────────────────────────────────────────");
 
+  // Restaurar estado de pausa desde BD (persiste entre reinicios del contenedor)
+  const { getConfig } = require('./src/db/config');
+  const botPausado = require('./src/estado/bot-pausado');
+  botPausado.pausado = getConfig('bot_pausado') === '1';
+  if (botPausado.pausado) console.log("⏸️  Bot arrancó en modo PAUSADO (estado guardado en BD)");
+
   restaurarTodasLasSesiones();
   startPanel(process.env.PANEL_PORT || 3000);
   startSuperAdmin(parseInt(process.env.SUPERADMIN_PORT || '3001'), client);

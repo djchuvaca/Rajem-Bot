@@ -176,11 +176,13 @@ async function handleComandos(msg, client) {
   // ── !pausar / !reanudar ────────────────────────────────────────────────────
   if (/^!pausar$/i.test(texto)) {
     botPausado.pausado = true;
+    setConfig('bot_pausado', '1');
     await msg.reply("⏸️ Bot en pausa. Los clientes no recibirán respuestas automáticas.\nUsa *!reanudar* para activarlo de nuevo.");
     return;
   }
   if (/^!reanudar$/i.test(texto)) {
     botPausado.pausado = false;
+    setConfig('bot_pausado', '0');
     await msg.reply("▶️ Bot reactivado. Volviendo a responder mensajes normalmente.");
     return;
   }
