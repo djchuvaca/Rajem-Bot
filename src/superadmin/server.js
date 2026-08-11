@@ -277,9 +277,8 @@ function startSuperAdmin(port = 3001, waClient = null) {
   if (waClient) _waClient = waClient;
   // Inicializar admin.db al arrancar
   getAdminDB();
-  app.listen(port, '127.0.0.1', () => {
-    console.log(`\n🔐 Super-admin corriendo en http://localhost:${port}`);
-    console.log(`   Solo accesible desde localhost (usa SSH tunnel en producción)\n`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`\n🔐 Super-admin corriendo en http://0.0.0.0:${port}`);
   });
 }
 
