@@ -11,7 +11,7 @@ const {
   getProductos, updateProducto, createProducto, deleteProducto,
   getAllClientes, getCliente, upsertCliente, deleteCliente,
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
-  getConfig, guardarTelefonoReal, getJIDReal, getGrupoId,
+  getConfig, guardarTelefonoReal, getJIDReal, getGrupoId, getNotifDestinoJID,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
 } = require("../db");
 const { queryOne, queryAll, run } = require("../db/core");
@@ -336,12 +336,12 @@ app.post("/webhook/mercadopago", async (req, res) => {
       } catch (_) {}
     }
 
-    // Notificar al grupo
-    const grupoId = getGrupoId();
-    if (grupoId && resultado.resumen) {
+    // Notificar al destino configurado
+    const notifJID = getNotifDestinoJID();
+    if (notifJID && resultado.resumen) {
       try {
         const nombre = resultado.nombre || resultado.telefono || "Cliente";
-        await waClient.sendMessage(grupoId,
+        await waClient.sendMessage(notifJID,
           `✅ *PAGO CONFIRMADO — MercadoPago*\n\n` +
           `👤 ${nombre}\n` +
           `📦 Pedido #${resultado.pedidoId}\n\n` +
@@ -449,8 +449,8 @@ const _pedidosAlertados = new Set();
 let _alertasInicializado = false;
 
 setInterval(async () => {
-  const grupoId = getGrupoId();
-  if (!grupoId) return;
+  const notifJID = getNotifDestinoJID();
+  if (!notifJID) return;
   const waClient = getWhatsappClient();
   if (!waClient) return;
 
@@ -471,7 +471,7 @@ setInterval(async () => {
     if (!_alertasInicializado) continue;
     const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ") || p.telefono || "—";
     try {
-      await waClient.sendMessage(grupoId,
+      await waClient.sendMessage(notifJID,
         `⚠️ *Pedido sin confirmar*\n\n` +
         `El pedido *#${p.id}* de *${nombre}* lleva más de 10 minutos esperando.\n` +
         `Total: $${Math.round(p.total || 0)}\n\n` +

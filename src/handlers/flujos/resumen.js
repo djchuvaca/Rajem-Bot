@@ -10,7 +10,7 @@ const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pe
 const { parsearPedidoSimple, detectarSinCorte, detectarModificacion } = require("../pedidoParser");
 const {
   upsertCliente, registrarPedido, guardarTelefonoReal,
-  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId, getConfig,
+  guardarJIDReal, guardarUltimoPedido, getCliente, getMensaje, getGrupoId, getNotifDestinoJID, getConfig,
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
 const { getRangoHorario } = require("../../horario");
@@ -456,15 +456,15 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     return true;
   }
 
-  // ── 2. Notificar al grupo y confirmar al cliente ───────────────────────────
-  const grupoId = getGrupoId();
-  if (grupoId) {
+  // ── 2. Notificar al destino configurado y confirmar al cliente ───────────────
+  const notifJID = getNotifDestinoJID();
+  if (notifJID) {
     try {
-      await client.sendMessage(grupoId, `🆕 Pedido #${pedidoId}\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}\n!listo ${infoPedido.telefono}\n!en_camino ${pedidoId}`);
-    } catch (e) { console.error("Error al notificar grupo:", e.message); }
+      await client.sendMessage(notifJID, `🆕 Pedido #${pedidoId}\nHora: ${horaVenta}\n\n${pendiente.texto}\n\nUsa: !confirmar ${infoPedido.telefono}\n!listo ${infoPedido.telefono}\n!en_camino ${pedidoId}`);
+    } catch (e) { console.error("Error al notificar pedido:", e.message); }
     if (_coloniaNoVerif && _coloniaTxt) {
       try {
-        await client.sendMessage(grupoId, `⚠️ *Pedido #${pedidoId} — colonia sin verificar*\nEl cliente indicó: "${_coloniaTxt}" pero no coincide con ninguna colonia registrada.\nConfirma la dirección y ajusta la tarifa de envío antes de salir.`);
+        await client.sendMessage(notifJID, `⚠️ *Pedido #${pedidoId} — colonia sin verificar*\nEl cliente indicó: "${_coloniaTxt}" pero no coincide con ninguna colonia registrada.\nConfirma la dirección y ajusta la tarifa de envío antes de salir.`);
       } catch (e) { console.error("Error al notificar colonia no verificada:", e.message); }
     }
   }

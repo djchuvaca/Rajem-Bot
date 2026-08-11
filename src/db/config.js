@@ -141,6 +141,21 @@ function getPasarelaConfig() {
   try { return JSON.parse(getConfig("pasarela_config") || "{}"); } catch (_) { return {}; }
 }
 
+function getNotifModalidad() {
+  return getConfig("notif_modalidad") || "grupo";
+}
+
+// Devuelve el JID de WhatsApp al que enviar notificaciones operativas del negocio:
+// "grupo"   → grupo de administración (requiere 2 dispositivos)
+// "privado" → número personal del dueño (requiere 2 dispositivos)
+// "ninguno" → null, sin notificaciones WA (1 dispositivo, gestión por panel)
+function getNotifDestinoJID() {
+  const modalidad = getNotifModalidad();
+  if (modalidad === "grupo")   return getGrupoId();
+  if (modalidad === "privado") return getConfig("notif_privado_jid") || null;
+  return null;
+}
+
 function guardarJIDReal(telefono, jid) {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)",
     [`jid_real_${telefono}`, jid]);
@@ -162,4 +177,5 @@ module.exports = {
   guardarJIDReal, getJIDReal,
   getGrupoId, getGrupoMandaditosId,
   isGroqActivo, getPasarelaActiva, getPasarelaConfig,
+  getNotifModalidad, getNotifDestinoJID,
 };

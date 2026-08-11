@@ -210,19 +210,26 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
               <div class="card-header"><div class="card-title">📱 Notificaciones WhatsApp</div></div>
               <div class="form-group">
                 <label>Modalidad</label>
-                <select id="tc-modalidad">
-                  <option value="grupo">Grupo de WhatsApp</option>
-                  <option value="privado">Conversación privada</option>
-                  <option value="ninguno">Sin notificaciones</option>
+                <select id="tc-modalidad" onchange="toggleNotifJIDField()">
+                  <option value="grupo">Grupo de WhatsApp (2 dispositivos)</option>
+                  <option value="privado">Número personal del dueño (2 dispositivos)</option>
+                  <option value="ninguno">Sin notificaciones — solo panel (1 dispositivo)</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>GRUPO_ID (JID del destino)</label>
-                <input id="tc-grupo-id" type="text" placeholder="521XXXXXXXXXX@g.us o @c.us">
+              <div id="campo-grupo-id" class="form-group">
+                <label>JID del grupo de administración</label>
+                <input id="tc-grupo-id" type="text" placeholder="521XXXXXXXXXX@g.us">
+                <div class="toolbar" style="margin-top:6px;margin-bottom:0">
+                  <button class="btn btn-secondary btn-sm" onclick="openGruposWA()">📋 Ver grupos</button>
+                </div>
               </div>
-              <div class="toolbar" style="margin-bottom:0">
-                <button class="btn btn-secondary btn-sm" onclick="openResolverJID()">🔍 Buscar JID</button>
-                <button class="btn btn-secondary btn-sm" onclick="openGruposWA()">📋 Ver grupos</button>
+              <div id="campo-privado-jid" class="form-group" style="display:none">
+                <label>JID del número personal del dueño</label>
+                <input id="tc-privado-jid" type="text" placeholder="521XXXXXXXXXX@c.us">
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">El bot enviará pedidos y alertas a este número directamente.</div>
+                <div class="toolbar" style="margin-top:6px;margin-bottom:0">
+                  <button class="btn btn-secondary btn-sm" onclick="openResolverJID()">🔍 Buscar JID por teléfono</button>
+                </div>
               </div>
             </div>
 
@@ -757,7 +764,9 @@ async function loadTenantConfig() {
   _tcConfig=await r.json();
   document.getElementById('tc-content').style.display='block';
   document.getElementById('tc-grupo-id').value=_tcConfig.grupo_id||'';
+  document.getElementById('tc-privado-jid').value=_tcConfig.notif_privado_jid||'';
   document.getElementById('tc-modalidad').value=_tcConfig.notif_modalidad||'grupo';
+  toggleNotifJIDField();
   document.getElementById('tc-timeout-rec').value=_tcConfig.timeout_recordatorio_min||'20';
   document.getElementById('tc-timeout-ses').value=_tcConfig.timeout_sesion_min||'35';
   const groqAct=_tcConfig.groq_activo==='1';
@@ -810,6 +819,7 @@ async function saveTenantConfig() {
   const config={
     grupo_id:          document.getElementById('tc-grupo-id').value.trim(),
     notif_modalidad:   document.getElementById('tc-modalidad').value,
+    notif_privado_jid: document.getElementById('tc-privado-jid').value.trim(),
     timeout_recordatorio_min: document.getElementById('tc-timeout-rec').value,
     timeout_sesion_min:       document.getElementById('tc-timeout-ses').value,
     groq_activo:       document.getElementById('tc-groq-activo').checked?'1':'0',
@@ -837,11 +847,23 @@ async function resolverJID() {
     document.getElementById('jid-result').textContent=d.error||'Error';
   }
 }
+function toggleNotifJIDField() {
+  const mod=document.getElementById('tc-modalidad').value;
+  document.getElementById('campo-grupo-id').style.display   = mod==='grupo'   ? '' : 'none';
+  document.getElementById('campo-privado-jid').style.display = mod==='privado' ? '' : 'none';
+}
+
 function usarJID() {
   if(!_jidResuelto) return;
-  document.getElementById('tc-grupo-id').value=_jidResuelto;
+  const mod=document.getElementById('tc-modalidad').value;
+  if(mod==='privado'){
+    document.getElementById('tc-privado-jid').value=_jidResuelto;
+    toast('JID asignado al número privado');
+  } else {
+    document.getElementById('tc-grupo-id').value=_jidResuelto;
+    toast('JID asignado al campo GRUPO_ID');
+  }
   closeModal('modal-jid');
-  toast('JID asignado al campo GRUPO_ID');
 }
 
 async function openGruposWA() {

@@ -445,8 +445,12 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_activa', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_config', '{}')");
 
-  // Config: modalidad de notificaciones (grupo o privado) — configurada por super-admin
+  // Config: modalidad de notificaciones — configurada por super-admin
+  // "grupo"   → grupo WA de admins  (requiere 2 dispositivos)
+  // "privado" → número personal del dueño (requiere 2 dispositivos)
+  // "ninguno" → sin notificaciones WA  (1 dispositivo, gestión solo por panel)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_modalidad', 'grupo')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_privado_jid', '')");
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (

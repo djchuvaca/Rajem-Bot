@@ -10,7 +10,7 @@ const { MENU_FORMATO } = require("../config");
 
 const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping, ordenPendientePreventa } = require("./flujos/utils");
 const botPausado = require("../estado/bot-pausado");
-const { getGrupoId } = require("../db");
+const { getGrupoId, getNotifDestinoJID } = require("../db");
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido, handleCancelacionPagoMP } = require("./flujos/cancelacion");
 const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
@@ -53,11 +53,11 @@ async function handleMensaje(msg, client) {
         limpiarTodo(clienteNumero);
         ordenPendientePreventa.delete(clienteNumero);
         clientesNuevos.delete(clienteNumero);
-        const grupoId = getGrupoId();
-        if (grupoId) {
+        const notifJID = getNotifDestinoJID();
+        if (notifJID) {
           const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
           try {
-            await client.sendMessage(grupoId,
+            await client.sendMessage(notifJID,
               `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: (canceló antes de enviar captura)\nTelefono: ${datosCaptura?.telefono || "—"}\nMotivo: Canceló durante espera de transferencia`
             );
           } catch (e) { console.error("Error notificando cancelacion:", e.message); }

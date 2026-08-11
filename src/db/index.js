@@ -61,6 +61,8 @@ module.exports = {
   isGroqActivo:            config.isGroqActivo,
   getPasarelaActiva:       config.getPasarelaActiva,
   getPasarelaConfig:       config.getPasarelaConfig,
+  getNotifModalidad:       config.getNotifModalidad,
+  getNotifDestinoJID:      config.getNotifDestinoJID,
 
   // productos
   getProductos:        modelos.getProductos,
