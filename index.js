@@ -27,7 +27,7 @@ const { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendient
 const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
 const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
-const { initDB, getConfig, getGrupoId, getGrupoMandaditosId } = require("./src/db");
+const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
 const { startSuperAdmin, setWaClient: setSuperAdminWaClient } = require("./src/superadmin/server");
 const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
@@ -59,6 +59,11 @@ client.on("ready", () => {
   _reintentos = 0;
   setWhatsappClient(client);
   setSuperAdminWaClient(client);
+  // Autochat: guardar el JID propio para usarlo como destino de comandos y notificaciones
+  if (getNotifModalidad() === 'autochat') {
+    const propioJID = client.info?.wid?._serialized;
+    if (propioJID) setConfig('notif_autochat_jid', propioJID);
+  }
   reanudarDespachosPendientes(client).catch(e => logger.error("Error al reanudar despachos:", e.message));
   logger.info("Bot de Tacos Javier conectado y listo.")
   console.log("✅ Bot de Tacos Javier conectado y listo!");
@@ -188,13 +193,31 @@ const mandaditosId = getGrupoMandaditosId();
     return;
   }
 
-  if (msg.fromMe) return;
+  if (msg.fromMe) {
+    // Autochat: el admin se manda comandos a su propio número (1 solo dispositivo)
+    if (getNotifModalidad() === 'autochat') {
+      const propioJID = client.info?.wid?._serialized;
+      if (propioJID && msg.to === propioJID) {
+        await handleComandos(msg, client);
+      }
+    }
+    return;
+  }
   if (msg.isGroupMsg) return;
 
   try {
     const chat = await msg.getChat();
     if (chat.isGroup) return;
   } catch (_) {}
+
+  // Número privado autorizado: no es un cliente, rutear a comandos
+  if (getNotifModalidad() === 'privado') {
+    const adminJID = getConfig('notif_privado_jid');
+    if (adminJID && msg.from === adminJID) {
+      await handleComandos(msg, client);
+      return;
+    }
+  }
 
   if (msg.hasMedia) {
     const procesado = await handleImagen(msg, client);

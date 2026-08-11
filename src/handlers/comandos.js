@@ -110,6 +110,17 @@ async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
+  // Cuando viene de un grupo: solo los admins del grupo pueden ejecutar comandos
+  if (msg.from.endsWith('@g.us')) {
+    try {
+      const chat = await msg.getChat();
+      const participante = chat.participants.find(p => p.id._serialized === msg.author);
+      if (!participante?.isAdmin && !participante?.isSuperAdmin) return;
+    } catch (_) {
+      return; // sin permiso verificable = bloquear
+    }
+  }
+
   // ── Confirmación de grupo admin (respuesta a la pregunta de auto-detección) ──
   if (_grupoPendiente?.id === msg.from) {
     if (/^(s[íi]|si|yes|ok|dale|claro|correcto|afirmativo)$/i.test(texto)) {

@@ -451,11 +451,13 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('bot_pausado', '0')");
 
   // Config: modalidad de notificaciones — configurada por super-admin
-  // "grupo"   → grupo WA de admins  (requiere 2 dispositivos)
-  // "privado" → número personal del dueño (requiere 2 dispositivos)
-  // "ninguno" → sin notificaciones WA  (1 dispositivo, gestión solo por panel)
+  // "grupo"    → grupo WA de admins  (requiere 2+ dispositivos, solo admins del grupo ejecutan comandos)
+  // "privado"  → número personal del dueño (requiere 2 dispositivos, JID en notif_privado_jid)
+  // "autochat" → el dueño usa el chat consigo mismo (1 solo dispositivo)
+  // "ninguno"  → sin notificaciones WA  (1 dispositivo, gestión solo por panel)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_modalidad', 'grupo')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_privado_jid', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_autochat_jid', '')");
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (
