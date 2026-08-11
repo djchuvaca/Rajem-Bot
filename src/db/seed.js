@@ -111,6 +111,7 @@ async function seedDB() {
         'Á','a'),'É','e'),'Í','i'),'Ó','o'),'Ú','u'),
         'ñ','n'),'Ñ','n'),'ü','u'),'Ü','u'),
         ' ','-'),'.','-'),',','-'),';','-'),':','-'),'/',''),'''',''),'.',''))
+    )
     WHERE slug = '' OR slug IS NULL
   `);
   try { run(`CREATE TABLE IF NOT EXISTS tarifas_zonas (
