@@ -34,5 +34,14 @@ module.exports = {
       log_date_format: "YYYY-MM-DD HH:mm:ss",
       merge_logs: true,
     },
+    {
+      name: "webhook-deploy",
+      script: "scripts/webhook-deploy.js",
+      autorestart: true,
+      watch: false,
+      out_file:   "logs/webhook-out.log",
+      error_file: "logs/webhook-err.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+    },
   ],
 };
