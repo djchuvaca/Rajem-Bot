@@ -389,6 +389,7 @@ async function seedDB() {
       ["FOVISSSTE 1a Etapa",21.515917846191225,-104.91723960791154],["FOVISSSTE 2a Etapa",21.51742995799435,-104.92700214472366],
       ["La Lomita",21.523433201656655,-104.87458188706125],["Residencial La Loma",21.503963713790064,-104.90462010833275],
       ["Residencial los Olivos",21.4951731,-104.8161051],
+      ["Colinas del Valle",21.489512776541385,-104.84706436360527],
     ];
     for (const [nombre, lat, lon] of colonias) {
       try { run("INSERT INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, lat, lon]); } catch (_) {}

@@ -167,6 +167,10 @@ const correcciones = [
   ["Residencial La Loma",21.503963713790064,-104.90462010833275],
 ];
 
+const nuevas = [
+  ["Colinas del Valle", 21.489512776541385, -104.84706436360527],
+];
+
 const eliminar = ["Primero de Mayo", "Zapopan"];
 
 const { initDB, run, queryOne } = require('../src/db/core');
@@ -175,6 +179,11 @@ initDB();
 
 for (const [nombre, lat, lon] of correcciones) {
   run("UPDATE colonias SET lat=?, lon=? WHERE nombre=?", [lat, lon, nombre]);
+}
+
+for (const [nombre, lat, lon] of nuevas) {
+  run("INSERT OR IGNORE INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, lat, lon]);
+  console.log(`Agregada: ${nombre}`);
 }
 
 for (const nombre of eliminar) {
