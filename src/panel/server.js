@@ -511,26 +511,12 @@ app.get("/api/colonias", requireAuth, (req, res) => {
   res.json(colonias.map(c => ({ ...c, distancia: null, zona_actual: null })));
 });
 
-app.post("/api/colonias", requireAuth, (req, res) => {
-  const { nombre, lat, lon } = req.body;
-  if (!nombre || lat == null || lon == null) return res.status(400).json({ error: "Faltan campos" });
-  try {
-    run("INSERT INTO colonias (nombre, lat, lon) VALUES (?,?,?)", [nombre, parseFloat(lat), parseFloat(lon)]);
-    invalidarCacheColonias();
-    res.json({ ok: true });
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.put("/api/colonias/:id", requireAuth, (req, res) => {
-  const { nombre, lat, lon, activo } = req.body;
-  run("UPDATE colonias SET nombre=?, lat=?, lon=?, activo=? WHERE id=?",
-    [nombre, parseFloat(lat), parseFloat(lon), activo ?? 1, parseInt(req.params.id)]);
-  invalidarCacheColonias();
-  res.json({ ok: true });
-});
-
-app.delete("/api/colonias/:id", requireAuth, (req, res) => {
-  run("DELETE FROM colonias WHERE id=?", [parseInt(req.params.id)]);
+// Las colonias se crean/editan/eliminan solo desde el super-admin.
+// El tenant solo puede activar o desactivar su entrega a cada colonia.
+app.put("/api/colonias/:id/activo", requireAuth, (req, res) => {
+  const { activo } = req.body;
+  if (activo === undefined) return res.status(400).json({ error: "Falta campo activo" });
+  run("UPDATE colonias SET activo=? WHERE id=?", [activo ? 1 : 0, parseInt(req.params.id)]);
   invalidarCacheColonias();
   res.json({ ok: true });
 });

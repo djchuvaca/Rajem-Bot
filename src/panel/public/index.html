@@ -499,7 +499,6 @@ tr:hover td{background:var(--surface2)}
           <div class="card-title" style="margin:0">🏘️ Colonias registradas</div>
           <div style="display:flex;gap:8px;align-items:center">
             <input class="form-input" id="buscar-colonia" placeholder="Buscar colonia…" style="width:190px" oninput="filtrarColonias(this.value)">
-            <button class="btn btn-secondary btn-sm" onclick="openModalColonia()">+ Nueva</button>
           </div>
         </div>
         <div id="colonias-count" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
@@ -519,32 +518,6 @@ tr:hover td{background:var(--surface2)}
       </div>
     </div>
 
-  </div>
-</div>
-
-<!-- MODAL COLONIA -->
-<div class="modal-overlay" id="modal-colonia">
-  <div class="modal">
-    <div class="modal-title" id="modal-col-title">Nueva colonia</div>
-    <input type="hidden" id="col-id">
-    <div class="form-group">
-      <label class="form-label">Nombre de la colonia</label>
-      <input class="form-input" id="col-nombre" placeholder="Ej: Aramara">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Latitud</label>
-        <input class="form-input" id="col-lat" type="number" step="any" placeholder="21.4900">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Longitud</label>
-        <input class="form-input" id="col-lon" type="number" step="any" placeholder="-104.8900">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-colonia')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveColonia()">Guardar</button>
-    </div>
   </div>
 </div>
 
@@ -1757,9 +1730,8 @@ function renderColonias(lista) {
       <td>${c.distancia != null ? c.distancia + ' km' : '<span style="color:var(--muted)">—</span>'}</td>
       <td>${c.zona_actual ? `<span class="badge badge-blue">${c.zona_actual}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       <td><span class="badge ${c.activo ? 'badge-green' : 'badge-gray'}">${c.activo ? 'Activa' : 'Inactiva'}</span></td>
-      <td style="display:flex;gap:6px">
-        <button class="btn btn-secondary btn-sm" onclick='openModalColonia(${JSON.stringify(c)})'>✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteColonia(${c.id})">🗑</button>
+      <td>
+        <button class="btn btn-sm ${c.activo ? 'btn-danger' : 'btn-secondary'}" onclick="toggleColonia(${c.id}, ${c.activo ? 0 : 1})">${c.activo ? 'Desactivar' : 'Activar'}</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay colonias registradas</td></tr>';
 }
@@ -1807,40 +1779,13 @@ function filtrarColonias(q) {
   renderColonias(_aplicarSort(filtrada));
 }
 
-function openModalColonia(c = null) {
-  document.getElementById('modal-col-title').textContent = c ? 'Editar colonia' : 'Nueva colonia';
-  document.getElementById('col-id').value     = c?.id     || '';
-  document.getElementById('col-nombre').value = c?.nombre || '';
-  document.getElementById('col-lat').value    = c?.lat    || '';
-  document.getElementById('col-lon').value    = c?.lon    || '';
-  document.getElementById('modal-colonia').classList.add('show');
-}
-
-async function saveColonia() {
-  const id     = document.getElementById('col-id').value;
-  const nombre = document.getElementById('col-nombre').value.trim();
-  const lat    = parseFloat(document.getElementById('col-lat').value);
-  const lon    = parseFloat(document.getElementById('col-lon').value);
-  if (!nombre || isNaN(lat) || isNaN(lon)) return toast('Completa todos los campos', false);
-  const r = id
-    ? await api(`/api/colonias/${id}`, 'PUT',  { nombre, lat, lon, activo: 1 })
-    : await api('/api/colonias',       'POST', { nombre, lat, lon });
+async function toggleColonia(id, activo) {
+  const r = await api(`/api/colonias/${id}/activo`, 'PUT', { activo });
   if (r.ok) {
-    closeModal('modal-colonia');
-    toast('Colonia guardada ✅');
+    toast(activo ? 'Colonia activada' : 'Colonia desactivada');
     _coloniasData = await api('/api/colonias');
     filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
-  } else toast(r.error || 'Error al guardar', false);
-}
-
-async function deleteColonia(id) {
-  if (!confirm('¿Eliminar esta colonia?')) return;
-  const r = await api(`/api/colonias/${id}`, 'DELETE');
-  if (r.ok) {
-    toast('Colonia eliminada');
-    _coloniasData = await api('/api/colonias');
-    filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
-  }
+  } else toast(r.error || 'Error al actualizar', false);
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
