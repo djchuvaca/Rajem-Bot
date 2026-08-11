@@ -37,4 +37,4 @@ RUN mkdir -p data/backups logs
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["sh", "-c", "rm -f /app/.wwebjs_auth/session-carnitas-bot/SingletonLock && node index.js"]
