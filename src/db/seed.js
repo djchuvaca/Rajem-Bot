@@ -102,18 +102,16 @@ async function seedDB() {
   try { db.run("ALTER TABLE colonias ADD COLUMN aliases TEXT DEFAULT '[]'"); } catch (_) {}
 
   // Poblar slug en registros existentes que no lo tengan
-  db.run(`
-    UPDATE colonias SET slug = lower(
-      replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
-      replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
-      replace(replace(replace(nombre,
-        'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),
-        'Á','a'),'É','e'),'Í','i'),'Ó','o'),'Ú','u'),
-        'ñ','n'),'Ñ','n'),'ü','u'),'Ü','u'),
-        ' ','-'),'.','-'),',','-'),';','-'),':','-'),'/',''),'''',''),'.',''))
-    )
-    WHERE slug = '' OR slug IS NULL
-  `);
+  try {
+    const sinSlug = db.prepare("SELECT id, nombre FROM colonias WHERE slug = '' OR slug IS NULL").all();
+    const stmtSlug = db.prepare("UPDATE colonias SET slug = ? WHERE id = ?");
+    for (const { id, nombre } of sinSlug) {
+      const slug = (nombre || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      stmtSlug.run(slug, id);
+    }
+  } catch (_) {}
   try { run(`CREATE TABLE IF NOT EXISTS tarifas_zonas (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre_zona   TEXT NOT NULL,
