@@ -455,13 +455,15 @@ setInterval(async () => {
   if (!waClient) return;
 
   const { queryAll } = require("../db/core");
+  const alertaMin = parseInt(getConfig("alerta_pedido_min") || "10");
   const pendientes = queryAll(
     `SELECT p.id, c.nombre, c.apellido, c.telefono, p.total, p.hora_entrega
      FROM pedidos p
      LEFT JOIN clientes c ON p.cliente_id = c.id
      WHERE p.estado = 'pendiente'
-       AND datetime(p.fecha, 'localtime') <= datetime('now', 'localtime', '-10 minutes')
-     ORDER BY p.fecha ASC`
+       AND datetime(p.fecha, 'localtime') <= datetime('now', 'localtime', '-' || ? || ' minutes')
+     ORDER BY p.fecha ASC`,
+    [alertaMin]
   );
 
   for (const p of pendientes) {
