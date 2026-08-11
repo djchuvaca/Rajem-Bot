@@ -23,8 +23,20 @@ const {
   telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, palabrasConfirmacion, listaCortes,
 } = require("./utils");
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const GROQ_TIMEOUT_MS = parseInt(process.env.GROQ_TIMEOUT_MS || "15000");
+// Groq se inicializa en tiempo de llamada para leer la key desde admin.db
+let _groqInstance = null;
+let _groqKeyCache = null;
+
+function _getGroq() {
+  const { getGroqApiKey } = require('../../db/admin');
+  const key = getGroqApiKey();
+  if (!key) return null;
+  if (!_groqInstance || _groqKeyCache !== key) {
+    _groqInstance = new Groq({ apiKey: key });
+    _groqKeyCache = key;
+  }
+  return _groqInstance;
+}
 
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
 const _erroresConsec = new Map();
@@ -32,10 +44,14 @@ function _sumarError(num) { _erroresConsec.set(num, (_erroresConsec.get(num) || 
 function _resetError(num) { _erroresConsec.delete(num); }
 
 function groqConTimeout(params) {
+  const groqClient = _getGroq();
+  if (!groqClient) return Promise.reject(new Error("GROQ_NO_CONFIGURADO"));
+  const { getGroqTimeoutMs } = require('../../db/admin');
+  const timeout = getGroqTimeoutMs();
   return Promise.race([
-    groq.chat.completions.create(params),
+    groqClient.chat.completions.create(params),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("GROQ_TIMEOUT")), GROQ_TIMEOUT_MS)
+      setTimeout(() => reject(new Error("GROQ_TIMEOUT")), timeout)
     ),
   ]);
 }
@@ -1481,6 +1497,13 @@ async function handlePresupuestoInverso(msg, textoOriginal) {
 
 // ── FALLBACK A GROQ ───────────────────────────────────────────────────────────
 async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, esPreventa) {
+  // Si el tenant no tiene IA activa y no hay API key, responder sin Groq
+  const { isGroqActivo } = require('../../db/config');
+  if (!isGroqActivo() && !_getGroq()) {
+    await msg.reply("Lo siento, no entendí tu mensaje. ¿Puedes repetirme qué deseas ordenar? 😊");
+    return;
+  }
+
   historial.push({ role: "user", content: textoOriginal });
   if (historial.length > 15) historial.splice(0, 2);
 
@@ -1493,7 +1516,7 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, 
       esPreventa,
     });
     const respuestaGroq = await groqConTimeout({
-      model:       "llama-3.3-70b-versatile",
+      model:       require('../../db/admin').getGroqModelo(),
       max_tokens:  400,
       temperature: 0.2,
       messages:    [{ role: "system", content: systemPrompt }, ...historial],
@@ -1545,7 +1568,7 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, 
         esPreventa,
       });
       const respuestaRetry = await groqConTimeout({
-        model:       "llama-3.3-70b-versatile",
+        model:       require('../../db/admin').getGroqModelo(),
         max_tokens:  400,
         temperature: 0.35,
         messages:    [{ role: "system", content: systemPromptRetry }, ...historial],

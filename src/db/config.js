@@ -121,11 +121,24 @@ function getTelefonoReal(numeroWhatsApp) {
 }
 
 function getGrupoId() {
-  return process.env.GRUPO_ID || getConfig("grupo_id") || null;
+  return getConfig("grupo_id") || process.env.GRUPO_ID || null;
 }
 
 function getGrupoMandaditosId() {
-  return process.env.GRUPO_MANDADITOS_ID || getConfig("grupo_mandaditos_id") || null;
+  const { getGrupoMandaditosGlobal } = require('./admin');
+  return getGrupoMandaditosGlobal() || getConfig("grupo_mandaditos_id") || null;
+}
+
+function isGroqActivo() {
+  return getConfig("groq_activo") === "1";
+}
+
+function getPasarelaActiva() {
+  return getConfig("pasarela_activa") || null;
+}
+
+function getPasarelaConfig() {
+  try { return JSON.parse(getConfig("pasarela_config") || "{}"); } catch (_) { return {}; }
 }
 
 function guardarJIDReal(telefono, jid) {
@@ -148,4 +161,5 @@ module.exports = {
   guardarTelefonoReal, getTelefonoReal,
   guardarJIDReal, getJIDReal,
   getGrupoId, getGrupoMandaditosId,
+  isGroqActivo, getPasarelaActiva, getPasarelaConfig,
 };

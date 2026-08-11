@@ -25,7 +25,8 @@ module.exports = {
 
       // Variables de entorno (PM2 carga .env automáticamente si existe)
       env: {
-        NODE_ENV: "production",
+        NODE_ENV:        "production",
+        SUPERADMIN_PORT: "3001",  // solo localhost — usa SSH tunnel para acceder remotamente
       },
 
       // Logs

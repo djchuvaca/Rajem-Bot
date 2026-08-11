@@ -14,7 +14,7 @@ const {
 } = require("../../db");
 const { DATOS_BANCO, MENU_FORMATO } = require("../../config");
 const { getRangoHorario } = require("../../horario");
-const mpPagos = require("../../pagos/mercadopago");
+const mpPagos = require("../../pagos");
 const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,

@@ -1,25 +1,39 @@
 // src/pagos/mercadopago.js
 // Wrapper del SDK de MercadoPago v3.
-// Solo se activa si MERCADOPAGO_ACCESS_TOKEN y APP_URL están definidos en .env.
+// El token se lee desde la config del tenant (pasarela_config) y APP_URL desde admin.db.
 
 const { MercadoPagoConfig, Preference, Payment } = require("mercadopago");
 const {
   guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
 } = require("../db");
 
-let _mpCliente = null;
+function _getToken() {
+  try {
+    const { getPasarelaConfig } = require('../db/config');
+    const cfg = getPasarelaConfig();
+    if (cfg.access_token) return cfg.access_token;
+  } catch (_) {}
+  return process.env.MERCADOPAGO_ACCESS_TOKEN || null;
+}
+
+function _getAppUrl() {
+  try {
+    const { getAppUrl } = require('../db/admin');
+    return getAppUrl() || process.env.APP_URL || '';
+  } catch (_) {
+    return process.env.APP_URL || '';
+  }
+}
 
 function getCliente() {
-  if (!_mpCliente && process.env.MERCADOPAGO_ACCESS_TOKEN) {
-    _mpCliente = new MercadoPagoConfig({
-      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
-    });
-  }
-  return _mpCliente;
+  const token = _getToken();
+  if (!token) return null;
+  return new MercadoPagoConfig({ accessToken: token });
 }
 
 function estaConfigurado() {
-  return !!(process.env.MERCADOPAGO_ACCESS_TOKEN && process.env.APP_URL);
+  const { getPasarelaActiva } = require('../db/config');
+  return getPasarelaActiva() === 'mercadopago' && !!_getToken() && !!_getAppUrl();
 }
 
 async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resumen, nombre }) {
@@ -35,7 +49,7 @@ async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resume
         unit_price: Math.round(total * 100) / 100,
         currency_id: "MXN",
       }],
-      notification_url:  `${process.env.APP_URL}/webhook/mercadopago`,
+      notification_url:  `${_getAppUrl()}/webhook/mercadopago`,
       external_reference: String(pedidoId),
       expires:            true,
       expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),

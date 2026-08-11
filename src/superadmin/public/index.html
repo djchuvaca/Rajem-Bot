@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rajem's Technology — Super Admin</title>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3250;
+  --text:#e8eaf6;--muted:#8b90b3;--muted2:#5a5f80;
+  --accent:#6c63ff;--accent-dim:#1e1b4b;--green:#22c55e;--red:#ef4444;
+  --yellow:#f59e0b;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+/* SIDEBAR */
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:20px;border-bottom:1px solid var(--border)}
+.sidebar-logo .brand{font-weight:700;font-size:13px;color:var(--accent);letter-spacing:.5px}
+.sidebar-logo .sub{font-size:11px;color:var(--muted2);margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;color:var(--muted2);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);background:var(--accent-dim);border-left-color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.sidebar-bottom{margin-top:auto;padding:16px;border-top:1px solid var(--border)}
+.user-info{font-size:12px;color:var(--muted);margin-bottom:10px}
+/* MAIN */
+.main{flex:1;overflow-y:auto;padding:24px;max-width:1200px}
+.section{display:none}.section.active{display:block}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
+/* CARDS */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-weight:600;font-size:14px}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+.badge-green{background:#14532d;color:var(--green)}
+.badge-red{background:#7f1d1d;color:var(--red)}
+.badge-yellow{background:#78350f;color:var(--yellow)}
+.badge-blue{background:#1e3a5f;color:var(--blue)}
+.badge-gray{background:var(--surface2);color:var(--muted)}
+.stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px}
+.stat-row span{color:var(--text);font-weight:600}
+/* TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px}
+table{width:100%;border-collapse:collapse}
+th{background:var(--surface2);padding:10px 14px;text-align:left;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 14px;border-top:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:hover td{background:var(--surface2)}
+/* FORMS */
+.form-group{margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
+input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:none;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.9}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{border-color:var(--accent)}
+.btn-danger{background:#7f1d1d;color:var(--red);border:1px solid var(--red)}.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:4px 10px;font-size:12px}
+.toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.toolbar input[type=text]{width:auto;flex:1;min-width:200px}
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:16px;margin-bottom:16px}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+/* MAP */
+#mapa{height:320px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px}
+/* TOGGLE */
+.toggle-wrap{display:flex;align-items:center;gap:10px}
+.toggle{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--surface2);border-radius:22px;transition:.3s}
+.toggle input:checked+.slider{background:var(--accent)}
+.toggle-slider:before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+input:checked~.toggle-slider:before{transform:translateX(18px)}
+/* TABS */
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:20px;width:fit-content}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface);color:var(--text);font-weight:600}
+/* MISC */
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+.alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px}
+.alert-success{background:#14532d;color:var(--green)}
+.alert-error{background:#7f1d1d;color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chip{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px;margin:2px}
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+/* LOGIN */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100%}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:340px}
+.login-brand{font-size:18px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted2);margin-bottom:24px}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen" class="login-wrap">
+  <div class="login-box">
+    <div class="login-brand">Rajem's Technology</div>
+    <div class="login-sub">Panel de Super-Administración</div>
+    <div id="login-error" class="alert alert-error" style="display:none"></div>
+    <div class="form-group"><label>Usuario</label><input id="sa-user" type="text" autocomplete="username"></div>
+    <div class="form-group"><label>Contraseña</label><input id="sa-pass" type="password" autocomplete="current-password"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;width:100%">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">⚡ RAJEM'S TECH</div>
+      <div class="sub">Super Admin</div>
+    </div>
+    <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showSection('tenants')" data-s="tenants"><span class="icon">🏪</span> Negocios</div>
+    <div class="nav-item" onclick="showSection('geo')" data-s="geo"><span class="icon">🗺️</span> Geo & Colonias</div>
+    <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
+    <div class="nav-item" onclick="showSection('ia')" data-s="ia"><span class="icon">🤖</span> IA Global</div>
+    <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
+    <div class="nav-item" onclick="showSection('global')" data-s="global"><span class="icon">🌐</span> Config Global</div>
+    <div class="sidebar-bottom">
+      <div class="user-info" id="sa-user-label"></div>
+      <button class="btn btn-secondary" style="width:100%;font-size:12px" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div id="sec-dashboard" class="section active">
+      <h1>Dashboard</h1>
+      <p class="subtitle">Estado de todos los negocios en tiempo real</p>
+      <div id="dashboard-cards" class="cards"><div class="empty">Cargando…</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">🔄 Actualizar</button>
+    </div>
+
+    <!-- ── NEGOCIOS ── -->
+    <div id="sec-tenants" class="section">
+      <h1>Negocios (Tenants)</h1>
+      <p class="subtitle">Registro de negocios activos en la plataforma</p>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openTenantModal()">+ Nuevo negocio</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Ciudad</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tenants-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── GEO & COLONIAS ── -->
+    <div id="sec-geo" class="section">
+      <h1>Geo & Colonias</h1>
+      <p class="subtitle">Administra el diccionario de colonias y zonas de tarifa por negocio</p>
+      <div class="form-group" style="max-width:300px">
+        <label>Selecciona negocio</label>
+        <select id="geo-tenant-select" onchange="loadGeo()"><option value="">-- selecciona --</option></select>
+      </div>
+      <div id="geo-content" style="display:none">
+        <div class="tabs">
+          <div class="tab active" onclick="geoTab('colonias',this)">Colonias</div>
+          <div class="tab" onclick="geoTab('zonas',this)">Zonas Tarifa</div>
+        </div>
+
+        <!-- Colonias -->
+        <div id="geo-colonias">
+          <div class="toolbar">
+            <input type="text" id="col-search" placeholder="Buscar colonia…" oninput="filtrarColonias()">
+            <button class="btn btn-primary" onclick="openColoniaModal()">+ Agregar</button>
+          </div>
+          <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+            <table>
+              <thead><tr><th>Nombre</th><th>Tipo</th><th>Lat</th><th>Lon</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="colonias-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Zonas -->
+        <div id="geo-zonas" style="display:none">
+          <div id="zonas-form"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Zona</button>
+          <button class="btn btn-primary" style="margin-left:8px" onclick="saveZonas()">Guardar zonas</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONFIG TENANT ── -->
+    <div id="sec-tenant-config" class="section">
+      <h1>Configuración Técnica por Negocio</h1>
+      <p class="subtitle">GRUPO_ID, modalidad, timeouts, IA y pasarela por tenant</p>
+      <div class="form-group" style="max-width:300px">
+        <label>Selecciona negocio</label>
+        <select id="tc-tenant-select" onchange="loadTenantConfig()"><option value="">-- selecciona --</option></select>
+      </div>
+      <div id="tc-content" style="display:none">
+        <div class="grid2" style="gap:20px">
+          <div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">📱 Notificaciones WhatsApp</div></div>
+              <div class="form-group">
+                <label>Modalidad</label>
+                <select id="tc-modalidad">
+                  <option value="grupo">Grupo de WhatsApp</option>
+                  <option value="privado">Conversación privada</option>
+                  <option value="ninguno">Sin notificaciones</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>GRUPO_ID (JID del destino)</label>
+                <input id="tc-grupo-id" type="text" placeholder="521XXXXXXXXXX@g.us o @c.us">
+              </div>
+              <div class="toolbar" style="margin-bottom:0">
+                <button class="btn btn-secondary btn-sm" onclick="openResolverJID()">🔍 Buscar JID</button>
+                <button class="btn btn-secondary btn-sm" onclick="openGruposWA()">📋 Ver grupos</button>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top:16px">
+              <div class="card-header"><div class="card-title">⏱️ Timeouts del Bot</div></div>
+              <div class="form-group">
+                <label>Recordatorio (minutos)</label>
+                <input id="tc-timeout-rec" type="number" min="5" max="60" value="20">
+              </div>
+              <div class="form-group">
+                <label>Cerrar sesión (minutos)</label>
+                <input id="tc-timeout-ses" type="number" min="10" max="120" value="35">
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">🤖 Inteligencia Artificial</div></div>
+              <div class="form-group">
+                <label>Plan con IA activa</label>
+                <div class="toggle-wrap">
+                  <label class="toggle"><input type="checkbox" id="tc-groq-activo"><span class="toggle-slider"></span></label>
+                  <span id="tc-groq-label">Desactivado</span>
+                </div>
+              </div>
+              <small style="color:var(--muted);font-size:11px">La API Key de IA se configura en la sección IA Global</small>
+            </div>
+
+            <div class="card" style="margin-top:16px">
+              <div class="card-header"><div class="card-title">📍 Coordenadas del Negocio</div></div>
+              <div class="form-group">
+                <label>Latitud</label>
+                <input id="tc-lat" type="number" step="any" placeholder="21.5104">
+              </div>
+              <div class="form-group">
+                <label>Longitud</label>
+                <input id="tc-lon" type="number" step="any" placeholder="-104.8922">
+              </div>
+              <div id="tc-mini-mapa" style="height:180px;border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
+              <small style="color:var(--muted);font-size:11px">Haz clic en el mapa para fijar las coordenadas</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><div class="card-title">💳 Pasarela de Pago</div></div>
+          <div class="form-group">
+            <label>Pasarela activa</label>
+            <select id="tc-pasarela" onchange="renderPasarelaFields()">
+              <option value="">Sin pasarela</option>
+              <option value="mercadopago">MercadoPago</option>
+              <option value="stripe">Stripe (próximamente)</option>
+              <option value="conekta">Conekta (próximamente)</option>
+            </select>
+          </div>
+          <div id="tc-pasarela-fields"></div>
+        </div>
+
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveTenantConfig()">Guardar cambios</button>
+          <button class="btn btn-secondary" onclick="loadTenantConfig()">Revertir</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── IA GLOBAL ── -->
+    <div id="sec-ia" class="section">
+      <h1>IA Global</h1>
+      <p class="subtitle">Configuración de Groq compartida entre todos los tenants con IA activa</p>
+      <div class="card" style="max-width:500px">
+        <div class="form-group">
+          <label>GROQ_API_KEY</label>
+          <input id="ia-key" type="password" placeholder="gsk_…">
+          <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="toggleIaKey()">👁 Mostrar / Ocultar</button>
+        </div>
+        <div class="form-group">
+          <label>Modelo</label>
+          <select id="ia-modelo">
+            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (recomendado)</option>
+            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (más rápido)</option>
+            <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Timeout (ms)</label>
+          <input id="ia-timeout" type="number" min="5000" max="60000" step="1000" value="15000">
+        </div>
+        <button class="btn btn-primary" onclick="saveIaConfig()">Guardar</button>
+      </div>
+    </div>
+
+    <!-- ── PASARELAS ── -->
+    <div id="sec-pasarelas" class="section">
+      <h1>Pasarelas de Pago</h1>
+      <p class="subtitle">Pasarelas disponibles en la plataforma. La configuración por negocio se hace en "Config Tenant".</p>
+      <div class="cards">
+        <div class="card">
+          <div class="card-header"><div class="card-title">MercadoPago</div><span class="badge badge-green">Disponible</span></div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Pagos con link (Preference API v3). Requiere token de acceso por negocio y APP_URL global.</p>
+          <div class="chip">México</div><div class="chip">Argentina</div><div class="chip">Colombia</div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Stripe</div><span class="badge badge-gray">Próximamente</span></div>
+          <p style="font-size:12px;color:var(--muted)">Payment Links y Checkout Session. Cobertura global.</p>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Conekta</div><span class="badge badge-gray">Próximamente</span></div>
+          <p style="font-size:12px;color:var(--muted)">Especializada en México. OXXO Pay, tarjetas.</p>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">OpenPay</div><span class="badge badge-gray">Próximamente</span></div>
+          <p style="font-size:12px;color:var(--muted)">BBVA. Tarjetas y tiendas de conveniencia en México.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONFIG GLOBAL ── -->
+    <div id="sec-global" class="section">
+      <h1>Configuración Global</h1>
+      <p class="subtitle">Valores compartidos entre todos los tenants del servidor</p>
+      <div class="card" style="max-width:500px">
+        <div class="form-group">
+          <label>APP_URL (URL pública del servidor)</label>
+          <input id="g-appurl" type="text" placeholder="https://mi-servidor.com">
+        </div>
+        <div class="form-group">
+          <label>Grupo Mandaditos (JID global)</label>
+          <input id="g-mandaditos" type="text" placeholder="521XXXXXXXXXX@g.us">
+        </div>
+        <div class="form-group">
+          <label>Sentry DSN (monitoreo de errores)</label>
+          <input id="g-sentry" type="text" placeholder="https://…@sentry.io/…">
+        </div>
+        <button class="btn btn-primary" onclick="saveGlobalConfig()">Guardar</button>
+      </div>
+      <div class="card" style="max-width:500px;margin-top:16px">
+        <div class="card-header"><div class="card-title">🔑 Cambiar contraseña super-admin</div></div>
+        <div class="form-group"><label>Contraseña actual</label><input id="g-pass-actual" type="password"></div>
+        <div class="form-group"><label>Contraseña nueva</label><input id="g-pass-nueva" type="password"></div>
+        <button class="btn btn-secondary" onclick="cambiarPassword()">Cambiar contraseña</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Modales -->
+<div class="modal-bg" id="modal-tenant">
+  <div class="modal">
+    <h2 id="modal-tenant-title">Nuevo negocio</h2>
+    <div class="grid2">
+      <div class="form-group"><label>ID único</label><input id="mt-id" type="text" placeholder="carnitas-bot-guadalajara"></div>
+      <div class="form-group"><label>Plan</label><select id="mt-plan"><option value="basico">Básico</option><option value="plus">Plus</option><option value="pro">Pro</option></select></div>
+    </div>
+    <div class="form-group"><label>Nombre del negocio</label><input id="mt-nombre" type="text"></div>
+    <div class="grid2">
+      <div class="form-group"><label>Ciudad</label><input id="mt-ciudad" type="text"></div>
+      <div class="form-group"><label>Estado</label><input id="mt-estado" type="text"></div>
+    </div>
+    <div class="form-group"><label>Ruta BD (relativa a la raíz del bot)</label><input id="mt-db" type="text" placeholder="data/tacos_javier.db"></div>
+    <div class="grid2">
+      <div class="form-group"><label>Puerto panel</label><input id="mt-port" type="number" value="3000"></div>
+      <div class="form-group"><label>Desde</label><input id="mt-desde" type="date"></div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="mt-notas" rows="2"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tenant')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveTenant()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-colonia">
+  <div class="modal">
+    <h2 id="modal-colonia-title">Agregar colonia</h2>
+    <input type="hidden" id="mc-id">
+    <div class="form-group"><label>Nombre</label><input id="mc-nombre" type="text" oninput="inferTipo()"></div>
+    <div class="grid2">
+      <div class="form-group"><label>Tipo</label>
+        <select id="mc-tipo">
+          <option value="colonia">Colonia</option>
+          <option value="fraccionamiento">Fraccionamiento</option>
+          <option value="residencial">Residencial</option>
+          <option value="infonavit">INFONAVIT</option>
+          <option value="fovissste">FOVISSSTE</option>
+          <option value="ampliacion">Ampliación</option>
+          <option value="unidad">Unidad</option>
+          <option value="privada">Privada</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Activo</label>
+        <select id="mc-activo"><option value="1">Sí</option><option value="0">No</option></select>
+      </div>
+    </div>
+    <div id="mc-mapa" style="height:240px;border-radius:8px;border:1px solid var(--border);margin-bottom:10px"></div>
+    <div class="grid2">
+      <div class="form-group"><label>Latitud</label><input id="mc-lat" type="number" step="any" oninput="syncMapFromInputs()"></div>
+      <div class="form-group"><label>Longitud</label><input id="mc-lon" type="number" step="any" oninput="syncMapFromInputs()"></div>
+    </div>
+    <div class="form-group"><label>Aliases (separados por coma)</label><input id="mc-aliases" type="text" placeholder="col. flores, las flores, flores"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-colonia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveColonia()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-jid">
+  <div class="modal">
+    <h2>Resolver JID de WhatsApp</h2>
+    <div class="form-group"><label>Número de teléfono (10 dígitos)</label><input id="jid-tel" type="text" placeholder="3311234567"></div>
+    <button class="btn btn-primary" onclick="resolverJID()">Buscar</button>
+    <div id="jid-result" style="margin-top:12px;font-size:13px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-jid')">Cerrar</button>
+      <button class="btn btn-primary" id="jid-usar-btn" style="display:none" onclick="usarJID()">Usar este JID</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-grupos">
+  <div class="modal">
+    <h2>Grupos de WhatsApp del Bot</h2>
+    <div id="grupos-list" class="empty">Cargando…</div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-grupos')">Cerrar</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = '';
+let _token = null;
+let _colonias = [];
+let _mapColonia = null, _markerColonia = null;
+let _mapTcMini = null, _markerTcMini = null;
+let _geoTenant = null, _tcTenant = null;
+let _jidResuelto = null;
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById('sa-user').value;
+  const p = document.getElementById('sa-pass').value;
+  const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({usuario:u,password:p}) });
+  if (r.ok) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('sa-user-label').textContent = u;
+    loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+  } else {
+    const e = await r.json();
+    const el = document.getElementById('login-error');
+    el.textContent = e.error; el.style.display = 'block';
+  }
+}
+async function doLogout() {
+  await fetch('/api/logout', {method:'POST'});
+  location.reload();
+}
+document.getElementById('sa-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+// Auto-check session
+fetch('/api/me').then(r => {
+  if (r.ok) r.json().then(d => {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('sa-user-label').textContent = d.usuario;
+    loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+  });
+});
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.querySelector(`[data-s="${name}"]`).classList.add('active');
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = (type==='ok'?'✅ ':'❌ ') + msg;
+  t.className = 'show'; setTimeout(()=>t.className='', 2500);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const r = await fetch('/api/dashboard'); if(!r.ok) return;
+  const data = await r.json();
+  const el = document.getElementById('dashboard-cards');
+  if (!data.length) { el.innerHTML = '<div class="empty">No hay negocios registrados</div>'; return; }
+  el.innerHTML = data.map(t => {
+    const s = t.stats || {};
+    const badge = t.activo ? `<span class="badge badge-green">Activo</span>` : `<span class="badge badge-red">Inactivo</span>`;
+    const plan = `<span class="badge badge-blue">${t.plan}</span>`;
+    const ia = s.groq_activo ? `<span class="badge badge-purple" style="background:#2e1b69;color:#a78bfa">IA</span>` : '';
+    return `<div class="card">
+      <div class="card-header"><div class="card-title">${s.nombre_negocio||t.nombre}</div>${badge}</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">${plan}${ia}</div>
+      <div class="stat-row">Pedidos hoy <span>${s.pedidos_hoy||0}</span></div>
+      <div class="stat-row">Confirmados hoy <span>${s.confirmados_hoy||0}</span></div>
+      <div class="stat-row">Ventas hoy <span>$${s.ventas_hoy||0}</span></div>
+      <div class="stat-row">Pendientes <span style="${(s.pendientes||0)>0?'color:var(--yellow)':''}">${s.pendientes||0}</span></div>
+      <div class="stat-row">Sesiones activas <span>${s.sesiones_activas||0}</span></div>
+      <div class="stat-row">Clientes totales <span>${s.total_clientes||0}</span></div>
+      ${s.error?`<div style="color:var(--red);font-size:11px;margin-top:8px">⚠️ ${s.error}</div>`:''}
+      <div style="margin-top:12px;font-size:11px;color:var(--muted2)">${t.ciudad}, ${t.estado} · Puerto ${t.panel_port}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TENANTS ───────────────────────────────────────────────────────────────────
+async function loadTenants() {
+  const r = await fetch('/api/tenants'); if(!r.ok) return;
+  const data = await r.json();
+  const PLAN_BADGE = {basico:'badge-gray', plus:'badge-blue', pro:'badge-green'};
+  document.getElementById('tenants-tbody').innerHTML = data.map(t => `
+    <tr>
+      <td><code style="font-size:11px">${t.id}</code></td>
+      <td>${t.nombre}</td>
+      <td>${t.ciudad}, ${t.estado}</td>
+      <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
+      <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}')">Eliminar</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
+}
+function openTenantModal(id) {
+  document.getElementById('modal-tenant-title').textContent = id ? 'Editar negocio' : 'Nuevo negocio';
+  ['mt-id','mt-nombre','mt-ciudad','mt-estado','mt-db','mt-notas'].forEach(i => document.getElementById(i).value='');
+  document.getElementById('mt-port').value = 3000;
+  document.getElementById('mt-desde').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mt-plan').value = 'basico';
+  openModal('modal-tenant');
+}
+async function editTenant(id) {
+  const r = await fetch('/api/tenants'); const data = await r.json();
+  const t = data.find(x=>x.id===id); if(!t) return;
+  document.getElementById('modal-tenant-title').textContent = 'Editar negocio';
+  document.getElementById('mt-id').value=t.id; document.getElementById('mt-nombre').value=t.nombre;
+  document.getElementById('mt-ciudad').value=t.ciudad; document.getElementById('mt-estado').value=t.estado;
+  document.getElementById('mt-db').value=t.db_path; document.getElementById('mt-port').value=t.panel_port;
+  document.getElementById('mt-desde').value=t.desde; document.getElementById('mt-plan').value=t.plan;
+  document.getElementById('mt-notas').value=t.notas||'';
+  openModal('modal-tenant');
+}
+async function saveTenant() {
+  const body = {
+    id:document.getElementById('mt-id').value.trim(),
+    nombre:document.getElementById('mt-nombre').value.trim(),
+    ciudad:document.getElementById('mt-ciudad').value.trim(),
+    estado:document.getElementById('mt-estado').value.trim(),
+    db_path:document.getElementById('mt-db').value.trim(),
+    panel_port:parseInt(document.getElementById('mt-port').value),
+    desde:document.getElementById('mt-desde').value,
+    plan:document.getElementById('mt-plan').value,
+    notas:document.getElementById('mt-notas').value.trim(),
+  };
+  if(!body.id||!body.nombre||!body.db_path){toast('Completa los campos requeridos','err');return;}
+  const r = await fetch('/api/tenants', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){closeModal('modal-tenant');loadTenants();populateTenantSelects();toast('Negocio guardado');}
+  else toast('Error al guardar','err');
+}
+async function confirmDelete(id) {
+  if(!confirm(`¿Eliminar el tenant "${id}" del registro? (no borra su BD)`)) return;
+  await fetch(`/api/tenants/${id}`,{method:'DELETE'});
+  loadTenants(); populateTenantSelects(); toast('Eliminado del registro');
+}
+
+// ── GEO ───────────────────────────────────────────────────────────────────────
+function geoTab(tab, el) {
+  document.querySelectorAll('#sec-geo .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('geo-colonias').style.display = tab==='colonias'?'':'none';
+  document.getElementById('geo-zonas').style.display    = tab==='zonas'?'':'none';
+  if(tab==='zonas') loadZonas();
+}
+async function loadGeo() {
+  const id = document.getElementById('geo-tenant-select').value;
+  if(!id){document.getElementById('geo-content').style.display='none';return;}
+  _geoTenant = id;
+  document.getElementById('geo-content').style.display='block';
+  await loadColonias();
+}
+async function loadColonias() {
+  if(!_geoTenant) return;
+  const r = await fetch(`/api/tenants/${_geoTenant}/colonias`); if(!r.ok) return;
+  _colonias = await r.json();
+  renderColonias();
+}
+function filtrarColonias() {
+  const q = document.getElementById('col-search').value.toLowerCase();
+  const filtered = _colonias.filter(c => c.nombre.toLowerCase().includes(q));
+  renderColoniasData(filtered);
+}
+function renderColonias() { renderColoniasData(_colonias); }
+function renderColoniasData(data) {
+  document.getElementById('colonias-tbody').innerHTML = data.map(c => `
+    <tr>
+      <td>${c.nombre}</td>
+      <td><span class="chip">${c.tipo||'colonia'}</span></td>
+      <td>${c.lat?.toFixed(4)||'—'}</td>
+      <td>${c.lon?.toFixed(4)||'—'}</td>
+      <td>${c.activo?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-secondary btn-sm" onclick="editColonia(${c.id})">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteColonia(${c.id})">✕</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin colonias</td></tr>';
+}
+
+let _mcMap = null, _mcMarker = null;
+function openColoniaModal(id) {
+  document.getElementById('modal-colonia-title').textContent = id ? 'Editar colonia' : 'Agregar colonia';
+  document.getElementById('mc-id').value = id||'';
+  document.getElementById('mc-nombre').value=''; document.getElementById('mc-aliases').value='';
+  document.getElementById('mc-lat').value=''; document.getElementById('mc-lon').value='';
+  document.getElementById('mc-tipo').value='colonia'; document.getElementById('mc-activo').value='1';
+  openModal('modal-colonia');
+  setTimeout(()=>{
+    if(!_mcMap){
+      _mcMap = L.map('mc-mapa').setView([21.51,-104.89],12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(_mcMap);
+      _mcMap.on('click',e=>{
+        const {lat,lng} = e.latlng;
+        document.getElementById('mc-lat').value=lat.toFixed(7);
+        document.getElementById('mc-lon').value=lng.toFixed(7);
+        if(_mcMarker)_mcMarker.setLatLng(e.latlng);
+        else _mcMarker=L.marker(e.latlng).addTo(_mcMap);
+      });
+    } else _mcMap.invalidateSize();
+  },200);
+}
+function editColonia(id) {
+  const c = _colonias.find(x=>x.id===id); if(!c) return;
+  openColoniaModal(id);
+  setTimeout(()=>{
+    document.getElementById('mc-id').value=c.id;
+    document.getElementById('mc-nombre').value=c.nombre;
+    document.getElementById('mc-tipo').value=c.tipo||'colonia';
+    document.getElementById('mc-activo').value=String(c.activo??1);
+    document.getElementById('mc-lat').value=c.lat;
+    document.getElementById('mc-lon').value=c.lon;
+    const aliases = (() => { try { return JSON.parse(c.aliases||'[]').join(', '); } catch(_){ return c.aliases||''; } })();
+    document.getElementById('mc-aliases').value=aliases;
+    if(c.lat && c.lon){
+      _mcMap.setView([c.lat,c.lon],14);
+      if(_mcMarker)_mcMarker.setLatLng([c.lat,c.lon]);
+      else _mcMarker=L.marker([c.lat,c.lon]).addTo(_mcMap);
+    }
+  },250);
+}
+function syncMapFromInputs() {
+  const lat=parseFloat(document.getElementById('mc-lat').value);
+  const lon=parseFloat(document.getElementById('mc-lon').value);
+  if(isNaN(lat)||isNaN(lon)||!_mcMap) return;
+  _mcMap.setView([lat,lon],14);
+  if(_mcMarker)_mcMarker.setLatLng([lat,lon]);
+  else _mcMarker=L.marker([lat,lon]).addTo(_mcMap);
+}
+function inferTipo() {
+  const n = document.getElementById('mc-nombre').value.toLowerCase();
+  let tipo='colonia';
+  if(/infonavit/.test(n)) tipo='infonavit';
+  else if(/fovissste/.test(n)) tipo='fovissste';
+  else if(/fracc|fraccionamiento/.test(n)) tipo='fraccionamiento';
+  else if(/^residencial/.test(n)) tipo='residencial';
+  else if(/^ampl|ampliaci[oó]n/.test(n)) tipo='ampliacion';
+  else if(/^unidad\s/.test(n)) tipo='unidad';
+  else if(/^privada\s/.test(n)) tipo='privada';
+  document.getElementById('mc-tipo').value=tipo;
+}
+async function saveColonia() {
+  const id=document.getElementById('mc-id').value;
+  const nombre=document.getElementById('mc-nombre').value.trim();
+  const lat=parseFloat(document.getElementById('mc-lat').value);
+  const lon=parseFloat(document.getElementById('mc-lon').value);
+  const tipo=document.getElementById('mc-tipo').value;
+  const activo=parseInt(document.getElementById('mc-activo').value);
+  const aliasesRaw=document.getElementById('mc-aliases').value;
+  const aliases=aliasesRaw.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!nombre||isNaN(lat)||isNaN(lon)){toast('Faltan datos','err');return;}
+  const url = id ? `/api/tenants/${_geoTenant}/colonias/${id}` : `/api/tenants/${_geoTenant}/colonias`;
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,lat,lon,tipo,activo,aliases})});
+  if(r.ok){closeModal('modal-colonia');loadColonias();toast(id?'Colonia actualizada':'Colonia agregada');}
+  else toast('Error al guardar','err');
+}
+async function deleteColonia(id) {
+  const c=_colonias.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar "${c?.nombre||id}"?`)) return;
+  const r=await fetch(`/api/tenants/${_geoTenant}/colonias/${id}`,{method:'DELETE'});
+  if(r.ok){loadColonias();toast('Colonia eliminada');}
+  else toast('Error','err');
+}
+
+// Zonas
+let _zonas = [];
+async function loadZonas() {
+  if(!_geoTenant) return;
+  const r=await fetch(`/api/tenants/${_geoTenant}/zonas`); if(!r.ok) return;
+  _zonas=await r.json(); renderZonas();
+}
+function renderZonas() {
+  document.getElementById('zonas-form').innerHTML = _zonas.map((z,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" value="${z.nombre_zona}" onchange="_zonas[${i}].nombre_zona=this.value" style="flex:2">
+      <input type="number" value="${z.distancia_max}" onchange="_zonas[${i}].distancia_max=parseFloat(this.value)" style="flex:1" placeholder="km máx">
+      <input type="number" value="${z.tarifa}" onchange="_zonas[${i}].tarifa=parseFloat(this.value)" style="flex:1" placeholder="tarifa $">
+      <button class="btn btn-danger btn-sm" onclick="_zonas.splice(${i},1);renderZonas()">✕</button>
+    </div>`).join('');
+}
+function addZonaRow() { _zonas.push({nombre_zona:'',distancia_max:0,tarifa:0}); renderZonas(); }
+async function saveZonas() {
+  const r=await fetch(`/api/tenants/${_geoTenant}/zonas`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({zonas:_zonas})});
+  r.ok ? toast('Zonas guardadas') : toast('Error','err');
+}
+
+// ── CONFIG TENANT ─────────────────────────────────────────────────────────────
+let _tcConfig = {};
+let _tcMap = null, _tcMarker = null;
+
+async function loadTenantConfig() {
+  const id=document.getElementById('tc-tenant-select').value;
+  if(!id){document.getElementById('tc-content').style.display='none';return;}
+  _tcTenant=id;
+  const r=await fetch(`/api/tenants/${id}/config`); if(!r.ok) return;
+  _tcConfig=await r.json();
+  document.getElementById('tc-content').style.display='block';
+  document.getElementById('tc-grupo-id').value=_tcConfig.grupo_id||'';
+  document.getElementById('tc-modalidad').value=_tcConfig.notif_modalidad||'grupo';
+  document.getElementById('tc-timeout-rec').value=_tcConfig.timeout_recordatorio_min||'20';
+  document.getElementById('tc-timeout-ses').value=_tcConfig.timeout_sesion_min||'35';
+  const groqAct=_tcConfig.groq_activo==='1';
+  document.getElementById('tc-groq-activo').checked=groqAct;
+  document.getElementById('tc-groq-label').textContent=groqAct?'Activado':'Desactivado';
+  document.getElementById('tc-lat').value=_tcConfig.negocio_lat||'';
+  document.getElementById('tc-lon').value=_tcConfig.negocio_lon||'';
+  document.getElementById('tc-pasarela').value=_tcConfig.pasarela_activa||'';
+  renderPasarelaFields();
+  // Mini mapa
+  setTimeout(()=>{
+    if(!_tcMap){
+      _tcMap=L.map('tc-mini-mapa').setView([21.51,-104.89],12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(_tcMap);
+      _tcMap.on('click',e=>{
+        document.getElementById('tc-lat').value=e.latlng.lat.toFixed(7);
+        document.getElementById('tc-lon').value=e.latlng.lng.toFixed(7);
+        if(_tcMarker)_tcMarker.setLatLng(e.latlng); else _tcMarker=L.marker(e.latlng).addTo(_tcMap);
+      });
+    } else _tcMap.invalidateSize();
+    const lat=parseFloat(_tcConfig.negocio_lat); const lon=parseFloat(_tcConfig.negocio_lon);
+    if(!isNaN(lat)&&!isNaN(lon)){
+      _tcMap.setView([lat,lon],14);
+      if(_tcMarker)_tcMarker.setLatLng([lat,lon]); else _tcMarker=L.marker([lat,lon]).addTo(_tcMap);
+    }
+  },200);
+  document.getElementById('tc-groq-activo').onchange=function(){
+    document.getElementById('tc-groq-label').textContent=this.checked?'Activado':'Desactivado';
+  };
+}
+
+function renderPasarelaFields() {
+  const p=document.getElementById('tc-pasarela').value;
+  let cfg={};
+  try{ cfg=JSON.parse(_tcConfig.pasarela_config||'{}'); }catch(_){}
+  const el=document.getElementById('tc-pasarela-fields');
+  if(p==='mercadopago'){
+    el.innerHTML=`<div class="form-group"><label>Access Token (APP_USR-…)</label><input id="tc-mp-token" type="password" value="${cfg.access_token||''}"><button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="document.getElementById('tc-mp-token').type=document.getElementById('tc-mp-token').type==='password'?'text':'password'">👁</button></div>`;
+  } else { el.innerHTML=''; }
+}
+
+async function saveTenantConfig() {
+  if(!_tcTenant){toast('Selecciona un negocio','err');return;}
+  const pasarela=document.getElementById('tc-pasarela').value;
+  let pasarelaConfig='{}';
+  if(pasarela==='mercadopago'){
+    const token=document.getElementById('tc-mp-token')?.value||'';
+    pasarelaConfig=JSON.stringify({access_token:token});
+  }
+  const config={
+    grupo_id:          document.getElementById('tc-grupo-id').value.trim(),
+    notif_modalidad:   document.getElementById('tc-modalidad').value,
+    timeout_recordatorio_min: document.getElementById('tc-timeout-rec').value,
+    timeout_sesion_min:       document.getElementById('tc-timeout-ses').value,
+    groq_activo:       document.getElementById('tc-groq-activo').checked?'1':'0',
+    negocio_lat:       document.getElementById('tc-lat').value,
+    negocio_lon:       document.getElementById('tc-lon').value,
+    pasarela_activa:   pasarela,
+    pasarela_config:   pasarelaConfig,
+  };
+  const r=await fetch(`/api/tenants/${_tcTenant}/config/bulk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
+  r.ok ? toast('Configuración guardada') : toast('Error al guardar','err');
+}
+
+// ── RESOLVER JID ──────────────────────────────────────────────────────────────
+function openResolverJID() { document.getElementById('jid-result').textContent=''; document.getElementById('jid-usar-btn').style.display='none'; _jidResuelto=null; openModal('modal-jid'); }
+async function resolverJID() {
+  const tel=document.getElementById('jid-tel').value.replace(/\D/g,'');
+  const r=await fetch('/api/resolver-jid',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefono:tel})});
+  const d=await r.json();
+  if(r.ok&&d.jid){
+    document.getElementById('jid-result').innerHTML=`<div class="badge badge-green">✅ Registrado en WhatsApp</div><br><code style="font-size:12px;margin-top:6px;display:block">${d.jid}</code>`;
+    _jidResuelto=d.jid; document.getElementById('jid-usar-btn').style.display='';
+  } else if(r.ok){
+    document.getElementById('jid-result').innerHTML=`<span class="badge badge-red">❌ No registrado en WhatsApp</span>`;
+  } else {
+    document.getElementById('jid-result').textContent=d.error||'Error';
+  }
+}
+function usarJID() {
+  if(!_jidResuelto) return;
+  document.getElementById('tc-grupo-id').value=_jidResuelto;
+  closeModal('modal-jid');
+  toast('JID asignado al campo GRUPO_ID');
+}
+
+async function openGruposWA() {
+  openModal('modal-grupos');
+  document.getElementById('grupos-list').textContent='Cargando…';
+  const r=await fetch('/api/grupos-wa');
+  if(!r.ok){document.getElementById('grupos-list').textContent='Bot no conectado o error';return;}
+  const grupos=await r.json();
+  if(!grupos.length){document.getElementById('grupos-list').innerHTML='<div class="empty">Sin grupos</div>';return;}
+  document.getElementById('grupos-list').innerHTML=grupos.map(g=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-weight:600">${g.nombre}</div><code style="font-size:11px;color:var(--muted)">${g.id}</code></div>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('tc-grupo-id').value='${g.id}';closeModal('modal-grupos');toast('JID copiado al campo')">Usar</button>
+    </div>`).join('');
+}
+
+// ── IA GLOBAL ─────────────────────────────────────────────────────────────────
+async function loadIaConfig() {
+  const r=await fetch('/api/global-config'); if(!r.ok) return;
+  const data=await r.json();
+  const m=Object.fromEntries(data.map(d=>[d.clave,d.valor]));
+  document.getElementById('ia-key').value=m.groq_api_key||'';
+  document.getElementById('ia-modelo').value=m.groq_modelo||'llama-3.3-70b-versatile';
+  document.getElementById('ia-timeout').value=m.groq_timeout_ms||'15000';
+}
+async function saveIaConfig() {
+  const config={groq_api_key:document.getElementById('ia-key').value.trim(),groq_modelo:document.getElementById('ia-modelo').value,groq_timeout_ms:document.getElementById('ia-timeout').value};
+  const r=await fetch('/api/global-config/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
+  r.ok ? toast('Config IA guardada') : toast('Error','err');
+}
+function toggleIaKey() {
+  const el=document.getElementById('ia-key');
+  el.type=el.type==='password'?'text':'password';
+}
+
+// ── CONFIG GLOBAL ─────────────────────────────────────────────────────────────
+async function loadGlobalConfig() {
+  const r=await fetch('/api/global-config'); if(!r.ok) return;
+  const data=await r.json();
+  const m=Object.fromEntries(data.map(d=>[d.clave,d.valor]));
+  document.getElementById('g-appurl').value=m.app_url||'';
+  document.getElementById('g-mandaditos').value=m.grupo_mandaditos_id||'';
+  document.getElementById('g-sentry').value=m.sentry_dsn||'';
+}
+async function saveGlobalConfig() {
+  const config={app_url:document.getElementById('g-appurl').value.trim(),grupo_mandaditos_id:document.getElementById('g-mandaditos').value.trim(),sentry_dsn:document.getElementById('g-sentry').value.trim()};
+  const r=await fetch('/api/global-config/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
+  r.ok ? toast('Config global guardada') : toast('Error','err');
+}
+async function cambiarPassword() {
+  const actual=document.getElementById('g-pass-actual').value;
+  const nueva=document.getElementById('g-pass-nueva').value;
+  if(!nueva||nueva.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres','err');return;}
+  const r=await fetch('/api/cambiar-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password_actual:actual,password_nuevo:nueva})});
+  if(r.ok){document.getElementById('g-pass-actual').value='';document.getElementById('g-pass-nueva').value='';toast('Contraseña actualizada');}
+  else toast('Contraseña actual incorrecta','err');
+}
+
+// ── POPULATE SELECTS ──────────────────────────────────────────────────────────
+async function populateTenantSelects() {
+  const r=await fetch('/api/tenants'); if(!r.ok) return;
+  const data=await r.json();
+  const opts=data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  document.getElementById('geo-tenant-select').innerHTML='<option value="">-- selecciona --</option>'+opts;
+  document.getElementById('tc-tenant-select').innerHTML='<option value="">-- selecciona --</option>'+opts;
+  loadTenants();
+}
+
+// Cargar tenants en la tabla cuando se abre esa sección
+document.querySelector('[data-s="tenants"]').addEventListener('click',()=>setTimeout(loadTenants,100));
+</script>
+</body>
+</html>

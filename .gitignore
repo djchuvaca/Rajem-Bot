@@ -10,10 +10,11 @@ node_modules/
 .wwebjs_auth/
 .wwebjs_cache/
 
-# ── Base de datos (contiene datos personales de clientes) ──────
+# ── Base de datos y datos de tenants (contienen datos privados) ─
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/tenants.json
 
 # ── Capturas enviadas por clientes (imágenes privadas) ─────────
 capturas/

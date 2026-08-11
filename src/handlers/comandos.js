@@ -116,7 +116,6 @@ async function handleComandos(msg, client) {
       clearTimeout(_grupoPendiente.timeout);
       _grupoPendiente = null;
       setConfig("grupo_id", msg.from);
-      process.env.GRUPO_ID = msg.from;
       await msg.reply("✅ ¡Listo! Este grupo queda configurado como grupo de administración.\nYa recibirás pedidos y notificaciones aquí.\n\nEscribe *!ayuda* para ver los comandos disponibles.");
       return;
     }

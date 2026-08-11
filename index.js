@@ -8,15 +8,9 @@ if (process.env.SENTRY_DSN) {
 
 // ── VALIDACIÓN DE VARIABLES DE ENTORNO ───────────────────────────────────────
 (function validarEnv() {
-  const requeridas = ["GROQ_API_KEY"];
-  const faltantes  = requeridas.filter(k => !process.env[k]);
-  if (faltantes.length) {
-    console.error("❌ Faltan variables de entorno requeridas:", faltantes.join(", "));
-    console.error("   Copia .env.example como .env y completa los valores.");
-    process.exit(1);
-  }
-  if (!process.env.GRUPO_ID) {
-    console.warn("⚠️  GRUPO_ID no está definido. Agrega el bot a tu grupo de WhatsApp para configurarlo automáticamente.");
+  // GROQ_API_KEY ya no es requerida en .env — puede configurarse desde el super-admin (admin.db)
+  if (!process.env.GROQ_API_KEY) {
+    console.warn("⚠️  GROQ_API_KEY no está en .env. Configúrala desde el super-admin si este tenant tiene IA activa.");
   }
   if (!process.env.PANEL_SECRET) {
     console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto por defecto (inseguro en producción).");
@@ -35,6 +29,7 @@ const { handleMensaje }  = require("./src/handlers/mensajes");
 const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, getGrupoId, getGrupoMandaditosId } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
+const { startSuperAdmin, setWaClient: setSuperAdminWaClient } = require("./src/superadmin/server");
 const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
 
@@ -63,6 +58,7 @@ client.on("qr", (qr) => {
 client.on("ready", () => {
   _reintentos = 0;
   setWhatsappClient(client);
+  setSuperAdminWaClient(client);
   reanudarDespachosPendientes(client).catch(e => logger.error("Error al reanudar despachos:", e.message));
   logger.info("Bot de Tacos Javier conectado y listo.")
   console.log("✅ Bot de Tacos Javier conectado y listo!");
@@ -255,6 +251,7 @@ initDB().then(() => {
 
   restaurarTodasLasSesiones();
   startPanel(process.env.PANEL_PORT || 3000);
+  startSuperAdmin(parseInt(process.env.SUPERADMIN_PORT || '3001'), client);
   client.initialize();
 
   // Primer backup al arrancar, luego cada 6 horas

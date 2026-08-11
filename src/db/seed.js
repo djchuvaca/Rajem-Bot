@@ -95,6 +95,24 @@ async function seedDB() {
     lon         REAL NOT NULL,
     activo      INTEGER DEFAULT 1
   )`); } catch (_) {}
+
+  // Migraciones colonias: campos enriquecidos para el super-admin
+  try { db.run("ALTER TABLE colonias ADD COLUMN slug    TEXT DEFAULT ''"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN tipo    TEXT DEFAULT 'colonia'"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN aliases TEXT DEFAULT '[]'"); } catch (_) {}
+
+  // Poblar slug en registros existentes que no lo tengan
+  db.run(`
+    UPDATE colonias SET slug = lower(
+      replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+      replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+      replace(replace(replace(nombre,
+        'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),
+        'Á','a'),'É','e'),'Í','i'),'Ó','o'),'Ú','u'),
+        'ñ','n'),'Ñ','n'),'ü','u'),'Ü','u'),
+        ' ','-'),'.','-'),',','-'),';','-'),':','-'),'/',''),'''',''),'.',''))
+    WHERE slug = '' OR slug IS NULL
+  `);
   try { run(`CREATE TABLE IF NOT EXISTS tarifas_zonas (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre_zona   TEXT NOT NULL,
@@ -422,6 +440,14 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_colonia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_referencia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupo_mandaditos_id', '')");
+
+  // Config: IA y pasarela de pagos (administradas desde super-admin)
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('groq_activo', '0')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_activa', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_config', '{}')");
+
+  // Config: modalidad de notificaciones (grupo o privado) — configurada por super-admin
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_modalidad', 'grupo')");
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (

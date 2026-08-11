@@ -21,7 +21,7 @@ const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
 const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
 const botPausado = require("../estado/bot-pausado");
 const { actualizarEstadoPorId } = require("../db");
-const mpPagos = require("../pagos/mercadopago");
+const mpPagos = require("../pagos");
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
