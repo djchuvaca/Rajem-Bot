@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - TZ=America/Tepic
+      - TZ=America/Mazatlan
     ports:
       - "3000:3000"
     volumes:
