@@ -145,7 +145,8 @@ async function seedDB() {
       ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa. Si es de Tacos Javier, ni para qué te cuento."],
     ];
     for (const [nombre, desc] of descripciones) {
-      db.run("UPDATE productos SET descripcion = ? WHERE nombre = ?", [desc, nombre]);
+      // Solo rellenar si la descripción está vacía — no sobreescribir cambios del tenant
+      db.run("UPDATE productos SET descripcion = ? WHERE nombre = ? AND (descripcion IS NULL OR descripcion = '')", [desc, nombre]);
     }
     const sinonimosDefault = [
       ["surtido", "surtida,mixto,mixta"],
@@ -202,7 +203,8 @@ async function seedDB() {
       run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
         [nombre, desc, taco, torta, g100, sins, cat]);
     } else {
-      run("UPDATE productos SET categoria = ? WHERE nombre = ?", [cat, nombre]);
+      // Solo rellenar categoría si está vacía — no sobreescribir cambios del tenant
+      run("UPDATE productos SET categoria = ? WHERE nombre = ? AND (categoria IS NULL OR categoria = '')", [cat, nombre]);
     }
   }
   // Rename legacy "cebolla rallada" if it exists
