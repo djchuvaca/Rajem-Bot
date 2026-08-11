@@ -2,7 +2,7 @@ const {
   pendientesConfirmacion, clientesNuevos, datosCampos, resumenPendiente,
   esperandoConfirmacionItem, esperandoAgregarMas, esperandoCorte,
   esperandoTipoItem, esperandoCaptura, esperandoExtras, ordenPreResumen,
-  limpiarTodo, extraerTelefonoDeJID,
+  limpiarTodo, extraerTelefonoDeJID, persistirEstado,
 } = require("../estado");
 const {
   actualizarEstadoPedido, actualizarEstadoConfirmado, actualizarEstadoPorId,
@@ -175,14 +175,12 @@ async function handleComandos(msg, client) {
 
   // ── !pausar / !reanudar ────────────────────────────────────────────────────
   if (/^!pausar$/i.test(texto)) {
-    botPausado.pausado = true;
-    setConfig('bot_pausado', '1');
+    botPausado.pausado = true; // el setter ya persiste en BD
     await msg.reply("⏸️ Bot en pausa. Los clientes no recibirán respuestas automáticas.\nUsa *!reanudar* para activarlo de nuevo.");
     return;
   }
   if (/^!reanudar$/i.test(texto)) {
-    botPausado.pausado = false;
-    setConfig('bot_pausado', '0');
+    botPausado.pausado = false; // el setter ya persiste en BD
     await msg.reply("▶️ Bot reactivado. Volviendo a responder mensajes normalmente.");
     return;
   }
@@ -381,6 +379,7 @@ async function handleComandos(msg, client) {
       await client.sendMessage(numeroCliente, mensajeCliente);
       try { actualizarEstadoPedido(datos.telefono, "confirmado"); } catch (e) { console.error("BD Error:", e.message); }
       pendientesConfirmacion.delete(numeroCliente);
+      persistirEstado(numeroCliente); // elimina la sesión de BD para que no reaparezca en el próximo reinicio
 
       let replyAdmin = `✅ Confirmación enviada a *${datos.nombre}* (${datos.telefono})`;
 
@@ -540,6 +539,7 @@ async function handleComandos(msg, client) {
         await client.sendMessage(numeroCliente, mensajeCancelacion);
         try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (e) { console.error("BD Error:", e.message); }
         pendientesConfirmacion.delete(numeroCliente);
+        persistirEstado(numeroCliente); // elimina sesión de BD
         await msg.reply(`❌ Cancelación enviada a *${datos.nombre}* (${datos.telefono})`);
       } catch (e) {
         await msg.reply(`❌ Error al enviar cancelación: ${e.message}`);
@@ -568,6 +568,7 @@ async function handleComandos(msg, client) {
     try {
       await client.sendMessage(jid, mensajeCancelacion);
       try { actualizarEstadoConfirmado(numBuscar, "cancelado"); } catch (e) { console.error("BD Error:", e.message); }
+      persistirEstado(jid); // limpia cualquier sesión residual en BD
       await msg.reply(`❌ Cancelación enviada a *${nombre}* (${numBuscar})`);
     } catch (e) {
       await msg.reply(`❌ Error al enviar cancelación: ${e.message}`);
@@ -596,6 +597,7 @@ async function handleComandos(msg, client) {
       await client.sendMessage(numeroCliente, mensajeRechazo);
       try { actualizarEstadoPedido(datos.telefono, "rechazado"); } catch (e) { console.error("BD Error:", e.message); }
       pendientesConfirmacion.delete(numeroCliente);
+      persistirEstado(numeroCliente); // elimina sesión de BD
       await msg.reply(`⚠️ Rechazo enviado a *${datos.nombre}* (${datos.telefono})`);
       console.log(`⚠️ Pedido rechazado para ${numeroCliente}`);
     } catch (e) {

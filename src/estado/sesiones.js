@@ -80,13 +80,16 @@ function persistirEstado(numero) {
   guardarSesion(numero, estado, historial);
 }
 
-// Claves que indican que el cliente está en medio de un flujo conversacional real.
-// Sesiones con solo datos de fondo (datosCampos, tipoEntregaCliente, etc.) no se restauran.
+// Claves que indican que el cliente tiene contexto relevante que vale la pena restaurar.
+// Se incluyen tanto flujos bloqueantes como datos de formulario parcialmente completados.
 const _CLAVES_FLUJO_ACTIVO = new Set([
+  // Flujos activos bloqueantes
   "resumenPendiente", "esperandoCaptura", "esperandoConfirmItem",
   "esperandoAgregarMas", "esperandoConfirmDatos", "esperandoEdicion",
   "esperandoCorte", "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
   "ordenPreResumen", "pendienteConfirmacion", "esperandoPagoMP",
+  // Datos de formulario — el cliente llenó parte de su dirección/datos; restaurar evita que repita todo
+  "datosCampos",
 ]);
 
 function _tieneFlujoActivo(estado) {
