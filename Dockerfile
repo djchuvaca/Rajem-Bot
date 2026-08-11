@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     build-essential \
     python3 \
+    tzdata \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
