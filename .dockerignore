@@ -1,0 +1,11 @@
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/
+data/
+logs/
+.env
+.env.local
+.git/
+.claude/
+*.log
+npm-debug.log*

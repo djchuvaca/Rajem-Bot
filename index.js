@@ -42,6 +42,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ clientId: process.env.TENANT_ID || "carnitas-bot" }),
   puppeteer: {
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
   },
   webVersionCache: {
