@@ -615,8 +615,8 @@ function _seedBusinessTypes(db) {
   );
   const stmtIT = db.prepare(
     `INSERT OR IGNORE INTO item_types
-       (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo, precio_base)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`
+       (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo, precio_base, activo)
+     VALUES (?,?,?,?,?,?,?,?,?,?,0)`
   );
   const stmtPT = db.prepare(
     `INSERT OR IGNORE INTO business_type_products
