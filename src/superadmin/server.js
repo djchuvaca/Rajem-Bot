@@ -90,9 +90,9 @@ app.get('/api/tenants', requireAuth, (req, res) => {
 });
 
 app.post('/api/tenants', requireAuth, (req, res) => {
-  const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas } = req.body;
+  const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas, business_type } = req.body;
   if (!id || !nombre || !db_path) return res.status(400).json({ error: 'Faltan campos requeridos: id, nombre, db_path' });
-  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: plan || 'basico', desde: desde || new Date().toISOString().slice(0,10), notas: notas || '' });
+  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: plan || 'basico', desde: desde || new Date().toISOString().slice(0,10), notas: notas || '', business_type: business_type || 'taqueria' });
   res.json({ ok: true });
 });
 

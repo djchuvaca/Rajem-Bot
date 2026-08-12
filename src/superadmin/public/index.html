@@ -154,8 +154,8 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Nombre</th><th>Ciudad</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody id="tenants-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Ciudad</th><th>Giro</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tenants-tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -409,6 +409,14 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
       <div class="form-group"><label>Ciudad</label><input id="mt-ciudad" type="text"></div>
       <div class="form-group"><label>Estado</label><input id="mt-estado" type="text"></div>
     </div>
+    <div class="form-group">
+      <label>Giro de negocio</label>
+      <select id="mt-business-type">
+        <option value="taqueria">🌮 Taquería</option>
+        <option value="pizzeria">🍕 Pizzería</option>
+        <option value="hamburgueseria">🍔 Hamburguesería</option>
+      </select>
+    </div>
     <div class="grid2">
       <div class="form-group"><label>Plan</label><select id="mt-plan"><option value="basico">Básico</option><option value="plus">Plus</option><option value="pro">Pro</option></select></div>
       <div class="form-group"><label>GRUPO_ID WhatsApp <span style="color:var(--muted);font-weight:400;font-size:12px">(opcional)</span></label><input id="mt-grupo" type="text" placeholder="521XXXXXXXXXX@g.us"></div>
@@ -564,6 +572,12 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 
 <script>
 const API = '';
+const GIRO_CATALOG = [
+  { slug: 'taqueria',       label: '🌮 Taquería' },
+  { slug: 'pizzeria',       label: '🍕 Pizzería' },
+  { slug: 'hamburgueseria', label: '🍔 Hamburguesería' },
+];
+const GIRO_LABEL = Object.fromEntries(GIRO_CATALOG.map(g => [g.slug, g.label]));
 let _token = null;
 let _colonias = [];
 let _mapColonia = null, _markerColonia = null;
@@ -663,6 +677,7 @@ async function loadTenants() {
       <td><code style="font-size:11px">${t.id}</code></td>
       <td>${t.nombre}</td>
       <td>${t.ciudad}, ${t.estado}</td>
+      <td style="font-size:12px;white-space:nowrap">${GIRO_LABEL[t.business_type] || t.business_type || '🌮 Taquería'}</td>
       <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
       <td><span class="badge ${{activo:'badge-green',pausado:'badge-yellow',inactivo:'badge-gray'}[t.bot_estado]||'badge-gray'}">${{activo:'Activo',pausado:'En pausa',inactivo:'Inactivo'}[t.bot_estado]||'Inactivo'}</span></td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
@@ -670,7 +685,7 @@ async function loadTenants() {
         <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${(t.nombre||'').replace(/'/g,'')}')">Provisionar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}','${(t.nombre||'').replace(/'/g,'')  }')">Eliminar</button>
       </td>
-    </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Sin negocios</td></tr>';
 }
 let _editingTenantId = null;
 function openTenantModal() {
@@ -679,6 +694,7 @@ function openTenantModal() {
   ['mt-id','mt-nombre','mt-ciudad','mt-estado','mt-grupo','mt-notas'].forEach(i => document.getElementById(i).value='');
   document.getElementById('mt-id').disabled = false;
   document.getElementById('mt-plan').value = 'basico';
+  document.getElementById('mt-business-type').value = 'taqueria';
   document.getElementById('mt-btn').textContent = 'Crear y provisionar';
   openModal('modal-tenant');
 }
@@ -692,6 +708,7 @@ async function editTenant(id) {
   document.getElementById('mt-ciudad').value=t.ciudad; document.getElementById('mt-estado').value=t.estado;
   document.getElementById('mt-grupo').value='';
   document.getElementById('mt-plan').value=t.plan;
+  document.getElementById('mt-business-type').value = t.business_type || 'taqueria';
   document.getElementById('mt-notas').value=t.notas||'';
   document.getElementById('mt-btn').textContent = 'Guardar cambios';
   openModal('modal-tenant');
@@ -702,13 +719,14 @@ async function saveTenant() {
   if(!id || !nombre){ toast('El nombre es requerido','err'); return; }
   const body = {
     nombre,
-    ciudad:     document.getElementById('mt-ciudad').value.trim(),
-    estado:     document.getElementById('mt-estado').value.trim(),
-    db_path:    `data/${id}.db`,
-    panel_port: 0,
-    desde:      new Date().toISOString().slice(0,10),
-    plan:       document.getElementById('mt-plan').value,
-    notas:      document.getElementById('mt-notas').value.trim(),
+    ciudad:        document.getElementById('mt-ciudad').value.trim(),
+    estado:        document.getElementById('mt-estado').value.trim(),
+    db_path:       `data/${id}.db`,
+    panel_port:    0,
+    desde:         new Date().toISOString().slice(0,10),
+    plan:          document.getElementById('mt-plan').value,
+    business_type: document.getElementById('mt-business-type').value,
+    notas:         document.getElementById('mt-notas').value.trim(),
   };
   const url    = _editingTenantId ? `/api/tenants/${_editingTenantId}` : '/api/tenants';
   const method = _editingTenantId ? 'PUT' : 'POST';
@@ -723,12 +741,13 @@ async function saveTenant() {
       _provTenantId  = id;
       _provPanelPort = 0;
       await _ejecutarProvisionamientoDirecto({
-        tenant_id:  id,
-        nombre:     body.nombre,
-        ciudad:     body.ciudad,
-        estado:     body.estado,
-        plan:       body.plan,
-        grupo_id:   document.getElementById('mt-grupo').value.trim(),
+        tenant_id:     id,
+        nombre:        body.nombre,
+        ciudad:        body.ciudad,
+        estado:        body.estado,
+        plan:          body.plan,
+        business_type: body.business_type,
+        grupo_id:      document.getElementById('mt-grupo').value.trim(),
       });
     }
   } else toast('Error al guardar','err');
