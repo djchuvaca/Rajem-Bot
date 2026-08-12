@@ -709,7 +709,12 @@ function showSection(name) {
     document.querySelector('.sidebar').classList.remove('open');
     document.getElementById('sidebar-overlay').classList.remove('show');
   }
+  history.replaceState(null, '', '#' + name);
   loaders[name]?.();
+}
+function _restoreSection() {
+  const name = location.hash.slice(1);
+  if (name && document.getElementById('s-' + name)) showSection(name);
 }
 
 const loaders = {
@@ -1833,6 +1838,7 @@ async function initApp() {
   checkWaStatus();
   loadNegocioEstado();
   loadDashboard();
+  _restoreSection();
 }
 
 setInterval(async () => {

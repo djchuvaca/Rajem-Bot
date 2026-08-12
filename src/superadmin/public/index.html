@@ -580,6 +580,7 @@ async function doLogin() {
     document.getElementById('app').style.display = 'flex';
     document.getElementById('sa-user-label').textContent = u;
     loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+    _restoreSection();
   } else {
     const e = await r.json();
     const el = document.getElementById('login-error');
@@ -598,6 +599,7 @@ fetch('/api/me').then(r => {
     document.getElementById('app').style.display = 'flex';
     document.getElementById('sa-user-label').textContent = d.usuario;
     loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+    _restoreSection();
   });
 });
 
@@ -606,6 +608,11 @@ function showSection(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('sec-'+name).classList.add('active');
   document.querySelector(`[data-s="${name}"]`).classList.add('active');
+  history.replaceState(null, '', '#' + name);
+}
+function _restoreSection() {
+  const name = location.hash.slice(1);
+  if (name && document.getElementById('sec-' + name)) showSection(name);
 }
 
 function toast(msg, type='ok') {
