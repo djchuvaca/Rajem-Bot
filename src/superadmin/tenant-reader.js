@@ -221,6 +221,26 @@ function setTenantZonas(tenant, zonas) {
   finally { db.close(); }
 }
 
+// Estado real del bot: lee qr_pendiente y sesiones_activas de la BD del tenant.
+// sin_bd → esperando_qr → en_uso → conectado
+function getTenantBotStatus(tenant) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path
+    : path.join(ROOT_PATH, tenant.db_path);
+  if (!fs.existsSync(dbPath)) return 'sin_bd';
+  let db;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const qr = db.prepare('SELECT valor FROM configuracion WHERE clave=?').get('qr_pendiente');
+    if (qr?.valor) return 'esperando_qr';
+    const sesiones = db.prepare(
+      `SELECT COUNT(*) as n FROM sesiones_activas WHERE actualizado_en >= datetime('now','localtime','-35 minutes')`
+    ).get()?.n || 0;
+    return sesiones > 0 ? 'en_uso' : 'conectado';
+  } catch { return 'sin_bd'; }
+  finally { try { db?.close(); } catch {} }
+}
+
 // Lectura de QR con conexion fresca (sin cache) para ver siempre datos recientes
 function getTenantQR(tenant) {
   const dbPath = path.isAbsolute(tenant.db_path)
@@ -243,5 +263,5 @@ module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas, getTenantQR,
+  getTenantZonas, setTenantZonas, getTenantQR, getTenantBotStatus,
 };

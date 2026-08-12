@@ -18,7 +18,7 @@ const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas, getTenantQR,
+  getTenantZonas, setTenantZonas, getTenantQR, getTenantBotStatus,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -330,46 +330,12 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
   proxyReq.end();
 });
 
-// ── ESTADO DOCKER POR TENANT ──────────────────────────────────────────────────
-// Lee el estado de cada contenedor via Docker Unix socket (/var/run/docker.sock).
-// No requiere Docker CLI, ni llamadas HTTP externas, ni permisos especiales de PM2.
-app.get('/api/docker-statuses', requireAuth, async (req, res) => {
-  const tenants = getTenants();
-
-  let socketError = null;
-  const dockerMap = await new Promise(resolve => {
-    const http = require('http');
-    const req = http.get({
-      socketPath: '/var/run/docker.sock',
-      path:       '/containers/json?all=true',
-      headers:    { Host: 'localhost' },
-    }, resp => {
-      let body = '';
-      resp.on('data', c => body += c);
-      resp.on('end', () => {
-        try {
-          const map = {};
-          JSON.parse(body).forEach(c => {
-            const name = (c.Names[0] || '').replace(/^\//, '');
-            map[name] = c.State;
-          });
-          resolve(map);
-        } catch (e) { socketError = 'parse:' + e.message; resolve({}); }
-      });
-    });
-    req.on('error', e => { socketError = e.message; resolve({}); });
-    req.end();
-  });
-
+// ── ESTADO DEL BOT POR TENANT ─────────────────────────────────────────────────
+// Lee qr_pendiente y sesiones_activas de la BD de cada tenant (volumen ./data).
+// sin_bd | esperando_qr | en_uso | conectado
+app.get('/api/docker-statuses', requireAuth, (req, res) => {
   const result = {};
-  for (const t of tenants) {
-    const ds = dockerMap[t.id];
-    if (!ds)                      result[t.id] = 'sin_contenedor';
-    else if (ds === 'running')    result[t.id] = getTenantQR(t) ? 'iniciando' : 'activo';
-    else if (ds === 'restarting') result[t.id] = 'reiniciando';
-    else                          result[t.id] = 'inactivo';
-  }
-  if (socketError) result._error = socketError;
+  for (const t of getTenants()) result[t.id] = getTenantBotStatus(t);
   res.json(result);
 });
 
