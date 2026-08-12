@@ -235,73 +235,70 @@ async function seedDB() {
     }
     if (productosGiro.length) console.log(`✅ Productos iniciales insertados (${_btSlug})`);
   } else if (_btSlug === 'taqueria') {
-    // Migraciones de datos legados — solo para instancias de taquería existentes
+    // 1. Limpiar duplicados por capitalización (conservar el activo con precios reales)
+    const _dupes = [
+      ['costilla',         'Costilla'],       // 'costilla' era seed legacy; 'Costilla' tiene precios del tenant
+      ['Surtido especial', 'surtido especial'], // 'Surtido especial' inactivo; 'surtido especial' activo
+      ['cebolla',          'Cebolla'],
+      ['picada',           'Picada'],
+      ['roja',             'Roja'],
+      ['suave',            'Suave'],
+    ];
+    for (const [eliminar, conservar] of _dupes) {
+      const rowElim = queryOne("SELECT id FROM productos WHERE nombre = ?", [eliminar]);
+      const rowCons = queryOne("SELECT id FROM productos WHERE nombre = ?", [conservar]);
+      if (rowElim && rowCons) {
+        run("DELETE FROM productos WHERE nombre = ?", [eliminar]);
+        console.log(`🧹 Duplicado eliminado: "${eliminar}" (conservado: "${conservar}")`);
+      }
+    }
+    // limones: producto de relleno sin precio real; borrar si no fue personalizado
+    run("DELETE FROM productos WHERE nombre = 'limones' AND precio_taco = 0 AND precio_torta = 0");
+
+    // 2. Insertar productos de la plantilla que no existan (cortes nuevos, ej. asada/pastor)
+    for (const p of (_giro?.productos || [])) {
+      const cap = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
+      const ya  = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [p.nombre, cap]);
+      if (!ya) {
+        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+          [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']);
+        console.log(`✅ Producto nuevo: ${p.nombre}`);
+      }
+    }
+
+    // 3. Sincronizar campos textuales donde estén vacíos; no tocar precios del tenant
     db.run("UPDATE productos SET nombre = 'carne' WHERE nombre = 'carner'");
     db.run("UPDATE productos SET categoria = 'corte' WHERE categoria IS NULL");
-    const descripciones = (_giro?.productos || []).map(p => [p.nombre, p.descripcion]).filter(([, d]) => d);
-    for (const [nombre, desc] of descripciones) {
-      db.run("UPDATE productos SET descripcion = ? WHERE nombre = ? AND (descripcion IS NULL OR descripcion = '')", [desc, nombre]);
-    }
-    const sinonimosDefault = (_giro?.productos || []).map(p => [p.nombre, p.sinonimos]).filter(([, s]) => s);
-    for (const [nombre, sins] of sinonimosDefault) {
-      db.run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [sins, nombre]);
+    for (const p of (_giro?.productos || [])) {
+      if (p.descripcion) run("UPDATE productos SET descripcion = ? WHERE nombre = ? AND (descripcion IS NULL OR descripcion = '')", [p.descripcion, p.nombre]);
+      if (p.sinonimos)   run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [p.sinonimos, p.nombre]);
     }
   }
 
-  // ── MIGRACIONES DE PRODUCTOS ESPECÍFICAS POR GIRO ────────────────────────────
-  if (_btSlug === 'taqueria') {
-    const yaSE = queryOne("SELECT id FROM productos WHERE nombre = 'surtido especial'");
-    if (!yaSE) {
-      const surtido = queryOne("SELECT precio_taco, precio_torta, precio_100g FROM productos WHERE nombre = 'surtido'");
-      const pt  = surtido ? surtido.precio_taco  : 30;
-      const por = surtido ? surtido.precio_torta : 40;
-      const pg  = surtido ? surtido.precio_100g  : 32;
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
-        ["surtido especial", "Combinación personalizada de cortes a elección del cliente.", pt, por, pg, "", "corte"]);
-      console.log("✅ Producto 'surtido especial' insertado");
-    }
-    const yaCostilla = queryOne("SELECT id FROM productos WHERE nombre = 'costilla'");
-    if (!yaCostilla) {
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
-        ["costilla", "Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.", 35, 45, 35, "costillas,costillita,costillitas,costilla de puerco,costilla de cerdo", "corte"]);
-      console.log("✅ Producto 'costilla' insertado");
-    }
-  }
-
-  // ── SEED REFRESCOS ─────────────────────────────────────────────────────────
-  const refrescosData = [
-    ["coca cola", "Refresco Coca-Cola bien frío 🥤", 20, 20, 0, "coca,coke,cola,coca-cola", "refresco"],
-    ["fanta",     "Refresco Fanta bien frío 🥤",     20, 20, 0, "fanta,naranja",             "refresco"],
-    ["sprite",    "Refresco Sprite bien frío 🥤",    20, 20, 0, "sprite,limon,limón",        "refresco"],
-  ];
-  for (const [nombre, desc, taco, torta, g100, sins, cat] of refrescosData) {
-    const ya = queryOne("SELECT id FROM productos WHERE nombre = ?", [nombre]);
+  // ── SEED REFRESCOS (desde módulo de giro) ──────────────────────────────────
+  for (const r of (_giro?.refrescos || [])) {
+    // Buscar exacto o capitalizado para evitar duplicados por capitalización
+    const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
+    const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
     if (!ya) {
       run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
-        [nombre, desc, taco, torta, g100, sins, cat]);
+        [r.nombre, r.descripcion || '', r.precio || 0, r.precio || 0, 0, r.sinonimos || '', 'refresco']);
     }
   }
 
-  // ── SEED SALSAS ────────────────────────────────────────────────────────────
+  // ── SEED SALSAS (desde módulo de giro) ─────────────────────────────────────
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
-  const salsasData = [
-    ["picada",  "Salsa picada de la casa 🌶️",   0, 0, 0, "picante,salsa picada",               "salsa"],
-    ["cebolla", "Cebolla fresca 🧅",             0, 0, 0, "cebollas,cebollita,cebollitas,cebolla rallada", "salsa"],
-    ["suave",   "Salsa suave 🌿",               0, 0, 0, "salsa suave,verde",                   "salsa"],
-    ["roja",    "Salsa roja casera 🔴",          0, 0, 0, "salsa roja",                          "salsa"],
-    ["limones", "Limones frescos 🍋",            0, 0, 0, "limon,limón,limonez,limonazo",        "salsa"],
-  ];
-  for (const [nombre, desc, taco, torta, g100, sins, cat] of salsasData) {
-    const ya = queryOne("SELECT id FROM productos WHERE nombre = ?", [nombre]);
+  for (const s of (_giro?.salsas || [])) {
+    const cap = s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1);
+    const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [s.nombre, cap]);
     if (!ya) {
       run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
-        [nombre, desc, taco, torta, g100, sins, cat]);
+        [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']);
     } else {
-      // Solo rellenar categoría si está vacía — no sobreescribir cambios del tenant
-      run("UPDATE productos SET categoria = ? WHERE nombre = ? AND (categoria IS NULL OR categoria = '')", [cat, nombre]);
+      run("UPDATE productos SET categoria = 'salsa' WHERE (nombre = ? OR nombre = ?) AND (categoria IS NULL OR categoria = '')", [s.nombre, cap]);
     }
   }
-  // Rename legacy "cebolla rallada" if it exists
+  // Rename legacy "cebolla rallada" si aún existe
   run("UPDATE productos SET nombre = 'cebolla', sinonimos = 'cebollas,cebollita,cebollitas,cebolla rallada' WHERE nombre = 'cebolla rallada'");
 
   // ── SEED CONFIGURACIÓN ─────────────────────────────────────────────────────
