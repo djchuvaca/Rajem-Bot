@@ -55,94 +55,93 @@ function formatearHorario() {
 // ── RESPUESTA: PRECIO ─────────────────────────────────────────────────────────
 function respuestaPrecio(producto = null) {
   try {
-    const precios  = getPrecios();
-    const negocio  = getNegocio();
-    const productos = getProductos();
-    const cortes   = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
+    const precios     = getPrecios();
+    const negocio     = getNegocio();
     const notaPrecios = (getMensaje("menu_nota_precios") || "_Los precios incluyen tortillas y salsas_ 😊").replace(/{negocio}/g, negocio);
 
-    if (producto) {
-      const pc = (precios.porCorte && precios.porCorte[producto.toLowerCase()]) || precios;
-      return (
-        `💰 *Precios en ${negocio}:*\n\n` +
-        `🌮 Taco de ${producto}: *$${pc.pTaco}*\n` +
-        `🥖 Torta de ${producto}: *$${pc.pTorta}*\n` +
-        `⚖️ Por 100g de ${producto}: *$${pc.p100g}*\n\n` +
-        notaPrecios
-      );
+    // Obtener item_types activos para construir columnas de precio
+    let itemTypes = [];
+    try { itemTypes = getItemTypes() || []; } catch (_) {}
+    if (!itemTypes.length) itemTypes = [
+      { slug: 'taco',  nombre: 'taco',  nombre_plural: 'tacos',  emoji: '🌮', soporta_gramos: 1, precio_campo: 'precio_taco'  },
+      { slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖', soporta_gramos: 0, precio_campo: 'precio_torta' },
+    ];
+
+    // Obtener cortes desde tabla cortes (nueva) con fallback a productos
+    let cortes = [];
+    try {
+      const { getCortesBDObj } = require("../db/cortes");
+      cortes = (getCortesBDObj() || []).filter(c => c.slug !== 'surtido');
+    } catch (_) {}
+    if (!cortes.length) {
+      try {
+        cortes = getProductos().filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
+      } catch (_) {}
     }
 
-    // Verificar si todos los cortes tienen el mismo precio efectivo (aplicando fallback a globales)
-    const todosIguales = !cortes.length || cortes.every(p => {
-      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
-      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
+    // Precio para un corte en un formato específico
+    const precioCorteFormato = (corteId, formatoSlug) => {
+      const pc = precios.porCorte[corteId] || precios;
+      const it = itemTypes.find(t => t.slug === formatoSlug);
+      // 1. Precio explícito por corte+formato (precios_json del corte)
+      if (pc.precios && pc.precios[formatoSlug] !== undefined) return pc.precios[formatoSlug];
+      // 2. Formatos clásicos: usar precio por corte de productos
+      if (it?.precio_campo === 'precio_torta') return pc.pTorta ?? precios.pTorta;
+      if (it?.precio_campo === 'precio_taco')  return pc.pTaco  ?? precios.pTaco;
+      // 3. Formatos dinámicos (quesadilla, vampiro, burrito): precio_base del item_type
+      if (it?.precio_base) return it.precio_base;
+      return pc.pTaco ?? precios.pTaco;
+    };
+
+    if (producto) {
+      const slugProducto = producto.toLowerCase();
+      const pc = precios.porCorte[slugProducto] || precios;
+      let resp = `💰 *Precios en ${negocio}:*\n\n🥩 *${producto.charAt(0).toUpperCase() + producto.slice(1)}*\n`;
+      for (const it of itemTypes) {
+        const p = precioCorteFormato(slugProducto, it.slug);
+        resp += `   ${it.emoji} ${it.nombre_plural}: *$${p}*\n`;
+      }
+      if (itemTypes.some(t => t.soporta_gramos)) resp += `   ⚖️ Por 100g: *$${pc.p100g ?? precios.p100g}*\n`;
+      return resp + `\n` + notaPrecios;
+    }
+
+    // Vista completa — desglose por corte
+    const todosIguales = !cortes.length || cortes.every(c => {
+      const key = c.slug || c.nombre?.toLowerCase();
+      const pc  = precios.porCorte[key] || precios;
+      return itemTypes.every(it => {
+        const p  = precioCorteFormato(key, it.slug);
+        const pb = it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+        return p === pb;
+      });
     });
 
     if (todosIguales || !cortes.length) {
       const nombres = cortes.length
-        ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
-        : "Surtido, Carne, Buche, Cuero, Lengua";
+        ? cortes.map(c => (c.nombre || c.slug).charAt(0).toUpperCase() + (c.nombre || c.slug).slice(1)).join(", ")
+        : "Asada, Tripa, Al Pastor, Suadero, Carnitas";
       let lineasPrecios = "";
-      try {
-        const itemTypes = getItemTypes();
-        for (const it of itemTypes) {
-          const campo = it.precio_campo || 'precio_taco';
-          const p     = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
-          lineasPrecios += `${it.emoji} *${it.nombre_plural.charAt(0).toUpperCase() + it.nombre_plural.slice(1)}* — $${p} c/u\n`;
-        }
-        if (itemTypes.some(t => t.soporta_gramos)) lineasPrecios += `⚖️ *Por gramos* — $${precios.p100g} / 100g\n`;
-      } catch (_) {
-        lineasPrecios = `🌮 *Tacos* — $${precios.pTaco} c/u\n🥖 *Tortas* — $${precios.pTorta} c/u\n⚖️ *Por gramos* — $${precios.p100g} / 100g\n`;
+      for (const it of itemTypes) {
+        const p = it.precio_base || (it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
+        lineasPrecios += `${it.emoji} *${(it.nombre_plural || it.nombre).charAt(0).toUpperCase() + (it.nombre_plural || it.nombre).slice(1)}* — $${p} c/u\n`;
       }
-      return (
-        `💰 *Precios en ${negocio}:*\n\n` +
-        lineasPrecios +
-        `\n🥩 Piezas disponibles: ${nombres}\n\n` +
-        notaPrecios
-      );
+      if (itemTypes.some(t => t.soporta_gramos)) lineasPrecios += `⚖️ *Por gramos* — $${precios.p100g} / 100g\n`;
+      return `💰 *Precios en ${negocio}:*\n\n` + lineasPrecios + `\n🥩 Cortes disponibles: ${nombres}\n\n*(Las combinaciones "X con Y" tienen el precio del corte más caro)*\n\n` + notaPrecios;
     }
 
-    // Precios diferentes por corte — mostrar desglose usando precio efectivo (con fallback global)
+    // Precios diferentes por corte — desglose completo
     let resp = `💰 *Precios en ${negocio}:*\n\n`;
-    // Construir columnas dinámicamente desde item_types
-    let _itCols = null;
-    try {
-      const its = getItemTypes();
-      if (its.length) _itCols = its;
-    } catch (_) {}
-    for (const p of cortes) {
-      const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
-      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
+    for (const c of cortes) {
+      const key    = c.slug || c.nombre?.toLowerCase();
+      const nombre = (c.nombre || c.slug).charAt(0).toUpperCase() + (c.nombre || c.slug).slice(1);
+      const pc     = precios.porCorte[key] || precios;
       resp += `🥩 *${nombre}*\n`;
-      if (_itCols) {
-        const partes = _itCols.map(it => {
-          const v = it.precio_campo === 'precio_torta' ? pc.pTorta : pc.pTaco;
-          return `${it.emoji} $${v}`;
-        });
-        const tieneGramos = _itCols.some(it => it.soporta_gramos);
-        if (tieneGramos) partes.push(`⚖️ $${pc.p100g}/100g`);
-        resp += `   ${partes.join(' · ')}\n\n`;
-      } else {
-        resp += `   🌮 $${pc.pTaco} · 🥖 $${pc.pTorta} · ⚖️ $${pc.p100g}/100g\n\n`;
-      }
+      const partes = itemTypes.map(it => `${it.emoji} $${precioCorteFormato(key, it.slug)}`);
+      const tieneGramos = itemTypes.some(it => it.soporta_gramos);
+      if (tieneGramos) partes.push(`⚖️ $${pc.p100g ?? precios.p100g}/100g`);
+      resp += `   ${partes.join(' · ')}\n\n`;
     }
-    const se = productos.find(p => p.nombre === "surtido especial");
-    if (se) {
-      const sePc = precios.porCorte["surtido especial"] || precios;
-      resp += `🌟 *Surtido especial* (combinación a tu gusto)\n`;
-      if (_itCols) {
-        const partes = _itCols.map(it => {
-          const v = it.precio_campo === 'precio_torta' ? sePc.pTorta : sePc.pTaco;
-          return `${it.emoji} $${v}`;
-        });
-        const tieneGramos = _itCols.some(it => it.soporta_gramos);
-        if (tieneGramos) partes.push(`⚖️ $${sePc.p100g}/100g`);
-        resp += `   ${partes.join(' · ')}\n\n`;
-      } else {
-        resp += `   🌮 $${sePc.pTaco} · 🥖 $${sePc.pTorta} · ⚖️ $${sePc.p100g}/100g\n\n`;
-      }
-    }
-    resp += notaPrecios;
+    resp += `*(Combina cualquier corte al gusto — precio del más caro)*\n\n` + notaPrecios;
     return resp;
   } catch (e) {
     return "Ahorita no tengo los precios disponibles. ¿Me dices qué quieres y te digo cuánto es?";

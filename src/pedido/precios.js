@@ -1,4 +1,4 @@
-﻿/**
+/**
  * pedido/precios.js
  * Funciones puras de cálculo de precios — sin estado, sin BD directa.
  * Lee precios desde la BD solo cuando se llama getPrecios().
@@ -12,15 +12,44 @@ function getPrecios() {
   const pSalsa = parseInt(getConfig("precio_salsa") || "15");
 
   const porCorte = {};
+
+  // Fuente primaria: tabla `productos` — precios configurados por el admin desde el panel
   try {
     const productos = getProductos();
     for (const p of (productos || [])) {
       if (p.categoria === "refresco" || p.categoria === "salsa") continue;
-      porCorte[p.nombre.toLowerCase()] = {
+      const key = p.nombre.toLowerCase();
+      porCorte[key] = {
         pTaco:  parseInt(p.precio_taco  || pTaco),
         pTorta: parseInt(p.precio_torta || pTorta),
         p100g:  parseInt(p.precio_100g  || p100g),
+        precios: {},
       };
+    }
+  } catch (_) {}
+
+  // Complementario: tabla `cortes` — agrega cortes nuevos (asada, tripa, pastor…)
+  // y enriquece con precios_json para formatos dinámicos
+  try {
+    const { getCortesBDObj } = require("../db/cortes");
+    for (const c of (getCortesBDObj() || [])) {
+      let precios = {};
+      try { precios = JSON.parse(c.precios_json || '{}'); } catch (_) {}
+      const entry = {
+        pTaco:  precios.taco  ?? c.precio_base ?? pTaco,
+        pTorta: precios.torta ?? c.precio_base ?? pTorta,
+        p100g:  precios['100g'] ?? p100g,
+        precios,
+      };
+      // Si ya existe en productos, solo enriquecer con precios_json para formatos dinámicos
+      if (porCorte[c.slug]) {
+        porCorte[c.slug].precios = precios;
+      } else {
+        porCorte[c.slug] = entry;
+      }
+      // Nombre del corte también como clave (compat con código que usa el nombre)
+      const nom = c.nombre.toLowerCase();
+      if (!porCorte[nom]) porCorte[nom] = porCorte[c.slug];
     }
   } catch (_) {}
 
@@ -33,30 +62,59 @@ function _preciosParaCorte(item, precios) {
   return precios;
 }
 
+/**
+ * Devuelve el precio de un ítem para un formato dinámico (quesadilla, vampiro, burrito…).
+ * Cadena de fallback: precios_json[formato] → precio_base del item_type → config global.
+ */
+function _precioFormatoDinamico(item, precios) {
+  const corteKey = item.corte && item.corte !== 'surtido especial' ? item.corte : null;
+  // Desde tabla cortes (tiene precios_json completo)
+  if (corteKey && precios.porCorte && precios.porCorte[corteKey]) {
+    const pc = precios.porCorte[corteKey];
+    if (pc.precios && pc.precios[item.presentacion] !== undefined) return pc.precios[item.presentacion];
+    return pc.pTaco; // fallback al precio taco del corte
+  }
+  // Desde item_type.precio_base
+  try {
+    const { getItemTypeBySlug } = require("../db");
+    const it = getItemTypeBySlug(item.presentacion);
+    if (it) {
+      if (it.precio_base) return it.precio_base;
+      return it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+    }
+  } catch (_) {}
+  return precios.pTaco;
+}
+
 function calcularPrecioItem(item, precios) {
+  // Ítem mixto con combinacion (mecanismo _aplicarSurtidoEspecial)
+  if (item.corte === 'surtido especial' && item.combinacion) {
+    try {
+      const { getCortesBD, calcularPrecioMixto } = require("../db/cortes");
+      const mapa = getCortesBD();
+      const slugs = item.combinacion.split(/\s+con\s+/i).map(n => mapa[n.trim().toLowerCase()] || n.trim()).filter(Boolean);
+      if (slugs.length) {
+        const precioUnit = calcularPrecioMixto(slugs, item.presentacion || 'taco');
+        return item.cantidad * precioUnit;
+      }
+    } catch (_) {}
+  }
+
   const pc = _preciosParaCorte(item, precios);
   const { pTaco, pTorta, p100g } = pc;
+
   switch (item.presentacion) {
-    case "taco":    return item.cantidad * pTaco;
-    case "torta":   return item.cantidad * pTorta;
-    case "gramos":  return Math.round((item.gramos / 100) * p100g);
-    case "pesos":   return item.monto;
+    case "taco":   return item.cantidad * pTaco;
+    case "torta":  return item.cantidad * pTorta;
+    case "gramos": return Math.round((item.gramos / 100) * p100g);
+    case "pesos":  return item.monto;
     case "grupo_repetido":
       return item.grupos * item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
     case "plato_separado":
       return item.items.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
     default: {
-      // Tipo de ítem dinámico: buscar precio según precio_campo del item_type
-      if (item.cantidad) {
-        try {
-          const { getItemTypeBySlug } = require("../db");
-          const itemType = getItemTypeBySlug(item.presentacion);
-          if (itemType) {
-            const precio = itemType.precio_campo === 'precio_torta' ? pTorta : pTaco;
-            return item.cantidad * precio;
-          }
-        } catch (_) {}
-      }
+      // Formatos dinámicos: quesadilla, vampiro, burrito, etc.
+      if (item.cantidad) return item.cantidad * _precioFormatoDinamico(item, precios);
       return 0;
     }
   }

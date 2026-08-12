@@ -8,6 +8,7 @@ const core         = require("./core");
 const config       = require("./config");
 const modelos      = require("./modelos");
 const businessTypes = require("./business-types");
+const cortesDB     = require("./cortes");
 const { seedDB }   = require("./seed");
 
 // initDB ahora también ejecuta el seed
@@ -79,7 +80,17 @@ module.exports = {
   invalidarCacheItemTypes: businessTypes.invalidarCacheItemTypes,
   getTemplateProducts:     businessTypes.getTemplateProducts,
 
-  // productos
+  // cortes (catálogo de cortes/ingredientes — nuevo modelo)
+  getCortesBD:              cortesDB.getCortesBD,
+  getCortesBDObj:           cortesDB.getCortesBDObj,
+  getAllCortesBD:            cortesDB.getAllCortesBD,
+  getPrecioCorteFormato:    cortesDB.getPrecioCorteFormato,
+  calcularPrecioMixto:      cortesDB.calcularPrecioMixto,
+  invalidarCacheCortesBD:   cortesDB.invalidarCacheCortesBD,
+  createCorte:              cortesDB.createCorte,
+  updateCorte:              cortesDB.updateCorte,
+
+  // productos (bebidas/salsas — cortes migrados a tabla cortes)
   getProductos:        modelos.getProductos,
   getProducto:         modelos.getProducto,
   updateProducto:      modelos.updateProducto,

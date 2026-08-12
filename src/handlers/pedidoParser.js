@@ -18,12 +18,13 @@ let _itemTypesCacheTs = 0;
 const _CORTES_TTL = 60 * 1000;
 
 function invalidarCacheCortes() {
-  _cortesCache     = null; _cortesCacheTs     = 0;
-  _refrescosCache  = null; _refrescosCacheTs  = 0;
-  _salsasCache     = null; _salsasCacheTs     = 0;
+  _cortesCache      = null; _cortesCacheTs      = 0;
+  _refrescosCache   = null; _refrescosCacheTs   = 0;
+  _salsasCache      = null; _salsasCacheTs      = 0;
   _cortesRegexCache = null; _cortesRegexCacheTs = 0;
-  _itemTypesCache  = null; _itemTypesCacheTs  = 0;
+  _itemTypesCache   = null; _itemTypesCacheTs   = 0;
   invalidarCacheItemTypes();
+  try { require("../db/cortes").invalidarCacheCortesBD(); } catch (_) {}
 }
 
 // ── ITEM TYPES DINÁMICOS ──────────────────────────────────────────────────────
@@ -103,6 +104,36 @@ function getCortes() {
   const ahora = Date.now();
   if (_cortesCache && ahora - _cortesCacheTs < _CORTES_TTL) return _cortesCache;
   try {
+    // Nueva tabla `cortes` — fuente principal para taquería y otros giros
+    const { getCortesBD } = require("../db");
+    const cortesBD = getCortesBD();
+    if (cortesBD && Object.keys(cortesBD).length > 0) {
+      // Combinar con productos (categoria='corte') para no perder ítems legados
+      let mapa = { ...cortesBD };
+      try {
+        const productos = getProductos();
+        for (const p of (productos || [])) {
+          if (p.categoria === "refresco" || p.categoria === "salsa") continue;
+          const nom = p.nombre.toLowerCase().trim();
+          if (!mapa[nom]) {
+            mapa[nom] = nom;
+            const plural = /[aeiouáéíóú]$/i.test(nom) ? nom + "s" : nom + "es";
+            mapa[plural] = nom;
+            if (p.sinonimos) {
+              for (const s of p.sinonimos.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)) {
+                if (!mapa[s]) mapa[s] = nom;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      _cortesCache = mapa;
+      _cortesCacheTs = Date.now();
+      return mapa;
+    }
+  } catch (_) {}
+  // Fallback: leer de tabla productos (compat con instancias sin tabla cortes)
+  try {
     const productos = getProductos();
     if (!productos || !productos.length) return _cortesDefault();
     const mapa = {};
@@ -110,7 +141,6 @@ function getCortes() {
       if (p.categoria === "refresco" || p.categoria === "salsa") continue;
       const nombre = p.nombre.toLowerCase().trim();
       mapa[nombre] = nombre;
-      // Plural simple: termina en vocal → +s, en consonante → +es
       const plural = /[aeiouáéíóú]$/i.test(nombre) ? nombre + "s" : nombre + "es";
       mapa[plural] = nombre;
       if (p.sinonimos) {
@@ -119,8 +149,7 @@ function getCortes() {
         }
       }
     }
-    _cortesCache = mapa;
-    _cortesCacheTs = Date.now();
+    _cortesCache = mapa; _cortesCacheTs = Date.now();
     return mapa;
   } catch (e) { return _cortesDefault(); }
 }
@@ -195,8 +224,20 @@ function detectarRefresco(texto) {
 
 function _cortesDefault() {
   return {
+    // Taquería — cortes de res
+    asada: "asada", "carne asada": "asada", res: "asada", bistek: "asada", bistec: "asada",
+    tripa: "tripa", tripas: "tripa", tripita: "tripa", tripitas: "tripa",
+    suadero: "suadero", suaderito: "suadero",
+    // Taquería — cerdo
+    pastor: "pastor", "al pastor": "pastor", adobada: "pastor",
+    longaniza: "longaniza", longanitas: "longaniza",
+    chicharron: "chicharron", "chicharrón": "chicharron", chicharrones: "chicharron",
+    chorizo: "chorizo", chorizito: "chorizo",
+    cabeza: "cabeza", cabezita: "cabeza",
+    campechano: "campechano", campechana: "campechano",
+    // Carnitas (especialidad de cerdo)
     surtido: "surtido", surtida: "surtido", surtidos: "surtido", mixto: "surtido", mixta: "surtido",
-    carne: "carne", carnes: "carne", carner: "carne", masiza: "carne", maciza: "carne", carnita: "carne", carnitas: "carne",
+    carne: "carne", carnes: "carne", carner: "carne", carnita: "carne", carnitas: "carne", maciza: "carne", masiza: "carne",
     buche: "buche", buches: "buche", buchito: "buche", buchon: "buche", buchones: "buche",
     cuero: "cuero", cueros: "cuero", cueritos: "cuero", cuerito: "cuero",
     lengua: "lengua", lenguas: "lengua", lenguita: "lengua", lenguitas: "lengua",

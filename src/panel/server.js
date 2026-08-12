@@ -702,6 +702,57 @@ app.get("/api/business-types/products", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── CORTES ────────────────────────────────────────────────────────────────────
+const { getAllCortesBD, createCorte, updateCorte, invalidarCacheCortesBD } = require("../db/cortes");
+
+// GET /api/cortes — todos los cortes del giro (incluye inactivos)
+app.get("/api/cortes", requireAuth, (req, res) => {
+  try { res.json(getAllCortesBD()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/cortes — crear nuevo corte
+app.post("/api/cortes", requireAuth, (req, res) => {
+  const { nombre, aliases, descripcion, precio_base, precios, activo } = req.body;
+  if (!nombre) return res.status(400).json({ error: "nombre requerido" });
+  try {
+    createCorte({ nombre, aliases, descripcion, precio_base, precios, activo });
+    invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/cortes/:id — editar corte (precio, aliases, activo)
+app.put("/api/cortes/:id", requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { nombre, aliases, descripcion, precio_base, precios, activo } = req.body;
+  try {
+    updateCorte(id, { nombre, aliases, descripcion, precio_base, precios, activo });
+    invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── FORMATOS (item_types del giro activo) ─────────────────────────────────────
+
+// GET /api/formatos — formatos activos del giro
+app.get("/api/formatos", requireAuth, (req, res) => {
+  try { res.json(getItemTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/formatos/:id — editar precio_base de un formato
+app.put("/api/formatos/:id", requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { precio_base, activo } = req.body;
+  try {
+    const { run } = require("../db/core");
+    if (precio_base !== undefined) run("UPDATE item_types SET precio_base = ? WHERE id = ?", [precio_base, id]);
+    if (activo !== undefined) run("UPDATE item_types SET activo = ? WHERE id = ?", [activo ? 1 : 0, id]);
+    invalidarCacheItemTypes();
+    invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 function startPanel(port = 3000) {
   app.listen(port, () => {
     console.log(`\n🌐 Panel de administración corriendo en http://localhost:${port}`);

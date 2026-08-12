@@ -284,26 +284,26 @@ describe("respuestaPrecio filtrado y precios efectivos", () => {
 
   test("BUG: precio 0 en BD NO debe mostrarse como $0 en desglose", () => {
     // Simula que buche tiene precio 0 (usa global) y carne tiene precio diferente
-    run("UPDATE productos SET precio_taco = 0, precio_torta = 0, precio_100g = 0 WHERE nombre = 'buche'");
-    run("UPDATE productos SET precio_taco = 35, precio_torta = 45, precio_100g = 36 WHERE nombre = 'carne'");
+    run("UPDATE productos SET precio_taco = 0, precio_torta = 0, precio_100g = 0 WHERE lower(nombre) = 'buche'");
+    run("UPDATE productos SET precio_taco = 35, precio_torta = 45, precio_100g = 36 WHERE lower(nombre) = 'carne'");
     try {
       const r = respuestaPrecio();
       // Buche tiene precio 0 → debe usar global (30/40/32), NO mostrar $0
       assert.doesNotMatch(r, /\$0\b/);
     } finally {
-      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE nombre = 'buche'");
-      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE nombre = 'carne'");
+      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE lower(nombre) = 'buche'");
+      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE lower(nombre) = 'carne'");
     }
   });
 
   test("desglose muestra precio correcto para corte con precio específico", () => {
-    run("UPDATE productos SET precio_taco = 38 WHERE nombre = 'lengua'");
+    run("UPDATE productos SET precio_taco = 38 WHERE lower(nombre) = 'lengua'");
     try {
       const r = respuestaPrecio();
       // Lengua debe aparecer con $38
       assert.match(r, /\$38/);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'lengua'");
+      run("UPDATE productos SET precio_taco = 30 WHERE lower(nombre) = 'lengua'");
     }
   });
 });

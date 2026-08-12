@@ -136,11 +136,31 @@ async function seedDB() {
     );
   `);
 
+  // ── TABLA CORTES (catálogo de cortes/ingredientes por giro) ──────────────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS cortes (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      giro_id      INTEGER NOT NULL REFERENCES business_types(id),
+      slug         TEXT    NOT NULL,
+      nombre       TEXT    NOT NULL,
+      aliases_json TEXT    DEFAULT '[]',
+      descripcion  TEXT    DEFAULT '',
+      precio_base  INTEGER DEFAULT 30,
+      precios_json TEXT    DEFAULT '{}',
+      activo       INTEGER DEFAULT 1,
+      UNIQUE(giro_id, slug)
+    )
+  `);
+
   // ── MIGRACIONES (columnas nuevas en tablas existentes) ─────────────────────
   try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN sinonimos TEXT DEFAULT ''"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_slug TEXT DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE item_types ADD COLUMN precio_base INTEGER DEFAULT 0"); } catch (_) {}
+
+  // Migración: renombrar slug 'maciza' → 'carne' (v1.5 compat)
+  try { db.run("UPDATE cortes SET slug='carne', nombre='Carne/Maciza', aliases_json='[\"carnitas\",\"carnita\",\"carne\",\"maciza\",\"masiza\",\"maciza de puerco\"]' WHERE slug='maciza'"); } catch (_) {}
 
   // ── TABLAS PARA ZONAS DE ENVÍO ────────────────────────────────────────────
   try { run(`CREATE TABLE IF NOT EXISTS colonias (
@@ -524,6 +544,14 @@ async function seedDB() {
   const _btSlugDefault = (process.env.BUSINESS_TYPE || 'taqueria').trim().toLowerCase();
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('business_type_slug', ?)", [_btSlugDefault]);
 
+  // Config: estrategia de precio para ítems mixtos (combinaciones de cortes)
+  // 'mas_caro' = precio del corte más caro (default, protege el margen)
+  // 'promedio' = promedio de precios de los cortes combinados
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('estrategia_precio_mixto', 'mas_caro')");
+
+  // ── SEED CORTES DEL GIRO ACTIVO ────────────────────────────────────────────
+  _seedCortesTaqueria(db);
+
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -543,23 +571,72 @@ async function seedDB() {
   console.log("✅ Base de datos lista");
 }
 
+// ── HELPER: SEED CORTES DEL GIRO TAQUERÍA ────────────────────────────────────
+function _seedCortesTaqueria(db) {
+  const bt = db.prepare("SELECT id FROM business_types WHERE slug = 'taqueria'").get();
+  if (!bt) return; // taqueria no existe aún (se seedea en _seedBusinessTypes)
+
+  const cortesTaqueria = [
+    // Cortes de res
+    { slug: 'asada',      nombre: 'Asada',      precio_base: 35, aliases: ['carne asada','res','bistek','bistec','bistec asado'], descripcion: 'Carne de res a las brasas, jugosa y con sabor intenso.' },
+    { slug: 'suadero',    nombre: 'Suadero',    precio_base: 35, aliases: ['suaderito'], descripcion: 'Corte de res entre la piel y la costilla, muy suave y jugoso.' },
+    { slug: 'tripa',      nombre: 'Tripa',      precio_base: 32, aliases: ['tripas','tripita','tripitas','tripas de res'], descripcion: 'Intestino de res frito, crujiente por fuera y tierno por dentro.' },
+    // Cortes de cerdo
+    { slug: 'pastor',     nombre: 'Al Pastor',  precio_base: 32, aliases: ['al pastor','pastor','adobada','adobado'], descripcion: 'Carne de cerdo marinada en achiote, especias y chile, asada en trompo.' },
+    { slug: 'longaniza',  nombre: 'Longaniza',  precio_base: 32, aliases: ['longanitas','longanisa'], descripcion: 'Embutido de cerdo especiado, frito a la perfección.' },
+    { slug: 'chicharron', nombre: 'Chicharrón', precio_base: 30, aliases: ['chicharrón','chicharrones','chicharron prensado'], descripcion: 'Piel y carne de cerdo frita, crujiente y sabrosa.' },
+    { slug: 'chorizo',    nombre: 'Chorizo',    precio_base: 32, aliases: ['chorizito','chorizo mexicano'], descripcion: 'Chorizo mexicano frito, con chile y especias.' },
+    // Cortes de carnitas (especialidad)
+    { slug: 'carne',      nombre: 'Carne/Maciza',precio_base: 30, aliases: ['carnitas','carnita','carne','maciza','masiza','maciza de puerco'], descripcion: 'Espaldilla, pierna y aldilla de cerdo. Fibra pura, bajo porcentaje de grasa.' },
+    { slug: 'buche',      nombre: 'Buche',      precio_base: 30, aliases: ['buchito','buchon','buchones'], descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
+    { slug: 'cuero',      nombre: 'Cuero',      precio_base: 30, aliases: ['cueros','cueritos','cuerito'], descripcion: 'Piel del puerco, textura muy suave y delicada.' },
+    { slug: 'lengua',     nombre: 'Lengua',     precio_base: 30, aliases: ['lenguita','lenguitas'], descripcion: 'Textura cremosa, sabor intenso y limpio.' },
+    { slug: 'cabeza',     nombre: 'Cabeza',     precio_base: 30, aliases: ['cabezita','carnitas de cabeza'], descripcion: 'Carne de cabeza de cerdo, muy tierna y jugosa.' },
+    // Especiales/mezclas
+    { slug: 'campechano', nombre: 'Campechano', precio_base: 35, aliases: ['campechana','mixto campechano'], descripcion: 'Combinación de asada y longaniza, el favorito de los que no pueden elegir.' },
+    { slug: 'surtido',    nombre: 'Surtido',    precio_base: 30, aliases: ['surtida','mixto','la combinacion','de todo','todos los cortes'], descripcion: 'Combinación de los cortes que el local maneja. El chef decide la mezcla.' },
+  ];
+
+  const stmt = db.prepare(
+    'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo) VALUES (?,?,?,?,?,?,?,1)'
+  );
+  for (const c of cortesTaqueria) {
+    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases), c.descripcion, c.precio_base, '{}');
+  }
+}
+
 // ── HELPER: SEED BUSINESS TYPES + ITEM TYPES + TEMPLATE PRODUCTS ─────────────
 function _seedBusinessTypes(db) {
   // ─ Definición de plantillas ───────────────────────────────────────────────
   const TEMPLATES = [
     {
       slug: 'taqueria', nombre: 'Taquería', emoji: '🌮',
-      descripcion: 'Tacos, tortas y venta por gramos de diferentes cortes',
+      descripcion: 'Tacos, tortas, quesadillas, vampiros y venta de cortes en múltiples presentaciones',
       itemTypes: [
         {
           slug: 'taco', nombre: 'taco', nombre_plural: 'tacos', emoji: '🌮',
           aliases: ['taquito', 'taquitos', 'tacito', 'tacitos'],
-          soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco',
+          soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco', precio_base: 30,
         },
         {
           slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖',
-          aliases: ['sandwich', 'sándwich', 'sándwiches', 'tortas'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
+          aliases: ['sandwich', 'sándwich', 'sándwiches'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta', precio_base: 45,
+        },
+        {
+          slug: 'quesadilla', nombre: 'quesadilla', nombre_plural: 'quesadillas', emoji: '🧀',
+          aliases: ['quesa', 'quesas', 'quesadillas', 'queso'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 50,
+        },
+        {
+          slug: 'vampiro', nombre: 'vampiro', nombre_plural: 'vampiros', emoji: '🧛',
+          aliases: ['vampiros', 'vampira', 'vampiras'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 35,
+        },
+        {
+          slug: 'burrito', nombre: 'burrito', nombre_plural: 'burritos', emoji: '🌯',
+          aliases: ['burritos', 'burrita', 'burritas'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 60,
         },
       ],
       products: [
@@ -624,8 +701,8 @@ function _seedBusinessTypes(db) {
   );
   const stmtIT = db.prepare(
     `INSERT OR IGNORE INTO item_types
-       (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo)
-     VALUES (?,?,?,?,?,?,?,?,?)`
+       (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo, precio_base)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
   );
   const stmtPT = db.prepare(
     `INSERT OR IGNORE INTO business_type_products
@@ -642,8 +719,12 @@ function _seedBusinessTypes(db) {
       stmtIT.run(
         btRow.id, it.slug, it.nombre, it.nombre_plural,
         it.emoji, JSON.stringify(it.aliases),
-        it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo
+        it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo,
+        it.precio_base || 0
       );
+      // Actualizar precio_base si ya existía el registro
+      db.prepare("UPDATE item_types SET precio_base = ? WHERE business_type_id = ? AND slug = ? AND precio_base = 0")
+        .run(it.precio_base || 0, btRow.id, it.slug);
     }
 
     for (const prod of tpl.products) {
