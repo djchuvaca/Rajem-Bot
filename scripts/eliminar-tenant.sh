@@ -21,11 +21,11 @@ echo "  Eliminando tenant: ${TENANT_ID}"
 echo "======================================="
 echo ""
 
-# 1. Detener y eliminar contenedor
+# 1. Detener y eliminar contenedor (docker directo — no docker compose, para no afectar otros servicios)
 if docker ps -a --format '{{.Names}}' | grep -qx "${TENANT_ID}"; then
   echo "Deteniendo contenedor ${TENANT_ID}..."
-  docker compose -f "$COMPOSE" stop "$TENANT_ID" 2>&1 || true
-  docker compose -f "$COMPOSE" rm -f "$TENANT_ID" 2>&1 || true
+  docker stop "${TENANT_ID}" 2>&1 || true
+  docker rm -f "${TENANT_ID}" 2>&1 || true
   echo "Contenedor eliminado."
 else
   echo "Contenedor ${TENANT_ID} no estaba corriendo."
