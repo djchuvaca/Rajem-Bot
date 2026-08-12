@@ -458,6 +458,8 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_modalidad', 'grupo')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_privado_jid', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('notif_autochat_jid', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupos_wa_cache', '[]')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('qr_pendiente', '')");
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (

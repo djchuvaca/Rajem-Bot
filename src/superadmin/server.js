@@ -283,26 +283,29 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
 });
 
 // ── QR DE VINCULACIÓN POR TENANT ─────────────────────────────────────────────
-// Hace proxy al panel del tenant (server-to-server, sin CORS) para obtener el QR.
+// Lee qr_pendiente desde la BD del tenant (volumen compartido ./data).
+// No requiere llamadas HTTP entre contenedores.
 app.get('/api/tenants/:id/qr', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const cfg = getTenantConfig(tenant);
+  const qr  = cfg.qr_pendiente || '';
+  if (!qr) return res.status(404).json({ error: 'Sin QR — el bot ya está autenticado o aún no ha iniciado' });
+  res.json({ qr, ts: Date.now() });
+});
 
-  const http = require('http');
-  const proxyReq = http.request(
-    { hostname: '127.0.0.1', port: tenant.panel_port, path: '/api/qr', method: 'GET', timeout: 4000 },
-    proxyRes => {
-      let data = '';
-      proxyRes.on('data', chunk => data += chunk);
-      proxyRes.on('end', () => {
-        try { res.status(proxyRes.statusCode).json(JSON.parse(data)); }
-        catch { res.status(502).json({ error: 'Respuesta inválida del panel del tenant' }); }
-      });
-    }
-  );
-  proxyReq.on('timeout', () => { proxyReq.destroy(); res.status(504).json({ error: 'Timeout — panel del tenant no responde' }); });
-  proxyReq.on('error',   err => res.status(503).json({ error: `Panel del tenant no accesible: ${err.message}` }));
-  proxyReq.end();
+// ── GRUPOS WA POR TENANT ──────────────────────────────────────────────────────
+// Lee grupos_wa_cache desde la BD del tenant (se actualiza cuando el bot conecta).
+app.get('/api/tenants/:id/grupos', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const cfg = getTenantConfig(tenant);
+  try {
+    const grupos = JSON.parse(cfg.grupos_wa_cache || '[]');
+    res.json(grupos);
+  } catch {
+    res.json([]);
+  }
 });
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────

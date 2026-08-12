@@ -51,6 +51,8 @@ client.on("qr", (qr) => {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
   qrcode.generate(qr, { small: true });
   setQR(qr);
+  // Guardar QR en BD para que el super admin lo lea sin llamadas HTTP entre contenedores
+  try { setConfig("qr_pendiente", qr); } catch (_) {}
   console.log("\n  WhatsApp > Dispositivos vinculados > Vincular dispositivo");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 });
@@ -59,11 +61,21 @@ client.on("ready", () => {
   _reintentos = 0;
   clearQR();
   setWhatsappClient(client);
-  // Autochat: guardar el JID propio para usarlo como destino de comandos y notificaciones
+  try { setConfig("qr_pendiente", ""); } catch (_) {}
+
+  // Autochat: guardar el JID propio
   if (getNotifModalidad() === 'autochat') {
     const propioJID = client.info?.wid?._serialized;
     if (propioJID) setConfig('notif_autochat_jid', propioJID);
   }
+
+  // Cachear grupos de WhatsApp en BD para que el super admin los pueda leer
+  client.getChats().then(chats => {
+    const grupos = chats
+      .filter(c => c.isGroup)
+      .map(c => ({ id: c.id._serialized, nombre: c.name, participantes: c.participants?.length || 0 }));
+    try { setConfig("grupos_wa_cache", JSON.stringify(grupos)); } catch (_) {}
+  }).catch(() => {});
   reanudarDespachosPendientes(client).catch(e => logger.error("Error al reanudar despachos:", e.message));
   logger.info("Bot de Tacos Javier conectado y listo.")
   console.log("✅ Bot de Tacos Javier conectado y listo!");
