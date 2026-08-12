@@ -170,6 +170,7 @@ cat >> "$COMPOSE" <<EOF
     volumes:
       - ./data:/-Rajem-Bot/data
       - ./logs:/-Rajem-Bot/logs
+      - ./src/panel/public:/-Rajem-Bot/src/panel/public
       - ./.wwebjs_auth:/-Rajem-Bot/.wwebjs_auth
       - ./.wwebjs_cache:/-Rajem-Bot/.wwebjs_cache
 EOF

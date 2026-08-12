@@ -51,18 +51,48 @@ async function handleDeploy(req, res) {
   }
 
   res.writeHead(200); res.end('Deploy iniciado');
-  console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — desplegando...`);
 
-  exec(
-    `cd ${PROJECT} && git pull && docker compose up -d --build && pm2 restart webhook-deploy`,
-    { timeout: 300_000 },
-    (err, stdout, stderr) => {
-      if (err) { console.error('[webhook] Error en deploy:', err.message); return; }
-      if (stdout) console.log('[webhook]', stdout.trim());
-      if (stderr) console.error('[webhook]', stderr.trim());
-      console.log('[webhook] ✅ Deploy completado');
-    }
+  // Analizar qué archivos cambiaron para elegir la acción mínima
+  const changed = (payload.commits || [])
+    .flatMap(c => [...(c.added || []), ...(c.removed || []), ...(c.modified || [])]);
+
+  const needsRebuild = changed.some(f =>
+    ['package.json', 'package-lock.json', 'Dockerfile'].includes(f)
   );
+  const onlyStatic = changed.length > 0 && changed.every(f =>
+    f.startsWith('src/panel/public/') || f.startsWith('src/superadmin/public/')
+  );
+  const needsRestart = !needsRebuild && !onlyStatic && changed.some(f => f.endsWith('.js') || f.endsWith('.sh'));
+  const needsPm2    = changed.includes('scripts/webhook-deploy.js');
+
+  let dockerCmd;
+  if (needsRebuild) {
+    dockerCmd = 'docker compose up -d --build';
+    console.log('[webhook] Cambios en dependencias/Dockerfile — rebuild completo');
+  } else if (needsRestart) {
+    dockerCmd = 'docker compose restart';
+    console.log('[webhook] Cambios en lógica JS — restart sin rebuild');
+  } else if (onlyStatic) {
+    dockerCmd = null;
+    console.log('[webhook] Solo archivos estáticos — volumen actualiza sin reiniciar');
+  } else {
+    dockerCmd = 'docker compose restart';
+    console.log('[webhook] Cambios mixtos — restart sin rebuild');
+  }
+
+  const cmds = [`cd ${PROJECT}`, 'git pull'];
+  if (dockerCmd) cmds.push(dockerCmd);
+  if (needsPm2 || needsRebuild || needsRestart) cmds.push('pm2 restart webhook-deploy');
+
+  const cmd = cmds.join(' && ');
+  console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — ejecutando: ${cmd}`);
+
+  exec(cmd, { timeout: 300_000 }, (err, stdout, stderr) => {
+    if (err) { console.error('[webhook] Error en deploy:', err.message); return; }
+    if (stdout) console.log('[webhook]', stdout.trim());
+    if (stderr) console.error('[webhook]', stderr.trim());
+    console.log('[webhook] ✅ Deploy completado');
+  });
 }
 
 // ── /provisionar — aprovisiona un nuevo tenant desde el super admin ───────────
