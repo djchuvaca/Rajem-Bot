@@ -109,6 +109,7 @@ mkdir -p "$ENVS_DIR"
 cat > "$ENVS_DIR/${TENANT_ID}.env" <<EOF
 # Generado por provisionar-tenant.sh — $(date)
 TENANT_ID=${TENANT_ID}
+NOMBRE_NEGOCIO=${NOMBRE}
 GROQ_API_KEY=${GROQ_KEY}
 GRUPO_ID=${GRUPO_ID}
 PANEL_PORT=3000
