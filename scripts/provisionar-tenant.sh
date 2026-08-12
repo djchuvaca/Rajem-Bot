@@ -157,7 +157,7 @@ fi
 info "Añadiendo servicio ${TENANT_ID} a docker-compose.yml..."
 cat >> "$COMPOSE" <<EOF
 
-  # ── Tenant: ${NOMBRE} ─────────────────────────────────────────────────────────
+  # Tenant: ${NOMBRE}
   ${TENANT_ID}:
     build: .
     container_name: ${TENANT_ID}

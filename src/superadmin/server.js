@@ -257,7 +257,7 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   const options = {
-    hostname: '127.0.0.1',
+    hostname: process.env.WEBHOOK_HOST || 'host.docker.internal',
     port:     webhookPort,
     path:     '/provisionar',
     method:   'POST',

@@ -11,6 +11,8 @@ services:
       - TZ=America/Mazatlan
     ports:
       - "3001:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/-Rajem-Bot/data
       - ./logs:/-Rajem-Bot/logs
