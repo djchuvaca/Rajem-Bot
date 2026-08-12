@@ -48,6 +48,11 @@ module.exports = {
       aliases: ['burrita', 'burritas'],
       soporta_gramos: false, soporta_pesos: false, precio_campo: 'precio_taco', precio_base: 60,
     },
+    {
+      slug: 'gramos', nombre: 'grameado', nombre_plural: 'grameados', emoji: '⚖️',
+      aliases: ['por gr', 'por gr.', 'por gramo', 'por gramos', 'gramo', 'gramos', 'gr', 'kilo', 'kilos', 'medio kilo', 'cuarto kilo', 'tres cuartos', 'por kilo'],
+      soporta_gramos: true, soporta_pesos: true, precio_campo: 'precio_100g', precio_base: 32,
+    },
   ],
 
   // Cortes/ingredientes del menú (tabla cortes en BD)
