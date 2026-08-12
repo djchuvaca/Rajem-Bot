@@ -12,8 +12,8 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ./data:/Rajem-Bot/data
+      - ./logs:/Rajem-Bot/logs
 
   # Los tenants se añaden aquí automáticamente al provisionar desde el super admin.
   # Cada servicio usa envs/{TENANT_ID}.env y comparte ./data con el super admin.
