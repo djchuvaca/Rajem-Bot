@@ -18,9 +18,16 @@ function buildCortes() {
 // Detectar si el mensaje pregunta por algún corte
 function preguntaCorte(texto) {
   const productos = getProductos();
+  let _fb = '';
+  if (!productos.length) {
+    try {
+      const { getGiroActivo } = require('../giros');
+      _fb = Object.keys(getGiroActivo()?.fallbackCortes || {}).join('|');
+    } catch (_) {}
+  }
   const cortesPat = productos.length
     ? productos.map(p => p.nombre.toLowerCase()).join("|")
-    : "surtido|carne|buche|cuero|lengua";
+    : (_fb || 'surtido|carne|buche');
   return new RegExp(
     `qu[eé]\\s+es\\s+(el\\s+)?(${cortesPat})|cu[eé]ntame|c[oó]mo\\s+es\\s+(el\\s+)?(${cortesPat})|qu[eé]\\s+tiene|de\\s+qu[eé]\\s+(es|tiene|se\\s+trata)`,
     "i"

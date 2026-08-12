@@ -5,6 +5,7 @@
 const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
+const { MENU_FORMATO } = require("../config");
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function getNegocio() {
@@ -195,82 +196,10 @@ function respuestaDomicilio() {
 }
 
 // ── RESPUESTA: MENÚ ───────────────────────────────────────────────────────────
+// Delega a MENU_FORMATO (config.js) — fuente única de construcción del menú.
 function respuestaMenu() {
   try {
-    const precios   = getPrecios();
-    const negocio   = getNegocio();
-    const productos = getProductos();
-    const cortes    = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
-    const nombres   = cortes.length
-      ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
-      : "Surtido · Carne · Buche · Cuero · Lengua";
-    const notaTaco     = getMensaje("menu_taco_nota")    || "_(combinaciones al gusto)_";
-    const notaGramos   = getMensaje("menu_gramos_nota")  || "Cualquier pieza o combinación\n_Incluye tortillas y salsas_";
-    const notaCantidad = getMensaje("menu_por_cantidad") || "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_";
-    const notaPie      = getMensaje("menu_pie_salsas")   || "🟢 Todos los tacos y tortas incluyen salsas";
-
-    const preciosUniformes = !cortes.length || cortes.every(p => {
-      const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
-      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
-    });
-
-    const itemTypes   = getItemTypes();
-    let seccionPrecios = "";
-    for (const it of itemTypes) {
-      const campo  = it.precio_campo || 'precio_taco';
-      const preKey = campo === 'precio_torta' ? 'pTorta' : 'pTaco';
-      if (preciosUniformes) {
-        const pBase = precios[preKey];
-        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${pBase} c/u\n${notaTaco}\n\n`;
-      } else {
-        const minP = cortes.length
-          ? Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios)[preKey]))
-          : precios[preKey];
-        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — desde $${minP} c/u\n`;
-      }
-    }
-    if (!itemTypes.length) {
-      try {
-        const { getGiroActivo } = require('../giros');
-        const _giroFb = getGiroActivo();
-        for (const it of (_giroFb?.itemTypes || [])) {
-          const preKey = it.precio_campo === 'precio_torta' ? 'pTorta' : 'pTaco';
-          const p = preciosUniformes
-            ? precios[preKey]
-            : (cortes.length
-                ? Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios)[preKey]))
-                : precios[preKey]);
-          const label = preciosUniformes ? `$${p} c/u` : `desde $${p} c/u`;
-          seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — ${label}\n${preciosUniformes ? notaTaco + '\n' : ''}\n`;
-        }
-      } catch (_) {}
-    }
-    if (!preciosUniformes && cortes.length) {
-      seccionPrecios += `_(El precio varía por variante — escribe *precios* para ver el desglose)_\n\n`;
-    }
-    const soportaGramos = itemTypes.some(t => t.soporta_gramos);
-    const soportaPesos  = itemTypes.some(t => t.soporta_pesos);
-    if (soportaGramos) {
-      seccionPrecios += preciosUniformes
-        ? `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`
-        : `⚖️ *POR GRAMOS* — desde $${precios.p100g} / 100g\n${notaGramos}\n\n`;
-    }
-    const headerEmoji = itemTypes[0]?.emoji || '🌮';
-    const seccionPesos = soportaPesos ? `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` : "";
-    const tiposNombres = itemTypes.map(t => t.nombre_plural).join(" y ");
-    const notaPieDyn   = getMensaje("menu_pie_salsas") || `🟢 Todos los ${tiposNombres || "tacos y tortas"} incluyen salsas`;
-
-    return (
-      `\n${headerEmoji} *MENÚ ${negocio.toUpperCase()}* ${headerEmoji}\n` +
-      `━━━━━━━━━━━━━━━━━━\n\n` +
-      seccionPrecios +
-      seccionPesos +
-      `🥩 *Piezas disponibles:* ${nombres}\n\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `${notaPieDyn}\n` +
-      `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
-      `*¿Qué te vamos a preparar?* 😊\n`
-    );
+    return MENU_FORMATO();
   } catch (e) {
     return "¡Con gusto te comparto el menú! ¿Me dices si tu pedido es para domicilio o mostrador?";
   }

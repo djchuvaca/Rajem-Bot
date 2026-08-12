@@ -4,12 +4,22 @@
 function buildPedido() {
   const { getProductos } = require("../db");
   const productos = getProductos();
+
+  // Fallback desde módulo de giro — sin hardcoding de nombres de taquería
+  let _fallbackNombres = '';
+  if (!productos.length) {
+    try {
+      const { getGiroActivo } = require('../giros');
+      const slugs = [...new Set(Object.values(getGiroActivo()?.fallbackCortes || {}))].filter(s => s !== 'surtido especial');
+      _fallbackNombres = slugs.join(', ');
+    } catch (_) {}
+  }
   const nombresCortes = productos.length
     ? productos.map(p => p.nombre.toLowerCase()).join(", ")
-    : "surtido, carne, buche, cuero, lengua";
+    : _fallbackNombres;
   const cortesLista = productos.length
     ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
-    : "Surtido, Carne, Buche, Cuero o Lengua";
+    : _fallbackNombres.split(', ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ');
 
   return `
 INSTRUCCIONES PARA TOMA DE PEDIDO:
