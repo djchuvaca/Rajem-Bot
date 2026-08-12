@@ -590,16 +590,24 @@ function _seedCortesGiro(db, giro) {
   if (!bt) return; // business_type aún no existe (se seedea en _seedBusinessTypes)
   if (!Array.isArray(giro.cortes) || giro.cortes.length === 0) return;
 
-  const stmt = db.prepare(
+  const stmtInsert = db.prepare(
     'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo, seccion) VALUES (?,?,?,?,?,?,?,1,?)'
   );
   for (const c of giro.cortes) {
-    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases || []), c.descripcion || '', c.precio_base || 0, '{}', c.seccion || 'carnitas');
+    stmtInsert.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases || []), c.descripcion || '', c.precio_base || 0, '{}', c.seccion || 'carnitas');
   }
-  // Actualizar seccion en cortes ya existentes que tengan el valor default
-  const stmtUpdSec = db.prepare("UPDATE cortes SET seccion=? WHERE giro_id=? AND slug=? AND seccion='carnitas'");
+
+  // Sincronizar campos NLU en cortes ya existentes:
+  // aliases_json es config de sistema (NLU), el tenant no la edita desde el panel → siempre sobrescribir.
+  // descripcion solo si estaba vacía → respetar ediciones del tenant.
+  // seccion solo si aún tiene el valor default → respetar secciones personalizadas.
+  const stmtAlias = db.prepare("UPDATE cortes SET aliases_json=? WHERE giro_id=? AND slug=?");
+  const stmtDesc  = db.prepare("UPDATE cortes SET descripcion=? WHERE giro_id=? AND slug=? AND (descripcion IS NULL OR descripcion='')");
+  const stmtSec   = db.prepare("UPDATE cortes SET seccion=? WHERE giro_id=? AND slug=? AND (seccion IS NULL OR seccion='' OR seccion='carnitas')");
   for (const c of giro.cortes) {
-    if (c.seccion && c.seccion !== 'carnitas') stmtUpdSec.run(c.seccion, bt.id, c.slug);
+    stmtAlias.run(JSON.stringify(c.aliases || []), bt.id, c.slug);
+    if (c.descripcion) stmtDesc.run(c.descripcion, bt.id, c.slug);
+    if (c.seccion)     stmtSec.run(c.seccion, bt.id, c.slug);
   }
 }
 
@@ -627,6 +635,9 @@ function _seedBusinessTypes(db) {
     const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(giro.slug);
     if (!btRow) continue;
 
+    const stmtSyncIT = db.prepare(
+      "UPDATE item_types SET aliases_json=?, soporta_gramos=?, soporta_pesos=?, precio_campo=? WHERE business_type_id=? AND slug=?"
+    );
     for (const it of (giro.itemTypes || [])) {
       stmtIT.run(
         btRow.id, it.slug, it.nombre, it.nombre_plural,
@@ -634,8 +645,17 @@ function _seedBusinessTypes(db) {
         it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo,
         it.precio_base || 0
       );
-      db.prepare("UPDATE item_types SET precio_base = ? WHERE business_type_id = ? AND slug = ? AND precio_base = 0")
-        .run(it.precio_base || 0, btRow.id, it.slug);
+      // Sincronizar campos NLU/estructurales para item_types ya existentes.
+      // aliases_json, soporta_gramos, soporta_pesos y precio_campo son config de sistema
+      // (no editables por el tenant desde el panel) → siempre se sobreescriben.
+      // precio_base NO se toca: el tenant configura sus precios desde el panel.
+      stmtSyncIT.run(
+        JSON.stringify(it.aliases || []),
+        it.soporta_gramos ? 1 : 0,
+        it.soporta_pesos ? 1 : 0,
+        it.precio_campo,
+        btRow.id, it.slug
+      );
     }
 
     for (const prod of (giro.productos || [])) {
