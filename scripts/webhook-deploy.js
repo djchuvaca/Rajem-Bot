@@ -59,30 +59,34 @@ async function handleDeploy(req, res) {
   const needsRebuild = changed.some(f =>
     ['package.json', 'package-lock.json', 'Dockerfile'].includes(f)
   );
-  const onlyStatic = changed.length > 0 && changed.every(f =>
-    f.startsWith('src/panel/public/') || f.startsWith('src/superadmin/public/')
+  // src/panel/public/ está baked en la imagen (COPY . .) — necesita --build
+  // src/superadmin/public/ está montado como volumen — no necesita restart
+  const onlySuperadminStatic = changed.length > 0 && changed.every(f =>
+    f.startsWith('src/superadmin/public/')
   );
-  const needsRestart = !needsRebuild && !onlyStatic && changed.some(f => f.endsWith('.js') || f.endsWith('.sh'));
+  const hasPanelStatic = changed.some(f => f.startsWith('src/panel/public/'));
+  const needsRestart = !needsRebuild && !onlySuperadminStatic && changed.some(f => f.endsWith('.js') || f.endsWith('.sh') || hasPanelStatic);
   const needsPm2    = changed.includes('scripts/webhook-deploy.js');
 
   let dockerCmd;
-  if (needsRebuild) {
+  if (needsRebuild || hasPanelStatic) {
     dockerCmd = 'docker compose up -d --build';
-    console.log('[webhook] Cambios en dependencias/Dockerfile — rebuild completo');
+    console.log('[webhook] Cambios en dependencias/Dockerfile/panel-public — rebuild completo');
   } else if (needsRestart) {
     dockerCmd = 'docker compose up -d --force-recreate';
     console.log('[webhook] Cambios en lógica JS — force-recreate (recarga codigo en contenedores)');
-  } else if (onlyStatic) {
+  } else if (onlySuperadminStatic) {
     dockerCmd = null;
-    console.log('[webhook] Solo archivos estáticos — volumen actualiza sin reiniciar');
+    console.log('[webhook] Solo estáticos de superadmin — volumen actualiza sin reiniciar');
   } else {
     dockerCmd = 'docker compose up -d --force-recreate';
     console.log('[webhook] Cambios mixtos — force-recreate sin rebuild');
   }
 
-  const cmds = [`cd ${PROJECT}`, 'git stash', 'git pull', 'git stash pop'];
+  // git stash/pop falla si no hay cambios locales — simplemente pullamos directo
+  const cmds = [`cd ${PROJECT}`, 'git pull'];
   if (dockerCmd) cmds.push(dockerCmd);
-  if (needsPm2 || needsRebuild || needsRestart) cmds.push('pm2 restart webhook-deploy');
+  if (needsPm2) cmds.push('pm2 restart webhook-deploy');
 
   const cmd = cmds.join(' && ');
   console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — ejecutando: ${cmd}`);
@@ -212,7 +216,8 @@ async function handleEliminar(req, res) {
 
 // ── Servidor HTTP ─────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
-  if      (req.method === 'POST' && req.url === '/deploy')      handleDeploy(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
+  if      (req.method === 'GET'  && req.url === '/health')      { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() })); }
+  else if (req.method === 'POST' && req.url === '/deploy')      handleDeploy(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else if (req.method === 'POST' && req.url === '/provisionar') handleProvisionar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else if (req.method === 'POST' && req.url === '/eliminar')    handleEliminar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else { res.writeHead(404); res.end('Not found'); }
