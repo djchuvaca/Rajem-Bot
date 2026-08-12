@@ -1,4 +1,21 @@
 services:
+
+  # ── Super admin — siempre arriba, independiente de cualquier tenant ───────────
+  superadmin:
+    build: .
+    container_name: rajem-superadmin
+    command: node src/superadmin/standalone.js
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=America/Mazatlan
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+  # ── Tenant: Tacos Javier (Tepic) ─────────────────────────────────────────────
   tacos-javier-tepic:
     build: .
     container_name: tacos-javier-tepic
@@ -8,7 +25,6 @@ services:
       - TZ=America/Mazatlan
     ports:
       - "3000:3000"
-      - "3001:3001"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

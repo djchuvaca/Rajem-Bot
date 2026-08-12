@@ -29,7 +29,6 @@ const { handleMensaje }  = require("./src/handlers/mensajes");
 const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
-const { startSuperAdmin, setWaClient: setSuperAdminWaClient } = require("./src/superadmin/server");
 const { setWhatsappClient, setWaEstado, setQR, clearQR } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
 
@@ -60,7 +59,6 @@ client.on("ready", () => {
   _reintentos = 0;
   clearQR();
   setWhatsappClient(client);
-  setSuperAdminWaClient(client);
   // Autochat: guardar el JID propio para usarlo como destino de comandos y notificaciones
   if (getNotifModalidad() === 'autochat') {
     const propioJID = client.info?.wid?._serialized;
@@ -276,7 +274,6 @@ initDB().then(() => {
 
   restaurarTodasLasSesiones();
   startPanel(process.env.PANEL_PORT || 3000);
-  startSuperAdmin(parseInt(process.env.SUPERADMIN_PORT || '3001'), client);
   client.initialize();
 
   // Primer backup al arrancar, luego cada 6 horas

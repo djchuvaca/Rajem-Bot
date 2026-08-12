@@ -9,40 +9,46 @@
 
 module.exports = {
   apps: [
+
+    // ── Super admin (proceso independiente) ────────────────────────────────────
+    {
+      name: "superadmin",
+      script: "src/superadmin/standalone.js",
+      autorestart: true,
+      watch: false,
+      env: { NODE_ENV: "production" },
+      out_file:        "logs/superadmin-out.log",
+      error_file:      "logs/superadmin-err.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+    },
+
+    // ── Bot tenant (una entrada por cada tenant activo) ────────────────────────
     {
       name: process.env.TENANT_ID || "tacos-javier-tepic",
       script: "index.js",
-
-      // Reiniciar automáticamente si el proceso muere
       autorestart: true,
-      watch: false,           // no usar watch en producción (lo hace nodemon en dev)
+      watch: false,
       max_memory_restart: "1G",
-
-      // Espera 15s entre reinicios para que WhatsApp Web pueda reconectarse
       restart_delay: 15000,
-      max_restarts: 10,       // si falla 10 veces seguidas, PM2 deja de reintentar
-      min_uptime: "30s",      // debe vivir al menos 30s para considerar el inicio exitoso
-
-      // Variables de entorno (PM2 carga .env automáticamente si existe)
-      env: {
-        NODE_ENV:        "production",
-        SUPERADMIN_PORT: "3001",  // solo localhost — usa SSH tunnel para acceder remotamente
-      },
-
-      // Logs
-      out_file:   "logs/bot-out.log",
-      error_file: "logs/bot-err.log",
+      max_restarts: 10,
+      min_uptime: "30s",
+      env: { NODE_ENV: "production" },
+      out_file:        "logs/bot-out.log",
+      error_file:      "logs/bot-err.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss",
       merge_logs: true,
     },
+
+    // ── Webhook de deploy automático desde GitHub ──────────────────────────────
     {
       name: "webhook-deploy",
       script: "scripts/webhook-deploy.js",
       autorestart: true,
       watch: false,
-      out_file:   "logs/webhook-out.log",
-      error_file: "logs/webhook-err.log",
+      out_file:        "logs/webhook-out.log",
+      error_file:      "logs/webhook-err.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss",
     },
+
   ],
 };
