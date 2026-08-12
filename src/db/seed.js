@@ -56,7 +56,17 @@ async function seedDB() {
       precio_taco    REAL    DEFAULT 30,
       precio_torta   REAL    DEFAULT 40,
       precio_100g    REAL    DEFAULT 32,
-      activo         INTEGER DEFAULT 1
+      activo         INTEGER DEFAULT 1,
+      catalogo_slug  TEXT    DEFAULT NULL
+    );
+    CREATE TABLE IF NOT EXISTS solicitudes_producto (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre_propuesto TEXT    NOT NULL,
+      descripcion      TEXT,
+      categoria        TEXT    DEFAULT 'corte',
+      motivo           TEXT,
+      estado           TEXT    DEFAULT 'pendiente',
+      created_at       TEXT    DEFAULT (datetime('now','localtime'))
     );
     CREATE TABLE IF NOT EXISTS clientes (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,6 +140,7 @@ async function seedDB() {
   try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN sinonimos TEXT DEFAULT ''"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
+  try { db.run("ALTER TABLE productos ADD COLUMN catalogo_slug TEXT DEFAULT NULL"); } catch (_) {}
 
   // ── TABLAS PARA ZONAS DE ENVÍO ────────────────────────────────────────────
   try { run(`CREATE TABLE IF NOT EXISTS colonias (

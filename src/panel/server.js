@@ -124,9 +124,81 @@ app.post("/api/mensajes", requireAuth, (req, res) => {
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
 app.get("/api/productos", requireAuth, (req, res) => res.json(getProductos()));
-app.post("/api/productos", requireAuth, (req, res) => { createProducto(req.body); invalidarCacheCortes(); res.json({ ok: true }); });
-app.put("/api/productos/:id", requireAuth, (req, res) => { updateProducto(parseInt(req.params.id), req.body); invalidarCacheCortes(); res.json({ ok: true }); });
-app.delete("/api/productos/:id", requireAuth, (req, res) => { deleteProducto(parseInt(req.params.id)); invalidarCacheCortes(); res.json({ ok: true }); });
+
+// Tenant solo puede modificar precios y estado activo — el resto lo gestiona el super-admin
+app.put("/api/productos/:id", requireAuth, (req, res) => {
+  const id   = parseInt(req.params.id);
+  const prod = getProductos().find(p => p.id === id);
+  if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
+  const { precio_taco, precio_torta, precio_100g, activo } = req.body;
+  updateProducto(id, {
+    ...prod,
+    precio_taco:  precio_taco  !== undefined ? precio_taco  : prod.precio_taco,
+    precio_torta: precio_torta !== undefined ? precio_torta : prod.precio_torta,
+    precio_100g:  precio_100g  !== undefined ? precio_100g  : prod.precio_100g,
+    activo:       activo       !== undefined ? activo       : prod.activo,
+  });
+  invalidarCacheCortes();
+  res.json({ ok: true });
+});
+
+// Desactivar producto (no eliminar físicamente — el catálogo lo define el super-admin)
+app.delete("/api/productos/:id", requireAuth, (req, res) => {
+  const id   = parseInt(req.params.id);
+  const prod = getProductos().find(p => p.id === id);
+  if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
+  updateProducto(id, { ...prod, activo: 0 });
+  invalidarCacheCortes();
+  res.json({ ok: true });
+});
+
+// Adoptar un producto del catálogo al menú del tenant
+app.post("/api/productos/adoptar", requireAuth, (req, res) => {
+  const { catalogo_slug, precio_taco, precio_torta, precio_100g } = req.body;
+  if (!catalogo_slug) return res.status(400).json({ error: "catalogo_slug requerido" });
+  try {
+    const slug  = getBusinessTypeSlug();
+    const prods = getTemplateProducts(slug);
+    const tpl   = prods.find(p => p.sinonimos === catalogo_slug || p.nombre.toLowerCase().replace(/\s+/g,'_') === catalogo_slug);
+    if (!tpl) return res.status(404).json({ error: "Producto no encontrado en el catálogo" });
+    const existe = getProductos().find(p => p.nombre.toLowerCase() === tpl.nombre.toLowerCase());
+    if (existe) {
+      updateProducto(existe.id, { ...existe, activo: 1 });
+      invalidarCacheCortes();
+      return res.json({ ok: true, accion: 'reactivado', id: existe.id });
+    }
+    const precioData = {};
+    if (precio_taco  !== undefined) precioData.precio_taco  = parseFloat(precio_taco)  || tpl.precio_taco;
+    if (precio_torta !== undefined) precioData.precio_torta = parseFloat(precio_torta) || tpl.precio_torta;
+    if (precio_100g  !== undefined) precioData.precio_100g  = parseFloat(precio_100g)  || tpl.precio_100g;
+    createProducto({ ...tpl, ...precioData, catalogo_slug, activo: 1 });
+    invalidarCacheCortes();
+    res.json({ ok: true, accion: 'creado' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Solicitud de nuevo producto (no disponible en el catálogo actual)
+app.post("/api/solicitudes-producto", requireAuth, (req, res) => {
+  const { nombre_propuesto, descripcion, categoria, motivo } = req.body;
+  if (!nombre_propuesto) return res.status(400).json({ error: "nombre_propuesto requerido" });
+  run(
+    "INSERT INTO solicitudes_producto (nombre_propuesto, descripcion, categoria, motivo) VALUES (?,?,?,?)",
+    [nombre_propuesto, descripcion || '', categoria || 'corte', motivo || '']
+  );
+  // Notificar al grupo de admins si el cliente WA está disponible
+  try {
+    const { getClienteWA } = require("./whatsapp-bridge");
+    const grupoId = process.env.GRUPO_ID;
+    const client  = getClienteWA();
+    if (client && grupoId) {
+      const msg = `📋 *Nueva solicitud de producto*\n\n*Nombre:* ${nombre_propuesto}\n*Categoría:* ${categoria || 'corte'}\n*Descripción:* ${descripcion || '—'}\n*Motivo:* ${motivo || '—'}\n\n_Revisar en el panel de super-admin._`;
+      client.sendMessage(grupoId, msg).catch(() => {});
+    }
+  } catch (_) {}
+  res.json({ ok: true });
+});
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
 app.get("/api/clientes", requireAuth, (req, res) => res.json(getAllClientes()));
@@ -617,9 +689,17 @@ app.delete("/api/item-types/:id", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/business-types/:slug/productos — productos-plantilla de una plantilla
+// GET /api/business-types/:slug/productos — productos-plantilla de una plantilla específica
 app.get("/api/business-types/:slug/productos", requireAuth, (req, res) => {
   try { res.json(getTemplateProducts(req.params.slug)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/business-types/products — productos del catálogo del giro activo del tenant
+app.get("/api/business-types/products", requireAuth, (req, res) => {
+  try {
+    const slug = getBusinessTypeSlug();
+    res.json(getTemplateProducts(slug));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 function startPanel(port = 3000) {

@@ -15,8 +15,8 @@ function updateProducto(id, datos) {
 }
 function createProducto(datos) {
   run(
-    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '', datos.categoria || 'corte']
+    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, catalogo_slug) VALUES (?,?,?,?,?,?,?,?)",
+    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '', datos.categoria || 'corte', datos.catalogo_slug || null]
   );
 }
 function deleteProducto(id) {
