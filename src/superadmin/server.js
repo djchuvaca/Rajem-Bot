@@ -102,6 +102,45 @@ app.delete('/api/tenants/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Eliminacion completa: baja contenedor, limpia compose y env (streaming)
+app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
+  const webhookPort = process.env.WEBHOOK_PORT || 4000;
+  const secret      = process.env.WEBHOOK_SECRET || '';
+  const body        = JSON.stringify({ tenant_id: req.params.id, borrar_db: req.body.borrar_db || false });
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const options = {
+    hostname: process.env.WEBHOOK_HOST || 'host.docker.internal',
+    port:     webhookPort,
+    path:     '/eliminar',
+    method:   'POST',
+    headers: {
+      'Content-Type':   'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      ...(secret ? { 'Authorization': `Bearer ${secret}` } : {}),
+    },
+  };
+
+  const http = require('http');
+  const proxyReq = http.request(options, proxyRes => {
+    proxyRes.on('data', chunk => res.write(chunk));
+    proxyRes.on('end', () => {
+      deleteTenant(req.params.id);
+      res.end();
+    });
+  });
+  proxyReq.on('error', err => {
+    res.write(`\nError: webhook-deploy no responde en puerto ${webhookPort}.\n`);
+    res.end();
+  });
+  proxyReq.write(body);
+  proxyReq.end();
+});
+
 // ── STATS POR TENANT ──────────────────────────────────────────────────────────
 app.get('/api/tenants/:id/stats', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);

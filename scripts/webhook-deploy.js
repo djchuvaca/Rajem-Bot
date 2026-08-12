@@ -128,10 +128,64 @@ async function handleProvisionar(req, res) {
   });
 }
 
+// ── /eliminar — elimina un tenant del servidor ────────────────────────────────
+async function handleEliminar(req, res) {
+  if (!verificarBearer(req)) {
+    res.writeHead(401); res.end('Unauthorized'); return;
+  }
+
+  let data;
+  try {
+    const body = await leerBody(req);
+    data = JSON.parse(body);
+  } catch {
+    res.writeHead(400); res.end('JSON invalido'); return;
+  }
+
+  if (!data.tenant_id) {
+    res.writeHead(400); res.end('Falta tenant_id'); return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type':      'text/plain; charset=utf-8',
+    'Transfer-Encoding': 'chunked',
+    'Cache-Control':     'no-cache',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const env = {
+    ...process.env,
+    TENANT_ID: data.tenant_id,
+    BORRAR_DB: data.borrar_db ? '1' : '0',
+  };
+
+  console.log(`[webhook] Eliminando tenant "${data.tenant_id}"...`);
+
+  const proc = spawn('bash', [path.join(PROJECT, 'scripts/eliminar-tenant.sh')], {
+    env,
+    cwd: PROJECT,
+  });
+
+  const stripAnsi = s => s.toString().replace(/\x1b\[[0-9;]*m/g, '');
+  proc.stdout.on('data', chunk => res.write(stripAnsi(chunk)));
+  proc.stderr.on('data', chunk => res.write(stripAnsi(chunk)));
+  proc.on('close', code => {
+    console.log(`[webhook] Eliminacion finalizada con codigo ${code}`);
+    res.write(`\n[DONE:${code}]\n`);
+    res.end();
+  });
+  proc.on('error', err => {
+    console.error('[webhook] Error al eliminar:', err.message);
+    res.write(`\n[ERROR: ${err.message}]\n`);
+    res.end();
+  });
+}
+
 // ── Servidor HTTP ─────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   if      (req.method === 'POST' && req.url === '/deploy')      handleDeploy(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else if (req.method === 'POST' && req.url === '/provisionar') handleProvisionar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
+  else if (req.method === 'POST' && req.url === '/eliminar')    handleEliminar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else { res.writeHead(404); res.end('Not found'); }
 });
 

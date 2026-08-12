@@ -552,6 +552,36 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
   </div>
 </div>
 
+<!-- Modal eliminar tenant -->
+<div class="modal-bg" id="modal-eliminar-tenant">
+  <div class="modal" style="max-width:480px">
+    <h2 style="color:var(--red)">Eliminar negocio</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esta acción detendrá el contenedor Docker, eliminará la configuración y el archivo <code>.env</code> del negocio.</p>
+    <div style="background:#2d1515;border:1px solid var(--red);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px">
+      <strong id="elim-nombre-label"></strong>
+    </div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="elim-borrar-db" style="width:auto">
+      <label for="elim-borrar-db" style="margin:0;font-size:13px;color:var(--red)">También eliminar la base de datos (historial de pedidos y clientes)</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-eliminar-tenant')">Cancelar</button>
+      <button class="btn btn-danger" id="elim-btn" onclick="ejecutarEliminacion()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal logs eliminacion -->
+<div class="modal-bg" id="modal-elim-logs">
+  <div class="modal" style="max-width:560px">
+    <h2 id="elim-logs-title">Eliminando…</h2>
+    <pre id="elim-logs" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:11px;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('modal-elim-logs');loadTenants();populateTenantSelects()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -651,7 +681,7 @@ async function loadTenants() {
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
         <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${t.nombre}','${t.ciudad}','${t.estado}',${t.panel_port})">Provisionar</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}')">Eliminar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}','${(t.nombre||'').replace(/'/g,'')  }')">Eliminar</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
 }
@@ -702,10 +732,47 @@ async function saveTenant() {
     else { openProvisionar(id, body.nombre, body.ciudad, body.estado, body.panel_port, body.plan); }
   } else toast('Error al guardar','err');
 }
-async function confirmDelete(id) {
-  if(!confirm(`¿Eliminar el tenant "${id}" del registro? (no borra su BD)`)) return;
-  await fetch(`/api/tenants/${id}`,{method:'DELETE'});
-  loadTenants(); populateTenantSelects(); toast('Eliminado del registro');
+let _elimId = null;
+function confirmDelete(id, nombre) {
+  _elimId = id;
+  document.getElementById('elim-nombre-label').textContent = `${nombre || id} (${id})`;
+  document.getElementById('elim-borrar-db').checked = false;
+  document.getElementById('elim-btn').disabled = false;
+  openModal('modal-eliminar-tenant');
+}
+async function ejecutarEliminacion() {
+  if (!_elimId) return;
+  document.getElementById('elim-btn').disabled = true;
+  const borrarDb = document.getElementById('elim-borrar-db').checked;
+  closeModal('modal-eliminar-tenant');
+  const logsEl = document.getElementById('elim-logs');
+  logsEl.textContent = '';
+  document.getElementById('elim-logs-title').textContent = `Eliminando "${_elimId}"…`;
+  openModal('modal-elim-logs');
+  try {
+    const r = await fetch(`/api/tenants/${_elimId}/eliminar`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ borrar_db: borrarDb }),
+    });
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let exito = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      logsEl.textContent += chunk;
+      logsEl.scrollTop = logsEl.scrollHeight;
+      if (chunk.includes('[DONE:0]') || chunk.includes('[LISTO]')) exito = true;
+    }
+    document.getElementById('elim-logs-title').textContent = exito
+      ? `✅ "${_elimId}" eliminado`
+      : `❌ Error al eliminar "${_elimId}"`;
+  } catch(e) {
+    logsEl.textContent += `\nError: ${e.message}`;
+    document.getElementById('elim-logs-title').textContent = '❌ Error de conexión';
+  }
 }
 
 // ── GEO ───────────────────────────────────────────────────────────────────────
