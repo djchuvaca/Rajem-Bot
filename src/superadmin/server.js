@@ -78,6 +78,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
   const tenants = getTenants();
   const data = tenants.map(t => ({
     ...t,
+    bot_estado: getTenantBotEstado(t),
     stats: getTenantStats(t),
   }));
   res.json(data);
