@@ -16,7 +16,7 @@ services:
     volumes:
       - ./data:/-Rajem-Bot/data
       - ./logs:/-Rajem-Bot/logs
-      - ./src/superadmin/public:/-Rajem-Bot/src/superadmin/public
+      - ./src/superadmin:/-Rajem-Bot/src/superadmin
 
   # Los tenants se anaden aqui automaticamente al provisionar desde el super admin.
   # Cada servicio usa envs/{TENANT_ID}.env y comparte ./data con el super admin.

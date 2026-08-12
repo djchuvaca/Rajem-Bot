@@ -70,14 +70,14 @@ async function handleDeploy(req, res) {
     dockerCmd = 'docker compose up -d --build';
     console.log('[webhook] Cambios en dependencias/Dockerfile — rebuild completo');
   } else if (needsRestart) {
-    dockerCmd = 'docker compose restart';
-    console.log('[webhook] Cambios en lógica JS — restart sin rebuild');
+    dockerCmd = 'docker compose up -d';
+    console.log('[webhook] Cambios en lógica JS — up -d (recoge volumenes y config)');
   } else if (onlyStatic) {
     dockerCmd = null;
     console.log('[webhook] Solo archivos estáticos — volumen actualiza sin reiniciar');
   } else {
-    dockerCmd = 'docker compose restart';
-    console.log('[webhook] Cambios mixtos — restart sin rebuild');
+    dockerCmd = 'docker compose up -d';
+    console.log('[webhook] Cambios mixtos — up -d sin rebuild');
   }
 
   const cmds = [`cd ${PROJECT}`, 'git pull'];
