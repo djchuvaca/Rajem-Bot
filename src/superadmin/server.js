@@ -243,6 +243,68 @@ app.get('/api/grupos-wa', requireAuth, async (req, res) => {
   }
 });
 
+// ── PROVISIONAMIENTO DE NUEVO TENANT ─────────────────────────────────────────
+// Retransmite la petición al webhook-deploy (que corre fuera de Docker en el host)
+// y hace streaming de los logs de vuelta al navegador.
+app.post('/api/provisionar', requireAuth, (req, res) => {
+  const webhookPort = process.env.WEBHOOK_PORT || 4000;
+  const secret      = process.env.WEBHOOK_SECRET || '';
+  const body        = JSON.stringify(req.body);
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const options = {
+    hostname: '127.0.0.1',
+    port:     webhookPort,
+    path:     '/provisionar',
+    method:   'POST',
+    headers: {
+      'Content-Type':   'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      ...(secret ? { 'Authorization': `Bearer ${secret}` } : {}),
+    },
+  };
+
+  const http = require('http');
+  const proxyReq = http.request(options, proxyRes => {
+    proxyRes.on('data', chunk => res.write(chunk));
+    proxyRes.on('end',  ()    => res.end());
+  });
+  proxyReq.on('error', err => {
+    res.write(`\nError: webhook-deploy no responde en puerto ${webhookPort}.\n`);
+    res.write(`Verifica que esté corriendo: pm2 status\n`);
+    res.end();
+  });
+  proxyReq.write(body);
+  proxyReq.end();
+});
+
+// ── QR DE VINCULACIÓN POR TENANT ─────────────────────────────────────────────
+// Hace proxy al panel del tenant (server-to-server, sin CORS) para obtener el QR.
+app.get('/api/tenants/:id/qr', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+
+  const http = require('http');
+  const proxyReq = http.request(
+    { hostname: '127.0.0.1', port: tenant.panel_port, path: '/api/qr', method: 'GET', timeout: 4000 },
+    proxyRes => {
+      let data = '';
+      proxyRes.on('data', chunk => data += chunk);
+      proxyRes.on('end', () => {
+        try { res.status(proxyRes.statusCode).json(JSON.parse(data)); }
+        catch { res.status(502).json({ error: 'Respuesta inválida del panel del tenant' }); }
+      });
+    }
+  );
+  proxyReq.on('timeout', () => { proxyReq.destroy(); res.status(504).json({ error: 'Timeout — panel del tenant no responde' }); });
+  proxyReq.on('error',   err => res.status(503).json({ error: `Panel del tenant no accesible: ${err.message}` }));
+  proxyReq.end();
+});
+
 // ── HEALTH ────────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   let dbOk = false;

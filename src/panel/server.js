@@ -18,7 +18,7 @@ const { queryOne, queryAll, run } = require("../db/core");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
 
-const { getWhatsappClient, getStatusInfo } = require("./whatsapp-bridge");
+const { getWhatsappClient, getStatusInfo, getQR } = require("./whatsapp-bridge");
 const botPausado = require("../estado/bot-pausado");
 const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos");
@@ -394,6 +394,13 @@ app.get("/api/sesiones", requireAuth, (req, res) => {
   }
 
   res.json({ total: sesiones.length, sesiones });
+});
+
+// ── QR DE VINCULACIÓN (sin auth — proxy del super admin lo consume server-to-server) ──
+app.get("/api/qr", (req, res) => {
+  const { qr, ts } = getQR();
+  if (!qr) return res.status(404).json({ error: "Sin QR — bot ya autenticado o aún iniciando" });
+  res.json({ qr, ts });
 });
 
 // ── HEALTH CHECK (público, para monitoreo externo) ───────────────────────────

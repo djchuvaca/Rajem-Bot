@@ -30,7 +30,7 @@ const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
 const { startSuperAdmin, setWaClient: setSuperAdminWaClient } = require("./src/superadmin/server");
-const { setWhatsappClient, setWaEstado } = require("./src/panel/whatsapp-bridge");
+const { setWhatsappClient, setWaEstado, setQR, clearQR } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
 
 const client = new Client({
@@ -51,12 +51,14 @@ client.on("qr", (qr) => {
   console.log("  📱 Escanea este QR con tu WhatsApp:");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
   qrcode.generate(qr, { small: true });
+  setQR(qr);
   console.log("\n  WhatsApp > Dispositivos vinculados > Vincular dispositivo");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 });
 
 client.on("ready", () => {
   _reintentos = 0;
+  clearQR();
   setWhatsappClient(client);
   setSuperAdminWaClient(client);
   // Autochat: guardar el JID propio para usarlo como destino de comandos y notificaciones

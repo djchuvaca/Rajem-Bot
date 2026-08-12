@@ -98,6 +98,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -465,6 +466,66 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
   </div>
 </div>
 
+<!-- Modal provisionar -->
+<div class="modal-bg" id="modal-provisionar">
+  <div class="modal" style="max-width:560px">
+    <h2>Provisionar bot en servidor</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Crea el directorio, genera el .env, instala dependencias y arranca el contenedor Docker — todo en un solo paso.</p>
+    <input type="hidden" id="prov-id">
+    <div class="grid2">
+      <div class="form-group"><label>Negocio</label><input id="prov-nombre" type="text" disabled style="background:var(--bg-alt)"></div>
+      <div class="form-group"><label>Puerto panel</label><input id="prov-port" type="number"></div>
+    </div>
+    <div class="form-group">
+      <label>GROQ_API_KEY <span style="color:var(--red)">*</span></label>
+      <div style="display:flex;gap:6px">
+        <input id="prov-groq" type="password" placeholder="gsk_..." style="flex:1">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('prov-groq').type=document.getElementById('prov-groq').type==='password'?'text':'password'">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>GRUPO_ID de WhatsApp <span style="color:var(--muted);font-weight:400">(opcional — puedes configurarlo después)</span></label>
+      <input id="prov-grupo" type="text" placeholder="521XXXXXXXXXX@g.us">
+    </div>
+    <div class="form-group">
+      <label>PANEL_SECRET</label>
+      <div style="display:flex;gap:6px">
+        <input id="prov-secret" type="text" placeholder="Se genera automáticamente si se deja vacío" style="flex:1;font-size:11px">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('prov-secret').value=Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b=>b.toString(16).padStart(2,'0')).join('')">Generar</button>
+      </div>
+    </div>
+    <div class="form-group"><label>Plan</label>
+      <select id="prov-plan">
+        <option value="basico">Básico</option>
+        <option value="plus">Plus</option>
+        <option value="pro">Pro</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-provisionar')">Cancelar</button>
+      <button class="btn btn-primary" id="prov-btn" onclick="ejecutarProvisionamiento()">Provisionar ahora</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal logs de provisionamiento + QR -->
+<div class="modal-bg" id="modal-prov-logs">
+  <div class="modal" style="max-width:620px">
+    <h2 id="prov-logs-title">Provisionando…</h2>
+    <pre id="prov-logs" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:11px;max-height:280px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0 0 16px"></pre>
+    <div id="prov-qr-section" style="display:none;text-align:center">
+      <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">El bot está listo. Escanea el QR con WhatsApp para vincularlo:</p>
+      <div id="prov-qr-container" style="display:inline-block;padding:12px;background:#fff;border-radius:8px;margin-bottom:8px"></div>
+      <div id="prov-qr-estado" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+      <div><button class="btn btn-secondary btn-sm" onclick="iniciarPollingQR()">Actualizar QR</button></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarLogsProvisionar()">Cerrar</button>
+      <a id="prov-link-panel" href="#" target="_blank" class="btn btn-primary" style="display:none">Abrir panel del negocio</a>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-pasos-tenant">
   <div class="modal" style="max-width:520px">
     <h2>Negocio registrado</h2>
@@ -579,8 +640,9 @@ async function loadTenants() {
       <td>${t.ciudad}, ${t.estado}</td>
       <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
       <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
-      <td style="display:flex;gap:6px">
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
+        <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${t.nombre}','${t.ciudad}','${t.estado}',${t.panel_port})">Provisionar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}')">Eliminar</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
@@ -882,6 +944,136 @@ async function resolverJID() {
     document.getElementById('jid-result').textContent=d.error||'Error';
   }
 }
+// ── PROVISIONAR TENANT ────────────────────────────────────────────────────────
+let _provTenantId   = null;
+let _provPanelPort  = null;
+let _provQRInterval = null;
+
+function openProvisionar(id, nombre, ciudad, estado, port) {
+  _provTenantId  = id;
+  _provPanelPort = port;
+  document.getElementById('prov-id').value     = id;
+  document.getElementById('prov-nombre').value = nombre;
+  document.getElementById('prov-port').value   = port;
+  document.getElementById('prov-groq').value   = '';
+  document.getElementById('prov-grupo').value  = '';
+  document.getElementById('prov-secret').value = '';
+  document.getElementById('prov-plan').value   = 'basico';
+  document.getElementById('prov-btn').disabled = false;
+  openModal('modal-provisionar');
+}
+
+async function ejecutarProvisionamiento() {
+  const groqKey = document.getElementById('prov-groq').value.trim();
+  if (!groqKey) { toast('La GROQ_API_KEY es requerida', 'err'); return; }
+
+  const body = {
+    tenant_id:    _provTenantId,
+    nombre:       document.getElementById('prov-nombre').value,
+    panel_port:   parseInt(document.getElementById('prov-port').value),
+    groq_key:     groqKey,
+    grupo_id:     document.getElementById('prov-grupo').value.trim(),
+    panel_secret: document.getElementById('prov-secret').value.trim(),
+    plan:         document.getElementById('prov-plan').value,
+  };
+
+  document.getElementById('prov-btn').disabled = true;
+  closeModal('modal-provisionar');
+
+  // Abrir modal de logs
+  const logsEl = document.getElementById('prov-logs');
+  logsEl.textContent = '';
+  document.getElementById('prov-logs-title').textContent = `Provisionando "${body.nombre}"…`;
+  document.getElementById('prov-qr-section').style.display = 'none';
+  document.getElementById('prov-link-panel').style.display = 'none';
+  openModal('modal-prov-logs');
+
+  try {
+    const r = await fetch('/api/provisionar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let exito = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      logsEl.textContent += chunk;
+      logsEl.scrollTop = logsEl.scrollHeight;
+      if (chunk.includes('[DONE:0]') || chunk.includes('[LISTO]')) exito = true;
+    }
+
+    if (exito) {
+      document.getElementById('prov-logs-title').textContent = `✅ "${body.nombre}" provisionado`;
+      // Mostrar link al panel
+      const ip = window.location.hostname;
+      const linkEl = document.getElementById('prov-link-panel');
+      linkEl.href = `http://${ip}:${body.panel_port}`;
+      linkEl.style.display = '';
+      // Intentar mostrar QR tras 20s (el bot necesita arrancar)
+      _provPanelPort = body.panel_port;
+      setTimeout(() => {
+        document.getElementById('prov-qr-section').style.display = '';
+        iniciarPollingQR();
+      }, 20000);
+      loadTenants();
+    } else {
+      document.getElementById('prov-logs-title').textContent = '❌ El provisionamiento terminó con errores';
+    }
+  } catch (e) {
+    logsEl.textContent += `\nError de conexión: ${e.message}`;
+    document.getElementById('prov-logs-title').textContent = '❌ Error de conexión';
+  }
+}
+
+function cerrarLogsProvisionar() {
+  if (_provQRInterval) { clearInterval(_provQRInterval); _provQRInterval = null; }
+  closeModal('modal-prov-logs');
+}
+
+function iniciarPollingQR() {
+  if (_provQRInterval) clearInterval(_provQRInterval);
+  document.getElementById('prov-qr-estado').textContent = 'Buscando QR…';
+  document.getElementById('prov-qr-container').innerHTML = '';
+  _pollearQR();
+  _provQRInterval = setInterval(_pollearQR, 5000);
+}
+
+async function _pollearQR() {
+  try {
+    const r = await fetch(`/api/tenants/${_provTenantId}/qr`);
+    if (r.status === 404) {
+      document.getElementById('prov-qr-estado').textContent = 'El bot ya está autenticado o aún iniciando — reintentando…';
+      return;
+    }
+    if (!r.ok) { document.getElementById('prov-qr-estado').textContent = 'Panel del tenant no disponible todavía…'; return; }
+    const { qr } = await r.json();
+    if (!qr) return;
+    // Renderizar QR
+    const container = document.getElementById('prov-qr-container');
+    container.innerHTML = '';
+    new QRCode(container, { text: qr, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff' });
+    document.getElementById('prov-qr-estado').textContent = 'Escanea con WhatsApp → Dispositivos vinculados → Vincular dispositivo';
+    // Cuando ya está autenticado, clearInterval
+    clearInterval(_provQRInterval);
+    _provQRInterval = setInterval(async () => {
+      const check = await fetch(`/api/tenants/${_provTenantId}/qr`).catch(() => null);
+      if (check?.status === 404) {
+        clearInterval(_provQRInterval); _provQRInterval = null;
+        document.getElementById('prov-qr-container').innerHTML = '<div style="padding:20px;color:green;font-weight:600">✅ WhatsApp vinculado</div>';
+        document.getElementById('prov-qr-estado').textContent = 'El bot está listo para recibir mensajes.';
+      }
+    }, 5000);
+  } catch (e) {
+    document.getElementById('prov-qr-estado').textContent = `Error: ${e.message}`;
+  }
+}
+
 function toggleNotifJIDField() {
   const mod=document.getElementById('tc-modalidad').value;
   document.getElementById('campo-grupo-id').style.display    = mod==='grupo'    ? '' : 'none';
