@@ -40,6 +40,7 @@ h1{font-size:20px;font-weight:700;margin-bottom:4px}
 .badge-yellow{background:#78350f;color:var(--yellow)}
 .badge-blue{background:#1e3a5f;color:var(--blue)}
 .badge-gray{background:var(--surface2);color:var(--muted)}
+.badge-orange{background:#7c2d12;color:#fb923c}
 .stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px}
 .stat-row span{color:var(--text);font-weight:600}
 /* TABLE */
@@ -632,7 +633,7 @@ async function loadDashboard() {
   if (!data.length) { el.innerHTML = '<div class="empty">No hay negocios registrados</div>'; return; }
   el.innerHTML = data.map(t => {
     const s = t.stats || {};
-    const badge = t.activo ? `<span class="badge badge-green">Activo</span>` : `<span class="badge badge-red">Inactivo</span>`;
+    const badge = `<span class="badge badge-gray" id="dsc-${t.id}">…</span>`;
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
     const ia = s.groq_activo ? `<span class="badge badge-purple" style="background:#2e1b69;color:#a78bfa">IA</span>` : '';
     return `<div class="card">
@@ -648,6 +649,30 @@ async function loadDashboard() {
       <div style="margin-top:12px;font-size:11px;color:var(--muted2)">${t.ciudad}, ${t.estado} · Puerto ${t.panel_port}</div>
     </div>`;
   }).join('');
+  loadDockerStatuses();
+}
+
+// ── ESTADOS DOCKER ────────────────────────────────────────────────────────────
+const _DS_LABELS = {
+  activo:         ['badge-green',  'Activo'],
+  iniciando:      ['badge-yellow', 'Iniciando'],
+  inactivo:       ['badge-red',    'Inactivo'],
+  reiniciando:    ['badge-orange', 'Reiniciando'],
+  sin_contenedor: ['badge-gray',   'Sin contenedor'],
+};
+async function loadDockerStatuses() {
+  try {
+    const r = await fetch('/api/docker-statuses');
+    if (!r.ok) return;
+    const data = await r.json();
+    for (const [id, status] of Object.entries(data)) {
+      const [cls, label] = _DS_LABELS[status] || ['badge-gray', status];
+      for (const prefix of ['ds-', 'dsc-']) {
+        const el = document.getElementById(prefix + id);
+        if (el) { el.className = `badge ${cls}`; el.textContent = label; }
+      }
+    }
+  } catch {}
 }
 
 // ── TENANTS ───────────────────────────────────────────────────────────────────
@@ -661,13 +686,14 @@ async function loadTenants() {
       <td>${t.nombre}</td>
       <td>${t.ciudad}, ${t.estado}</td>
       <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
-      <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
+      <td><span class="badge badge-gray" id="ds-${t.id}">…</span></td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
         <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${(t.nombre||'').replace(/'/g,'')}')">Provisionar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}','${(t.nombre||'').replace(/'/g,'')  }')">Eliminar</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
+  loadDockerStatuses();
 }
 let _editingTenantId = null;
 function openTenantModal() {

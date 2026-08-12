@@ -210,11 +210,35 @@ async function handleEliminar(req, res) {
   });
 }
 
+// ── /statuses — estado de todos los contenedores Docker ──────────────────────
+async function handleStatuses(req, res) {
+  if (!verificarBearer(req)) {
+    res.writeHead(401); res.end('Unauthorized'); return;
+  }
+  exec("docker ps -a --format '{{.Names}}\t{{.Status}}'", { timeout: 10_000 }, (err, stdout) => {
+    const map = {};
+    if (!err) {
+      stdout.trim().split('\n').filter(Boolean).forEach(line => {
+        const [name, ...rest] = line.split('\t');
+        const status = rest.join('\t').trim();
+        if (!name) return;
+        const key = name.trim();
+        if      (status.startsWith('Up'))          map[key] = 'running';
+        else if (status.startsWith('Restarting'))  map[key] = 'restarting';
+        else                                       map[key] = 'exited';
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(map));
+  });
+}
+
 // ── Servidor HTTP ─────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   if      (req.method === 'POST' && req.url === '/deploy')      handleDeploy(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else if (req.method === 'POST' && req.url === '/provisionar') handleProvisionar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else if (req.method === 'POST' && req.url === '/eliminar')    handleEliminar(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
+  else if (req.method === 'GET'  && req.url === '/statuses')    handleStatuses(req, res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} });
   else { res.writeHead(404); res.end('Not found'); }
 });
 

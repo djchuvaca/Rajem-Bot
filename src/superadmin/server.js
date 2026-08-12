@@ -330,6 +330,44 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
   proxyReq.end();
 });
 
+// ── ESTADO DOCKER POR TENANT ──────────────────────────────────────────────────
+// Consulta webhook-deploy (corre en el host con acceso a Docker).
+// Combina el estado del contenedor con qr_pendiente de la BD para dar estados precisos.
+app.get('/api/docker-statuses', requireAuth, async (req, res) => {
+  const tenants      = getTenants();
+  const webhookPort  = process.env.WEBHOOK_PORT  || 4000;
+  const secret       = process.env.WEBHOOK_SECRET || '';
+
+  const dockerMap = await new Promise(resolve => {
+    const http = require('http');
+    const r = http.request({
+      hostname: 'host.docker.internal',
+      port:     webhookPort,
+      path:     '/statuses',
+      method:   'GET',
+      headers:  { 'Authorization': `Bearer ${secret}` },
+      timeout:  8000,
+    }, resp => {
+      let body = '';
+      resp.on('data', c => body += c);
+      resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { resolve({}); } });
+    });
+    r.on('error',   () => resolve({}));
+    r.on('timeout', () => { r.destroy(); resolve({}); });
+    r.end();
+  });
+
+  const result = {};
+  for (const t of tenants) {
+    const ds = dockerMap[t.id];
+    if (!ds)                   result[t.id] = 'sin_contenedor';
+    else if (ds === 'running') result[t.id] = getTenantQR(t) ? 'iniciando' : 'activo';
+    else if (ds === 'restarting') result[t.id] = 'reiniciando';
+    else                       result[t.id] = 'inactivo';
+  }
+  res.json(result);
+});
+
 // ── QR DE VINCULACIÓN POR TENANT ─────────────────────────────────────────────
 // Lee qr_pendiente desde la BD del tenant (volumen compartido ./data).
 // No requiere llamadas HTTP entre contenedores.
