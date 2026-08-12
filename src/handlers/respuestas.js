@@ -62,10 +62,19 @@ function respuestaPrecio(producto = null) {
     // Obtener item_types activos para construir columnas de precio
     let itemTypes = [];
     try { itemTypes = getItemTypes() || []; } catch (_) {}
-    if (!itemTypes.length) itemTypes = [
-      { slug: 'taco',  nombre: 'taco',  nombre_plural: 'tacos',  emoji: '🌮', soporta_gramos: 1, precio_campo: 'precio_taco'  },
-      { slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖', soporta_gramos: 0, precio_campo: 'precio_torta' },
-    ];
+    if (!itemTypes.length) {
+      try {
+        const { getGiroActivo } = require('../giros');
+        const giro = getGiroActivo();
+        if (giro?.itemTypes?.length) {
+          itemTypes = giro.itemTypes.map(it => ({
+            ...it,
+            soporta_gramos: it.soporta_gramos ? 1 : 0,
+            soporta_pesos:  it.soporta_pesos  ? 1 : 0,
+          }));
+        }
+      } catch (_) {}
+    }
 
     // Obtener cortes desde tabla cortes (nueva) con fallback a productos
     let cortes = [];
@@ -119,7 +128,12 @@ function respuestaPrecio(producto = null) {
     if (todosIguales || !cortes.length) {
       const nombres = cortes.length
         ? cortes.map(c => (c.nombre || c.slug).charAt(0).toUpperCase() + (c.nombre || c.slug).slice(1)).join(", ")
-        : "Asada, Tripa, Al Pastor, Suadero, Carnitas";
+        : (() => {
+            try {
+              const { getGiroActivo } = require('../giros');
+              return (getGiroActivo()?.cortes || []).map(c => c.nombre).join(', ');
+            } catch (_) { return ''; }
+          })();
       let lineasPrecios = "";
       for (const it of itemTypes) {
         const p = it.precio_base || (it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
@@ -216,10 +230,20 @@ function respuestaMenu() {
       }
     }
     if (!itemTypes.length) {
-      // fallback si no hay item_types configurados
-      seccionPrecios = preciosUniformes
-        ? `🌮 *TACOS* — $${precios.pTaco} c/u\n${notaTaco}\n\n🥖 *TORTAS* — $${precios.pTorta} c/u\n${notaTaco}\n\n`
-        : `🌮 *TACOS* — desde $${Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTaco))} c/u\n🥖 *TORTAS* — desde $${Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTorta))} c/u\n`;
+      try {
+        const { getGiroActivo } = require('../giros');
+        const _giroFb = getGiroActivo();
+        for (const it of (_giroFb?.itemTypes || [])) {
+          const preKey = it.precio_campo === 'precio_torta' ? 'pTorta' : 'pTaco';
+          const p = preciosUniformes
+            ? precios[preKey]
+            : (cortes.length
+                ? Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios)[preKey]))
+                : precios[preKey]);
+          const label = preciosUniformes ? `$${p} c/u` : `desde $${p} c/u`;
+          seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — ${label}\n${preciosUniformes ? notaTaco + '\n' : ''}\n`;
+        }
+      } catch (_) {}
     }
     if (!preciosUniformes && cortes.length) {
       seccionPrecios += `_(El precio varía por variante — escribe *precios* para ver el desglose)_\n\n`;

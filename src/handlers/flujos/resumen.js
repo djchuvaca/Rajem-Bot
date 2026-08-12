@@ -20,6 +20,31 @@ const {
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
 } = require("./utils");
 
+// ── HELPERS GIRO-AWARE ────────────────────────────────────────────────────────
+
+function _descItem(item) {
+  if (item.presentacion === 'gramos') return `los ${item.gramos}g`;
+  try {
+    const { getGiroActivo } = require('../../giros');
+    const it = (getGiroActivo()?.itemTypes || []).find(t => t.slug === item.presentacion);
+    if (it) {
+      const art = /as$/i.test(it.nombre_plural) ? 'las' : 'los';
+      return `${art} ${item.cantidad} ${it.nombre_plural}`;
+    }
+  } catch (_) {}
+  return `los $${item.monto}`;
+}
+
+function _preguntaCorte(desc) {
+  try {
+    const { getGiroActivo } = require('../../giros');
+    const giro = getGiroActivo();
+    return (giro?.vocabulario?.preguntaCorte || '¿De qué corte quieres %desc%?').replace('%desc%', desc);
+  } catch (_) {
+    return `¿De qué corte quieres ${desc}?`;
+  }
+}
+
 // ── EDICIÓN DESDE RESUMEN PENDIENTE ──────────────────────────────────────────
 async function handleEdicionResumen(msg, textoOriginal, clienteNumero, historial, esPreventa) {
   if (!resumenPendiente.has(clienteNumero)) return false;
@@ -277,11 +302,8 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
       esperandoCorte.set(clienteNumero, pedidoParcial);
       resumenPendiente.delete(clienteNumero);
       const primerItem = pedidoParcial.items[0];
-      const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
-                 : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
-                 : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
-                 : `los $${primerItem.monto}`;
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+      const desc = _descItem(primerItem);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);
@@ -302,11 +324,8 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
       esperandoCorte.set(clienteNumero, pedidoParcial);
       resumenPendiente.delete(clienteNumero);
       const primerItem = pedidoParcial.items[0];
-      const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
-                 : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
-                 : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
-                 : `los $${primerItem.monto}`;
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+      const desc = _descItem(primerItem);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);

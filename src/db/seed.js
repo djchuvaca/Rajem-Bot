@@ -215,48 +215,41 @@ async function seedDB() {
   )`); } catch (_) {}
 
   // ── SEED PRODUCTOS ─────────────────────────────────────────────────────────
+  // Resolver giro activo una sola vez — se reutiliza en config y migraciones
+  const _btSlug = (process.env.BUSINESS_TYPE || 'taqueria').trim().toLowerCase();
+  let _giro;
+  try {
+    const { getGiro } = require('../giros');
+    _giro = getGiro(_btSlug);
+  } catch (_) {}
+
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
-    const productos = [
-      ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso y delicioso.", 30, 40, 32, "surtida,mixto,mixta"],
-      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa. Perfecto para unos tacos que rayen en lo light.", 30, 40, 32, "carnitas,carnita,carner,maciza,masiza"],
-      ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos.", 30, 40, 32, "buchito,buchon,buchones"],
-      ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. Ideal para botana o para acompañar tus tacos.", 30, 40, 32, "cueros,cueritos,cuerito"],
-      ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa.", 30, 40, 32, "lenguita,lenguitas"],
-    ];
-    for (const [nombre, desc, taco, torta, g100, sins] of productos) {
-      db.run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?)",
-        [nombre, desc, taco, torta, g100, sins]);
+    // Seed dinámico: los productos vienen del módulo del giro activo, sin hardcoding
+    const productosGiro = _giro?.productos || [];
+    for (const p of productosGiro) {
+      db.run(
+        "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']
+      );
     }
-    console.log("✅ Productos iniciales insertados");
-  } else {
+    if (productosGiro.length) console.log(`✅ Productos iniciales insertados (${_btSlug})`);
+  } else if (_btSlug === 'taqueria') {
+    // Migraciones de datos legados — solo para instancias de taquería existentes
     db.run("UPDATE productos SET nombre = 'carne' WHERE nombre = 'carner'");
     db.run("UPDATE productos SET categoria = 'corte' WHERE categoria IS NULL");
-    const descripciones = [
-      ["surtido", "El favorito de la casa y amado por la gran mayoría de nuestros clientes. Es una combinación de todos nuestros cortes: carne, buche, cuero y lengua, dando como resultado un surtido jugoso y delicioso."],
-      ["carne",   "Puede variar entre espaldilla, pierna y aldilla. Es fibra pura con un muy bajo porcentaje de grasa. Perfecto para unos tacos que rayen en lo light."],
-      ["buche",   "Básicamente es el estómago del puerco. Tiene una textura consistente, similar al cuero pero con un sabor parecido al de la tripa. Perfecto para botanas o acompañado en tacos."],
-      ["cuero",   "Es la piel del puerco, la capa más delgada y limpia de cebo, con una textura muy suave y delicada. Ideal para botana o para acompañar tus tacos."],
-      ["lengua",  "Tiene una textura muy suave y consistente, casi cremosa, con un sabor intenso pero limpio, más delicado que otras partes del cerdo. Cuando está bien cocinada se deshace fácilmente y queda muy jugosa."],
-    ];
+    const descripciones = (_giro?.productos || []).map(p => [p.nombre, p.descripcion]).filter(([, d]) => d);
     for (const [nombre, desc] of descripciones) {
-      // Solo rellenar si la descripción está vacía — no sobreescribir cambios del tenant
       db.run("UPDATE productos SET descripcion = ? WHERE nombre = ? AND (descripcion IS NULL OR descripcion = '')", [desc, nombre]);
     }
-    const sinonimosDefault = [
-      ["surtido", "surtida,mixto,mixta"],
-      ["carne",   "carnitas,carnita,carner,maciza,masiza"],
-      ["buche",   "buchito,buchon,buchones"],
-      ["cuero",   "cueros,cueritos,cuerito"],
-      ["lengua",  "lenguita,lenguitas"],
-    ];
+    const sinonimosDefault = (_giro?.productos || []).map(p => [p.nombre, p.sinonimos]).filter(([, s]) => s);
     for (const [nombre, sins] of sinonimosDefault) {
       db.run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [sins, nombre]);
     }
   }
 
-  // ── MIGRACIÓN: SURTIDO ESPECIAL ───────────────────────────────────────────────
-  {
+  // ── MIGRACIONES DE PRODUCTOS ESPECÍFICAS POR GIRO ────────────────────────────
+  if (_btSlug === 'taqueria') {
     const yaSE = queryOne("SELECT id FROM productos WHERE nombre = 'surtido especial'");
     if (!yaSE) {
       const surtido = queryOne("SELECT precio_taco, precio_torta, precio_100g FROM productos WHERE nombre = 'surtido'");
@@ -267,10 +260,6 @@ async function seedDB() {
         ["surtido especial", "Combinación personalizada de cortes a elección del cliente.", pt, por, pg, "", "corte"]);
       console.log("✅ Producto 'surtido especial' insertado");
     }
-  }
-
-  // ── MIGRACIÓN: COSTILLA ───────────────────────────────────────────────────────
-  {
     const yaCostilla = queryOne("SELECT id FROM productos WHERE nombre = 'costilla'");
     if (!yaCostilla) {
       run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
@@ -331,14 +320,8 @@ async function seedDB() {
     ["timeout_sesion_min",       "35"],
   ];
 
-  // Config del giro activo (según BUSINESS_TYPE del env o el ya guardado en BD)
-  const _btSlugForConfig = (process.env.BUSINESS_TYPE || 'taqueria').trim().toLowerCase();
-  let _configGiro = { tipo_negocio: 'carnitas de puerco', precio_taco: '30', precio_torta: '40', precio_100g: '32', precio_salsa: '15' };
-  try {
-    const { getGiro } = require('../giros');
-    const _g = getGiro(_btSlugForConfig);
-    if (_g && _g.configDefaults) _configGiro = { ..._configGiro, ..._g.configDefaults };
-  } catch (_) {}
+  // Config del giro activo — reutiliza _btSlug y _giro resueltos en la sección de productos
+  const _configGiro = _giro?.configDefaults ? { ..._giro.configDefaults } : {};
 
   const _configAll = [..._configBase, ...Object.entries(_configGiro)];
 

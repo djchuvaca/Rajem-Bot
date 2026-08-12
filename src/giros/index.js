@@ -29,6 +29,21 @@ function getGiro(slug) {
   return _registry.get(slug) || _registry.get('taqueria');
 }
 
+/**
+ * Devuelve el giro activo del tenant leyendo business_type_slug de la BD.
+ * Uso único en todo el sistema para obtener el giro en tiempo de ejecución.
+ * Require lazy de db/config para evitar dependencias circulares.
+ */
+function getGiroActivo() {
+  try {
+    const { getConfig } = require('../db/config');
+    const slug = (getConfig('business_type_slug') || 'taqueria').trim().toLowerCase();
+    return _registry.get(slug) || _registry.get('taqueria');
+  } catch (_) {
+    return _registry.get('taqueria');
+  }
+}
+
 /** Lista completa de giros registrados (objetos). */
 function listGiros() {
   return [..._registry.values()];
@@ -39,4 +54,4 @@ function getSlugs() {
   return [..._registry.keys()];
 }
 
-module.exports = { getGiro, listGiros, getSlugs };
+module.exports = { getGiro, getGiroActivo, listGiros, getSlugs };

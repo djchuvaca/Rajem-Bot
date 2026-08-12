@@ -24,6 +24,15 @@ function _datosBancoDefault() {
 }
 
 // ── MENÚ FORMATO ──────────────────────────────────────────────────────────────
+
+function _nombresCortesFallback() {
+  try {
+    const { getGiroActivo } = require('./giros');
+    const giro = getGiroActivo();
+    return (giro?.cortes || []).map(c => c.nombre.charAt(0).toUpperCase() + c.nombre.slice(1)).join(' · ');
+  } catch (_) { return ''; }
+}
+
 function getMenuFormato() {
   try {
     const productos   = getProductos();
@@ -32,7 +41,7 @@ function getMenuFormato() {
     const salsas      = productos.filter(p => p.categoria === "salsa");
     const nombres     = cortes.length > 0
       ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
-      : "Surtido · Carne · Buche · Cuero · Lengua";
+      : _nombresCortesFallback();
     const negocio    = getConfig("nombre_negocio")  || "el negocio";
     const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
     const precios    = getPrecios();
@@ -130,7 +139,22 @@ function _menuDefault() {
     }
     return `\n${itemTypes[0]?.emoji || '🍽️'} *MENÚ ${negocio.toUpperCase()}* ${itemTypes[0]?.emoji || '🍽️'}\n━━━━━━━━━━━━━━━━━━\n\n${lineas}\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
   } catch (_) {
-    return `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n━━━━━━━━━━━━━━━━━━\n\n🌮 *TACOS* — $${precios.pTaco} c/u\n🥖 *TORTAS* — $${precios.pTorta} c/u\n⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
+    try {
+      const { getGiroActivo } = require('./giros');
+      const giro = getGiroActivo();
+      const emoji = giro?.emoji || '🍽️';
+      let lineas = '';
+      for (const it of (giro?.itemTypes || [])) {
+        const p = it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+        lineas += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${p} c/u\n`;
+      }
+      if ((giro?.itemTypes || []).some(t => t.soporta_gramos) && precios.p100g > 0) {
+        lineas += `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n`;
+      }
+      return `\n${emoji} *MENÚ ${negocio.toUpperCase()}* ${emoji}\n━━━━━━━━━━━━━━━━━━\n\n${lineas}\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
+    } catch (_) {
+      return `\n🍽️ *MENÚ ${negocio.toUpperCase()}* 🍽️\n━━━━━━━━━━━━━━━━━━\n\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
+    }
   }
 }
 
@@ -199,11 +223,15 @@ function getFormPreventaDomicilio(tel = "") {
 
 function getSaludo() {
   const negocio = getConfig("nombre_negocio") || "el negocio";
+  const emojiGiro = (() => {
+    try { const { getGiroActivo } = require('./giros'); return getGiroActivo()?.emoji || '🍽️'; }
+    catch (_) { return '🍽️'; }
+  })();
   try {
-    const msg = getMensaje("saludo") || `¡Bienvenido a *${negocio}*! 🌮🔥\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪`;
+    const msg = getMensaje("saludo") || `¡Bienvenido a *${negocio}*! ${emojiGiro}🔥\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪`;
     return msg.replace(/{negocio}/g, negocio);
   } catch (e) {
-    return `¡Bienvenido a *${negocio}*! 🌮🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
+    return `¡Bienvenido a *${negocio}*! ${emojiGiro}🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
   }
 }
 

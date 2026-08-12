@@ -42,10 +42,23 @@ function _getItemTypesActivos() {
 }
 
 function _itemTypesDefault() {
-  return [
-    { slug: 'taco',  nombre: 'taco',  nombre_plural: 'tacos',  emoji: '🌮', aliases_json: '["taquito","taquitos","tacito","tacitos"]', soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco'  },
-    { slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖', aliases_json: '["sandwich","sándwich"]',                   soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta' },
-  ];
+  try {
+    const { getGiroActivo } = require('../giros');
+    const giro = getGiroActivo();
+    if (giro?.itemTypes?.length) {
+      return giro.itemTypes.map(it => ({
+        slug:           it.slug,
+        nombre:         it.nombre,
+        nombre_plural:  it.nombre_plural,
+        emoji:          it.emoji,
+        aliases_json:   JSON.stringify(it.aliases || []),
+        soporta_gramos: it.soporta_gramos ? 1 : 0,
+        soporta_pesos:  it.soporta_pesos  ? 1 : 0,
+        precio_campo:   it.precio_campo,
+      }));
+    }
+  } catch (_) {}
+  return [];
 }
 
 function _getItemTypeAliases(type) {
@@ -96,8 +109,13 @@ function _buildItemTypesPattern() {
  */
 function listaItemTypes() {
   const types = _getItemTypesActivos();
-  if (!types.length) return 'tacos o tortas';
-  return types.map(t => t.nombre_plural).join(' o ');
+  if (types.length) return types.map(t => t.nombre_plural).join(' o ');
+  try {
+    const { getGiroActivo } = require('../giros');
+    const giro = getGiroActivo();
+    if (giro?.itemTypes?.length) return giro.itemTypes.map(t => t.nombre_plural).join(' o ');
+  } catch (_) {}
+  return '';
 }
 
 function getCortes() {
@@ -224,14 +242,11 @@ function detectarRefresco(texto) {
 
 function _cortesDefault() {
   try {
-    const { getConfig } = require('../db/config');
-    const slug = getConfig('business_type_slug') || 'taqueria';
-    const { getGiro } = require('../giros');
-    const giro = getGiro(slug);
-    if (giro && giro.fallbackCortes) return { ...giro.fallbackCortes };
+    const { getGiroActivo } = require('../giros');
+    const giro = getGiroActivo();
+    if (giro?.fallbackCortes) return { ...giro.fallbackCortes };
   } catch (_) {}
-  // Mínimo absoluto para que el bot no quede sin cortes reconocibles
-  return { surtido: 'surtido', carne: 'carne', buche: 'buche', cuero: 'cuero', lengua: 'lengua' };
+  return {};
 }
 
 function getRegexCortes() {
