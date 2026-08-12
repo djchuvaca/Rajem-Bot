@@ -54,7 +54,7 @@ async function handleDeploy(req, res) {
   console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — desplegando...`);
 
   exec(
-    `cd ${PROJECT} && git pull && docker compose up -d --build`,
+    `cd ${PROJECT} && git pull && docker compose up -d --build && pm2 restart webhook-deploy`,
     { timeout: 300_000 },
     (err, stdout, stderr) => {
       if (err) { console.error('[webhook] Error en deploy:', err.message); return; }
