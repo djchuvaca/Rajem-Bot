@@ -633,7 +633,7 @@ async function loadDashboard() {
   if (!data.length) { el.innerHTML = '<div class="empty">No hay negocios registrados</div>'; return; }
   el.innerHTML = data.map(t => {
     const s = t.stats || {};
-    const badge = `<span class="badge badge-gray" id="dsc-${t.id}">…</span>`;
+    const badge = t.activo ? `<span class="badge badge-green">Activo</span>` : `<span class="badge badge-red">Inactivo</span>`;
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
     const ia = s.groq_activo ? `<span class="badge badge-purple" style="background:#2e1b69;color:#a78bfa">IA</span>` : '';
     return `<div class="card">
@@ -649,29 +649,6 @@ async function loadDashboard() {
       <div style="margin-top:12px;font-size:11px;color:var(--muted2)">${t.ciudad}, ${t.estado} · Puerto ${t.panel_port}</div>
     </div>`;
   }).join('');
-  loadDockerStatuses();
-}
-
-// ── ESTADOS DOCKER ────────────────────────────────────────────────────────────
-const _DS_LABELS = {
-  en_uso:       ['badge-green',  'En uso'],
-  conectado:    ['badge-blue',   'Conectado'],
-  esperando_qr: ['badge-yellow', 'Sin conectar'],
-  sin_bd:       ['badge-gray',   'Sin iniciar'],
-};
-async function loadDockerStatuses() {
-  try {
-    const r = await fetch('/api/docker-statuses');
-    if (!r.ok) return;
-    const data = await r.json();
-    for (const [id, status] of Object.entries(data)) {
-      const [cls, label] = _DS_LABELS[status] || ['badge-gray', status];
-      for (const prefix of ['ds-', 'dsc-']) {
-        const el = document.getElementById(prefix + id);
-        if (el) { el.className = `badge ${cls}`; el.textContent = label; }
-      }
-    }
-  } catch {}
 }
 
 // ── TENANTS ───────────────────────────────────────────────────────────────────
@@ -685,14 +662,13 @@ async function loadTenants() {
       <td>${t.nombre}</td>
       <td>${t.ciudad}, ${t.estado}</td>
       <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
-      <td><span class="badge badge-gray" id="ds-${t.id}">…</span></td>
+      <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
         <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${(t.nombre||'').replace(/'/g,'')}')">Provisionar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}','${(t.nombre||'').replace(/'/g,'')  }')">Eliminar</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
-  loadDockerStatuses();
 }
 let _editingTenantId = null;
 function openTenantModal() {

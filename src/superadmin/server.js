@@ -18,7 +18,7 @@ const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas, getTenantQR, getTenantBotStatus,
+  getTenantZonas, setTenantZonas, getTenantQR,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -328,15 +328,6 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
   });
   proxyReq.write(body);
   proxyReq.end();
-});
-
-// ── ESTADO DEL BOT POR TENANT ─────────────────────────────────────────────────
-// Lee qr_pendiente y sesiones_activas de la BD de cada tenant (volumen ./data).
-// sin_bd | esperando_qr | en_uso | conectado
-app.get('/api/docker-statuses', requireAuth, (req, res) => {
-  const result = {};
-  for (const t of getTenants()) result[t.id] = getTenantBotStatus(t);
-  res.json(result);
 });
 
 // ── QR DE VINCULACIÓN POR TENANT ─────────────────────────────────────────────

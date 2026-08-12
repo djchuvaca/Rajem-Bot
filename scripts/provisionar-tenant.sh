@@ -179,9 +179,23 @@ ok "Servicio añadido a docker-compose.yml."
 # ── 5. Construir y arrancar el contenedor ─────────────────────────────────────
 if command -v docker &>/dev/null; then
   info "Construyendo imagen y arrancando contenedor ${TENANT_ID}..."
-  docker compose -f "$COMPOSE" up -d --build "$TENANT_ID" \
-    && ok "Contenedor arrancado. El bot iniciará en ~30s." \
-    || warn "docker compose falló. Arráncalo manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
+  if docker compose -f "$COMPOSE" up -d --build "$TENANT_ID"; then
+    ok "Contenedor arrancado. El bot iniciará en ~30s."
+    # Marcar como activo en tenants.json
+    if command -v python3 &>/dev/null; then
+      python3 - <<PYEOF
+import json
+file = '${TENANTS_FILE}'
+with open(file) as f: data = json.load(f)
+for t in data['tenants']:
+    if t['id'] == '${TENANT_ID}': t['activo'] = True
+with open(file, 'w') as f: json.dump(data, f, ensure_ascii=False, indent=2)
+PYEOF
+      ok "Tenant marcado como Activo."
+    fi
+  else
+    warn "docker compose falló. Arráncalo manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
+  fi
 else
   warn "Docker no encontrado. Arranca el bot manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
 fi
