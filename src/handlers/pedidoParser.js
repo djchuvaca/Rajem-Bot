@@ -223,25 +223,15 @@ function detectarRefresco(texto) {
 }
 
 function _cortesDefault() {
-  return {
-    // Taquería — cortes de res
-    asada: "asada", "carne asada": "asada", res: "asada", bistek: "asada", bistec: "asada",
-    tripa: "tripa", tripas: "tripa", tripita: "tripa", tripitas: "tripa",
-    suadero: "suadero", suaderito: "suadero",
-    // Taquería — cerdo
-    pastor: "pastor", "al pastor": "pastor", adobada: "pastor",
-    longaniza: "longaniza", longanitas: "longaniza",
-    chicharron: "chicharron", "chicharrón": "chicharron", chicharrones: "chicharron",
-    chorizo: "chorizo", chorizito: "chorizo",
-    cabeza: "cabeza", cabezita: "cabeza",
-    campechano: "campechano", campechana: "campechano",
-    // Carnitas (especialidad de cerdo)
-    surtido: "surtido", surtida: "surtido", surtidos: "surtido", mixto: "surtido", mixta: "surtido",
-    carne: "carne", carnes: "carne", carner: "carne", carnita: "carne", carnitas: "carne", maciza: "carne", masiza: "carne",
-    buche: "buche", buches: "buche", buchito: "buche", buchon: "buche", buchones: "buche",
-    cuero: "cuero", cueros: "cuero", cueritos: "cuero", cuerito: "cuero",
-    lengua: "lengua", lenguas: "lengua", lenguita: "lengua", lenguitas: "lengua",
-  };
+  try {
+    const { getConfig } = require('../db/config');
+    const slug = getConfig('business_type_slug') || 'taqueria';
+    const { getGiro } = require('../giros');
+    const giro = getGiro(slug);
+    if (giro && giro.fallbackCortes) return { ...giro.fallbackCortes };
+  } catch (_) {}
+  // Mínimo absoluto para que el bot no quede sin cortes reconocibles
+  return { surtido: 'surtido', carne: 'carne', buche: 'buche', cuero: 'cuero', lengua: 'lengua' };
 }
 
 function getRegexCortes() {

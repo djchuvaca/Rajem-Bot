@@ -7,6 +7,7 @@ const { getConfig, getProductos } = require("../db");
 function buildBase() {
   const negocio     = getConfig("nombre_negocio")   || "el negocio";
   const tipoNegocio = getConfig("tipo_negocio")      || "comida";
+  const _btSlug     = getConfig("business_type_slug") || "taqueria";
   const pTaco       = getConfig("precio_taco")       || "30";
   const pTorta      = getConfig("precio_torta")      || "40";
   const p100g       = getConfig("precio_100g")       || "32";
@@ -27,7 +28,7 @@ function buildBase() {
     .filter(Boolean)
     .join("\n");
 
-  return `Eres el asistente de ventas de "${negocio}", negocio de ${tipoNegocio}.
+  let base = `Eres el asistente de ventas de "${negocio}", negocio de ${tipoNegocio}.
 Atiendes clientes por WhatsApp de forma ágil, natural y con personalidad mexicana.
 
 PRECIOS:
@@ -55,6 +56,17 @@ REGLAS GENERALES:
 - NUNCA pidas código postal.
 - Si el cliente pide algo fuera del menú: "Aquí somos especialistas en ${tipoNegocio} 😊 Lo que buscas no lo manejamos, pero te aseguro que lo que tenemos no te va a decepcionar. ¿Te animas?"
 - Si no entiendes algo, pregunta amablemente.`;
+
+  // Inyectar instrucciones específicas del giro si están definidas
+  try {
+    const { getGiro } = require('../giros');
+    const giro = getGiro(_btSlug);
+    if (giro && typeof giro.promptOverride === 'function') {
+      base += giro.promptOverride({ negocio, tipoNegocio });
+    }
+  } catch (_) {}
+
+  return base;
 }
 
 module.exports = { buildBase };

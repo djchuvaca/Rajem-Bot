@@ -42,8 +42,14 @@ for (const arg of process.argv.slice(2)) {
   if (m) _cliFlags[m[1]] = m[2];
 }
 
-// Tipos de negocio disponibles
-const BUSINESS_TYPES_DISPONIBLES = ['taqueria', 'pizzeria', 'hamburgueseria'];
+// Tipos de negocio — leídos del registry de giros para no tocar este script al agregar uno nuevo
+let BUSINESS_TYPES_DISPONIBLES;
+try {
+  const { getSlugs } = require('../src/giros');
+  BUSINESS_TYPES_DISPONIBLES = getSlugs();
+} catch (_) {
+  BUSINESS_TYPES_DISPONIBLES = ['taqueria', 'pizzeria', 'hamburgueseria'];
+}
 
 async function main() {
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

@@ -287,41 +287,38 @@ async function seedDB() {
 
   // ── SEED CONFIGURACIÓN ─────────────────────────────────────────────────────
   const countConf = db.exec("SELECT COUNT(*) as c FROM configuracion")[0]?.values[0][0] || 0;
+
+  // Config base (independiente del giro)
+  const _configBase = [
+    ["nombre_negocio",           process.env.NOMBRE_NEGOCIO || "Mi Negocio"],
+    ["domicilio_costo",          "50"],
+    ["moneda",                   "$"],
+    ["grupo_id",                 process.env.GRUPO_ID || ""],
+    ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
+    ["metodos_domicilio",        "efectivo o transferencia"],
+    ["tiempo_cancelacion",       "15"],
+    ["timeout_recordatorio_min", "20"],
+    ["timeout_sesion_min",       "35"],
+  ];
+
+  // Config del giro activo (según BUSINESS_TYPE del env o el ya guardado en BD)
+  const _btSlugForConfig = (process.env.BUSINESS_TYPE || 'taqueria').trim().toLowerCase();
+  let _configGiro = { tipo_negocio: 'carnitas de puerco', precio_taco: '30', precio_torta: '40', precio_100g: '32', precio_salsa: '15' };
+  try {
+    const { getGiro } = require('../giros');
+    const _g = getGiro(_btSlugForConfig);
+    if (_g && _g.configDefaults) _configGiro = { ..._configGiro, ..._g.configDefaults };
+  } catch (_) {}
+
+  const _configAll = [..._configBase, ...Object.entries(_configGiro)];
+
   if (countConf === 0) {
-    const config = [
-      ["nombre_negocio",    process.env.NOMBRE_NEGOCIO || "Mi Negocio"],
-      ["domicilio_costo",   "50"],
-      ["moneda",            "$"],
-      ["grupo_id",          process.env.GRUPO_ID || ""],
-      ["precio_taco",       "30"],
-      ["precio_torta",      "40"],
-      ["precio_100g",       "32"],
-      ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
-      ["metodos_domicilio",        "efectivo o transferencia"],
-      ["tipo_negocio",             "carnitas de puerco"],
-      ["tiempo_cancelacion",       "15"],
-      ["precio_salsa",             "15"],
-      ["timeout_recordatorio_min", "20"],
-      ["timeout_sesion_min",       "35"],
-    ];
-    for (const [clave, valor] of config) {
+    for (const [clave, valor] of _configAll) {
       db.run("INSERT INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
     }
     console.log("✅ Configuración inicial insertada");
   } else {
-    const nuevos = [
-      ["precio_taco",              "30"],
-      ["precio_torta",             "40"],
-      ["precio_100g",              "32"],
-      ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
-      ["metodos_domicilio",        "efectivo o transferencia"],
-      ["tipo_negocio",             "carnitas de puerco"],
-      ["tiempo_cancelacion",       "15"],
-      ["precio_salsa",             "15"],
-      ["timeout_recordatorio_min", "20"],
-      ["timeout_sesion_min",       "35"],
-    ];
-    for (const [clave, valor] of nuevos) {
+    for (const [clave, valor] of _configAll) {
       db.run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?,?)", [clave, valor]);
     }
   }
@@ -549,8 +546,11 @@ async function seedDB() {
   // 'promedio' = promedio de precios de los cortes combinados
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('estrategia_precio_mixto', 'mas_caro')");
 
-  // ── SEED CORTES DEL GIRO ACTIVO ────────────────────────────────────────────
-  _seedCortesTaqueria(db);
+  // ── SEED CORTES DE TODOS LOS GIROS REGISTRADOS ────────────────────────────
+  const { listGiros: _listGirosSeed } = require('../giros');
+  for (const _giro of _listGirosSeed()) {
+    _seedCortesGiro(db, _giro);
+  }
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (
@@ -571,131 +571,25 @@ async function seedDB() {
   console.log("✅ Base de datos lista");
 }
 
-// ── HELPER: SEED CORTES DEL GIRO TAQUERÍA ────────────────────────────────────
-function _seedCortesTaqueria(db) {
-  const bt = db.prepare("SELECT id FROM business_types WHERE slug = 'taqueria'").get();
-  if (!bt) return; // taqueria no existe aún (se seedea en _seedBusinessTypes)
-
-  const cortesTaqueria = [
-    // Cortes de res
-    { slug: 'asada',      nombre: 'Asada',      precio_base: 35, aliases: ['carne asada','res','bistek','bistec','bistec asado'], descripcion: 'Carne de res a las brasas, jugosa y con sabor intenso.' },
-    { slug: 'suadero',    nombre: 'Suadero',    precio_base: 35, aliases: ['suaderito'], descripcion: 'Corte de res entre la piel y la costilla, muy suave y jugoso.' },
-    { slug: 'tripa',      nombre: 'Tripa',      precio_base: 32, aliases: ['tripas','tripita','tripitas','tripas de res'], descripcion: 'Intestino de res frito, crujiente por fuera y tierno por dentro.' },
-    // Cortes de cerdo
-    { slug: 'pastor',     nombre: 'Al Pastor',  precio_base: 32, aliases: ['al pastor','pastor','adobada','adobado'], descripcion: 'Carne de cerdo marinada en achiote, especias y chile, asada en trompo.' },
-    { slug: 'longaniza',  nombre: 'Longaniza',  precio_base: 32, aliases: ['longanitas','longanisa'], descripcion: 'Embutido de cerdo especiado, frito a la perfección.' },
-    { slug: 'chicharron', nombre: 'Chicharrón', precio_base: 30, aliases: ['chicharrón','chicharrones','chicharron prensado'], descripcion: 'Piel y carne de cerdo frita, crujiente y sabrosa.' },
-    { slug: 'chorizo',    nombre: 'Chorizo',    precio_base: 32, aliases: ['chorizito','chorizo mexicano'], descripcion: 'Chorizo mexicano frito, con chile y especias.' },
-    // Cortes de carnitas (especialidad)
-    { slug: 'carne',      nombre: 'Carne/Maciza',precio_base: 30, aliases: ['carnitas','carnita','carne','maciza','masiza','maciza de puerco'], descripcion: 'Espaldilla, pierna y aldilla de cerdo. Fibra pura, bajo porcentaje de grasa.' },
-    { slug: 'buche',      nombre: 'Buche',      precio_base: 30, aliases: ['buchito','buchon','buchones'], descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
-    { slug: 'cuero',      nombre: 'Cuero',      precio_base: 30, aliases: ['cueros','cueritos','cuerito'], descripcion: 'Piel del puerco, textura muy suave y delicada.' },
-    { slug: 'lengua',     nombre: 'Lengua',     precio_base: 30, aliases: ['lenguita','lenguitas'], descripcion: 'Textura cremosa, sabor intenso y limpio.' },
-    { slug: 'cabeza',     nombre: 'Cabeza',     precio_base: 30, aliases: ['cabezita','carnitas de cabeza'], descripcion: 'Carne de cabeza de cerdo, muy tierna y jugosa.' },
-    // Especiales/mezclas
-    { slug: 'campechano', nombre: 'Campechano', precio_base: 35, aliases: ['campechana','mixto campechano'], descripcion: 'Combinación de asada y longaniza, el favorito de los que no pueden elegir.' },
-    { slug: 'surtido',    nombre: 'Surtido',    precio_base: 30, aliases: ['surtida','mixto','la combinacion','de todo','todos los cortes'], descripcion: 'Combinación de los cortes que el local maneja. El chef decide la mezcla.' },
-  ];
+// ── HELPER: SEED CORTES DE UN GIRO (genérico) ────────────────────────────────
+function _seedCortesGiro(db, giro) {
+  const bt = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(giro.slug);
+  if (!bt) return; // business_type aún no existe (se seedea en _seedBusinessTypes)
+  if (!Array.isArray(giro.cortes) || giro.cortes.length === 0) return;
 
   const stmt = db.prepare(
     'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo) VALUES (?,?,?,?,?,?,?,1)'
   );
-  for (const c of cortesTaqueria) {
-    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases), c.descripcion, c.precio_base, '{}');
+  for (const c of giro.cortes) {
+    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases || []), c.descripcion || '', c.precio_base || 0, '{}');
   }
 }
 
 // ── HELPER: SEED BUSINESS TYPES + ITEM TYPES + TEMPLATE PRODUCTS ─────────────
+// Lee los giros del registry — agregar un nuevo giro solo requiere crear src/giros/mi-giro.js
 function _seedBusinessTypes(db) {
-  // ─ Definición de plantillas ───────────────────────────────────────────────
-  const TEMPLATES = [
-    {
-      slug: 'taqueria', nombre: 'Taquería', emoji: '🌮',
-      descripcion: 'Tacos, tortas, quesadillas, vampiros y venta de cortes en múltiples presentaciones',
-      itemTypes: [
-        {
-          slug: 'taco', nombre: 'taco', nombre_plural: 'tacos', emoji: '🌮',
-          aliases: ['taquito', 'taquitos', 'tacito', 'tacitos'],
-          soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco', precio_base: 30,
-        },
-        {
-          slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖',
-          aliases: ['sandwich', 'sándwich', 'sándwiches'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta', precio_base: 45,
-        },
-        {
-          slug: 'quesadilla', nombre: 'quesadilla', nombre_plural: 'quesadillas', emoji: '🧀',
-          aliases: ['quesa', 'quesas', 'quesadillas', 'queso'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 50,
-        },
-        {
-          slug: 'vampiro', nombre: 'vampiro', nombre_plural: 'vampiros', emoji: '🧛',
-          aliases: ['vampiros', 'vampira', 'vampiras'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 35,
-        },
-        {
-          slug: 'burrito', nombre: 'burrito', nombre_plural: 'burritos', emoji: '🌯',
-          aliases: ['burritos', 'burrita', 'burritas'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco', precio_base: 60,
-        },
-      ],
-      products: [
-        { nombre: 'surtido',  categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'surtida,mixto,mixta', descripcion: 'El favorito de la casa. Combinación de todos los cortes: carne, buche, cuero y lengua.' },
-        { nombre: 'carne',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'carnitas,carnita,maciza,masiza', descripcion: 'Espaldilla, pierna y aldilla. Fibra pura, bajo porcentaje de grasa.' },
-        { nombre: 'buche',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'buchito,buchon,buchones', descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
-        { nombre: 'cuero',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'cueros,cueritos,cuerito', descripcion: 'Piel del puerco, textura muy suave y delicada.' },
-        { nombre: 'lengua',   categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'lenguita,lenguitas', descripcion: 'Textura cremosa, sabor intenso y limpio.' },
-      ],
-    },
-    {
-      slug: 'pizzeria', nombre: 'Pizzería', emoji: '🍕',
-      descripcion: 'Pizzas en diferentes tamaños con variedad de sabores',
-      itemTypes: [
-        {
-          slug: 'pizza_individual', nombre: 'pizza individual', nombre_plural: 'pizzas individuales', emoji: '🍕',
-          aliases: ['individual', 'pizza chica', 'chica', 'pequeña', 'chiquita'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco',
-        },
-        {
-          slug: 'pizza_familiar', nombre: 'pizza familiar', nombre_plural: 'pizzas familiares', emoji: '🍕',
-          aliases: ['familiar', 'pizza grande', 'grande', 'familiar', 'tamaño grande'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
-        },
-      ],
-      products: [
-        { nombre: 'hawaiana',     categoria: 'corte', precio_taco: 120, precio_torta: 200, precio_100g: 0, sinonimos: 'hawaii,piña y jamón,tropical', descripcion: 'Piña fresca y jamón sobre salsa de tomate y queso fundido.' },
-        { nombre: 'pepperoni',    categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0, sinonimos: 'peperoni,peperon', descripcion: 'Rodajas generosas de pepperoni sobre queso mozzarella.' },
-        { nombre: 'mexicana',     categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0, sinonimos: 'con jalapeños,picante,picosa', descripcion: 'Jalapeños, chorizo y cebolla morada. Para los amantes del picante.' },
-        { nombre: 'margarita',    categoria: 'corte', precio_taco: 110, precio_torta: 190, precio_100g: 0, sinonimos: 'margherita,marguerita,queso y jitomate', descripcion: 'La clásica italiana: jitomate fresco, mozzarella y albahaca.' },
-        { nombre: 'cuatro quesos',categoria: 'corte', precio_taco: 140, precio_torta: 240, precio_100g: 0, sinonimos: '4 quesos,quatro quesos,de quesos', descripcion: 'Mezcla de mozzarella, manchego, gouda y parmesano.' },
-      ],
-    },
-    {
-      slug: 'hamburgueseria', nombre: 'Hamburguesería', emoji: '🍔',
-      descripcion: 'Hamburguesas artesanales sencillas y dobles',
-      itemTypes: [
-        {
-          slug: 'hamburguesa_sencilla', nombre: 'hamburguesa sencilla', nombre_plural: 'hamburguesas sencillas', emoji: '🍔',
-          aliases: ['sencilla', 'simple', 'normal', 'sen', 'hamburguesa chica'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco',
-        },
-        {
-          slug: 'hamburguesa_doble', nombre: 'hamburguesa doble', nombre_plural: 'hamburguesas dobles', emoji: '🍔',
-          aliases: ['doble', 'double', 'extra', 'hamburguesa grande'],
-          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
-        },
-      ],
-      products: [
-        { nombre: 'clásica',   categoria: 'corte', precio_taco: 90,  precio_torta: 130, precio_100g: 0, sinonimos: 'clasica,original,normal,la clasica', descripcion: 'Carne de res, queso americano, lechuga, jitomate y catsup.' },
-        { nombre: 'BBQ',       categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0, sinonimos: 'bbq,barbecue,barbeque,a la parrilla', descripcion: 'Carne de res, salsa BBQ casera, cebolla caramelizada y tocino.' },
-        { nombre: 'chipotle',  categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0, sinonimos: 'chipotl,chipot', descripcion: 'Carne de res, salsa chipotle, jalapeños y queso manchego.' },
-        { nombre: 'crispy',    categoria: 'corte', precio_taco: 95,  precio_torta: 140, precio_100g: 0, sinonimos: 'crujiente,crunchy,pollo crujiente,pollo crispy', descripcion: 'Pechuga de pollo empanizada crujiente con mayonesa de ajo.' },
-        { nombre: 'especial',  categoria: 'corte', precio_taco: 110, precio_torta: 160, precio_100g: 0, sinonimos: 'la especial,la de la casa,de la casa,especial de la casa', descripcion: 'La favorita de la casa: doble carne, tocino, queso derretido y salsa secreta.' },
-      ],
-    },
-  ];
+  const { listGiros } = require('../giros');
 
-  // ─ Insertar plantillas (idempotente) ─────────────────────────────────────
   const stmtBT = db.prepare(
     "INSERT OR IGNORE INTO business_types (slug, nombre, descripcion, emoji) VALUES (?,?,?,?)"
   );
@@ -710,24 +604,23 @@ function _seedBusinessTypes(db) {
      VALUES (?,?,?,?,?,?,?,?)`
   );
 
-  for (const tpl of TEMPLATES) {
-    stmtBT.run(tpl.slug, tpl.nombre, tpl.descripcion, tpl.emoji);
-    const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(tpl.slug);
+  for (const giro of listGiros()) {
+    stmtBT.run(giro.slug, giro.nombre, giro.descripcion, giro.emoji);
+    const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(giro.slug);
     if (!btRow) continue;
 
-    for (const it of tpl.itemTypes) {
+    for (const it of (giro.itemTypes || [])) {
       stmtIT.run(
         btRow.id, it.slug, it.nombre, it.nombre_plural,
-        it.emoji, JSON.stringify(it.aliases),
+        it.emoji, JSON.stringify(it.aliases || []),
         it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo,
         it.precio_base || 0
       );
-      // Actualizar precio_base si ya existía el registro
       db.prepare("UPDATE item_types SET precio_base = ? WHERE business_type_id = ? AND slug = ? AND precio_base = 0")
         .run(it.precio_base || 0, btRow.id, it.slug);
     }
 
-    for (const prod of tpl.products) {
+    for (const prod of (giro.productos || [])) {
       const yaExiste = db.prepare(
         "SELECT id FROM business_type_products WHERE business_type_id = ? AND nombre = ?"
       ).get(btRow.id, prod.nombre);
