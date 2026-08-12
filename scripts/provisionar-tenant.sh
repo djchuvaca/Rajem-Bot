@@ -168,10 +168,10 @@ cat >> "$COMPOSE" <<EOF
     ports:
       - "${PANEL_PORT}:3000"
     volumes:
-      - ./data:/Rajem-Bot/data
-      - ./logs:/Rajem-Bot/logs
-      - ./.wwebjs_auth:/Rajem-Bot/.wwebjs_auth
-      - ./.wwebjs_cache:/Rajem-Bot/.wwebjs_cache
+      - ./data:/-Rajem-Bot/data
+      - ./logs:/-Rajem-Bot/logs
+      - ./.wwebjs_auth:/-Rajem-Bot/.wwebjs_auth
+      - ./.wwebjs_cache:/-Rajem-Bot/.wwebjs_cache
 EOF
 ok "Servicio añadido a docker-compose.yml."
 
