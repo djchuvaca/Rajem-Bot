@@ -1,7 +1,7 @@
 services:
-  carnitas-bot:
+  tacos-javier-tepic:
     build: .
-    container_name: carnitas-bot
+    container_name: tacos-javier-tepic
     restart: unless-stopped
     env_file: .env
     environment:

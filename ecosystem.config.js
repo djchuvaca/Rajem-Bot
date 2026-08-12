@@ -2,15 +2,15 @@
 // Uso:
 //   npm install -g pm2        ← instalar PM2 una sola vez
 //   pm2 start ecosystem.config.js   ← arrancar
-//   pm2 stop carnitas-bot           ← detener
-//   pm2 restart carnitas-bot        ← reiniciar
-//   pm2 logs carnitas-bot           ← ver logs en tiempo real
+//   pm2 stop $TENANT_ID             ← detener
+//   pm2 restart $TENANT_ID          ← reiniciar
+//   pm2 logs $TENANT_ID             ← ver logs en tiempo real
 //   pm2 save && pm2 startup         ← hacer que arranque con el sistema
 
 module.exports = {
   apps: [
     {
-      name: process.env.TENANT_ID || "carnitas-bot",
+      name: process.env.TENANT_ID || "tacos-javier-tepic",
       script: "index.js",
 
       // Reiniciar automáticamente si el proceso muere

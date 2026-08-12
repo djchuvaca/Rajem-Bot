@@ -1,5 +1,5 @@
 {
-  "name": "carnitas-bot",
+  "name": "tacos-javier-tepic",
   "version": "1.0.0",
   "description": "Bot de WhatsApp para vender carnitas con IA (Groq)",
   "main": "index.js",
@@ -9,11 +9,12 @@
     "test": "node --test tests/parser.test.js tests/campos.test.js tests/respuestas.test.js tests/horario.test.js",
     "backup": "node scripts/backup-db.js",
     "pm2:start": "pm2 start ecosystem.config.js",
-    "pm2:stop": "pm2 stop carnitas-bot",
-    "pm2:logs": "pm2 logs carnitas-bot",
+    "pm2:stop": "pm2 stop ${TENANT_ID:-tacos-javier-tepic}",
+    "pm2:logs": "pm2 logs ${TENANT_ID:-tacos-javier-tepic}",
     "reset-password": "node scripts/reset-password.js",
     "onboarding": "node scripts/onboarding.js",
     "nuevo-tenant": "node scripts/nuevo-tenant.js",
+    "provisionar": "bash scripts/provisionar-tenant.sh",
     "ngrok": "node scripts/ngrok-start.js"
   },
   "dependencies": {
