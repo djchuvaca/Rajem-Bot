@@ -556,17 +556,17 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 <div class="modal-bg" id="modal-eliminar-tenant">
   <div class="modal" style="max-width:480px">
     <h2 style="color:var(--red)">Eliminar negocio</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Esta acción detendrá el contenedor Docker, eliminará la configuración y el archivo <code>.env</code> del negocio.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Se eliminará <strong>todo</strong> permanentemente: contenedor Docker, configuración, archivo <code>.env</code> y base de datos completa (pedidos, clientes, historial).</p>
     <div style="background:#2d1515;border:1px solid var(--red);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px">
       <strong id="elim-nombre-label"></strong>
     </div>
-    <div class="form-group" style="display:flex;align-items:center;gap:10px">
-      <input type="checkbox" id="elim-borrar-db" style="width:auto">
-      <label for="elim-borrar-db" style="margin:0;font-size:13px;color:var(--red)">También eliminar la base de datos (historial de pedidos y clientes)</label>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid var(--red);border-radius:6px;padding:10px 14px">
+      <input type="checkbox" id="elim-confirmar" style="width:auto;accent-color:var(--red)" onchange="document.getElementById('elim-btn').disabled=!this.checked">
+      <label for="elim-confirmar" style="margin:0;font-size:13px;color:var(--red)">Entiendo que esta acción es irreversible y no hay forma de recuperar los datos</label>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-eliminar-tenant')">Cancelar</button>
-      <button class="btn btn-danger" id="elim-btn" onclick="ejecutarEliminacion()">Eliminar</button>
+      <button class="btn btn-danger" id="elim-btn" disabled onclick="ejecutarEliminacion()">Eliminar todo</button>
     </div>
   </div>
 </div>
@@ -736,14 +736,13 @@ let _elimId = null;
 function confirmDelete(id, nombre) {
   _elimId = id;
   document.getElementById('elim-nombre-label').textContent = `${nombre || id} (${id})`;
-  document.getElementById('elim-borrar-db').checked = false;
-  document.getElementById('elim-btn').disabled = false;
+  document.getElementById('elim-confirmar').checked = false;
+  document.getElementById('elim-btn').disabled = true;
   openModal('modal-eliminar-tenant');
 }
 async function ejecutarEliminacion() {
   if (!_elimId) return;
   document.getElementById('elim-btn').disabled = true;
-  const borrarDb = document.getElementById('elim-borrar-db').checked;
   closeModal('modal-eliminar-tenant');
   const logsEl = document.getElementById('elim-logs');
   logsEl.textContent = '';
@@ -753,7 +752,7 @@ async function ejecutarEliminacion() {
     const r = await fetch(`/api/tenants/${_elimId}/eliminar`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ borrar_db: borrarDb }),
+      body: JSON.stringify({}),
     });
     const reader = r.body.getReader();
     const decoder = new TextDecoder();

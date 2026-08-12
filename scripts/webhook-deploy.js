@@ -156,7 +156,6 @@ async function handleEliminar(req, res) {
   const env = {
     ...process.env,
     TENANT_ID: data.tenant_id,
-    BORRAR_DB: data.borrar_db ? '1' : '0',
   };
 
   console.log(`[webhook] Eliminando tenant "${data.tenant_id}"...`);

@@ -4,9 +4,9 @@
 #   - Detiene y elimina el contenedor Docker
 #   - Elimina el servicio de docker-compose.yml
 #   - Elimina envs/{TENANT_ID}.env
-#   - Opcionalmente elimina la BD (BORRAR_DB=1)
+#   - Elimina la base de datos data/{TENANT_ID}.db
 #
-# Uso: TENANT_ID=tacos-javier [BORRAR_DB=1] bash scripts/eliminar-tenant.sh
+# Uso: TENANT_ID=tacos-javier bash scripts/eliminar-tenant.sh
 
 set -euo pipefail
 
@@ -60,16 +60,12 @@ else
   echo "Archivo .env no encontrado."
 fi
 
-# 4. Opcionalmente eliminar la BD
-if [[ "${BORRAR_DB:-0}" == "1" ]]; then
-  if [[ -f "$RAIZ/data/${TENANT_ID}.db" ]]; then
-    rm "$RAIZ/data/${TENANT_ID}.db"
-    echo "Base de datos data/${TENANT_ID}.db eliminada."
-  else
-    echo "Archivo de BD no encontrado."
-  fi
+# 4. Eliminar base de datos
+if [[ -f "$RAIZ/data/${TENANT_ID}.db" ]]; then
+  rm "$RAIZ/data/${TENANT_ID}.db"
+  echo "Base de datos data/${TENANT_ID}.db eliminada."
 else
-  echo "BD conservada en data/${TENANT_ID}.db"
+  echo "Base de datos no encontrada."
 fi
 
 echo ""

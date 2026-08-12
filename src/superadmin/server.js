@@ -106,7 +106,7 @@ app.delete('/api/tenants/:id', requireAuth, (req, res) => {
 app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
   const webhookPort = process.env.WEBHOOK_PORT || 4000;
   const secret      = process.env.WEBHOOK_SECRET || '';
-  const body        = JSON.stringify({ tenant_id: req.params.id, borrar_db: req.body.borrar_db || false });
+  const body        = JSON.stringify({ tenant_id: req.params.id });
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
