@@ -52,7 +52,7 @@ module.exports = {
 
   // Cortes/ingredientes del menú (tabla cortes en BD)
   cortes: [
-    // ── Res ───────────────────────────────────────────────────────────────────
+    // ── Tacos de asada (cortes "clásicos") ───────────────────────────────────
     { slug: 'asada',      nombre: 'Asada',       precio_base: 35,
       aliases: ['carne asada', 'res', 'bistek', 'bistec', 'bistec asado'],
       descripcion: 'Carne de res a las brasas, jugosa y con sabor intenso.' },
@@ -62,7 +62,6 @@ module.exports = {
     { slug: 'tripa',      nombre: 'Tripa',        precio_base: 32,
       aliases: ['tripas', 'tripita', 'tripitas', 'tripas de res'],
       descripcion: 'Intestino de res frito, crujiente por fuera y tierno por dentro.' },
-    // ── Cerdo ─────────────────────────────────────────────────────────────────
     { slug: 'pastor',     nombre: 'Al Pastor',    precio_base: 32,
       aliases: ['al pastor', 'adobada', 'adobado'],
       descripcion: 'Carne de cerdo marinada en achiote y especias, asada en trompo.' },
@@ -75,7 +74,7 @@ module.exports = {
     { slug: 'chorizo',    nombre: 'Chorizo',      precio_base: 32,
       aliases: ['chorizito', 'chorizo mexicano'],
       descripcion: 'Chorizo mexicano frito, con chile y especias.' },
-    // ── Carnitas ──────────────────────────────────────────────────────────────
+    // ── Carnitas (cortes "clásicos") ──────────────────────────────────────────
     { slug: 'carne',      nombre: 'Carne/Maciza', precio_base: 30,
       aliases: ['carnitas', 'carnita', 'carne', 'maciza', 'masiza', 'maciza de puerco'],
       descripcion: 'Espaldilla, pierna y aldilla de cerdo. Fibra pura, bajo porcentaje de grasa.' },
