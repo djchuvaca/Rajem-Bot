@@ -89,7 +89,8 @@ ports = [t.get('panel_port', 0) for t in data.get('tenants', [])]
 print(' '.join(map(str, ports)))
 " 2>/dev/null || echo "")
     while echo "$PUERTOS_USADOS" | grep -qw "$PUERTO_SUGERIDO" || \
-          ss -tlnp 2>/dev/null | grep -q ":$PUERTO_SUGERIDO "; do
+          ss -tlnp 2>/dev/null | grep -q ":$PUERTO_SUGERIDO " || \
+          docker ps --format "{{.Ports}}" 2>/dev/null | grep -q ":$PUERTO_SUGERIDO->"; do
       PUERTO_SUGERIDO=$((PUERTO_SUGERIDO + 1))
     done
   fi
