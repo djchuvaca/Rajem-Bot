@@ -1,6 +1,6 @@
 services:
 
-  # ── Super admin — siempre arriba, independiente de cualquier tenant ───────────
+  # Super admin - siempre arriba, independiente de cualquier tenant
   superadmin:
     build: .
     container_name: rajem-superadmin
@@ -15,5 +15,5 @@ services:
       - ./data:/-Rajem-Bot/data
       - ./logs:/-Rajem-Bot/logs
 
-  # Los tenants se añaden aquí automáticamente al provisionar desde el super admin.
+  # Los tenants se anaden aqui automaticamente al provisionar desde el super admin.
   # Cada servicio usa envs/{TENANT_ID}.env y comparte ./data con el super admin.
