@@ -115,6 +115,18 @@ tr:hover td{background:var(--surface2)}
 .topbar-ctrl-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s;white-space:nowrap}
 .topbar-ctrl-btn:hover{border-color:var(--border2);color:var(--text)}.topbar-ctrl-btn.pausado{border-color:var(--yellow);color:var(--yellow)}.topbar-ctrl-btn.cerrado{border-color:var(--red);color:var(--red)}
 .empty-state{text-align:center;padding:48px 24px;color:var(--muted)}.empty-state-icon{font-size:36px;margin-bottom:10px}.empty-state-title{font-size:14px;font-weight:600;color:var(--muted2);margin-bottom:4px}.empty-state-sub{font-size:12px}
+/* ── CATÁLOGO PRODUCTOS ──────────────────────────────────────── */
+.prod-cell{display:flex;align-items:center;gap:10px}
+.prod-avatar{font-size:20px;width:30px;text-align:center;flex-shrink:0;line-height:1}
+.prod-name{font-weight:600;font-size:13px}
+.prod-desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.35;max-width:320px}
+.price-pill{display:inline-flex;align-items:center;gap:2px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;min-width:70px;justify-content:flex-end}
+.price-pill .sym{font-size:10px;color:var(--muted2);flex-shrink:0}
+.price-pill input{background:transparent;border:none;outline:none;width:44px;text-align:right;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:0;min-width:0}
+.price-pill input:focus{color:var(--accent)}
+td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
+.fmt-tab-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);white-space:nowrap}
+.fmt-tab-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 @media(max-width:900px){#pedidos-table th:nth-child(5),#pedidos-table td:nth-child(5),#pedidos-table th:nth-child(7),#pedidos-table td:nth-child(7),#pedidos-table th:nth-child(9),#pedidos-table td:nth-child(9){display:none}}
 @keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -488,55 +500,76 @@ tr:hover td{background:var(--surface2)}
         <button class="btn btn-primary" style="margin-top:14px" onclick="saveFormatos()">Guardar precios de formato</button>
       </div>
 
-      <!-- Catálogo disponible: botones por formato de venta -->
+      <!-- Mis Cortes (formatos integrados en header) -->
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">📦 Catálogo disponible</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Selecciona un formato de venta para configurar qué cortes ofreces y a qué precio.</p>
-        <div id="formatos-btns" style="display:flex;flex-wrap:wrap;gap:10px"></div>
-      </div>
-
-      <!-- Tabla Cortes -->
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">🥩 Mis Cortes</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+          <div>
+            <div class="card-title" style="margin:0">🥩 Mis Cortes</div>
+            <p style="font-size:12px;color:var(--muted);margin-top:4px">Selecciona un formato para agregar cortes y ajustar sus precios.</p>
+          </div>
+          <div id="formatos-btns" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
         <div class="table-wrap">
           <table id="menu-cortes-table" style="display:none">
             <thead id="menu-cortes-thead"><tr><th>Corte</th><th>Estado</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div id="menu-cortes-empty" style="font-size:13px;color:var(--muted);padding:12px 0">
-          Sin cortes en el menú — usa el catálogo para agregar.
+        <div id="menu-cortes-empty">
+          <div class="empty-state">
+            <div class="empty-state-icon">🥩</div>
+            <div class="empty-state-title">Sin cortes en el menú</div>
+            <div class="empty-state-sub">Usa los botones de formato para agregar cortes al menú.</div>
+          </div>
         </div>
       </div>
 
-      <!-- Tabla Bebidas -->
+      <!-- Bebidas -->
       <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="margin:0">🥤 Bebidas</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="card-title" style="margin:0">🥤 Bebidas</div>
+            <p style="font-size:12px;color:var(--muted);margin-top:4px">Refrescos y bebidas disponibles en el menú.</p>
+          </div>
           <button class="btn btn-primary btn-sm" onclick="openModalAgregarBebida()">+ Agregar bebida</button>
         </div>
         <div class="table-wrap">
           <table id="menu-bebidas-table" style="display:none">
-            <thead><tr><th>Bebida</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Bebida</th><th class="num">Precio</th><th>Estado</th><th style="width:44px"></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div id="menu-bebidas-empty" style="font-size:13px;color:var(--muted);padding:8px 0">Sin bebidas en el menú</div>
+        <div id="menu-bebidas-empty">
+          <div class="empty-state" style="padding:28px 24px">
+            <div class="empty-state-icon">🥤</div>
+            <div class="empty-state-title">Sin bebidas en el menú</div>
+            <div class="empty-state-sub">Agrega bebidas usando el botón de arriba.</div>
+          </div>
+        </div>
       </div>
 
-      <!-- Tabla Salsas -->
+      <!-- Salsas -->
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="margin:0">🌶️ Salsas</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="card-title" style="margin:0">🌶️ Salsas</div>
+            <p style="font-size:12px;color:var(--muted);margin-top:4px">Salsas y acompañamientos con su precio extra.</p>
+          </div>
           <button class="btn btn-primary btn-sm" onclick="openModalAgregarSalsa()">+ Agregar salsa</button>
         </div>
         <div class="table-wrap">
           <table id="menu-salsas-table" style="display:none">
-            <thead><tr><th>Salsa</th><th>Precio extra</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Salsa</th><th class="num">Precio extra</th><th>Estado</th><th style="width:44px"></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div id="menu-salsas-empty" style="font-size:13px;color:var(--muted);padding:8px 0">Sin salsas en el menú</div>
+        <div id="menu-salsas-empty">
+          <div class="empty-state" style="padding:28px 24px">
+            <div class="empty-state-icon">🌶️</div>
+            <div class="empty-state-title">Sin salsas en el menú</div>
+            <div class="empty-state-sub">Agrega salsas usando el botón de arriba.</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1572,19 +1605,31 @@ async function deleteCliente(id) {
 // ── PRODUCTOS (menú del tenant) ───────────────────────────────────────────────
 let _menuItems   = [];
 let _formatoSlug = null;
+let _descBebidas = {};
+let _descSalsas  = {};
+let _descCortes  = {};
 
 async function loadProductos() {
-  const [formatos, items] = await Promise.all([
+  const [formatos, items, catBebidas, catSalsas, catCortes] = await Promise.all([
     api('/api/formatos?todos=1'),
     api('/api/menu-items'),
+    api('/api/catalogo/bebidas'),
+    api('/api/catalogo/salsas'),
+    api('/api/catalogo/cortes'),
   ]);
   _menuItems = items || [];
 
-  // Botones del catálogo por formato
+  // Mapas nombre→objeto para enriquecer las tablas con descripción y datos completos
+  _descBebidas = Object.fromEntries((catBebidas || []).map(b => [b.nombre, b]));
+  _descSalsas  = Object.fromEntries((catSalsas  || []).map(s => [s.nombre, s]));
+  const _allCortes = [...(catCortes?.asada || []), ...(catCortes?.carnitas || [])];
+  _descCortes  = _allCortes.reduce((m, c) => ({ ...m, [c.slug]: c }), {});
+
+  // Pills de formato en el header de "Mis Cortes"
   const btnsEl = document.getElementById('formatos-btns');
   if (btnsEl) {
     btnsEl.innerHTML = (formatos || []).map(f =>
-      `<button class="btn btn-secondary" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
+      `<button class="fmt-tab-btn" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
         ${f.emoji || ''} ${_ucfirst(f.nombre_plural)}
       </button>`
     ).join('');
@@ -1596,7 +1641,7 @@ async function loadProductos() {
 }
 
 function _renderMenuCortes(formatos) {
-  const corteItems = _menuItems.filter(i => i.categoria === 'corte');
+  const corteItems  = _menuItems.filter(i => i.categoria === 'corte');
   const slugsVistos = [...new Set(corteItems.map(i => i.producto_slug))];
 
   const table   = document.getElementById('menu-cortes-table');
@@ -1614,9 +1659,10 @@ function _renderMenuCortes(formatos) {
   const thead = document.getElementById('menu-cortes-thead');
   if (thead) {
     thead.innerHTML = `<tr>
-      <th>Corte</th>
-      ${formatos.map(f => `<th class="num">${f.emoji||''} ${_ucfirst(f.nombre_plural)}</th>`).join('')}
-      <th>Estado</th><th></th>
+      <th style="min-width:200px">Corte</th>
+      ${formatos.map(f => `<th class="num" style="white-space:nowrap">${f.emoji||''} ${_ucfirst(f.nombre_plural)}</th>`).join('')}
+      <th style="min-width:95px">Estado</th>
+      <th style="width:44px"></th>
     </tr>`;
   }
 
@@ -1628,28 +1674,46 @@ function _renderMenuCortes(formatos) {
 
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = slugsVistos.map(slug => {
-    const fmtMap  = cortesMap[slug] || {};
-    const activo  = formatos.some(f => fmtMap[f.slug]?.activo) ||
-                    (!formatos.length && Object.values(fmtMap).some(i => i.activo));
-    const celdas  = formatos.map(f => {
+    const fmtMap = cortesMap[slug] || {};
+    const activo = formatos.some(f => fmtMap[f.slug]?.activo) ||
+                   (!formatos.length && Object.values(fmtMap).some(i => i.activo));
+    const info   = _descCortes?.[slug] || {};
+    const nombre = info.nombre || _ucfirst(slug);
+    const desc   = info.descripcion || '';
+
+    const celdas = formatos.map(f => {
       const item = fmtMap[f.slug];
-      if (!item) return `<td class="num" style="color:var(--muted)">—</td>`;
+      if (!item) return `<td class="num"><span style="color:var(--muted);font-size:13px">—</span></td>`;
       return `<td class="num">
-        <input type="number" min="0" step="1" value="${item.precio||0}"
-          style="width:64px;padding:3px 6px;text-align:right"
-          onblur="actualizarPrecioMenuItem(${item.id},this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()">
+        <div class="price-pill">
+          <span class="sym">$</span>
+          <input type="number" min="0" step="1" value="${item.precio||0}"
+            onblur="actualizarPrecioMenuItem(${item.id},this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
       </td>`;
     }).join('');
 
-    return `<tr style="${activo ? '' : 'opacity:.55'}">
-      <td><strong>${_esc(slug)}</strong></td>
+    return `<tr style="${activo ? '' : 'opacity:.45'}">
+      <td>
+        <div class="prod-cell">
+          <div>
+            <div class="prod-name">${_esc(nombre)}</div>
+            ${desc ? `<div class="prod-desc">${_esc(desc)}</div>` : ''}
+          </div>
+        </div>
+      </td>
       ${celdas}
-      <td><span class="badge ${activo ? 'badge-green' : 'badge-red'}" style="cursor:pointer"
-        onclick="toggleCorteMenu('${_esc(slug)}',${activo ? 0 : 1})">
-        ${activo ? '✓ Activo' : '✗ Inactivo'}
-      </span></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="eliminarCorteMenu('${_esc(slug)}')" title="Quitar del menú">🗑</button></td>
+      <td>
+        <span class="badge ${activo ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
+          onclick="toggleCorteMenu('${_esc(slug)}',${activo ? 0 : 1})">
+          ${activo ? '✓ Activo' : '✗ Inactivo'}
+        </span>
+      </td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="eliminarCorteMenu('${_esc(slug)}')"
+          title="Quitar del menú" style="padding:4px 8px">🗑</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1668,21 +1732,44 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
   table.style.display = '';
   if (emptyEl) emptyEl.style.display = 'none';
 
+  const catMap = categoria === 'refresco' ? _descBebidas : _descSalsas;
+  const emoji  = categoria === 'refresco' ? '🥤' : '🌶️';
+
   const tbody = table.querySelector('tbody');
-  tbody.innerHTML = items.map(item => `<tr style="${item.activo ? '' : 'opacity:.55'}">
-    <td><strong>${_esc(item.producto_slug)}</strong></td>
-    <td class="num">
-      <input type="number" min="0" step="1" value="${item.precio||0}"
-        style="width:72px;padding:3px 6px;text-align:right"
-        onblur="actualizarPrecioMenuItem(${item.id},this.value)"
-        onkeydown="if(event.key==='Enter')this.blur()">
-    </td>
-    <td><span class="badge ${item.activo ? 'badge-green' : 'badge-red'}" style="cursor:pointer"
-      onclick="toggleMenuItemActivo(${item.id},${item.activo ? 0 : 1})">
-      ${item.activo ? '✓ Activo' : '✗ Inactivo'}
-    </span></td>
-    <td><button class="btn btn-secondary btn-sm" onclick="eliminarMenuItem(${item.id})" title="Quitar del menú">🗑</button></td>
-  </tr>`).join('');
+  tbody.innerHTML = items.map(item => {
+    const info   = catMap?.[item.producto_slug] || {};
+    const nombre = info.nombre || item.producto_slug;
+    const desc   = info.descripcion || '';
+    return `<tr style="${item.activo ? '' : 'opacity:.45'}">
+      <td>
+        <div class="prod-cell">
+          <div class="prod-avatar">${emoji}</div>
+          <div>
+            <div class="prod-name">${_esc(_ucfirst(nombre))}</div>
+            ${desc ? `<div class="prod-desc">${_esc(desc)}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td class="num">
+        <div class="price-pill">
+          <span class="sym">$</span>
+          <input type="number" min="0" step="1" value="${item.precio||0}"
+            onblur="actualizarPrecioMenuItem(${item.id},this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+      </td>
+      <td>
+        <span class="badge ${item.activo ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
+          onclick="toggleMenuItemActivo(${item.id},${item.activo ? 0 : 1})">
+          ${item.activo ? '✓ Activo' : '✗ Inactivo'}
+        </span>
+      </td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="eliminarMenuItem(${item.id})"
+          title="Quitar" style="padding:4px 8px">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 async function actualizarPrecioMenuItem(id, valor) {
