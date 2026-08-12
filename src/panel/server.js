@@ -734,9 +734,19 @@ app.put("/api/cortes/:id", requireAuth, (req, res) => {
 
 // ── FORMATOS (item_types del giro activo) ─────────────────────────────────────
 
-// GET /api/formatos — formatos activos del giro
+// GET /api/formatos — formatos del giro
+// ?todos=1 devuelve activos e inactivos (para gestión en el panel)
 app.get("/api/formatos", requireAuth, (req, res) => {
-  try { res.json(getItemTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    if (req.query.todos === "1") {
+      const { queryOne, queryAll } = require("../db/core");
+      const slug = getBusinessTypeSlug() || "taqueria";
+      const bt   = queryOne("SELECT id FROM business_types WHERE slug = ?", [slug]);
+      if (!bt) return res.json([]);
+      return res.json(queryAll("SELECT * FROM item_types WHERE business_type_id = ? ORDER BY id", [bt.id]) || []);
+    }
+    res.json(getItemTypes());
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PUT /api/formatos/:id — editar precio_base de un formato
