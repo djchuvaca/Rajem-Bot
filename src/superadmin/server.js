@@ -12,6 +12,7 @@ const {
   getSuperadminUsuario, updateSuperadminPassword,
   getGroqApiKey, getGroqTimeoutMs, getGroqModelo, getAppUrl, getGrupoMandaditosGlobal,
 } = require('../db/admin');
+const SqliteSessionStore = require('../db/session-store');
 
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
@@ -30,6 +31,7 @@ app.use(session({
   secret:            process.env.SUPERADMIN_SECRET || 'rajem-superadmin-secret-2024',
   resave:            false,
   saveUninitialized: false,
+  store:             new SqliteSessionStore(() => getAdminDB()),
   cookie:            { maxAge: 8 * 60 * 60 * 1000 },
 }));
 app.use(express.static(path.join(__dirname, 'public')));

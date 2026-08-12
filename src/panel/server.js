@@ -14,7 +14,8 @@ const {
   getConfig, guardarTelefonoReal, getJIDReal, getGrupoId, getNotifDestinoJID,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
 } = require("../db");
-const { queryOne, queryAll, run } = require("../db/core");
+const { queryOne, queryAll, run, getBsdb } = require("../db/core");
+const SqliteSessionStore = require("../db/session-store");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
 
@@ -38,6 +39,7 @@ app.use(session({
   secret:            process.env.PANEL_SECRET || "tacos-javier-secret-2024",
   resave:            false,
   saveUninitialized: false,
+  store:             new SqliteSessionStore(() => getBsdb()),
   cookie:            { maxAge: 8 * 60 * 60 * 1000 },
 }));
 app.use(express.static(path.join(__dirname, "public")));

@@ -66,4 +66,6 @@ function run(sql, params = []) {
   }
 }
 
-module.exports = { initDB, guardarDB, getDB, queryAll, queryOne, run };
+function getBsdb() { return _bsdb; }
+
+module.exports = { initDB, guardarDB, getDB, getBsdb, queryAll, queryOne, run };
