@@ -26,6 +26,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
+  name:              'rajem.superadmin.sid',
   secret:            process.env.SUPERADMIN_SECRET || 'rajem-superadmin-secret-2024',
   resave:            false,
   saveUninitialized: false,

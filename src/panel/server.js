@@ -34,6 +34,7 @@ if (!process.env.PANEL_SECRET) {
   console.warn("[SEGURIDAD] PANEL_SECRET no está definido en .env — usando secreto por defecto (INSEGURO en producción)");
 }
 app.use(session({
+  name:              `rajem.panel.${process.env.TENANT_ID || 'default'}.sid`,
   secret:            process.env.PANEL_SECRET || "tacos-javier-secret-2024",
   resave:            false,
   saveUninitialized: false,
