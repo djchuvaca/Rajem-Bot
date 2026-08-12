@@ -396,24 +396,26 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 <div class="modal-bg" id="modal-tenant">
   <div class="modal">
     <h2 id="modal-tenant-title">Nuevo negocio</h2>
-    <div class="grid2">
-      <div class="form-group"><label>ID único</label><input id="mt-id" type="text" placeholder="carnitas-bot-guadalajara" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-')"></div>
-      <div class="form-group"><label>Plan</label><select id="mt-plan"><option value="basico">Básico</option><option value="plus">Plus</option><option value="pro">Pro</option></select></div>
+    <div class="form-group">
+      <label>Nombre del negocio</label>
+      <input id="mt-nombre" type="text" placeholder="Tacos Pepe Guadalajara" oninput="if(!_editingTenantId){const s=this.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');document.getElementById('mt-id').value=s;}">
     </div>
-    <div class="form-group"><label>Nombre del negocio</label><input id="mt-nombre" type="text" oninput="if(!_editingTenantId){const s=this.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');document.getElementById('mt-id').value=s;}"></div>
+    <div class="form-group">
+      <label>ID único <span style="color:var(--muted);font-weight:400;font-size:12px">(se genera solo)</span></label>
+      <input id="mt-id" type="text" placeholder="tacos-pepe-guadalajara" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-')">
+    </div>
     <div class="grid2">
       <div class="form-group"><label>Ciudad</label><input id="mt-ciudad" type="text"></div>
       <div class="form-group"><label>Estado</label><input id="mt-estado" type="text"></div>
     </div>
-    <div class="form-group"><label>Ruta BD (relativa a la raíz del bot)</label><input id="mt-db" type="text" placeholder="data/tacos_javier.db"></div>
     <div class="grid2">
-      <div class="form-group"><label>Puerto panel</label><input id="mt-port" type="number" value="3000"></div>
-      <div class="form-group"><label>Desde</label><input id="mt-desde" type="date"></div>
+      <div class="form-group"><label>Plan</label><select id="mt-plan"><option value="basico">Básico</option><option value="plus">Plus</option><option value="pro">Pro</option></select></div>
+      <div class="form-group"><label>GRUPO_ID WhatsApp <span style="color:var(--muted);font-weight:400;font-size:12px">(opcional)</span></label><input id="mt-grupo" type="text" placeholder="521XXXXXXXXXX@g.us"></div>
     </div>
-    <div class="form-group"><label>Notas</label><textarea id="mt-notas" rows="2"></textarea></div>
+    <div class="form-group"><label>Notas <span style="color:var(--muted);font-weight:400;font-size:12px">(opcional)</span></label><textarea id="mt-notas" rows="2"></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-tenant')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveTenant()">Guardar</button>
+      <button class="btn btn-primary" id="mt-btn" onclick="saveTenant()">Crear y provisionar</button>
     </div>
   </div>
 </div>
@@ -474,40 +476,15 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
   </div>
 </div>
 
-<!-- Modal provisionar -->
+<!-- Modal provisionar (re-provisionar tenant ya registrado) -->
 <div class="modal-bg" id="modal-provisionar">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" style="max-width:460px">
     <h2>Provisionar bot en servidor</h2>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Crea el directorio, genera el .env, instala dependencias y arranca el contenedor Docker — todo en un solo paso.</p>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Genera el <code>.env</code> y arranca el contenedor Docker para <strong id="prov-nombre-label"></strong>.</p>
     <input type="hidden" id="prov-id">
-    <div class="grid2">
-      <div class="form-group"><label>Negocio</label><input id="prov-nombre" type="text" disabled style="background:var(--bg-alt)"></div>
-      <div class="form-group"><label>Puerto panel</label><input id="prov-port" type="number"></div>
-    </div>
     <div class="form-group">
-      <label>GROQ_API_KEY <span style="color:var(--red)">*</span></label>
-      <div style="display:flex;gap:6px">
-        <input id="prov-groq" type="password" placeholder="gsk_..." style="flex:1">
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('prov-groq').type=document.getElementById('prov-groq').type==='password'?'text':'password'">👁</button>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>GRUPO_ID de WhatsApp <span style="color:var(--muted);font-weight:400">(opcional — puedes configurarlo después)</span></label>
+      <label>GRUPO_ID de WhatsApp <span style="color:var(--muted);font-weight:400;font-size:12px">(opcional — configurable después)</span></label>
       <input id="prov-grupo" type="text" placeholder="521XXXXXXXXXX@g.us">
-    </div>
-    <div class="form-group">
-      <label>PANEL_SECRET</label>
-      <div style="display:flex;gap:6px">
-        <input id="prov-secret" type="text" placeholder="Se genera automáticamente si se deja vacío" style="flex:1;font-size:11px">
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('prov-secret').value=Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b=>b.toString(16).padStart(2,'0')).join('')">Generar</button>
-      </div>
-    </div>
-    <div class="form-group"><label>Plan</label>
-      <select id="prov-plan">
-        <option value="basico">Básico</option>
-        <option value="plus">Plus</option>
-        <option value="pro">Pro</option>
-      </select>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-provisionar')">Cancelar</button>
@@ -680,7 +657,7 @@ async function loadTenants() {
       <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
-        <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${t.nombre}','${t.ciudad}','${t.estado}',${t.panel_port})">Provisionar</button>
+        <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${(t.nombre||'').replace(/'/g,'')}')">Provisionar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${t.id}','${(t.nombre||'').replace(/'/g,'')  }')">Eliminar</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin negocios</td></tr>';
@@ -689,11 +666,10 @@ let _editingTenantId = null;
 function openTenantModal() {
   _editingTenantId = null;
   document.getElementById('modal-tenant-title').textContent = 'Nuevo negocio';
-  ['mt-id','mt-nombre','mt-ciudad','mt-estado','mt-db','mt-notas'].forEach(i => document.getElementById(i).value='');
+  ['mt-id','mt-nombre','mt-ciudad','mt-estado','mt-grupo','mt-notas'].forEach(i => document.getElementById(i).value='');
   document.getElementById('mt-id').disabled = false;
-  document.getElementById('mt-port').value = 3000;
-  document.getElementById('mt-desde').value = new Date().toISOString().slice(0,10);
   document.getElementById('mt-plan').value = 'basico';
+  document.getElementById('mt-btn').textContent = 'Crear y provisionar';
   openModal('modal-tenant');
 }
 async function editTenant(id) {
@@ -704,32 +680,47 @@ async function editTenant(id) {
   document.getElementById('mt-id').value=t.id; document.getElementById('mt-id').disabled=true;
   document.getElementById('mt-nombre').value=t.nombre;
   document.getElementById('mt-ciudad').value=t.ciudad; document.getElementById('mt-estado').value=t.estado;
-  document.getElementById('mt-db').value=t.db_path; document.getElementById('mt-port').value=t.panel_port;
-  document.getElementById('mt-desde').value=t.desde; document.getElementById('mt-plan').value=t.plan;
+  document.getElementById('mt-grupo').value='';
+  document.getElementById('mt-plan').value=t.plan;
   document.getElementById('mt-notas').value=t.notas||'';
+  document.getElementById('mt-btn').textContent = 'Guardar cambios';
   openModal('modal-tenant');
 }
 async function saveTenant() {
   const id = _editingTenantId || document.getElementById('mt-id').value.trim();
+  const nombre = document.getElementById('mt-nombre').value.trim();
+  if(!id || !nombre){ toast('El nombre es requerido','err'); return; }
   const body = {
-    nombre:document.getElementById('mt-nombre').value.trim(),
-    ciudad:document.getElementById('mt-ciudad').value.trim(),
-    estado:document.getElementById('mt-estado').value.trim(),
-    db_path:document.getElementById('mt-db').value.trim(),
-    panel_port:parseInt(document.getElementById('mt-port').value),
-    desde:document.getElementById('mt-desde').value,
-    plan:document.getElementById('mt-plan').value,
-    notas:document.getElementById('mt-notas').value.trim(),
+    nombre,
+    ciudad:     document.getElementById('mt-ciudad').value.trim(),
+    estado:     document.getElementById('mt-estado').value.trim(),
+    db_path:    `data/${id}.db`,
+    panel_port: 0,
+    desde:      new Date().toISOString().slice(0,10),
+    plan:       document.getElementById('mt-plan').value,
+    notas:      document.getElementById('mt-notas').value.trim(),
   };
-  if(!id||!body.nombre||!body.db_path){toast('Completa los campos requeridos','err');return;}
-  const url = _editingTenantId ? `/api/tenants/${_editingTenantId}` : '/api/tenants';
+  const url    = _editingTenantId ? `/api/tenants/${_editingTenantId}` : '/api/tenants';
   const method = _editingTenantId ? 'PUT' : 'POST';
   if(!_editingTenantId) body.id = id;
   const r = await fetch(url, {method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.ok){
     closeModal('modal-tenant'); loadTenants(); populateTenantSelects();
-    if(_editingTenantId){ toast('Negocio actualizado'); }
-    else { openProvisionar(id, body.nombre, body.ciudad, body.estado, body.panel_port, body.plan); }
+    if(_editingTenantId){
+      toast('Negocio actualizado');
+    } else {
+      // Provisionar directamente sin modal intermedio
+      _provTenantId  = id;
+      _provPanelPort = 0;
+      await _ejecutarProvisionamientoDirecto({
+        tenant_id:  id,
+        nombre:     body.nombre,
+        ciudad:     body.ciudad,
+        estado:     body.estado,
+        plan:       body.plan,
+        grupo_id:   document.getElementById('mt-grupo').value.trim(),
+      });
+    }
   } else toast('Error al guardar','err');
 }
 let _elimId = null;
@@ -1042,41 +1033,31 @@ let _provTenantId   = null;
 let _provPanelPort  = null;
 let _provQRInterval = null;
 
-function openProvisionar(id, nombre, ciudad, estado, port, plan='basico') {
+function openProvisionar(id, nombre) {
   _provTenantId  = id;
-  _provPanelPort = port;
-  document.getElementById('prov-id').value     = id;
-  document.getElementById('prov-nombre').value = nombre;
-  document.getElementById('prov-port').value   = port;
-  document.getElementById('prov-groq').value   = document.getElementById('ia-key')?.value || '';
-  document.getElementById('prov-grupo').value  = '';
-  document.getElementById('prov-secret').value = '';
-  document.getElementById('prov-plan').value   = plan || 'basico';
-  document.getElementById('prov-btn').disabled = false;
+  _provPanelPort = 0;
+  document.getElementById('prov-id').value          = id;
+  document.getElementById('prov-nombre-label').textContent = nombre || id;
+  document.getElementById('prov-grupo').value       = '';
+  document.getElementById('prov-btn').disabled      = false;
   openModal('modal-provisionar');
 }
 
 async function ejecutarProvisionamiento() {
-  const groqKey = document.getElementById('prov-groq').value.trim();
-  if (!groqKey) { toast('La GROQ_API_KEY es requerida', 'err'); return; }
-
-  const body = {
-    tenant_id:    _provTenantId,
-    nombre:       document.getElementById('prov-nombre').value,
-    panel_port:   parseInt(document.getElementById('prov-port').value),
-    groq_key:     groqKey,
-    grupo_id:     document.getElementById('prov-grupo').value.trim(),
-    panel_secret: document.getElementById('prov-secret').value.trim(),
-    plan:         document.getElementById('prov-plan').value,
-  };
-
   document.getElementById('prov-btn').disabled = true;
+  const body = {
+    tenant_id: _provTenantId,
+    grupo_id:  document.getElementById('prov-grupo').value.trim(),
+  };
   closeModal('modal-provisionar');
+  await _ejecutarProvisionamientoDirecto(body);
+}
 
-  // Abrir modal de logs
+async function _ejecutarProvisionamientoDirecto(body) {
+  const etiqueta = body.nombre || body.tenant_id;
   const logsEl = document.getElementById('prov-logs');
   logsEl.textContent = '';
-  document.getElementById('prov-logs-title').textContent = `Provisionando "${body.nombre}"…`;
+  document.getElementById('prov-logs-title').textContent = `Provisionando "${etiqueta}"…`;
   document.getElementById('prov-qr-section').style.display = 'none';
   document.getElementById('prov-link-panel').style.display = 'none';
   openModal('modal-prov-logs');
@@ -1102,19 +1083,24 @@ async function ejecutarProvisionamiento() {
     }
 
     if (exito) {
-      document.getElementById('prov-logs-title').textContent = `✅ "${body.nombre}" provisionado`;
-      // Mostrar link al panel
-      const ip = window.location.hostname;
-      const linkEl = document.getElementById('prov-link-panel');
-      linkEl.href = `http://${ip}:${body.panel_port}`;
-      linkEl.style.display = '';
+      document.getElementById('prov-logs-title').textContent = `✅ "${etiqueta}" provisionado`;
+      // Recargar tenants para obtener el puerto real asignado por el script
+      await loadTenants();
+      const tenants = await fetch('/api/tenants').then(r=>r.json()).catch(()=>[]);
+      const t = tenants.find(x=>x.id===_provTenantId);
+      if (t && t.panel_port) {
+        const ip = window.location.hostname;
+        const linkEl = document.getElementById('prov-link-panel');
+        linkEl.href = `http://${ip}:${t.panel_port}`;
+        linkEl.style.display = '';
+        _provPanelPort = t.panel_port;
+      }
       // Intentar mostrar QR tras 20s (el bot necesita arrancar)
-      _provPanelPort = body.panel_port;
       setTimeout(() => {
         document.getElementById('prov-qr-section').style.display = '';
         iniciarPollingQR();
       }, 20000);
-      loadTenants();
+      populateTenantSelects();
     } else {
       document.getElementById('prov-logs-title').textContent = '❌ El provisionamiento terminó con errores';
     }
