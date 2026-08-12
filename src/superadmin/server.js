@@ -331,39 +331,43 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
 });
 
 // ── ESTADO DOCKER POR TENANT ──────────────────────────────────────────────────
-// Consulta webhook-deploy (corre en el host con acceso a Docker).
-// Combina el estado del contenedor con qr_pendiente de la BD para dar estados precisos.
+// Lee el estado de cada contenedor via Docker Unix socket (/var/run/docker.sock).
+// No requiere Docker CLI, ni llamadas HTTP externas, ni permisos especiales de PM2.
 app.get('/api/docker-statuses', requireAuth, async (req, res) => {
-  const tenants      = getTenants();
-  const webhookPort  = process.env.WEBHOOK_PORT  || 4000;
-  const secret       = process.env.WEBHOOK_SECRET || '';
+  const tenants = getTenants();
 
   const dockerMap = await new Promise(resolve => {
     const http = require('http');
-    const r = http.request({
-      hostname: 'host.docker.internal',
-      port:     webhookPort,
-      path:     '/statuses',
-      method:   'GET',
-      headers:  { 'Authorization': `Bearer ${secret}` },
-      timeout:  8000,
+    const req = http.get({
+      socketPath: '/var/run/docker.sock',
+      path:       '/containers/json?all=true',
+      headers:    { Host: 'localhost' },
     }, resp => {
       let body = '';
       resp.on('data', c => body += c);
-      resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { resolve({}); } });
+      resp.on('end', () => {
+        try {
+          const map = {};
+          JSON.parse(body).forEach(c => {
+            // Names viene como ["/nombre-contenedor"]
+            const name = (c.Names[0] || '').replace(/^\//, '');
+            map[name] = c.State; // "running" | "exited" | "restarting" | "created" | "dead"
+          });
+          resolve(map);
+        } catch { resolve({}); }
+      });
     });
-    r.on('error',   () => resolve({}));
-    r.on('timeout', () => { r.destroy(); resolve({}); });
-    r.end();
+    req.on('error', () => resolve({}));
+    req.end();
   });
 
   const result = {};
   for (const t of tenants) {
     const ds = dockerMap[t.id];
-    if (!ds)                   result[t.id] = 'sin_contenedor';
-    else if (ds === 'running') result[t.id] = getTenantQR(t) ? 'iniciando' : 'activo';
+    if (!ds)                      result[t.id] = 'sin_contenedor';
+    else if (ds === 'running')    result[t.id] = getTenantQR(t) ? 'iniciando' : 'activo';
     else if (ds === 'restarting') result[t.id] = 'reiniciando';
-    else                       result[t.id] = 'inactivo';
+    else                          result[t.id] = 'inactivo';
   }
   res.json(result);
 });
