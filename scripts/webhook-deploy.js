@@ -113,8 +113,9 @@ async function handleProvisionar(req, res) {
     cwd: PROJECT,
   });
 
-  proc.stdout.on('data', chunk => res.write(chunk));
-  proc.stderr.on('data', chunk => res.write(chunk));
+  const stripAnsi = s => s.toString().replace(/\x1b\[[0-9;]*m/g, '');
+  proc.stdout.on('data', chunk => res.write(stripAnsi(chunk)));
+  proc.stderr.on('data', chunk => res.write(stripAnsi(chunk)));
   proc.on('close', code => {
     console.log(`[webhook] Provisionamiento finalizado con código ${code}`);
     res.write(`\n[DONE:${code}]\n`);

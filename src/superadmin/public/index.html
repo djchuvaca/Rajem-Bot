@@ -397,10 +397,10 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
   <div class="modal">
     <h2 id="modal-tenant-title">Nuevo negocio</h2>
     <div class="grid2">
-      <div class="form-group"><label>ID único</label><input id="mt-id" type="text" placeholder="carnitas-bot-guadalajara"></div>
+      <div class="form-group"><label>ID único</label><input id="mt-id" type="text" placeholder="carnitas-bot-guadalajara" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-')"></div>
       <div class="form-group"><label>Plan</label><select id="mt-plan"><option value="basico">Básico</option><option value="plus">Plus</option><option value="pro">Pro</option></select></div>
     </div>
-    <div class="form-group"><label>Nombre del negocio</label><input id="mt-nombre" type="text"></div>
+    <div class="form-group"><label>Nombre del negocio</label><input id="mt-nombre" type="text" oninput="if(!_editingTenantId){const s=this.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');document.getElementById('mt-id').value=s;}"></div>
     <div class="grid2">
       <div class="form-group"><label>Ciudad</label><input id="mt-ciudad" type="text"></div>
       <div class="form-group"><label>Estado</label><input id="mt-estado" type="text"></div>
