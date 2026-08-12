@@ -219,19 +219,8 @@ tr:hover td{background:var(--surface2)}
     <div class="wizard-progress" id="wz-progress"></div>
     <div class="wizard-body">
 
-      <!-- PASO 0: Tipo de Negocio -->
+      <!-- PASO 0: Datos del Negocio -->
       <div class="wizard-step active" id="wz-s0">
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Selecciona el tipo de negocio para cargar la plantilla NLU correcta. Podrás cambiarlo después desde <em>Tipo de Negocio</em>.</p>
-        <div class="wz-bt-grid" id="wz-bt-list">
-          <div class="wz-bt-card selected" data-slug="taqueria"><div class="bt-emoji">🌮</div><div class="bt-name">Taquería</div></div>
-          <div class="wz-bt-card" data-slug="pizzeria"><div class="bt-emoji">🍕</div><div class="bt-name">Pizzería</div></div>
-          <div class="wz-bt-card" data-slug="hamburgueseria"><div class="bt-emoji">🍔</div><div class="bt-name">Hamburguesería</div></div>
-        </div>
-        <p style="font-size:11px;color:var(--muted);margin-top:8px">La plantilla configura los productos de ejemplo y el reconocimiento de texto del bot.</p>
-      </div>
-
-      <!-- PASO 1: Datos del Negocio -->
-      <div class="wizard-step" id="wz-s1">
         <div class="form-group">
           <label class="form-label">Nombre del negocio</label>
           <input class="form-input" id="wz-nombre" type="text" placeholder="Ej: Tacos El Güero">
@@ -246,16 +235,16 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
 
-      <!-- PASO 2: Horarios -->
-      <div class="wizard-step" id="wz-s2">
+      <!-- PASO 1: Horarios -->
+      <div class="wizard-step" id="wz-s1">
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Configura tu horario de atención. Podrás ajustarlo después en <em>Horarios</em>.</p>
         <div id="wz-horarios-rows">
           <!-- se llena dinámicamente -->
         </div>
       </div>
 
-      <!-- PASO 3: Banco -->
-      <div class="wizard-step" id="wz-s3">
+      <!-- PASO 2: Banco -->
+      <div class="wizard-step" id="wz-s2">
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Datos para que tus clientes hagan transferencias. Puedes dejarlo vacío si no manejas transferencia.</p>
         <div class="form-group">
           <label class="form-label">Banco</label>
@@ -271,16 +260,16 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
 
-      <!-- PASO 4: Precios base -->
-      <div class="wizard-step" id="wz-s4">
+      <!-- PASO 3: Precios base -->
+      <div class="wizard-step" id="wz-s3">
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Precios globales. Los productos individuales pueden tener su propio precio en <em>Productos</em>.</p>
         <div id="wz-precios-rows">
           <!-- se llena dinámicamente -->
         </div>
       </div>
 
-      <!-- PASO 5: Contraseña -->
-      <div class="wizard-step" id="wz-s5">
+      <!-- PASO 4: Contraseña -->
+      <div class="wizard-step" id="wz-s4">
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Cambia la contraseña del panel. La contraseña actual es <code style="background:var(--surface3);padding:1px 5px;border-radius:4px">admin123</code>.</p>
         <div class="form-group">
           <label class="form-label">Nueva contraseña</label>
@@ -293,8 +282,8 @@ tr:hover td{background:var(--surface2)}
         <p style="font-size:11px;color:var(--muted)">Deja vacío para mantener <code style="background:var(--surface3);padding:1px 5px;border-radius:4px">admin123</code>.</p>
       </div>
 
-      <!-- PASO 6: ¡Listo! -->
-      <div class="wizard-step" id="wz-s6">
+      <!-- PASO 5: ¡Listo! -->
+      <div class="wizard-step" id="wz-s5">
         <div class="wz-done-icon">🎉</div>
         <div class="wz-done-title">¡Tu negocio está listo!</div>
         <div class="wz-done-sub">El bot de WhatsApp ya tiene toda la información para atender a tus clientes.<br><br>Escanea el código QR cuando lo solicite el panel para conectar WhatsApp.</div>
@@ -585,21 +574,24 @@ tr:hover td{background:var(--surface2)}
     <!-- TIPO DE NEGOCIO                                                -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="section" id="s-tipodenegocio">
-      <div class="card">
-        <div class="card-title">🏪 Plantilla de negocio activa</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-          Elige el tipo de negocio que mejor describe tu operación. Cada plantilla viene con los tipos de ítem y el lenguaje NLU pre-configurado para funcionar desde el primer momento.
+      <div class="card" style="max-width:560px">
+        <div class="card-title">🏪 Giro del negocio</div>
+        <div id="bt-giro-info" style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--surface2);border-radius:8px;margin-bottom:14px">
+          <div id="bt-giro-emoji" style="font-size:36px"></div>
+          <div>
+            <div id="bt-giro-nombre" style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700"></div>
+            <div id="bt-giro-desc" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+          <span style="font-size:15px">🔒</span>
+          El giro es definido por el administrador técnico al crear la instancia y no puede modificarse desde aquí. Contacta a soporte si necesitas cambiarlo.
         </p>
-        <div id="bt-plantillas-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:16px"></div>
-        <div id="bt-actual-badge" style="display:none;padding:10px 14px;background:var(--success, #eafbe7);border-radius:8px;font-size:13px;margin-bottom:10px"></div>
       </div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="margin:0">🍽️ Tipos de ítem configurados</div>
-          <button class="btn btn-secondary btn-sm" onclick="openItemTypeModal()">+ Agregar tipo</button>
-        </div>
+        <div class="card-title">🍽️ Tipos de ítem activos</div>
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-          Los tipos de ítem definen cómo el bot reconoce y procesa los pedidos. Por ejemplo: "taco", "torta", "pizza individual".
+          Estos son los formatos de presentación que el bot reconoce en los pedidos de tus clientes.
         </p>
         <div id="item-types-list"></div>
       </div>
@@ -2033,7 +2025,6 @@ initApp();
 
 // ── WIZARD DE ONBOARDING ─────────────────────────────────────────────────────
 const WZ_STEPS = [
-  { title:'Tipo de Negocio',    sub:'Elige la plantilla base del bot' },
   { title:'Datos del Negocio',  sub:'Nombre y descripción' },
   { title:'Horarios',           sub:'Cuándo atiendes a tus clientes' },
   { title:'Datos de Banco',     sub:'Para pagos por transferencia' },
@@ -2042,34 +2033,13 @@ const WZ_STEPS = [
   { title:'¡Todo listo!',       sub:'' },
 ];
 let _wzStep = 0;
-let _wzBtSlug = 'taqueria';
-let _wzDias   = null; // se carga en el paso 2
+let _wzDias  = null;
 
 function wizardOpen() {
   _wzStep = 0;
   document.getElementById('wizard-overlay').style.display = 'flex';
   _wzRenderProgress();
   _wzRenderStep(0);
-  // Cargar plantillas reales si el API responde
-  api('/api/business-types').then(bts => {
-    if (!bts || !bts.length) return;
-    const list = document.getElementById('wz-bt-list');
-    list.innerHTML = bts.map((bt,i) => {
-      const sel = i === 0;
-      if (sel) _wzBtSlug = bt.slug;
-      return `<div class="wz-bt-card${sel?' selected':''}" data-slug="${bt.slug}" onclick="wzSelectBt(this,'${bt.slug}')"><div class="bt-emoji">${bt.emoji||'🏪'}</div><div class="bt-name">${bt.nombre}</div></div>`;
-    }).join('');
-  }).catch(()=>{});
-  // Wire up static cards onclick
-  document.querySelectorAll('#wz-bt-list .wz-bt-card').forEach(c => {
-    c.onclick = () => wzSelectBt(c, c.dataset.slug);
-  });
-}
-
-function wzSelectBt(el, slug) {
-  document.querySelectorAll('#wz-bt-list .wz-bt-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  _wzBtSlug = slug;
 }
 
 function _wzRenderProgress() {
@@ -2087,10 +2057,10 @@ function _wzRenderStep(n) {
   const nextBtn = document.getElementById('wz-next-btn');
   nextBtn.textContent = n === WZ_STEPS.length - 1 ? '¡Comenzar! →' : (n === WZ_STEPS.length - 2 ? 'Finalizar →' : 'Siguiente →');
   document.querySelector('.wz-skip').style.display = n === WZ_STEPS.length - 1 ? 'none' : '';
-  // Inicializar paso 2 (horarios)
-  if (n === 2 && !_wzDias) _wzInitHorarios();
-  // Inicializar paso 4 (precios)
-  if (n === 4) _wzInitPrecios();
+  // Inicializar paso 1 (horarios)
+  if (n === 1 && !_wzDias) _wzInitHorarios();
+  // Inicializar paso 3 (precios)
+  if (n === 3) _wzInitPrecios();
 }
 
 const _WZ_DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
@@ -2151,9 +2121,6 @@ function wizardPrev() {
 async function _wzSavePaso(n) {
   try {
     if (n === 0) {
-      // Seleccionar plantilla de negocio
-      await api('/api/business-types/seleccionar', 'POST', { slug: _wzBtSlug });
-    } else if (n === 1) {
       // Datos del negocio
       const nombre    = document.getElementById('wz-nombre').value.trim();
       const tipo      = document.getElementById('wz-tipo').value.trim();
@@ -2161,30 +2128,29 @@ async function _wzSavePaso(n) {
       if (nombre)    await api('/api/config', 'POST', { clave:'nombre_negocio', valor: nombre });
       if (tipo)      await api('/api/config', 'POST', { clave:'tipo_negocio', valor: tipo });
       if (ubicacion) await api('/api/config', 'POST', { clave:'ubicacion', valor: ubicacion });
-      // Actualizar nombre en sidebar
       if (nombre) {
         const el = document.getElementById('sidebar-negocio');
         if (el) el.textContent = nombre;
         document.title = `Panel — ${nombre}`;
       }
-    } else if (n === 2 && _wzDias) {
-      // Horarios — días 0 (lunes) a 6 (domingo) en la BD
+    } else if (n === 1 && _wzDias) {
+      // Horarios
       for (const d of _wzDias) {
         await api(`/api/horarios/${d.dia}`, 'POST', { abierto: d.abierto, hora_inicio: d.hora_inicio, hora_fin: d.hora_fin });
       }
-    } else if (n === 3) {
+    } else if (n === 2) {
       // Banco
-      const banco       = document.getElementById('wz-banco').value.trim();
-      const beneficiario= document.getElementById('wz-beneficiario').value.trim();
-      const clabe       = document.getElementById('wz-clabe').value.trim();
+      const banco        = document.getElementById('wz-banco').value.trim();
+      const beneficiario = document.getElementById('wz-beneficiario').value.trim();
+      const clabe        = document.getElementById('wz-clabe').value.trim();
       if (banco || beneficiario || clabe) await api('/api/banco', 'POST', { banco, beneficiario, clabe });
-    } else if (n === 4) {
+    } else if (n === 3) {
       // Precios base
       for (const campo of ['precio_taco','precio_torta','precio_100g']) {
         const el = document.getElementById(`wz-p-${campo}`);
         if (el && el.value) await api('/api/config', 'POST', { clave: campo, valor: el.value });
       }
-    } else if (n === 5) {
+    } else if (n === 4) {
       // Contraseña
       const p1 = document.getElementById('wz-pass1').value;
       const p2 = document.getElementById('wz-pass2').value;
@@ -2212,168 +2178,46 @@ function wizardSkip() {
   wizardClose();
 }
 
-// ── TIPO DE NEGOCIO ───────────────────────────────────────────────────────────
-let _btActualSlug = null;
-
+// ── TIPO DE NEGOCIO (solo lectura — gestionado por super-admin) ───────────────
 async function loadTipoDeNegocio() {
-  const [plantillas, actual] = await Promise.all([
-    api('/api/business-types'),
-    api('/api/business-types/actual'),
-  ]);
-  _btActualSlug = actual.slug;
+  const actual = await api('/api/business-types/actual');
 
-  // Render plantillas disponibles
-  const listEl = document.getElementById('bt-plantillas-list');
-  listEl.innerHTML = (plantillas || []).map(bt => {
-    const isActual = bt.slug === _btActualSlug;
-    return `<div class="card" style="border:2px solid ${isActual ? 'var(--primary)' : 'var(--border)'};cursor:${isActual ? 'default' : 'pointer'};padding:16px;transition:border-color .2s" onclick="${isActual ? '' : `seleccionarPlantilla('${bt.slug}')`}">
-      <div style="font-size:24px;margin-bottom:6px">${bt.emoji}</div>
-      <div style="font-weight:600;margin-bottom:4px">${bt.nombre}</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${bt.descripcion || ''}</div>
-      ${isActual
-        ? '<span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px">✓ Activa</span>'
-        : `<button class="btn btn-secondary btn-sm" onclick="seleccionarPlantilla('${bt.slug}')">Seleccionar</button>`
-      }
-    </div>`;
-  }).join('');
+  // Mostrar giro activo
+  const emoji  = document.getElementById('bt-giro-emoji');
+  const nombre = document.getElementById('bt-giro-nombre');
+  const desc   = document.getElementById('bt-giro-desc');
+  if (emoji)  emoji.textContent  = actual.emoji  || '🏪';
+  if (nombre) nombre.textContent = actual.nombre  || actual.slug || '—';
+  if (desc)   desc.textContent   = actual.descripcion || '';
 
-  // Render item types activos
+  // Render item types — solo lectura
   renderItemTypes(actual.itemTypes || []);
 }
 
 function renderItemTypes(its) {
   const el = document.getElementById('item-types-list');
   if (!its.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No hay tipos de ítem configurados.</p>';
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No hay tipos de ítem configurados para este giro.</p>';
     return;
   }
-  el.innerHTML = `<table class="table" style="margin-bottom:0">
-    <thead><tr>
-      <th>Emoji</th><th>Slug</th><th>Singular</th><th>Plural</th>
-      <th>Aliases</th><th>Precio campo</th><th>Gramos</th><th></th>
-    </tr></thead>
-    <tbody>
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
     ${its.map(it => {
       let aliases = [];
       try { aliases = JSON.parse(it.aliases_json || '[]'); } catch(_) {}
-      return `<tr>
-        <td style="font-size:18px">${it.emoji}</td>
-        <td><code>${it.slug}</code></td>
-        <td>${it.nombre}</td>
-        <td>${it.nombre_plural}</td>
-        <td style="font-size:12px;color:var(--muted)">${aliases.join(', ') || '—'}</td>
-        <td><code>${it.precio_campo}</code></td>
-        <td>${it.soporta_gramos ? '✓' : '—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-secondary btn-sm" onclick='editItemType(${JSON.stringify(it)})'>Editar</button>
-          <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteItemTypeById(${it.id})">✕</button>
-        </td>
-      </tr>`;
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div style="font-size:26px;margin-bottom:6px">${it.emoji}</div>
+        <div style="font-weight:600;font-size:14px">${it.nombre_plural}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          ${aliases.length ? 'También: ' + aliases.slice(0,3).join(', ') : ''}
+          ${it.soporta_gramos ? '<br>⚖️ Soporta gramos' : ''}
+        </div>
+      </div>`;
     }).join('')}
-    </tbody>
-  </table>`;
-}
-
-async function seleccionarPlantilla(slug) {
-  if (!confirm(`¿Cambiar a la plantilla "${slug}"?\nEsto afecta cómo el bot reconoce los pedidos.`)) return;
-  const r = await api('/api/business-types/seleccionar', 'POST', { slug });
-  if (r.ok) { toast('Plantilla actualizada'); loadTipoDeNegocio(); }
-  else toast('Error: ' + (r.error || 'Error desconocido'), 'error');
-}
-
-// Modal para crear/editar item_type
-let _editingItemTypeId = null;
-
-function openItemTypeModal(it) {
-  _editingItemTypeId = it ? it.id : null;
-  let aliases = [];
-  if (it) { try { aliases = JSON.parse(it.aliases_json || '[]'); } catch(_) {} }
-  const html = `<div class="modal-overlay" id="modal-it" onclick="if(event.target===this)closeItModal()" style="display:flex">
-    <div class="modal" style="max-width:480px;width:95%">
-      <div class="modal-title">${it ? 'Editar tipo de ítem' : 'Nuevo tipo de ítem'}</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Emoji</label>
-          <input class="form-input" id="it-emoji" value="${it ? it.emoji : '🍽️'}" maxlength="2" style="font-size:20px;width:60px;text-align:center">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label class="form-label">Slug (identificador único)</label>
-          <input class="form-input" id="it-slug" value="${it ? it.slug : ''}" placeholder="ej: pizza_individual" ${it ? 'readonly' : ''}>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre singular</label>
-          <input class="form-input" id="it-nombre" value="${it ? it.nombre : ''}" placeholder="ej: pizza individual">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Nombre plural</label>
-          <input class="form-input" id="it-nombre-plural" value="${it ? it.nombre_plural : ''}" placeholder="ej: pizzas individuales">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Aliases NLU (separados por coma)</label>
-        <input class="form-input" id="it-aliases" value="${aliases.join(', ')}" placeholder="ej: individual, pizza chica, chica">
-        <div class="hint">Palabras que el bot reconocerá como este tipo de ítem.</div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Campo de precio</label>
-          <select class="form-input" id="it-precio-campo">
-            <option value="precio_taco" ${(!it || it.precio_campo==='precio_taco') ? 'selected' : ''}>precio_taco (principal)</option>
-            <option value="precio_torta" ${(it && it.precio_campo==='precio_torta') ? 'selected' : ''}>precio_torta (secundario)</option>
-          </select>
-        </div>
-        <div class="form-group" style="display:flex;align-items:flex-end;gap:16px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" id="it-gramos" ${(it && it.soporta_gramos) ? 'checked' : ''}> Soporta gramos
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" id="it-pesos" ${(it && it.soporta_pesos) ? 'checked' : ''}> Soporta pesos $
-          </label>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
-        <button class="btn btn-secondary" onclick="closeItModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveItemType()">Guardar</button>
-      </div>
-    </div>
   </div>`;
-  document.body.insertAdjacentHTML('beforeend', html);
 }
 
-function editItemType(it) { openItemTypeModal(it); }
-function closeItModal() { document.getElementById('modal-it')?.remove(); }
-
-async function saveItemType() {
-  const aliasesRaw = document.getElementById('it-aliases').value;
-  const aliases = aliasesRaw.split(',').map(s => s.trim()).filter(Boolean);
-  const body = {
-    slug:          document.getElementById('it-slug').value.trim().replace(/\s+/g, '_'),
-    nombre:        document.getElementById('it-nombre').value.trim(),
-    nombre_plural: document.getElementById('it-nombre-plural').value.trim(),
-    emoji:         document.getElementById('it-emoji').value.trim(),
-    aliases_json:  JSON.stringify(aliases),
-    precio_campo:  document.getElementById('it-precio-campo').value,
-    soporta_gramos: document.getElementById('it-gramos').checked ? 1 : 0,
-    soporta_pesos:  document.getElementById('it-pesos').checked  ? 1 : 0,
-  };
-  if (!body.slug || !body.nombre || !body.nombre_plural) {
-    return toast('Slug, nombre y plural son obligatorios', 'error');
-  }
-  const url    = _editingItemTypeId ? `/api/item-types/${_editingItemTypeId}` : '/api/item-types';
-  const method = _editingItemTypeId ? 'PUT' : 'POST';
-  const r = await api(url, method, body);
-  if (r.ok) { closeItModal(); toast('Tipo de ítem guardado'); loadTipoDeNegocio(); }
-  else toast('Error: ' + (r.error || 'Error'), 'error');
-}
-
-async function deleteItemTypeById(id) {
-  if (!confirm('¿Eliminar este tipo de ítem? El bot usará los tipos restantes.')) return;
-  const r = await api('/api/item-types/' + id, 'DELETE');
-  if (r.ok) { toast('Eliminado'); loadTipoDeNegocio(); }
-  else toast('Error: ' + (r.error || 'Error'), 'error');
-}
+// Las funciones de edición de item_types y selección de plantilla
+// son exclusivas del super-admin y no están disponibles en el panel del tenant.
 </script>
 </body>
 </html>
