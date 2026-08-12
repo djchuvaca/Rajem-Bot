@@ -5,6 +5,8 @@
 #   - Elimina el servicio de docker-compose.yml
 #   - Elimina envs/{TENANT_ID}.env
 #   - Elimina la base de datos data/{TENANT_ID}.db
+#   - Elimina los backups data/backups/{TENANT_ID}_*.db
+#   - Elimina la sesión WhatsApp .wwebjs_auth/session-{TENANT_ID}/
 #
 # Uso: TENANT_ID=tacos-javier bash scripts/eliminar-tenant.sh
 
@@ -61,12 +63,28 @@ else
   echo "Archivo .env no encontrado."
 fi
 
-# 4. Eliminar base de datos
+# 4. Eliminar datos del tenant (BD, backups, sesión WA)
 if [[ -f "$RAIZ/data/${TENANT_ID}.db" ]]; then
   rm "$RAIZ/data/${TENANT_ID}.db"
   echo "Base de datos data/${TENANT_ID}.db eliminada."
 else
   echo "Base de datos no encontrada."
+fi
+
+BACKUPS=("$RAIZ/data/backups/${TENANT_ID}_"*.db)
+if [[ -f "${BACKUPS[0]}" ]]; then
+  rm -f "$RAIZ/data/backups/${TENANT_ID}_"*.db
+  echo "Backups de data/backups/${TENANT_ID}_*.db eliminados."
+else
+  echo "Sin backups que eliminar."
+fi
+
+WA_SESSION="$RAIZ/.wwebjs_auth/session-${TENANT_ID}"
+if [[ -d "$WA_SESSION" ]]; then
+  rm -rf "$WA_SESSION"
+  echo "Sesión WhatsApp .wwebjs_auth/session-${TENANT_ID}/ eliminada."
+else
+  echo "Sin sesión WhatsApp que eliminar."
 fi
 
 echo ""
