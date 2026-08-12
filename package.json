@@ -14,6 +14,7 @@
     "reset-password": "node scripts/reset-password.js",
     "onboarding": "node scripts/onboarding.js",
     "nuevo-tenant": "node scripts/nuevo-tenant.js",
+    "actualizar": "node scripts/actualizar-tenants.js",
     "provisionar": "bash scripts/provisionar-tenant.sh",
     "ngrok": "node scripts/ngrok-start.js"
   },
