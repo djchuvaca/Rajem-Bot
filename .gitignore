@@ -57,3 +57,8 @@ backups/*
 # ── Archivos de respaldo ────────────────────────────────────────
 *.bak
 *.old
+
+# ── Servicios de tenants (generados por provisionar-tenant.sh) ──
+# docker-compose.yml solo contiene el superadmin (base git-tracked).
+# Los tenants van aqui para que git pull nunca falle por conflicto.
+docker-compose.override.yml

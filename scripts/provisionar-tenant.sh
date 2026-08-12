@@ -51,6 +51,7 @@ echo ""
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE="$RAIZ/docker-compose.yml"
+OVERRIDE="$RAIZ/docker-compose.override.yml"
 TENANTS_FILE="$RAIZ/data/tenants.json"
 ENVS_DIR="$RAIZ/envs"
 
@@ -60,8 +61,8 @@ TENANT_ID=$(get_val "TENANT_ID" "ID del tenant (ej: tacos-pepe-gdl)")
 [[ ! "$TENANT_ID" =~ ^[a-z0-9-]+$ ]]   && error "El ID debe ser minúsculas, números y guiones."
 
 # Verificar que no exista ya
-if grep -q "^  ${TENANT_ID}:" "$COMPOSE" 2>/dev/null; then
-  error "El tenant '${TENANT_ID}' ya existe en docker-compose.yml."
+if grep -q "^  ${TENANT_ID}:" "$OVERRIDE" 2>/dev/null; then
+  error "El tenant '${TENANT_ID}' ya existe en docker-compose.override.yml."
 fi
 if [[ -f "$ENVS_DIR/${TENANT_ID}.env" ]]; then
   error "Ya existe envs/${TENANT_ID}.env — elimínalo antes de reprovisionar."
@@ -89,8 +90,8 @@ ports = [t.get('panel_port', 0) for t in data.get('tenants', [])]
 print(' '.join(map(str, ports)))
 " 2>/dev/null || echo "")
     while echo "$PUERTOS_USADOS" | grep -qw "$PUERTO_SUGERIDO" || \
-          ss -tlnp 2>/dev/null | grep -q ":$PUERTO_SUGERIDO " || \
-          docker ps --format "{{.Ports}}" 2>/dev/null | grep -q ":$PUERTO_SUGERIDO->"; do
+          docker ps --format "{{.Ports}}" 2>/dev/null | grep -q ":${PUERTO_SUGERIDO}->" || \
+          ss -tlnp 2>/dev/null | grep -q ":${PUERTO_SUGERIDO} "; do
       PUERTO_SUGERIDO=$((PUERTO_SUGERIDO + 1))
     done
   fi
@@ -154,9 +155,13 @@ else
   warn "python3 no disponible — registra el tenant manualmente en data/tenants.json."
 fi
 
-# ── 4. Añadir servicio a docker-compose.yml ───────────────────────────────────
-info "Añadiendo servicio ${TENANT_ID} a docker-compose.yml..."
-cat >> "$COMPOSE" <<EOF
+# ── 4. Añadir servicio a docker-compose.override.yml ─────────────────────────
+info "Añadiendo servicio ${TENANT_ID} a docker-compose.override.yml..."
+# Crear el override con cabecera si no existe
+if [[ ! -f "$OVERRIDE" ]]; then
+  echo "services:" > "$OVERRIDE"
+fi
+cat >> "$OVERRIDE" <<EOF
 
   # Tenant: ${NOMBRE}
   ${TENANT_ID}:
@@ -171,16 +176,15 @@ cat >> "$COMPOSE" <<EOF
     volumes:
       - ./data:/-Rajem-Bot/data
       - ./logs:/-Rajem-Bot/logs
-      - ./src/panel/public:/-Rajem-Bot/src/panel/public
       - ./.wwebjs_auth:/-Rajem-Bot/.wwebjs_auth
       - ./.wwebjs_cache:/-Rajem-Bot/.wwebjs_cache
 EOF
-ok "Servicio añadido a docker-compose.yml."
+ok "Servicio añadido a docker-compose.override.yml."
 
 # ── 5. Construir y arrancar el contenedor ─────────────────────────────────────
 if command -v docker &>/dev/null; then
   info "Construyendo imagen y arrancando contenedor ${TENANT_ID}..."
-  if docker compose -f "$COMPOSE" up -d --build "$TENANT_ID"; then
+  if docker compose up -d --build "$TENANT_ID"; then
     ok "Contenedor arrancado. El bot iniciará en ~30s."
     # Marcar como activo en tenants.json
     if command -v python3 &>/dev/null; then
@@ -198,7 +202,7 @@ PYEOF
     warn "docker compose falló. Arráncalo manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
   fi
 else
-  warn "Docker no encontrado. Arranca el bot manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
+  warn "Docker no encontrado. Arranca el bot manualmente: cd $RAIZ && docker compose up -d --build $TENANT_ID"
 fi
 
 # ── Resumen ───────────────────────────────────────────────────────────────────

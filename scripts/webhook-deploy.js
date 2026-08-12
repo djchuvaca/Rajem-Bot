@@ -80,7 +80,7 @@ async function handleDeploy(req, res) {
     console.log('[webhook] Cambios mixtos — force-recreate sin rebuild');
   }
 
-  const cmds = [`cd ${PROJECT}`, 'git pull'];
+  const cmds = [`cd ${PROJECT}`, 'git stash', 'git pull', 'git stash pop'];
   if (dockerCmd) cmds.push(dockerCmd);
   if (needsPm2 || needsRebuild || needsRestart) cmds.push('pm2 restart webhook-deploy');
 

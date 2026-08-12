@@ -12,6 +12,7 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE="$RAIZ/docker-compose.yml"
+OVERRIDE="$RAIZ/docker-compose.override.yml"
 
 [[ -z "${TENANT_ID:-}" ]] && echo "Error: TENANT_ID no definido" && exit 1
 
@@ -31,12 +32,12 @@ else
   echo "Contenedor ${TENANT_ID} no estaba corriendo."
 fi
 
-# 2. Eliminar servicio de docker-compose.yml
-if grep -q "^  ${TENANT_ID}:" "$COMPOSE" 2>/dev/null; then
-  echo "Actualizando docker-compose.yml..."
+# 2. Eliminar servicio de docker-compose.override.yml
+if [[ -f "$OVERRIDE" ]] && grep -q "^  ${TENANT_ID}:" "$OVERRIDE" 2>/dev/null; then
+  echo "Actualizando docker-compose.override.yml..."
   node -e "
 const fs = require('fs');
-let content = fs.readFileSync('${COMPOSE}', 'utf8');
+let content = fs.readFileSync('${OVERRIDE}', 'utf8');
 // Elimina bloque: comentario opcional + servicio hasta el proximo bloque o fin
 const re = new RegExp('\\\\n  # Tenant:[^\\\\n]*\\\\n  ${TENANT_ID}:(?:\\\\n(?:    [^\\\\n]*|))*', 'g');
 let updated = content.replace(re, '');
@@ -45,11 +46,11 @@ if (updated === content) {
   const re2 = new RegExp('\\\\n  ${TENANT_ID}:(?:\\\\n(?:    [^\\\\n]*|))*', 'g');
   updated = content.replace(re2, '');
 }
-fs.writeFileSync('${COMPOSE}', updated);
-console.log('docker-compose.yml actualizado.');
+fs.writeFileSync('${OVERRIDE}', updated);
+console.log('docker-compose.override.yml actualizado.');
 " 2>&1
 else
-  echo "Servicio ${TENANT_ID} no encontrado en docker-compose.yml."
+  echo "Servicio ${TENANT_ID} no encontrado en docker-compose.override.yml."
 fi
 
 # 3. Eliminar archivo .env del tenant
