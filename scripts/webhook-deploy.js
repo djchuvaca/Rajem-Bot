@@ -128,7 +128,7 @@ async function handleProvisionar(req, res) {
     PROV_NOMBRE:          data.nombre       || data.tenant_id,
     PROV_CIUDAD:          data.ciudad       || '',
     PROV_ESTADO:          data.estado       || '',
-    PROV_PANEL_PORT:      String(data.panel_port || 3002),
+    ...(data.panel_port ? { PROV_PANEL_PORT: String(data.panel_port) } : {}),
     PROV_GROQ_KEY:        data.groq_key,
     PROV_GRUPO_ID:        data.grupo_id     || '',
     PROV_PANEL_SECRET:    data.panel_secret || '',
