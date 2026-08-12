@@ -5,7 +5,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
-envs/
+envs/**
+!envs/.env.tenant.example
 
 # ── WhatsApp Web JS ─────────────────────────────────────────────
 .wwebjs_auth/
