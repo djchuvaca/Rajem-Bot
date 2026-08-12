@@ -221,9 +221,27 @@ function setTenantZonas(tenant, zonas) {
   finally { db.close(); }
 }
 
+// Lectura de QR con conexion fresca (sin cache) para ver siempre datos recientes
+function getTenantQR(tenant) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path
+    : path.join(ROOT_PATH, tenant.db_path);
+  if (!fs.existsSync(dbPath)) return null;
+  let db;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const row = db.prepare('SELECT valor FROM configuracion WHERE clave = ?').get('qr_pendiente');
+    return row?.valor || null;
+  } catch (_) {
+    return null;
+  } finally {
+    try { db?.close(); } catch {}
+  }
+}
+
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas,
+  getTenantZonas, setTenantZonas, getTenantQR,
 };

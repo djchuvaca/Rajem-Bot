@@ -17,7 +17,7 @@ const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas,
+  getTenantZonas, setTenantZonas, getTenantQR,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -333,8 +333,7 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
 app.get('/api/tenants/:id/qr', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const cfg = getTenantConfig(tenant);
-  const qr  = cfg.qr_pendiente || '';
+  const qr = getTenantQR(tenant);
   if (!qr) return res.status(404).json({ error: 'Sin QR — el bot ya está autenticado o aún no ha iniciado' });
   res.json({ qr, ts: Date.now() });
 });
