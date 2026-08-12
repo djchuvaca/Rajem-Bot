@@ -699,7 +699,7 @@ async function saveTenant() {
   if(r.ok){
     closeModal('modal-tenant'); loadTenants(); populateTenantSelects();
     if(_editingTenantId){ toast('Negocio actualizado'); }
-    else { openModal('modal-pasos-tenant'); }
+    else { openProvisionar(id, body.nombre, body.ciudad, body.estado, body.panel_port, body.plan); }
   } else toast('Error al guardar','err');
 }
 async function confirmDelete(id) {
@@ -976,16 +976,16 @@ let _provTenantId   = null;
 let _provPanelPort  = null;
 let _provQRInterval = null;
 
-function openProvisionar(id, nombre, ciudad, estado, port) {
+function openProvisionar(id, nombre, ciudad, estado, port, plan='basico') {
   _provTenantId  = id;
   _provPanelPort = port;
   document.getElementById('prov-id').value     = id;
   document.getElementById('prov-nombre').value = nombre;
   document.getElementById('prov-port').value   = port;
-  document.getElementById('prov-groq').value   = '';
+  document.getElementById('prov-groq').value   = document.getElementById('ia-key')?.value || '';
   document.getElementById('prov-grupo').value  = '';
   document.getElementById('prov-secret').value = '';
-  document.getElementById('prov-plan').value   = 'basico';
+  document.getElementById('prov-plan').value   = plan || 'basico';
   document.getElementById('prov-btn').disabled = false;
   openModal('modal-provisionar');
 }
