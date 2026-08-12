@@ -663,16 +663,18 @@ const _DS_LABELS = {
 async function loadDockerStatuses() {
   try {
     const r = await fetch('/api/docker-statuses');
-    if (!r.ok) return;
+    if (!r.ok) { console.warn('[docker-statuses] HTTP', r.status); return; }
     const data = await r.json();
+    if (data._error) console.warn('[docker-statuses] socket error:', data._error);
     for (const [id, status] of Object.entries(data)) {
+      if (id === '_error') continue;
       const [cls, label] = _DS_LABELS[status] || ['badge-gray', status];
       for (const prefix of ['ds-', 'dsc-']) {
         const el = document.getElementById(prefix + id);
         if (el) { el.className = `badge ${cls}`; el.textContent = label; }
       }
     }
-  } catch {}
+  } catch (e) { console.error('[docker-statuses]', e); }
 }
 
 // ── TENANTS ───────────────────────────────────────────────────────────────────

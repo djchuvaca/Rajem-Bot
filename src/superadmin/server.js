@@ -336,6 +336,7 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
 app.get('/api/docker-statuses', requireAuth, async (req, res) => {
   const tenants = getTenants();
 
+  let socketError = null;
   const dockerMap = await new Promise(resolve => {
     const http = require('http');
     const req = http.get({
@@ -349,15 +350,14 @@ app.get('/api/docker-statuses', requireAuth, async (req, res) => {
         try {
           const map = {};
           JSON.parse(body).forEach(c => {
-            // Names viene como ["/nombre-contenedor"]
             const name = (c.Names[0] || '').replace(/^\//, '');
-            map[name] = c.State; // "running" | "exited" | "restarting" | "created" | "dead"
+            map[name] = c.State;
           });
           resolve(map);
-        } catch { resolve({}); }
+        } catch (e) { socketError = 'parse:' + e.message; resolve({}); }
       });
     });
-    req.on('error', () => resolve({}));
+    req.on('error', e => { socketError = e.message; resolve({}); });
     req.end();
   });
 
@@ -369,6 +369,7 @@ app.get('/api/docker-statuses', requireAuth, async (req, res) => {
     else if (ds === 'restarting') result[t.id] = 'reiniciando';
     else                          result[t.id] = 'inactivo';
   }
+  if (socketError) result._error = socketError;
   res.json(result);
 });
 
