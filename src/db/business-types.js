@@ -22,23 +22,9 @@ function _bustCache() {
   _cacheSlug = null;
 }
 
-// ── FALLBACK (taquería clásica — sin acceso a BD) ─────────────────────────────
-function _defaultItemTypes() {
-  return [
-    {
-      id: null, business_type_id: null,
-      slug: 'taco', nombre: 'taco', nombre_plural: 'tacos', emoji: '🌮',
-      aliases_json: '["taquito","taquitos","tacito","tacitos"]',
-      soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco', activo: 1,
-    },
-    {
-      id: null, business_type_id: null,
-      slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖',
-      aliases_json: '["sandwich","sándwich","sándwiches"]',
-      soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta', activo: 1,
-    },
-  ];
-}
+// Sin fallback hardcodeado — si no hay item_types activos en BD, devuelve vacío.
+// El tenant activa los tipos desde el panel; el menú refleja solo lo configurado.
+function _defaultItemTypes() { return []; }
 
 // ── BUSINESS TYPES ────────────────────────────────────────────────────────────
 
