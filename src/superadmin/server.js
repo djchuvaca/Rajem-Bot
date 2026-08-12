@@ -18,7 +18,7 @@ const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas, getTenantQR,
+  getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -84,7 +84,9 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
 });
 
 // ── TENANTS CRUD ──────────────────────────────────────────────────────────────
-app.get('/api/tenants', requireAuth, (req, res) => res.json(getTenants()));
+app.get('/api/tenants', requireAuth, (req, res) => {
+  res.json(getTenants().map(t => ({ ...t, bot_estado: getTenantBotEstado(t) })));
+});
 
 app.post('/api/tenants', requireAuth, (req, res) => {
   const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas } = req.body;

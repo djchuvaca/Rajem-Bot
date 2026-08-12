@@ -221,6 +221,21 @@ function setTenantZonas(tenant, zonas) {
   finally { db.close(); }
 }
 
+// Lee bot_pausado de configuracion con conexion fresca — activo | pausado | inactivo
+function getTenantBotEstado(tenant) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path
+    : path.join(ROOT_PATH, tenant.db_path);
+  if (!fs.existsSync(dbPath)) return 'inactivo';
+  let db;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const row = db.prepare('SELECT valor FROM configuracion WHERE clave=?').get('bot_pausado');
+    return row?.valor === '1' ? 'pausado' : 'activo';
+  } catch { return 'inactivo'; }
+  finally { try { db?.close(); } catch {} }
+}
+
 // Lectura de QR con conexion fresca (sin cache) para ver siempre datos recientes
 function getTenantQR(tenant) {
   const dbPath = path.isAbsolute(tenant.db_path)
@@ -243,5 +258,5 @@ module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
-  getTenantZonas, setTenantZonas, getTenantQR,
+  getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
 };

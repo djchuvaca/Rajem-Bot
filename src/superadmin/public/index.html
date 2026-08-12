@@ -633,7 +633,9 @@ async function loadDashboard() {
   if (!data.length) { el.innerHTML = '<div class="empty">No hay negocios registrados</div>'; return; }
   el.innerHTML = data.map(t => {
     const s = t.stats || {};
-    const badge = t.activo ? `<span class="badge badge-green">Activo</span>` : `<span class="badge badge-red">Inactivo</span>`;
+    const _BE = {activo:'badge-green',pausado:'badge-yellow',inactivo:'badge-gray'};
+    const _BL = {activo:'Activo',pausado:'En pausa',inactivo:'Inactivo'};
+    const badge = `<span class="badge ${_BE[t.bot_estado]||'badge-gray'}">${_BL[t.bot_estado]||'Inactivo'}</span>`;
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
     const ia = s.groq_activo ? `<span class="badge badge-purple" style="background:#2e1b69;color:#a78bfa">IA</span>` : '';
     return `<div class="card">
@@ -662,7 +664,7 @@ async function loadTenants() {
       <td>${t.nombre}</td>
       <td>${t.ciudad}, ${t.estado}</td>
       <td><span class="badge ${PLAN_BADGE[t.plan]||'badge-gray'}">${t.plan}</span></td>
-      <td>${t.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
+      <td><span class="badge ${{activo:'badge-green',pausado:'badge-yellow',inactivo:'badge-gray'}[t.bot_estado]||'badge-gray'}">${{activo:'Activo',pausado:'En pausa',inactivo:'Inactivo'}[t.bot_estado]||'Inactivo'}</span></td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Editar</button>
         <button class="btn btn-primary btn-sm" onclick="openProvisionar('${t.id}','${(t.nombre||'').replace(/'/g,'')}')">Provisionar</button>
