@@ -3,7 +3,7 @@ const fs        = require("fs");
 const path      = require("path");
 
 const DATA_DIR = path.join(__dirname, "../../data");
-const DB_PATH  = path.join(DATA_DIR, "tacos_javier.db");
+const DB_PATH  = path.join(DATA_DIR, `${process.env.TENANT_ID || 'tacos_javier'}.db`);
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 

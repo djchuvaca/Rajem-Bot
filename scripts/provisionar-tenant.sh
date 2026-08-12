@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # scripts/provisionar-tenant.sh
-# Provisiona un nuevo tenant: directorio, .env, tenants.json, Docker.
+# Provisiona un nuevo tenant en el mismo repo:
+#   - Crea envs/{TENANT_ID}.env con variables de entorno
+#   - Registra el tenant en data/tenants.json
+#   - Añade el servicio al docker-compose.yml
+#   - Arranca el contenedor
 #
 # Modo interactivo (terminal):
 #   bash scripts/provisionar-tenant.sh
@@ -27,8 +31,6 @@ ask() {
   echo "${REPLY:-${default}}"
 }
 
-# Devuelve el valor de una variable de entorno si existe,
-# o pregunta al usuario (solo en modo interactivo).
 get_val() {
   local env_var="$1" prompt="$2" default="${3:-}"
   local current="${!env_var:-}"
@@ -47,10 +49,23 @@ echo "   Rajem's Technology — Provisionar nuevo tenant"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+COMPOSE="$RAIZ/docker-compose.yml"
+TENANTS_FILE="$RAIZ/data/tenants.json"
+ENVS_DIR="$RAIZ/envs"
+
 # ── 1. Recopilar datos ────────────────────────────────────────────────────────
 TENANT_ID=$(get_val "TENANT_ID" "ID del tenant (ej: tacos-pepe-gdl)")
 [[ -z "$TENANT_ID" ]]                   && error "El ID no puede estar vacío."
 [[ ! "$TENANT_ID" =~ ^[a-z0-9-]+$ ]]   && error "El ID debe ser minúsculas, números y guiones."
+
+# Verificar que no exista ya
+if grep -q "^  ${TENANT_ID}:" "$COMPOSE" 2>/dev/null; then
+  error "El tenant '${TENANT_ID}' ya existe en docker-compose.yml."
+fi
+if [[ -f "$ENVS_DIR/${TENANT_ID}.env" ]]; then
+  error "Ya existe envs/${TENANT_ID}.env — elimínalo antes de reprovisionar."
+fi
 
 NOMBRE=$(get_val    "PROV_NOMBRE"     "Nombre del negocio"      "$TENANT_ID")
 CIUDAD=$(get_val    "PROV_CIUDAD"     "Ciudad"                  "")
@@ -62,18 +77,16 @@ GRUPO_ID=$(get_val  "PROV_GRUPO_ID"    "GRUPO_ID de WhatsApp (enter para omitir)
 PLAN=$(get_val      "PROV_PLAN"        "Plan (basico / plus / pro)"                "basico")
 NOTAS=$(get_val     "PROV_NOTAS"       "Notas (opcional)"                          "")
 
-# Puerto: auto-detectar el siguiente libre si no se especificó
-RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
-TENANTS_FILE="$RAIZ/data/tenants.json"
-
+# Puerto: auto-detectar el siguiente libre
 PUERTO_SUGERIDO=3002
-if [[ -z "${PROV_PANEL_PORT:-}" ]] && [[ "${PROV_NON_INTERACTIVE:-}" != "1" ]]; then
+if [[ -z "${PROV_PANEL_PORT:-}" ]]; then
   if command -v python3 &>/dev/null && [[ -f "$TENANTS_FILE" ]]; then
     PUERTOS_USADOS=$(python3 -c "
 import json
-with open('$TENANTS_FILE') as f: data=json.load(f)
-ports=[t.get('panel_port',0) for t in data.get('tenants',[])]
-print(' '.join(map(str,ports)))
+with open('$TENANTS_FILE') as f:
+    data = json.load(f)
+ports = [t.get('panel_port', 0) for t in data.get('tenants', [])]
+print(' '.join(map(str, ports)))
 " 2>/dev/null || echo "")
     while echo "$PUERTOS_USADOS" | grep -qw "$PUERTO_SUGERIDO" || \
           ss -tlnp 2>/dev/null | grep -q ":$PUERTO_SUGERIDO "; do
@@ -85,104 +98,102 @@ PANEL_PORT=$(get_val "PROV_PANEL_PORT" "Puerto del panel" "$PUERTO_SUGERIDO")
 
 PANEL_SECRET=$(get_val "PROV_PANEL_SECRET" "PANEL_SECRET (vacío = generar automático)" "")
 if [[ -z "$PANEL_SECRET" ]]; then
-  PANEL_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "secreto-$(date +%s)-$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-' || echo random)")
+  PANEL_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "secreto-$(date +%s)")
   ok "PANEL_SECRET generado automáticamente."
 fi
 
-# ── 2. Directorio destino ─────────────────────────────────────────────────────
-DESTINO="$(cd "$RAIZ/.." && pwd)/$TENANT_ID"
-info "Directorio destino: $DESTINO"
-[[ -d "$DESTINO" ]] && error "Ya existe la carpeta: $DESTINO"
-
-# ── 3. Copiar código fuente ───────────────────────────────────────────────────
-info "Copiando código fuente..."
-EXCLUIR=(node_modules .wwebjs_auth .wwebjs_cache data logs .env analisis capturas backups)
-if command -v rsync &>/dev/null; then
-  RSYNC_EX=()
-  for e in "${EXCLUIR[@]}"; do RSYNC_EX+=(--exclude="$e"); done
-  rsync -a "${RSYNC_EX[@]}" "$RAIZ/" "$DESTINO/"
-else
-  cp -r "$RAIZ" "$DESTINO"
-  for e in "${EXCLUIR[@]}"; do rm -rf "$DESTINO/$e"; done
-fi
-ok "Código copiado."
-
-# ── 4. Crear carpetas de datos ────────────────────────────────────────────────
-for d in data logs; do
-  mkdir -p "$DESTINO/$d"
-  touch "$DESTINO/$d/.gitkeep"
-done
-ok "Carpetas de datos creadas."
-
-# ── 5. Generar .env ───────────────────────────────────────────────────────────
-cat > "$DESTINO/.env" <<EOF
+# ── 2. Crear envs/{TENANT_ID}.env ─────────────────────────────────────────────
+mkdir -p "$ENVS_DIR"
+cat > "$ENVS_DIR/${TENANT_ID}.env" <<EOF
 # Generado por provisionar-tenant.sh — $(date)
-TENANT_ID=$TENANT_ID
-GROQ_API_KEY=$GROQ_KEY
-GRUPO_ID=$GRUPO_ID
-PANEL_PORT=$PANEL_PORT
-PANEL_SECRET=$PANEL_SECRET
+TENANT_ID=${TENANT_ID}
+GROQ_API_KEY=${GROQ_KEY}
+GRUPO_ID=${GRUPO_ID}
+PANEL_PORT=3000
+PANEL_SECRET=${PANEL_SECRET}
 EOF
-ok ".env generado."
+ok "envs/${TENANT_ID}.env creado."
 
-# ── 6. Registrar en tenants.json ──────────────────────────────────────────────
+# ── 3. Registrar en data/tenants.json ─────────────────────────────────────────
 HOY=$(date +%Y-%m-%d)
-if [[ -f "$TENANTS_FILE" ]] && command -v python3 &>/dev/null; then
+mkdir -p "$RAIZ/data"
+if command -v python3 &>/dev/null; then
   python3 - <<PYEOF
-import json
-with open('$TENANTS_FILE', 'r') as f:
-    data = json.load(f)
+import json, os
+file = '${TENANTS_FILE}'
+data = {"tenants": []}
+if os.path.exists(file):
+    try:
+        with open(file) as f:
+            data = json.load(f)
+    except Exception:
+        data = {"tenants": []}
+if "tenants" not in data:
+    data["tenants"] = []
 nuevo = {
-    "id": "$TENANT_ID", "nombre": "$NOMBRE",
-    "ciudad": "$CIUDAD", "estado": "$ESTADO",
-    "db_path": "data/tacos_javier.db", "logs_path": "logs/",
-    "panel_port": $PANEL_PORT, "activo": False,
-    "plan": "$PLAN", "desde": "$HOY", "notas": "$NOTAS"
+    "id": "${TENANT_ID}",
+    "nombre": "${NOMBRE}",
+    "ciudad": "${CIUDAD}",
+    "estado": "${ESTADO}",
+    "db_path": "data/${TENANT_ID}.db",
+    "logs_path": "logs/",
+    "panel_port": ${PANEL_PORT},
+    "activo": False,
+    "plan": "${PLAN}",
+    "desde": "${HOY}",
+    "notas": "${NOTAS}"
 }
-data['tenants'] = [t for t in data['tenants'] if t['id'] != '$TENANT_ID']
-data['tenants'].append(nuevo)
-with open('$TENANTS_FILE', 'w') as f:
+data["tenants"] = [t for t in data["tenants"] if t["id"] != "${TENANT_ID}"]
+data["tenants"].append(nuevo)
+with open(file, 'w') as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
 PYEOF
-  ok "Tenant registrado en tenants.json."
+  ok "Tenant registrado en data/tenants.json."
 else
-  warn "No se pudo actualizar tenants.json. Regístralo manualmente desde el super admin."
+  warn "python3 no disponible — registra el tenant manualmente en data/tenants.json."
 fi
 
-# ── 7. Instalar dependencias ──────────────────────────────────────────────────
-info "Instalando dependencias..."
-cd "$DESTINO"
-npm install --omit=dev --silent && ok "Dependencias instaladas." \
-  || warn "npm install falló. Ejecútalo manualmente en: $DESTINO"
+# ── 4. Añadir servicio a docker-compose.yml ───────────────────────────────────
+info "Añadiendo servicio ${TENANT_ID} a docker-compose.yml..."
+cat >> "$COMPOSE" <<EOF
 
-# ── 8. Ajustar puerto en docker-compose.yml ───────────────────────────────────
-COMPOSE="$DESTINO/docker-compose.yml"
-if [[ -f "$COMPOSE" ]]; then
-  # Reemplazar el mapeo de puerto del panel (3000 interno → PANEL_PORT externo)
-  sed -i "s|\"3000:3000\"|\"${PANEL_PORT}:3000\"|g" "$COMPOSE"
-  # Reemplazar nombre de servicio y contenedor
-  sed -i "s|tacos-javier-tepic|${TENANT_ID}|g" "$COMPOSE"
-  ok "docker-compose.yml ajustado."
-fi
+  # ── Tenant: ${NOMBRE} ─────────────────────────────────────────────────────────
+  ${TENANT_ID}:
+    build: .
+    container_name: ${TENANT_ID}
+    restart: unless-stopped
+    env_file: envs/${TENANT_ID}.env
+    environment:
+      - TZ=America/Mazatlan
+    ports:
+      - "${PANEL_PORT}:3000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./.wwebjs_cache:/app/.wwebjs_cache
+EOF
+ok "Servicio añadido a docker-compose.yml."
 
-# ── 9. Construir y arrancar contenedor ───────────────────────────────────────
+# ── 5. Construir y arrancar el contenedor ─────────────────────────────────────
 if command -v docker &>/dev/null; then
-  info "Construyendo imagen Docker y arrancando contenedor..."
-  docker compose -f "$COMPOSE" up -d --build \
+  info "Construyendo imagen y arrancando contenedor ${TENANT_ID}..."
+  docker compose -f "$COMPOSE" up -d --build "$TENANT_ID" \
     && ok "Contenedor arrancado. El bot iniciará en ~30s." \
-    || warn "docker compose falló. Arráncalo manualmente:\n   cd $DESTINO && docker compose up -d --build"
+    || warn "docker compose falló. Arráncalo manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
 else
-  warn "Docker no encontrado. Arranca el bot manualmente:\n   cd $DESTINO && npm start"
+  warn "Docker no encontrado. Arranca el bot manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
 fi
 
 # ── Resumen ───────────────────────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-ok "Tenant \"$NOMBRE\" ($TENANT_ID) provisionado."
+ok "Tenant \"${NOMBRE}\" (${TENANT_ID}) provisionado."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo -e "  Panel      : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
 echo -e "  Contenedor : ${CYAN}${TENANT_ID}${NC}"
+echo -e "  BD         : ${CYAN}data/${TENANT_ID}.db${NC}"
 echo ""
 echo -e "${YELLOW}Escanea el QR desde el super admin o con:${NC}"
 echo -e "  ${CYAN}docker logs -f ${TENANT_ID}${NC}"

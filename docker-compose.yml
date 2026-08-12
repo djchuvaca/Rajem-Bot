@@ -15,18 +15,5 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
 
-  # ── Tenant: Tacos Javier (Tepic) ─────────────────────────────────────────────
-  tacos-javier-tepic:
-    build: .
-    container_name: tacos-javier-tepic
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - TZ=America/Mazatlan
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./.wwebjs_auth:/app/.wwebjs_auth
-      - ./.wwebjs_cache:/app/.wwebjs_cache
+  # Los tenants se añaden aquí automáticamente al provisionar desde el super admin.
+  # Cada servicio usa envs/{TENANT_ID}.env y comparte ./data con el super admin.
