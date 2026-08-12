@@ -732,6 +732,96 @@ app.put("/api/cortes/:id", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── MENÚ DEL TENANT (menu_items) ─────────────────────────────────────────────
+
+// GET /api/menu-items?categoria=corte|refresco|salsa
+app.get("/api/menu-items", requireAuth, (req, res) => {
+  const { categoria } = req.query;
+  const where = categoria
+    ? "WHERE eliminado=0 AND categoria=?"
+    : "WHERE eliminado=0";
+  const params = categoria ? [categoria] : [];
+  res.json(queryAll(`SELECT * FROM menu_items ${where} ORDER BY categoria, producto_slug`, params));
+});
+
+// POST /api/menu-items — crea o reactiva un ítem del menú
+app.post("/api/menu-items", requireAuth, (req, res) => {
+  const { producto_slug, formato_slug, categoria, precio } = req.body;
+  if (!producto_slug || !categoria) return res.status(400).json({ error: "producto_slug y categoria requeridos" });
+  const fmtSlug = formato_slug || null;
+  // ¿Ya existe (incluso eliminado)?
+  const existe = queryOne(
+    "SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
+    [producto_slug, fmtSlug || '', categoria]
+  );
+  if (existe) {
+    run("UPDATE menu_items SET eliminado=0, activo=1, precio=? WHERE id=?", [parseFloat(precio) || 0, existe.id]);
+    return res.json({ ok: true, id: existe.id, accion: 'reactivado' });
+  }
+  run(
+    "INSERT INTO menu_items (producto_slug, formato_slug, categoria, precio, activo, eliminado) VALUES (?,?,?,?,1,0)",
+    [producto_slug, fmtSlug, categoria, parseFloat(precio) || 0]
+  );
+  const nuevo = queryOne("SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
+    [producto_slug, fmtSlug || '', categoria]);
+  res.json({ ok: true, id: nuevo?.id, accion: 'creado' });
+});
+
+// PUT /api/menu-items/:id — editar precio y/o activo
+app.put("/api/menu-items/:id", requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { precio, activo } = req.body;
+  const item = queryOne("SELECT id FROM menu_items WHERE id=? AND eliminado=0", [id]);
+  if (!item) return res.status(404).json({ error: "Item no encontrado" });
+  if (precio  !== undefined) run("UPDATE menu_items SET precio=? WHERE id=?",  [parseFloat(precio) || 0, id]);
+  if (activo  !== undefined) run("UPDATE menu_items SET activo=? WHERE id=?",  [activo ? 1 : 0, id]);
+  res.json({ ok: true });
+});
+
+// DELETE /api/menu-items/:id — soft delete
+app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  run("UPDATE menu_items SET eliminado=1 WHERE id=?", [id]);
+  res.json({ ok: true });
+});
+
+// POST /api/menu-items/toggle-corte — activa/desactiva todos los items de un corte
+app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
+  const { producto_slug, activo } = req.body;
+  if (!producto_slug) return res.status(400).json({ error: "producto_slug requerido" });
+  run("UPDATE menu_items SET activo=? WHERE producto_slug=? AND categoria='corte' AND eliminado=0",
+    [activo ? 1 : 0, producto_slug]);
+  res.json({ ok: true });
+});
+
+// ── CATÁLOGO DEL GIRO (para selección en modales) ────────────────────────────
+
+// GET /api/catalogo/cortes — cortes del giro agrupados por sección
+app.get("/api/catalogo/cortes", requireAuth, (req, res) => {
+  try {
+    const slug = getBusinessTypeSlug() || 'taqueria';
+    const bt   = queryOne("SELECT id FROM business_types WHERE slug=?", [slug]);
+    if (!bt) return res.json({ asada: [], carnitas: [] });
+    const cortes = queryAll(
+      "SELECT slug, nombre, precio_base, seccion FROM cortes WHERE giro_id=? ORDER BY id",
+      [bt.id]
+    );
+    const asada    = cortes.filter(c => c.seccion === 'asada');
+    const carnitas = cortes.filter(c => c.seccion !== 'asada');
+    res.json({ asada, carnitas });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/catalogo/bebidas
+app.get("/api/catalogo/bebidas", requireAuth, (req, res) => {
+  res.json(queryAll("SELECT id, nombre, descripcion, precio_taco as precio FROM productos WHERE categoria='refresco' ORDER BY nombre"));
+});
+
+// GET /api/catalogo/salsas
+app.get("/api/catalogo/salsas", requireAuth, (req, res) => {
+  res.json(queryAll("SELECT id, nombre, descripcion, precio_taco as precio FROM productos WHERE categoria='salsa' ORDER BY nombre"));
+});
+
 // ── FORMATOS (item_types del giro activo) ─────────────────────────────────────
 
 // GET /api/formatos — formatos del giro

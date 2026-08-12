@@ -334,7 +334,6 @@ tr:hover td{background:var(--surface2)}
     <div class="nav-item" onclick="showSection('banco')" data-s="banco"><span class="icon">💳</span> Datos Banco</div>
     <div class="nav-item" onclick="showSection('mensajes')" data-s="mensajes"><span class="icon">💬</span> Mensajes Bot</div>
     <div class="nav-item" onclick="showSection('config')" data-s="config"><span class="icon">⚙️</span> Configuración</div>
-    <div class="nav-item" onclick="showSection('cortes')" data-s="cortes"><span class="icon">🔪</span> Mis Cortes</div>
     <div class="nav-item" onclick="showSection('tipodenegocio')" data-s="tipodenegocio"><span class="icon">🏪</span> Tipo de Negocio</div>
     <div class="nav-item" onclick="showSection('envios')" data-s="envios"><span class="icon">🛵</span> Zonas Envío</div>
 
@@ -461,45 +460,55 @@ tr:hover td{background:var(--surface2)}
 
     <!-- PRODUCTOS -->
     <div class="section" id="s-productos">
-      <!-- Precios base globales -->
+      <!-- Catálogo disponible: botones por formato de venta -->
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">💰 Precios base</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Se aplican cuando un producto no tiene precio propio.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group"><label class="form-label">Precio por taco ($)</label><input class="form-input" id="pb-taco" type="number" min="0"></div>
-          <div class="form-group"><label class="form-label">Precio por torta ($)</label><input class="form-input" id="pb-torta" type="number" min="0"></div>
-          <div class="form-group"><label class="form-label">Precio por 100g ($)</label><input class="form-input" id="pb-100g" type="number" min="0"></div>
-          <div class="form-group"><label class="form-label">Salsa extra ($)</label><input class="form-input" id="pb-salsa" type="number" min="0"></div>
-        </div>
-        <button class="btn btn-primary" onclick="savePreciosBase()">Guardar precios base</button>
+        <div class="card-title">📦 Catálogo disponible</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Selecciona un formato de venta para configurar qué cortes ofreces y a qué precio.</p>
+        <div id="formatos-btns" style="display:flex;flex-wrap:wrap;gap:10px"></div>
       </div>
-      <!-- Menú activo del tenant -->
+
+      <!-- Tabla Cortes -->
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">🧾 Mi menú</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Precios y disponibilidad de tus productos. Solo puedes modificar el precio y el estado activo/agotado.</p>
-        <div class="table-wrap"><table id="cortes-table">
-          <thead><tr><th>Producto</th><th>Categoría</th><th>Taco / Principal</th><th>Torta / Secundario</th><th>$/100g</th><th>Estado</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table></div>
+        <div class="card-title">🥩 Mis Cortes</div>
+        <div class="table-wrap">
+          <table id="menu-cortes-table" style="display:none">
+            <thead id="menu-cortes-thead"><tr><th>Corte</th><th>Estado</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="menu-cortes-empty" style="font-size:13px;color:var(--muted);padding:12px 0">
+          Sin cortes en el menú — usa el catálogo para agregar.
+        </div>
       </div>
-      <!-- Catálogo disponible para adoptar -->
+
+      <!-- Tabla Bebidas -->
       <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="margin:0">📦 Catálogo disponible</div>
-          <span style="font-size:12px;color:var(--muted)">Productos de tu giro que puedes agregar al menú</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="margin:0">🥤 Bebidas</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalAgregarBebida()">+ Agregar bebida</button>
         </div>
-        <div id="catalogo-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px"></div>
-        <div id="catalogo-empty" style="display:none;font-size:13px;color:var(--muted);padding:8px 0">Todos los productos del catálogo ya están en tu menú.</div>
+        <div class="table-wrap">
+          <table id="menu-bebidas-table" style="display:none">
+            <thead><tr><th>Bebida</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="menu-bebidas-empty" style="font-size:13px;color:var(--muted);padding:8px 0">Sin bebidas en el menú</div>
       </div>
-      <!-- Solicitar nuevo producto -->
-      <div class="card" style="border:1px dashed var(--border2)">
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:4px">¿No encuentras un producto?</div>
-            <div style="font-size:13px;color:var(--muted)">Si necesitas un producto que no está en el catálogo, envía una solicitud al equipo técnico para que lo agregue.</div>
-          </div>
-          <button class="btn btn-secondary" onclick="openModalSolicitud()">📋 Solicitar producto</button>
+
+      <!-- Tabla Salsas -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="margin:0">🌶️ Salsas</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalAgregarSalsa()">+ Agregar salsa</button>
         </div>
+        <div class="table-wrap">
+          <table id="menu-salsas-table" style="display:none">
+            <thead><tr><th>Salsa</th><th>Precio extra</th><th>Estado</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="menu-salsas-empty" style="font-size:13px;color:var(--muted);padding:8px 0">Sin salsas en el menú</div>
       </div>
     </div>
 
@@ -607,27 +616,6 @@ tr:hover td{background:var(--surface2)}
     </div>
 
     <!-- ZONAS DE ENVÍO -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- MIS CORTES                                                      -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="section" id="s-cortes">
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px">
-          <div>
-            <div class="card-title" style="margin:0">🔪 Catálogo de cortes</div>
-            <p style="font-size:13px;color:var(--muted);margin-top:4px">Administra los cortes, sus aliases (cómo los pide el cliente) y sus precios por formato.</p>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="openModalCorte(null)">+ Nuevo corte</button>
-        </div>
-        <div style="background:var(--accent-dim);border:1px solid rgba(255,107,43,.18);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted2);display:flex;gap:8px;margin-bottom:16px">
-          <span style="flex-shrink:0">💡</span>
-          <span>Cuando el cliente pide <em>"buche con asada"</em> el bot detecta un <strong>mixto</strong> y asigna el precio según la estrategia en <em>Configuración</em>. Los campos de precio vacíos usan el <strong>precio base</strong> del corte.</span>
-        </div>
-        <div class="table-wrap" id="cortes-ext-wrap">
-          <div class="empty-state"><div class="empty-state-icon">↻</div><div class="empty-state-title">Cargando…</div></div>
-        </div>
-      </div>
-    </div>
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- TIPO DE NEGOCIO                                                -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -775,54 +763,6 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
-<!-- MODAL PRODUCTO (solo precios) -->
-<div class="modal-overlay" id="modal-producto">
-  <div class="modal">
-    <div class="modal-title" id="modal-prod-title">Editar precios</div>
-    <input type="hidden" id="prod-id">
-    <input type="hidden" id="prod-categoria">
-    <div id="prod-nombre-ro" style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text)"></div>
-    <div id="prod-desc-ro" style="font-size:13px;color:var(--muted);margin-bottom:16px"></div>
-    <div id="prod-precios-corte">
-      <div class="form-row-3">
-        <div class="form-group"><label class="form-label">Precio taco</label><input class="form-input" id="prod-taco" type="number" min="0"></div>
-        <div class="form-group"><label class="form-label">Precio torta</label><input class="form-input" id="prod-torta" type="number" min="0"></div>
-        <div class="form-group"><label class="form-label">$/100g</label><input class="form-input" id="prod-100g" type="number" min="0"></div>
-      </div>
-    </div>
-    <div id="prod-precio-unico" style="display:none">
-      <div class="form-group"><label class="form-label" id="prod-precio-label">Precio</label><input class="form-input" id="prod-precio-unit" type="number" min="0"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveProducto()">Guardar precios</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL SOLICITAR PRODUCTO -->
-<div class="modal-overlay" id="modal-solicitud">
-  <div class="modal">
-    <div class="modal-title">📋 Solicitar nuevo producto</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">El equipo técnico evaluará tu solicitud y lo agregará al catálogo de tu giro. Recibirás una notificación cuando esté disponible.</p>
-    <div class="form-group"><label class="form-label">Nombre del producto *</label><input class="form-input" id="sol-nombre" type="text" placeholder="Ej: Tripa, Chorizo, Jamaica..."></div>
-    <div class="form-group">
-      <label class="form-label">Categoría</label>
-      <select class="form-input" id="sol-categoria">
-        <option value="corte">Corte / platillo principal</option>
-        <option value="refresco">Bebida</option>
-        <option value="salsa">Salsa / complemento</option>
-      </select>
-    </div>
-    <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-textarea" id="sol-desc" placeholder="Describe brevemente el producto..."></textarea></div>
-    <div class="form-group"><label class="form-label">Motivo / contexto</label><input class="form-input" id="sol-motivo" type="text" placeholder="¿Por qué quieres agregarlo?"></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-solicitud')">Cancelar</button>
-      <button class="btn btn-primary" onclick="enviarSolicitud()">Enviar solicitud</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL DETALLE PEDIDO -->
 <div class="modal-overlay" id="modal-pedido">
   <div class="modal" style="width:560px">
@@ -876,55 +816,40 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
-<!-- ── MODAL: CORTE ─────────────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-corte">
-  <div class="modal" style="width:620px">
-    <div class="modal-title" id="modal-corte-title">Editar corte</div>
-    <input type="hidden" id="corte-id">
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Nombre *</label>
-        <input class="form-input" id="corte-nombre" type="text" placeholder="Ej: Asada de res">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Precio base ($)</label>
-        <input class="form-input" id="corte-precio-base" type="number" min="0" step="1" placeholder="30">
-        <span class="hint">Precio por defecto cuando un formato no tiene precio propio</span>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Descripción <span style="color:var(--muted)">(opcional)</span></label>
-      <textarea class="form-textarea" id="corte-descripcion" rows="2" style="min-height:60px" placeholder="Describe el corte…"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Aliases <span style="color:var(--muted)">(cómo lo piden los clientes)</span></label>
-      <div class="tag-input-wrap" id="corte-aliases-wrap">
-        <input class="tag-ghost" id="corte-aliases-ghost" placeholder="Escribe y presiona Enter o coma…" autocomplete="off" spellcheck="false">
-      </div>
-      <span class="hint">Ej: asada, res, bistec, a la plancha — el bot los reconocerá como alias de este corte</span>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Precio por formato <span style="color:var(--muted)">(vacío = usa el precio base)</span></label>
-      <div class="precios-fmt-grid" id="corte-precios-fmt-grid">
-        <div style="color:var(--muted);font-size:13px">Cargando formatos…</div>
-      </div>
-    </div>
-
-    <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-bottom:0;padding-top:4px;border-top:1px solid var(--border)">
-      <label class="toggle">
-        <input type="checkbox" id="corte-activo" checked>
-        <span class="toggle-slider"></span>
-      </label>
-      <span style="font-size:13px;color:var(--muted2)">Activo — disponible en el menú y reconocido por el bot</span>
-    </div>
-
+<!-- ── MODAL: CONFIGURAR FORMATO ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-formato">
+  <div class="modal" style="width:520px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title" id="modal-formato-title">Configurar formato</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Marca los cortes disponibles e indica el precio por corte para este formato.</p>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted2);margin-bottom:8px">🥩 Tacos de Asada</div>
+    <div id="fmt-cortes-asada" style="margin-bottom:16px"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted2);margin-bottom:8px">🐷 Carnitas</div>
+    <div id="fmt-cortes-carnitas" style="margin-bottom:16px"></div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-corte')">Cancelar</button>
-      <button class="btn btn-primary" id="btn-save-corte" onclick="saveCorte()">Guardar corte</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-formato')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-formato" onclick="saveFormato()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: AGREGAR BEBIDA ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-bebida">
+  <div class="modal" style="width:420px;max-height:75vh;overflow-y:auto">
+    <div class="modal-title">🥤 Agregar bebida</div>
+    <div id="bebidas-catalogo-list"></div>
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-bebida')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: AGREGAR SALSA ───────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-salsa">
+  <div class="modal" style="width:420px;max-height:75vh;overflow-y:auto">
+    <div class="modal-title">🌶️ Agregar salsa</div>
+    <div id="salsas-catalogo-list"></div>
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-salsa')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -983,7 +908,6 @@ const sections = {
   banco:      { title:'Datos Banco', sub:'Información de transferencia' },
   mensajes:   { title:'Mensajes Bot', sub:'Textos del bot' },
   config:         { title:'Configuración', sub:'Ajustes generales' },
-  cortes:         { title:'Mis Cortes', sub:'Catálogo de cortes y precios por formato' },
   tipodenegocio:  { title:'Tipo de Negocio', sub:'Plantilla NLU y formatos de ítem' },
   envios:         { title:'Zonas de Envío', sub:'Tarifas por distancia a colonia' },
 };
@@ -1011,7 +935,6 @@ const loaders = {
   dashboard: loadDashboard, pedidos: loadPedidos, clientes: loadClientes,
   productos: loadProductos, reportes: loadReportes, horarios: loadHorarios,
   banco: loadBanco, mensajes: loadMensajes, config: loadConfig,
-  cortes:        loadCortes,
   tipodenegocio: loadTipoDeNegocio,
   envios:        loadEnvios,
 };
@@ -1649,168 +1572,267 @@ async function deleteCliente(id) {
   loadClientes();
 }
 
-// ── PRODUCTOS ─────────────────────────────────────────────────────────────────
-let _productosCache = [];
-async function loadPreciosBase() {
-  const conf = await api('/api/config');
-  const get  = k => conf.find(c => c.clave === k)?.valor || '';
-  document.getElementById('pb-taco').value  = get('precio_taco');
-  document.getElementById('pb-torta').value = get('precio_torta');
-  document.getElementById('pb-100g').value  = get('precio_100g');
-  document.getElementById('pb-salsa').value = get('precio_salsa');
-}
-
-async function savePreciosBase() {
-  await api('/api/config', 'POST', { clave: 'precio_taco',  valor: document.getElementById('pb-taco').value });
-  await api('/api/config', 'POST', { clave: 'precio_torta', valor: document.getElementById('pb-torta').value });
-  await api('/api/config', 'POST', { clave: 'precio_100g',  valor: document.getElementById('pb-100g').value });
-  await api('/api/config', 'POST', { clave: 'precio_salsa', valor: document.getElementById('pb-salsa').value });
-  toast('Precios base guardados ✅');
-}
+// ── PRODUCTOS (menú del tenant) ───────────────────────────────────────────────
+let _menuItems   = [];
+let _formatoSlug = null;
 
 async function loadProductos() {
-  loadPreciosBase();
-  _productosCache = await api('/api/productos');
+  const [formatos, items] = await Promise.all([
+    api('/api/formatos?todos=1'),
+    api('/api/menu-items'),
+  ]);
+  _menuItems = items || [];
 
-  const categoriaLabel = { corte: 'Corte', refresco: 'Bebida', salsa: 'Salsa' };
-  const badgeActivo = p => `<span class="badge ${p.activo?'badge-green':'badge-red'}" style="cursor:pointer"
-    title="${p.activo?'Clic para marcar agotado':'Clic para marcar disponible'}"
-    onclick="toggleProductoActivo(${p.id},${p.activo?0:1})">${p.activo?'✓ Activo':'✗ Agotado'}</span>`;
-
-  const fmtPrecio = (p) => {
-    if (p.categoria === 'corte') return `$${p.precio_taco}`;
-    return p.precio_taco > 0 ? `$${p.precio_taco}` : 'Gratis';
-  };
-  const fmtSecundario = (p) => {
-    if (p.categoria === 'corte') return `$${p.precio_torta}`;
-    return '—';
-  };
-  const fmtGramos = (p) => {
-    if (p.categoria === 'corte') return `$${p.precio_100g}`;
-    return '—';
-  };
-
-  document.querySelector('#cortes-table tbody').innerHTML = _productosCache.length
-    ? _productosCache.map(p => `<tr>
-        <td><strong>${p.nombre}</strong></td>
-        <td><span class="badge" style="background:var(--surface2);color:var(--muted);font-size:11px">${categoriaLabel[p.categoria]||p.categoria}</span></td>
-        <td>$${fmtPrecio(p)}</td>
-        <td>${fmtSecundario(p)}</td>
-        <td>${fmtGramos(p)}</td>
-        <td>${badgeActivo(p)}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick='openModalProducto(${JSON.stringify(p)})'>✏️ Precio</button></td>
-      </tr>`).join('')
-    : '<tr><td colspan="7" class="empty">No hay productos en tu menú</td></tr>';
-
-  loadCatalogo();
-}
-
-async function toggleProductoActivo(id, nuevoActivo) {
-  const prod = _productosCache.find(p => p.id === id);
-  if (!prod) return;
-  await api(`/api/productos/${id}`, 'PUT', { activo: nuevoActivo });
-  toast(nuevoActivo ? `✓ ${prod.nombre} marcado como disponible` : `✗ ${prod.nombre} marcado como agotado`);
-  loadProductos();
-}
-
-function openModalProducto(p) {
-  if (!p) return;
-  const cat = p.categoria || 'corte';
-  const esCorte = cat === 'corte';
-  document.getElementById('prod-id').value         = p.id;
-  document.getElementById('prod-categoria').value  = cat;
-  document.getElementById('prod-nombre-ro').textContent = p.nombre;
-  document.getElementById('prod-desc-ro').textContent   = p.descripcion || '';
-  document.getElementById('prod-precios-corte').style.display = esCorte ? '' : 'none';
-  document.getElementById('prod-precio-unico').style.display  = esCorte ? 'none' : '';
-  if (esCorte) {
-    document.getElementById('prod-taco').value  = p.precio_taco  || 0;
-    document.getElementById('prod-torta').value = p.precio_torta || 0;
-    document.getElementById('prod-100g').value  = p.precio_100g  || 0;
-  } else {
-    document.getElementById('prod-precio-label').textContent = cat === 'salsa' ? 'Precio extra' : 'Precio';
-    document.getElementById('prod-precio-unit').value = p.precio_taco || 0;
+  // Botones del catálogo por formato
+  const btnsEl = document.getElementById('formatos-btns');
+  if (btnsEl) {
+    btnsEl.innerHTML = (formatos || []).map(f =>
+      `<button class="btn btn-secondary" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
+        ${f.emoji || ''} ${_ucfirst(f.nombre_plural)}
+      </button>`
+    ).join('');
   }
-  document.getElementById('modal-producto').classList.add('show');
+
+  _renderMenuCortes(formatos || []);
+  _renderMenuSimples('refresco', 'menu-bebidas-table', 'menu-bebidas-empty', 'Precio');
+  _renderMenuSimples('salsa',    'menu-salsas-table',  'menu-salsas-empty',  'Precio extra');
 }
 
-async function saveProducto() {
-  const id  = document.getElementById('prod-id').value;
-  if (!id) return;
-  const cat = document.getElementById('prod-categoria').value || 'corte';
-  const esCorte = cat === 'corte';
-  let datos = {};
-  if (esCorte) {
-    datos.precio_taco  = parseFloat(document.getElementById('prod-taco').value)  || 0;
-    datos.precio_torta = parseFloat(document.getElementById('prod-torta').value) || 0;
-    datos.precio_100g  = parseFloat(document.getElementById('prod-100g').value)  || 0;
-  } else {
-    const precio = parseFloat(document.getElementById('prod-precio-unit').value) || 0;
-    datos.precio_taco  = precio;
-    datos.precio_torta = precio;
-    datos.precio_100g  = 0;
-  }
-  await api(`/api/productos/${id}`, 'PUT', datos);
-  closeModal('modal-producto');
-  toast('Precios actualizados ✅');
-  loadProductos();
-}
+function _renderMenuCortes(formatos) {
+  const corteItems = _menuItems.filter(i => i.categoria === 'corte');
+  const slugsVistos = [...new Set(corteItems.map(i => i.producto_slug))];
 
-async function loadCatalogo() {
-  let catalogo = [];
-  try { catalogo = await api('/api/business-types/products'); } catch(_) { return; }
-  // Genera slug igual que el endpoint de adoptar: nombre → lowercase → guiones bajos
-  const slugDe = c => c.nombre.toLowerCase().replace(/\s+/g,'_');
-  const slugsEnMenu = new Set((_productosCache||[]).map(p => p.catalogo_slug).filter(Boolean));
-  const nombresEnMenu = new Set((_productosCache||[]).map(p => p.nombre.toLowerCase()));
-  const disponibles = catalogo.filter(c => !slugsEnMenu.has(slugDe(c)) && !nombresEnMenu.has(c.nombre.toLowerCase()));
-  const listEl  = document.getElementById('catalogo-list');
-  const emptyEl = document.getElementById('catalogo-empty');
-  if (!listEl) return;
-  if (!disponibles.length) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = '';
+  const table   = document.getElementById('menu-cortes-table');
+  const emptyEl = document.getElementById('menu-cortes-empty');
+  if (!table) return;
+
+  if (!slugsVistos.length) {
+    table.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
     return;
   }
-  emptyEl.style.display = 'none';
-  const emojiCat = { corte:'🥩', refresco:'🥤', salsa:'🌶️' };
-  listEl.innerHTML = disponibles.map(c => {
-    const slug = slugDe(c);
-    return `<div style="background:var(--surface2);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:20px">${emojiCat[c.categoria]||'🍽️'}</div>
-      <div style="font-weight:700;font-size:14px">${c.nombre}</div>
-      <div style="font-size:12px;color:var(--muted);flex:1">${c.descripcion||''}</div>
-      <div style="font-size:12px;color:var(--muted)">Precio sugerido: $${c.precio_taco||0}</div>
-      <button class="btn btn-primary btn-sm" onclick="adoptarProducto('${slug}','${c.nombre.replace(/'/g,"\\'")}')">+ Agregar al menú</button>
-    </div>`;
+  table.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const thead = document.getElementById('menu-cortes-thead');
+  if (thead) {
+    thead.innerHTML = `<tr>
+      <th>Corte</th>
+      ${formatos.map(f => `<th class="num">${f.emoji||''} ${_ucfirst(f.nombre_plural)}</th>`).join('')}
+      <th>Estado</th><th></th>
+    </tr>`;
+  }
+
+  const cortesMap = {};
+  for (const item of corteItems) {
+    if (!cortesMap[item.producto_slug]) cortesMap[item.producto_slug] = {};
+    cortesMap[item.producto_slug][item.formato_slug || '_'] = item;
+  }
+
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = slugsVistos.map(slug => {
+    const fmtMap  = cortesMap[slug] || {};
+    const activo  = formatos.some(f => fmtMap[f.slug]?.activo) ||
+                    (!formatos.length && Object.values(fmtMap).some(i => i.activo));
+    const celdas  = formatos.map(f => {
+      const item = fmtMap[f.slug];
+      if (!item) return `<td class="num" style="color:var(--muted)">—</td>`;
+      return `<td class="num">
+        <input type="number" min="0" step="1" value="${item.precio||0}"
+          style="width:64px;padding:3px 6px;text-align:right"
+          onblur="actualizarPrecioMenuItem(${item.id},this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">
+      </td>`;
+    }).join('');
+
+    return `<tr style="${activo ? '' : 'opacity:.55'}">
+      <td><strong>${_esc(slug)}</strong></td>
+      ${celdas}
+      <td><span class="badge ${activo ? 'badge-green' : 'badge-red'}" style="cursor:pointer"
+        onclick="toggleCorteMenu('${_esc(slug)}',${activo ? 0 : 1})">
+        ${activo ? '✓ Activo' : '✗ Inactivo'}
+      </span></td>
+      <td><button class="btn btn-secondary btn-sm" onclick="eliminarCorteMenu('${_esc(slug)}')" title="Quitar del menú">🗑</button></td>
+    </tr>`;
   }).join('');
 }
 
-async function adoptarProducto(slug, nombre) {
-  await api('/api/productos/adoptar', 'POST', { catalogo_slug: slug });
-  toast(`✅ ${nombre} agregado al menú — edita el precio con ✏️`);
+function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
+  const items   = _menuItems.filter(i => i.categoria === categoria);
+  const table   = document.getElementById(tableId);
+  const emptyEl = document.getElementById(emptyId);
+  if (!table) return;
+
+  if (!items.length) {
+    table.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = items.map(item => `<tr style="${item.activo ? '' : 'opacity:.55'}">
+    <td><strong>${_esc(item.producto_slug)}</strong></td>
+    <td class="num">
+      <input type="number" min="0" step="1" value="${item.precio||0}"
+        style="width:72px;padding:3px 6px;text-align:right"
+        onblur="actualizarPrecioMenuItem(${item.id},this.value)"
+        onkeydown="if(event.key==='Enter')this.blur()">
+    </td>
+    <td><span class="badge ${item.activo ? 'badge-green' : 'badge-red'}" style="cursor:pointer"
+      onclick="toggleMenuItemActivo(${item.id},${item.activo ? 0 : 1})">
+      ${item.activo ? '✓ Activo' : '✗ Inactivo'}
+    </span></td>
+    <td><button class="btn btn-secondary btn-sm" onclick="eliminarMenuItem(${item.id})" title="Quitar del menú">🗑</button></td>
+  </tr>`).join('');
+}
+
+async function actualizarPrecioMenuItem(id, valor) {
+  await api(`/api/menu-items/${id}`, 'PUT', { precio: parseFloat(valor) || 0 });
+}
+
+async function toggleMenuItemActivo(id, activo) {
+  await api(`/api/menu-items/${id}`, 'PUT', { activo });
   loadProductos();
 }
 
-function openModalSolicitud() {
-  document.getElementById('sol-nombre').value    = '';
-  document.getElementById('sol-desc').value      = '';
-  document.getElementById('sol-motivo').value    = '';
-  document.getElementById('sol-categoria').value = 'corte';
-  document.getElementById('modal-solicitud').classList.add('show');
+async function toggleCorteMenu(slug, activo) {
+  await api('/api/menu-items/toggle-corte', 'POST', { producto_slug: slug, activo });
+  toast(activo ? `✓ ${slug} activado` : `✗ ${slug} desactivado`);
+  loadProductos();
 }
 
-async function enviarSolicitud() {
-  const nombre = document.getElementById('sol-nombre').value.trim();
-  if (!nombre) { toast('⚠️ El nombre es obligatorio', false); return; }
-  await api('/api/solicitudes-producto', 'POST', {
-    nombre_propuesto: nombre,
-    descripcion:      document.getElementById('sol-desc').value.trim(),
-    categoria:        document.getElementById('sol-categoria').value,
-    motivo:           document.getElementById('sol-motivo').value.trim(),
-  });
-  closeModal('modal-solicitud');
-  toast('✅ Solicitud enviada al equipo técnico');
+async function eliminarMenuItem(id) {
+  if (!confirm('¿Quitar del menú?')) return;
+  await api(`/api/menu-items/${id}`, 'DELETE');
+  toast('Eliminado del menú');
+  loadProductos();
+}
+
+async function eliminarCorteMenu(slug) {
+  if (!confirm(`¿Quitar "${slug}" del menú?`)) return;
+  const items = _menuItems.filter(i => i.producto_slug === slug && i.categoria === 'corte');
+  await Promise.all(items.map(i => api(`/api/menu-items/${i.id}`, 'DELETE')));
+  toast(`${slug} eliminado del menú`);
+  loadProductos();
+}
+
+// ── MODAL FORMATO ─────────────────────────────────────────────────────────────
+async function openModalFormato(slug, nombrePlural) {
+  _formatoSlug = slug;
+  document.getElementById('modal-formato-title').textContent = `Configurar: ${nombrePlural}`;
+
+  const { asada = [], carnitas = [] } = await api('/api/catalogo/cortes');
+
+  const existentes = {};
+  for (const item of _menuItems) {
+    if (item.categoria === 'corte' && item.formato_slug === slug) {
+      existentes[item.producto_slug] = item;
+    }
+  }
+
+  const renderFila = c => {
+    const item    = existentes[c.slug];
+    const checked = item ? 'checked' : '';
+    const precio  = item ? (item.precio || 0) : (c.precio_base || 0);
+    const dis     = item ? '' : 'opacity:.4;pointer-events:none';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <input type="checkbox" id="fmt-chk-${_esc(c.slug)}" value="${_esc(c.slug)}" ${checked}
+        style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0"
+        onchange="_onFmtCorteToggle(this,'${_esc(c.slug)}')">
+      <label for="fmt-chk-${_esc(c.slug)}" style="flex:1;font-size:13px;cursor:pointer">${_esc(c.nombre)}</label>
+      <input type="number" id="fmt-price-${_esc(c.slug)}" min="0" step="1" value="${precio}"
+        placeholder="$0" style="width:70px;padding:3px 6px;text-align:right;${dis}">
+    </div>`;
+  };
+
+  document.getElementById('fmt-cortes-asada').innerHTML    = asada.map(renderFila).join('') || '<p style="color:var(--muted);font-size:13px">Sin cortes de asada</p>';
+  document.getElementById('fmt-cortes-carnitas').innerHTML = carnitas.map(renderFila).join('') || '<p style="color:var(--muted);font-size:13px">Sin cortes de carnitas</p>';
+
+  document.getElementById('modal-formato').classList.add('show');
+}
+
+function _onFmtCorteToggle(cb, slug) {
+  const el = document.getElementById(`fmt-price-${slug}`);
+  if (!el) return;
+  el.style.opacity       = cb.checked ? '1' : '.4';
+  el.style.pointerEvents = cb.checked ? '' : 'none';
+}
+
+async function saveFormato() {
+  const btn = document.getElementById('btn-save-formato');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const checks = document.querySelectorAll('#fmt-cortes-asada input[type="checkbox"], #fmt-cortes-carnitas input[type="checkbox"]');
+    const ops = [];
+    for (const cb of checks) {
+      const cSlug   = cb.value;
+      const price   = parseFloat(document.getElementById(`fmt-price-${cSlug}`)?.value) || 0;
+      const existente = _menuItems.find(i => i.categoria === 'corte' && i.formato_slug === _formatoSlug && i.producto_slug === cSlug);
+      if (cb.checked) {
+        if (existente) {
+          ops.push(api(`/api/menu-items/${existente.id}`, 'PUT', { precio: price, activo: 1 }));
+        } else {
+          ops.push(api('/api/menu-items', 'POST', { producto_slug: cSlug, formato_slug: _formatoSlug, categoria: 'corte', precio: price }));
+        }
+      } else if (existente) {
+        ops.push(api(`/api/menu-items/${existente.id}`, 'DELETE'));
+      }
+    }
+    await Promise.all(ops);
+    closeModal('modal-formato');
+    toast('✅ Menú guardado');
+    loadProductos();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+// ── MODAL BEBIDA ──────────────────────────────────────────────────────────────
+async function openModalAgregarBebida() {
+  const catalogo   = await api('/api/catalogo/bebidas');
+  const enMenu     = new Set(_menuItems.filter(i => i.categoria === 'refresco').map(i => i.producto_slug));
+  const disponibles = (catalogo || []).filter(c => !enMenu.has(c.nombre));
+  const listEl = document.getElementById('bebidas-catalogo-list');
+  listEl.innerHTML = disponibles.length
+    ? disponibles.map(b => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${_esc(b.nombre)}</div>
+          <div style="font-size:11px;color:var(--muted)">${_esc(b.descripcion||'')}</div>
+        </div>
+        <span style="color:var(--muted);font-size:13px">$${b.precio||0}</span>
+        <button class="btn btn-primary btn-sm" onclick="agregarItemCatalogo('${_esc(b.nombre)}','refresco',${b.precio||0})">+ Agregar</button>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:12px">Todas las bebidas ya están en el menú.</p>';
+  document.getElementById('modal-bebida').classList.add('show');
+}
+
+// ── MODAL SALSA ───────────────────────────────────────────────────────────────
+async function openModalAgregarSalsa() {
+  const catalogo    = await api('/api/catalogo/salsas');
+  const enMenu      = new Set(_menuItems.filter(i => i.categoria === 'salsa').map(i => i.producto_slug));
+  const disponibles = (catalogo || []).filter(c => !enMenu.has(c.nombre));
+  const listEl = document.getElementById('salsas-catalogo-list');
+  listEl.innerHTML = disponibles.length
+    ? disponibles.map(s => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${_esc(s.nombre)}</div>
+          <div style="font-size:11px;color:var(--muted)">${_esc(s.descripcion||'')}</div>
+        </div>
+        <span style="color:var(--muted);font-size:13px">$${s.precio||0}</span>
+        <button class="btn btn-primary btn-sm" onclick="agregarItemCatalogo('${_esc(s.nombre)}','salsa',${s.precio||0})">+ Agregar</button>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:12px">Todas las salsas ya están en el menú.</p>';
+  document.getElementById('modal-salsa').classList.add('show');
+}
+
+async function agregarItemCatalogo(nombre, categoria, precio) {
+  await api('/api/menu-items', 'POST', { producto_slug: nombre, formato_slug: null, categoria, precio });
+  toast(`✅ ${nombre} agregado al menú`);
+  closeModal('modal-bebida');
+  closeModal('modal-salsa');
+  loadProductos();
 }
 
 // ── HORARIOS ──────────────────────────────────────────────────────────────────
@@ -2439,247 +2461,10 @@ async function saveFormatos() {
   await Promise.all(reqs);
   if (errores) toast(`${errores} error(es) al guardar`, false);
   else toast('✅ Precios de formato guardados');
-  // Recargar cortes si la sección está activa, para reflejar nuevos precio_base
-  if (document.getElementById('s-cortes')?.classList.contains('active')) loadCortes();
-}
-
-// ── MIS CORTES ────────────────────────────────────────────────────────────────
-let _cortesData  = [];   // todos los cortes del giro (activos e inactivos)
-let _formatosAct = [];   // formatos activos (columnas de la tabla)
-
-async function loadCortes() {
-  [_cortesData, _formatosAct] = await Promise.all([
-    api('/api/cortes'),
-    api('/api/formatos'),        // solo activos → columnas de la tabla
-  ]);
-  _renderCortesTabla();
-}
-
-function _renderCortesTabla() {
-  const wrap = document.getElementById('cortes-ext-wrap');
-  if (!_cortesData.length) {
-    wrap.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">🔪</div>
-      <div class="empty-state-title">Sin cortes configurados</div>
-      <div class="empty-state-sub">Agrega el primer corte con el botón superior.</div>
-    </div>`;
-    return;
-  }
-
-  const fmtTh = _formatosAct.map(f =>
-    `<th class="num">${f.emoji} ${_ucfirst(f.nombre_plural)}</th>`
-  ).join('');
-
-  const rows = _cortesData.map(c => {
-    let aliases = [];
-    try { aliases = JSON.parse(c.aliases_json || '[]'); } catch(_) {}
-    let pj = {};
-    try { pj = JSON.parse(c.precios_json || '{}'); } catch(_) {}
-
-    const preciosCells = _formatosAct.map(f => {
-      const p   = pj[f.slug];
-      const num = (p !== undefined && p > 0) ? p : (c.precio_base || 0);
-      const esBase = !(p !== undefined && p > 0);
-      return `<td class="num" style="${esBase ? 'color:var(--muted)' : ''}">
-        $${num}${esBase ? '<sup style="font-size:9px">B</sup>' : ''}
-      </td>`;
-    }).join('');
-
-    const estadoBadge = `<span class="badge ${c.activo ? 'badge-green' : 'badge-gray'}"
-      style="cursor:pointer" title="${c.activo ? 'Clic para desactivar' : 'Clic para activar'}"
-      onclick="toggleCorteActivo(${c.id},${c.activo ? 0 : 1})">
-      ${c.activo ? '✓ Activo' : '✗ Inactivo'}
-    </span>`;
-
-    return `<tr style="${c.activo ? '' : 'opacity:.5'}">
-      <td>
-        <strong>${_esc(c.nombre)}</strong>
-        ${aliases.length
-          ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${aliases.slice(0,5).map(_esc).join(', ')}${aliases.length > 5 ? '…' : ''}</div>`
-          : ''}
-        ${c.descripcion ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">${_esc(c.descripcion.substring(0,60))}${c.descripcion.length>60?'…':''}</div>` : ''}
-      </td>
-      <td class="num"><strong>$${c.precio_base || 0}</strong></td>
-      ${preciosCells}
-      <td class="act">${estadoBadge}</td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="_openCorteById(${c.id})" title="Editar corte">✏️</button>
-      </td>
-    </tr>`;
-  }).join('');
-
-  const legend = `<div style="font-size:11px;color:var(--muted);margin-top:8px"><sup>B</sup> Precio base del corte (sin precio propio para este formato)</div>`;
-
-  wrap.innerHTML = `<table id="cortes-ext-table" style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead><tr>
-      <th>Corte / Aliases</th>
-      <th class="num">Base $</th>
-      ${fmtTh}
-      <th>Estado</th>
-      <th></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>${legend}`;
 }
 
 function _ucfirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function _esc(s)      { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function _openCorteById(id) {
-  const c = _cortesData.find(x => x.id === id);
-  if (c) openModalCorte(c);
-}
-
-async function toggleCorteActivo(id, activo) {
-  const c = _cortesData.find(x => x.id === id);
-  if (!c) return;
-  let aliases = [];
-  try { aliases = JSON.parse(c.aliases_json || '[]'); } catch(_) {}
-  let precios = {};
-  try { precios = JSON.parse(c.precios_json || '{}'); } catch(_) {}
-  const r = await api(`/api/cortes/${id}`, 'PUT', {
-    nombre: c.nombre, aliases, descripcion: c.descripcion || '',
-    precio_base: c.precio_base || 30, precios, activo,
-  });
-  if (r.ok) {
-    toast(activo ? `✓ ${c.nombre} activado` : `✗ ${c.nombre} desactivado`);
-    await loadCortes();
-  } else {
-    toast(r.error || 'Error al actualizar', false);
-  }
-}
-
-// ── TAG INPUT (aliases) ───────────────────────────────────────────────────────
-let _corteAliases = [];
-
-function _renderTagChips() {
-  const wrap  = document.getElementById('corte-aliases-wrap');
-  const ghost = document.getElementById('corte-aliases-ghost');
-  if (!wrap || !ghost) return;
-  wrap.querySelectorAll('.tag-chip').forEach(t => t.remove());
-  _corteAliases.forEach((alias, i) => {
-    const chip = document.createElement('span');
-    chip.className = 'tag-chip';
-    chip.innerHTML = `${_esc(alias)}<span class="tag-chip-x" onclick="event.stopPropagation();_removeAlias(${i})">×</span>`;
-    wrap.insertBefore(chip, ghost);
-  });
-}
-
-function _addAliases(raw) {
-  raw.split(/[,;\n]+/)
-    .map(t => t.trim().toLowerCase())
-    .filter(t => t.length > 0 && !_corteAliases.includes(t))
-    .forEach(t => _corteAliases.push(t));
-  _renderTagChips();
-}
-
-function _removeAlias(i) {
-  _corteAliases.splice(i, 1);
-  _renderTagChips();
-}
-
-// ── MODAL CORTE ───────────────────────────────────────────────────────────────
-function openModalCorte(c = null) {
-  const isNew = !c;
-  document.getElementById('modal-corte-title').textContent = isNew ? 'Nuevo corte' : 'Editar corte';
-  document.getElementById('corte-id').value          = c?.id || '';
-  document.getElementById('corte-nombre').value      = c?.nombre || '';
-  document.getElementById('corte-descripcion').value = c?.descripcion || '';
-  document.getElementById('corte-precio-base').value = c?.precio_base ?? 30;
-  document.getElementById('corte-activo').checked    = isNew ? true : Boolean(c.activo);
-
-  // Aliases
-  _corteAliases = [];
-  if (c?.aliases_json) {
-    try { _corteAliases = JSON.parse(c.aliases_json).map(a => String(a).toLowerCase().trim()).filter(Boolean); } catch(_) {}
-  }
-  const ghost = document.getElementById('corte-aliases-ghost');
-  if (ghost) ghost.value = '';
-  _renderTagChips();
-
-  // Precio por formato
-  let pj = {};
-  if (c?.precios_json) { try { pj = JSON.parse(c.precios_json); } catch(_) {} }
-
-  const grid = document.getElementById('corte-precios-fmt-grid');
-  if (grid) {
-    if (!_formatosAct.length) {
-      grid.innerHTML = '<p style="color:var(--muted);font-size:13px">Abre <em>Mis Cortes</em> primero para cargar los formatos disponibles.</p>';
-    } else {
-      const placeholder = c?.precio_base ?? 30;
-      grid.innerHTML = _formatosAct.map(f => `
-        <div class="precios-fmt-cell">
-          <label>${f.emoji} ${_ucfirst(f.nombre_plural)}</label>
-          <input class="fmt-precio-inp" id="corte-fmt-${f.slug}" type="number" min="0" step="1"
-            value="${pj[f.slug] > 0 ? pj[f.slug] : ''}"
-            placeholder="$${placeholder}">
-        </div>`).join('');
-    }
-  }
-
-  document.getElementById('modal-corte').classList.add('show');
-}
-
-async function saveCorte() {
-  const nombre = document.getElementById('corte-nombre').value.trim();
-  if (!nombre) { toast('El nombre es obligatorio', false); return; }
-
-  const precio_base = parseInt(document.getElementById('corte-precio-base').value) || 0;
-  const activo      = document.getElementById('corte-activo').checked ? 1 : 0;
-  const descripcion = document.getElementById('corte-descripcion').value.trim();
-
-  // Recoger precios por formato (solo los que tengan valor > 0)
-  const precios = {};
-  for (const f of _formatosAct) {
-    const el = document.getElementById(`corte-fmt-${f.slug}`);
-    if (!el) continue;
-    const v = parseInt(el.value);
-    if (!isNaN(v) && v > 0) precios[f.slug] = v;
-  }
-
-  const id      = document.getElementById('corte-id').value;
-  const payload = { nombre, aliases: [..._corteAliases], descripcion, precio_base, precios, activo };
-
-  const btn = document.getElementById('btn-save-corte');
-  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
-
-  try {
-    const r = await api(id ? `/api/cortes/${id}` : '/api/cortes', id ? 'PUT' : 'POST', payload);
-    if (r.ok) {
-      closeModal('modal-corte');
-      toast(id ? '✅ Corte actualizado' : '✅ Corte creado');
-      await loadCortes();
-    } else {
-      toast(r.error || 'Error al guardar', false);
-    }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Guardar corte'; }
-  }
-}
-
-// ── TAG INPUT: event listeners (inicializa al cargar el DOM) ──────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const wrap  = document.getElementById('corte-aliases-wrap');
-  const ghost = document.getElementById('corte-aliases-ghost');
-  if (!wrap || !ghost) return;
-
-  wrap.addEventListener('click', () => ghost.focus());
-
-  ghost.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const val = ghost.value.trim();
-      if (val) { _addAliases(val); ghost.value = ''; }
-    } else if (e.key === 'Backspace' && !ghost.value && _corteAliases.length) {
-      _removeAlias(_corteAliases.length - 1);
-    }
-  });
-
-  ghost.addEventListener('blur', () => {
-    const val = ghost.value.trim();
-    if (val) { _addAliases(val); ghost.value = ''; }
-  });
-});
 </script>
 </body>
 </html>

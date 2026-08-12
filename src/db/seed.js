@@ -148,9 +148,28 @@ async function seedDB() {
       precio_base  INTEGER DEFAULT 30,
       precios_json TEXT    DEFAULT '{}',
       activo       INTEGER DEFAULT 1,
+      seccion      TEXT    DEFAULT 'carnitas',
       UNIQUE(giro_id, slug)
     )
   `);
+
+  // ── TABLA MENU_ITEMS (menú configurado por el tenant desde el panel) ─────────
+  db.run(`
+    CREATE TABLE IF NOT EXISTS menu_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_slug TEXT    NOT NULL,
+      formato_slug  TEXT    DEFAULT NULL,
+      categoria     TEXT    NOT NULL DEFAULT 'corte',
+      precio        REAL    DEFAULT 0,
+      activo        INTEGER DEFAULT 1,
+      eliminado     INTEGER DEFAULT 0,
+      precios_json  TEXT    DEFAULT '{}',
+      created_at    TEXT    DEFAULT (datetime('now','localtime'))
+    )
+  `);
+  try {
+    db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_items_uq ON menu_items(producto_slug, COALESCE(formato_slug,''), categoria)");
+  } catch (_) {}
 
   // ── MIGRACIONES (columnas nuevas en tablas existentes) ─────────────────────
   try { db.run("ALTER TABLE clientes ADD COLUMN ultimo_pedido_json TEXT"); } catch (_) {}
@@ -158,6 +177,7 @@ async function seedDB() {
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_slug TEXT DEFAULT NULL"); } catch (_) {}
   try { db.run("ALTER TABLE item_types ADD COLUMN precio_base INTEGER DEFAULT 0"); } catch (_) {}
+  try { db.run("ALTER TABLE cortes ADD COLUMN seccion TEXT DEFAULT 'carnitas'"); } catch (_) {}
 
   // Migración: renombrar slug 'maciza' → 'carne' (v1.5 compat)
   try { db.run("UPDATE cortes SET slug='carne', nombre='Carne/Maciza', aliases_json='[\"carnitas\",\"carnita\",\"carne\",\"maciza\",\"masiza\",\"maciza de puerco\"]' WHERE slug='maciza'"); } catch (_) {}
@@ -588,10 +608,15 @@ function _seedCortesGiro(db, giro) {
   if (!Array.isArray(giro.cortes) || giro.cortes.length === 0) return;
 
   const stmt = db.prepare(
-    'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo) VALUES (?,?,?,?,?,?,?,1)'
+    'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo, seccion) VALUES (?,?,?,?,?,?,?,1,?)'
   );
   for (const c of giro.cortes) {
-    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases || []), c.descripcion || '', c.precio_base || 0, '{}');
+    stmt.run(bt.id, c.slug, c.nombre, JSON.stringify(c.aliases || []), c.descripcion || '', c.precio_base || 0, '{}', c.seccion || 'carnitas');
+  }
+  // Actualizar seccion en cortes ya existentes que tengan el valor default
+  const stmtUpdSec = db.prepare("UPDATE cortes SET seccion=? WHERE giro_id=? AND slug=? AND seccion='carnitas'");
+  for (const c of giro.cortes) {
+    if (c.seccion && c.seccion !== 'carnitas') stmtUpdSec.run(c.seccion, bt.id, c.slug);
   }
 }
 
