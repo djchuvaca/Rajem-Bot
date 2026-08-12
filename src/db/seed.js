@@ -225,16 +225,9 @@ async function seedDB() {
 
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
-    // Seed dinámico: los productos vienen del módulo del giro activo, sin hardcoding
-    // activo=0 para que el tenant decida qué mostrar desde el panel
-    const productosGiro = _giro?.productos || [];
-    for (const p of productosGiro) {
-      db.run(
-        "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-        [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']
-      );
-    }
-    if (productosGiro.length) console.log(`✅ Productos iniciales insertados (${_btSlug}) — activo=0, activar desde el panel`);
+    // Instalación nueva — tabla productos vacía intencionalmente.
+    // El tenant construye su catálogo desde el panel: Productos → Agregar.
+    console.log(`ℹ️  Catálogo vacío (${_btSlug}) — el tenant define su menú desde el panel`);
   } else if (_btSlug === 'taqueria') {
     // 1. Limpiar duplicados por capitalización (conservar el activo con precios reales)
     const _dupes = [
@@ -276,28 +269,29 @@ async function seedDB() {
     }
   }
 
-  // ── SEED REFRESCOS (desde módulo de giro) ──────────────────────────────────
-  // activo=0 — el tenant activa desde el panel los refrescos que vende
-  for (const r of (_giro?.refrescos || [])) {
-    const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
-    const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
-    if (!ya) {
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-        [r.nombre, r.descripcion || '', r.precio || 0, r.precio || 0, 0, r.sinonimos || '', 'refresco']);
-    }
-  }
-
-  // ── SEED SALSAS (desde módulo de giro) ─────────────────────────────────────
-  // activo=0 — el tenant activa desde el panel las salsas que ofrece
+  // ── SINCRONIZACIÓN REFRESCOS/SALSAS (solo en instancias existentes) ──────────
+  // En instalaciones nuevas (countProd === 0) no se toca nada — catálogo vacío.
+  // En instancias existentes solo se corrigen categorías y se agregan productos
+  // que hayan aparecido en el módulo de giro pero aún no estén en la BD.
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
-  for (const s of (_giro?.salsas || [])) {
-    const cap = s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1);
-    const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [s.nombre, cap]);
-    if (!ya) {
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-        [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']);
-    } else {
-      run("UPDATE productos SET categoria = 'salsa' WHERE (nombre = ? OR nombre = ?) AND (categoria IS NULL OR categoria = '')", [s.nombre, cap]);
+  if (countProd > 0) {
+    for (const r of (_giro?.refrescos || [])) {
+      const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
+      const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
+      if (!ya) {
+        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
+          [r.nombre, r.descripcion || '', r.precio || 0, r.precio || 0, 0, r.sinonimos || '', 'refresco']);
+      }
+    }
+    for (const s of (_giro?.salsas || [])) {
+      const cap = s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1);
+      const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [s.nombre, cap]);
+      if (!ya) {
+        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
+          [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']);
+      } else {
+        run("UPDATE productos SET categoria = 'salsa' WHERE (nombre = ? OR nombre = ?) AND (categoria IS NULL OR categoria = '')", [s.nombre, cap]);
+      }
     }
   }
   // Rename legacy "cebolla rallada" si aún existe
