@@ -249,6 +249,16 @@ async function seedDB() {
     }
   }
 
+  // ── MIGRACIÓN: COSTILLA ───────────────────────────────────────────────────────
+  {
+    const yaCostilla = queryOne("SELECT id FROM productos WHERE nombre = 'costilla'");
+    if (!yaCostilla) {
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        ["costilla", "Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.", 35, 45, 35, "costillas,costillita,costillitas,costilla de puerco,costilla de cerdo", "corte"]);
+      console.log("✅ Producto 'costilla' insertado");
+    }
+  }
+
   // ── SEED REFRESCOS ─────────────────────────────────────────────────────────
   const refrescosData = [
     ["coca cola", "Refresco Coca-Cola bien frío 🥤", 20, 20, 0, "coca,coke,cola,coca-cola", "refresco"],

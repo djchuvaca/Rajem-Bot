@@ -74,6 +74,9 @@ module.exports = {
     { slug: 'chorizo',    nombre: 'Chorizo',      precio_base: 32,
       aliases: ['chorizito', 'chorizo mexicano'],
       descripcion: 'Chorizo mexicano frito, con chile y especias.' },
+    { slug: 'campechano', nombre: 'Campechano',   precio_base: 35,
+      aliases: ['campechana', 'mixto campechano'],
+      descripcion: 'Combinación de asada y longaniza, el favorito de los indecisos.' },
     // ── Carnitas (cortes "clásicos") ──────────────────────────────────────────
     { slug: 'carne',      nombre: 'Carne/Maciza', precio_base: 30,
       aliases: ['carnitas', 'carnita', 'carne', 'maciza', 'masiza', 'maciza de puerco'],
@@ -90,13 +93,15 @@ module.exports = {
     { slug: 'cabeza',     nombre: 'Cabeza',       precio_base: 30,
       aliases: ['cabezita', 'carnitas de cabeza'],
       descripcion: 'Carne de cabeza de cerdo, muy tierna y jugosa.' },
-    // ── Mezclas ───────────────────────────────────────────────────────────────
-    { slug: 'campechano', nombre: 'Campechano',   precio_base: 35,
-      aliases: ['campechana', 'mixto campechano'],
-      descripcion: 'Combinación de asada y longaniza, el favorito de los indecisos.' },
+    { slug: 'costilla',   nombre: 'Costilla',     precio_base: 35,
+      aliases: ['costillas', 'costillita', 'costillitas', 'costilla de puerco', 'costillas de puerco', 'costilla de cerdo'],
+      descripcion: 'Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.' },
     { slug: 'surtido',    nombre: 'Surtido',      precio_base: 30,
       aliases: ['surtida', 'mixto', 'la combinacion', 'de todo', 'todos los cortes'],
-      descripcion: 'Combinación de los cortes que el local maneja. El chef decide la mezcla.' },
+      descripcion: 'Combinación de los cortes de carnitas que el local maneja. El chef decide la mezcla.' },
+    { slug: 'surtido especial', nombre: 'Surtido Especial', precio_base: 30,
+      aliases: ['especial', 'surtido a tu gusto', 'surtido personalizado', 'mi surtido', 'combinacion especial'],
+      descripcion: 'Combinación personalizada de cortes a elección del cliente.' },
   ],
 
   // Productos-plantilla para provisioning (tabla business_type_products → productos)
@@ -113,31 +118,40 @@ module.exports = {
     { nombre: 'cuero',   categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32,
       sinonimos: 'cueros,cueritos,cuerito',
       descripcion: 'Piel del puerco, textura muy suave y delicada.' },
-    { nombre: 'lengua',  categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32,
+    { nombre: 'lengua',   categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32,
       sinonimos: 'lenguita,lenguitas',
       descripcion: 'Textura cremosa, sabor intenso y limpio.' },
+    { nombre: 'costilla', categoria: 'corte', precio_taco: 35, precio_torta: 45, precio_100g: 35,
+      sinonimos: 'costillas,costillita,costillitas,costilla de puerco,costilla de cerdo',
+      descripcion: 'Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.' },
+    { nombre: 'surtido especial', categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32,
+      sinonimos: 'especial,surtido personalizado,mi surtido',
+      descripcion: 'Combinación personalizada de cortes a elección del cliente.' },
   ],
 
   // Mapa alias→slug de emergencia para NLU sin BD
   fallbackCortes: {
-    // Res
+    // Tacos de asada
     asada: 'asada', 'carne asada': 'asada', res: 'asada', bistek: 'asada', bistec: 'asada',
     tripa: 'tripa', tripas: 'tripa', tripita: 'tripa', tripitas: 'tripa',
     suadero: 'suadero', suaderito: 'suadero',
-    // Cerdo
     pastor: 'pastor', 'al pastor': 'pastor', adobada: 'pastor',
     longaniza: 'longaniza', longanitas: 'longaniza',
     chicharron: 'chicharron', chicharrón: 'chicharron', chicharrones: 'chicharron',
     chorizo: 'chorizo', chorizito: 'chorizo',
-    cabeza: 'cabeza', cabezita: 'cabeza',
     campechano: 'campechano', campechana: 'campechano',
     // Carnitas
-    surtido: 'surtido', surtida: 'surtido', surtidos: 'surtido', mixto: 'surtido', mixta: 'surtido',
     carne: 'carne', carnes: 'carne', carner: 'carne', carnita: 'carne', carnitas: 'carne',
     maciza: 'carne', masiza: 'carne',
     buche: 'buche', buches: 'buche', buchito: 'buche', buchon: 'buche', buchones: 'buche',
     cuero: 'cuero', cueros: 'cuero', cueritos: 'cuero', cuerito: 'cuero',
     lengua: 'lengua', lenguas: 'lengua', lenguita: 'lengua', lenguitas: 'lengua',
+    cabeza: 'cabeza', cabezita: 'cabeza',
+    costilla: 'costilla', costillas: 'costilla', costillita: 'costilla', costillitas: 'costilla',
+    'costilla de puerco': 'costilla', 'costilla de cerdo': 'costilla',
+    surtido: 'surtido', surtida: 'surtido', surtidos: 'surtido', mixto: 'surtido', mixta: 'surtido',
+    'surtido especial': 'surtido especial', especial: 'surtido especial',
+    'surtido personalizado': 'surtido especial', 'mi surtido': 'surtido especial',
   },
 
   // Sin override — el prompt base genérico es suficiente para taquería
