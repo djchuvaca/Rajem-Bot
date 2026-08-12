@@ -13,6 +13,9 @@ const {
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
   getConfig, guardarTelefonoReal, getJIDReal, getGrupoId, getNotifDestinoJID,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
+  getAllBusinessTypes, getBusinessType, getBusinessTypeSlug,
+  getItemTypes, getItemTypeBySlug, createItemType, updateItemType, deleteItemType,
+  invalidarCacheItemTypes, getTemplateProducts,
 } = require("../db");
 const { queryOne, queryAll, run, getBsdb } = require("../db/core");
 const SqliteSessionStore = require("../db/session-store");
@@ -546,6 +549,77 @@ app.put("/api/tarifas-zonas", requireAuth, (req, res) => {
       [z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa)]);
   }
   res.json({ ok: true });
+});
+
+// ── BUSINESS TYPES ────────────────────────────────────────────────────────────
+// GET  /api/business-types        — lista de todas las plantillas disponibles
+// GET  /api/business-types/actual — plantilla activa del tenant
+// POST /api/business-types/seleccionar — cambia la plantilla activa (slug en body)
+app.get("/api/business-types", requireAuth, (req, res) => {
+  try { res.json(getAllBusinessTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get("/api/business-types/actual", requireAuth, (req, res) => {
+  try {
+    const slug = getBusinessTypeSlug();
+    const bt   = getBusinessType(slug);
+    const its  = getItemTypes();
+    res.json({ slug, businessType: bt, itemTypes: its });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/business-types/seleccionar", requireAuth, (req, res) => {
+  try {
+    const { slug } = req.body;
+    if (!slug) return res.status(400).json({ error: "Falta slug" });
+    const bt = getBusinessType(slug);
+    if (!bt) return res.status(404).json({ error: "Plantilla no encontrada" });
+    run("UPDATE configuracion SET valor=? WHERE clave='business_type_slug'", [slug]);
+    invalidarCacheItemTypes();
+    invalidarCacheCortes();
+    res.json({ ok: true, slug });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── ITEM TYPES (tipos de ítem del negocio actual) ─────────────────────────────
+// GET    /api/item-types           — lista los item_types del negocio activo
+// POST   /api/item-types           — crear nuevo item_type
+// PUT    /api/item-types/:slug     — editar item_type existente
+// DELETE /api/item-types/:slug     — eliminar item_type
+app.get("/api/item-types", requireAuth, (req, res) => {
+  try { res.json(getItemTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/item-types", requireAuth, (req, res) => {
+  try {
+    const slug = getBusinessTypeSlug();
+    const bt   = getBusinessType(slug);
+    if (!bt) return res.status(404).json({ error: "business_type no encontrado" });
+    createItemType(bt.id, req.body);
+    invalidarCacheItemTypes(); invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put("/api/item-types/:id", requireAuth, (req, res) => {
+  try {
+    updateItemType(parseInt(req.params.id), req.body);
+    invalidarCacheItemTypes(); invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/item-types/:id", requireAuth, (req, res) => {
+  try {
+    deleteItemType(parseInt(req.params.id));
+    invalidarCacheItemTypes(); invalidarCacheCortes();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/business-types/:slug/productos — productos-plantilla de una plantilla
+app.get("/api/business-types/:slug/productos", requireAuth, (req, res) => {
+  try { res.json(getTemplateProducts(req.params.slug)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 function startPanel(port = 3000) {

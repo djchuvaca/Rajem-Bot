@@ -12,7 +12,9 @@ const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumul
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
-  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes, parsearDistribucionRefrescos, normalizar, buscarCorteFuzzy,
+  detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
+  parsearDistribucionRefrescos, normalizar, buscarCorteFuzzy,
+  detectarTipoItemDesdeTexto, listaItemTypes,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
@@ -226,30 +228,33 @@ async function _iniciarFormPostOrden(msg, clienteNumero, ordenTexto, esOrdenDom,
   }
 }
 
-// ── ESPERANDO TIPO DE ÍTEM (taco/torta) ──────────────────────────────────────
+// ── ESPERANDO TIPO DE ÍTEM (dinámica según business_type) ────────────────────
 async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom) {
   if (!esperandoTipoItem.has(clienteNumero)) return false;
 
-  const pendiente = esperandoTipoItem.get(clienteNumero);
-  const tNorm = textoOriginal.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const esTaco  = /\btacos?\b/.test(tNorm);
-  const esTorta = /\btortas?\b/.test(tNorm);
-  const cortesMap = getCortes ? getCortes() : {};
+  const pendiente    = esperandoTipoItem.get(clienteNumero);
+  const tNorm        = textoOriginal.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const tipoDetectado = detectarTipoItemDesdeTexto(textoOriginal);
+
+  // Permitir que el cliente cambie solo el corte mientras espera el tipo
+  const cortesMap     = getCortes ? getCortes() : {};
   const palabrasCorte = Object.keys(cortesMap).join("|");
-  const soloCorteTipoItem = !esTaco && !esTorta && palabrasCorte
+  const soloCorteTipoItem = !tipoDetectado && palabrasCorte
     && new RegExp(`\\b(${palabrasCorte})\\b`, "i").test(tNorm)
     && pendiente.cantidad <= 4;
 
-  if (!esTaco && !esTorta && !soloCorteTipoItem) {
-    const errores = _sumarError(clienteNumero);
-    const extra = errores >= 2 ? "\n\n_Por ejemplo escríbeme: *tacos* o *tortas*_" : "";
-    await msg.reply("Disculpa, no entendí. *¿Serían tacos o tortas?*" + extra);
+  if (!tipoDetectado && !soloCorteTipoItem) {
+    const errores     = _sumarError(clienteNumero);
+    const listaEj     = listaItemTypes();
+    const [ej1, ...resto] = listaEj.split(" o ");
+    const extra       = errores >= 2 ? `\n\n_Por ejemplo: *${ej1}*${resto.length ? ` o *${resto.join(" o ")}*` : ""}_` : "";
+    await msg.reply(`Disculpa, no entendí. *¿Serían ${listaEj}?*` + extra);
     return true;
   }
 
   esperandoTipoItem.delete(clienteNumero);
   _resetError(clienteNumero);
-  const tipo = esTorta ? "torta" : "taco";
+  const tipo = tipoDetectado ? tipoDetectado.slug : "taco";
   const json = { tipo: "pedido", items: [{ presentacion: tipo, cantidad: pendiente.cantidad, corte: pendiente.corte }] };
   pedidoJSONActual.set(clienteNumero, json);
   const resultado = jsonALineas(json);
@@ -353,16 +358,15 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     if (textoSinNo.length > 3) {
       let jsonRechazoPed = parsearPedidoSimple(textoSinNo);
       if (!jsonRechazoPed) {
-        const matchNum = textoSinNo.match(/\b(\d+)\b/);
-        const esTacoR  = /\btacos?\b/i.test(textoSinNo);
-        const esTortaR = /\btortas?\b/i.test(textoSinNo);
-        if (matchNum && (esTacoR || esTortaR)) {
+        const matchNum     = textoSinNo.match(/\b(\d+)\b/);
+        const tipoRechazado = detectarTipoItemDesdeTexto(textoSinNo);
+        if (matchNum && tipoRechazado) {
           const cortesMap = getCortes();
           const palabrasC = Object.keys(cortesMap).join("|");
           const mCorte    = itemData.lineas.match(new RegExp(`\\b(${palabrasC})\\b`, "i"));
           if (mCorte) {
             const corteR = cortesMap[mCorte[1].toLowerCase()];
-            jsonRechazoPed = { tipo: "pedido", items: [{ presentacion: esTortaR ? "torta" : "taco", cantidad: parseInt(matchNum[1]), corte: corteR }] };
+            jsonRechazoPed = { tipo: "pedido", items: [{ presentacion: tipoRechazado.slug, cantidad: parseInt(matchNum[1]), corte: corteR }] };
           }
         }
       }

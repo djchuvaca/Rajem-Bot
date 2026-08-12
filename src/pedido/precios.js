@@ -45,7 +45,20 @@ function calcularPrecioItem(item, precios) {
       return item.grupos * item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
     case "plato_separado":
       return item.items.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
-    default: return 0;
+    default: {
+      // Tipo de ítem dinámico: buscar precio según precio_campo del item_type
+      if (item.cantidad) {
+        try {
+          const { getItemTypeBySlug } = require("../db");
+          const itemType = getItemTypeBySlug(item.presentacion);
+          if (itemType) {
+            const precio = itemType.precio_campo === 'precio_torta' ? pTorta : pTaco;
+            return item.cantidad * precio;
+          }
+        } catch (_) {}
+      }
+      return 0;
+    }
   }
 }
 

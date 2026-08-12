@@ -4,10 +4,11 @@
  * siga usando require("../db") sin cambiar ningún import existente.
  */
 
-const core    = require("./core");
-const config  = require("./config");
-const modelos = require("./modelos");
-const { seedDB } = require("./seed");
+const core         = require("./core");
+const config       = require("./config");
+const modelos      = require("./modelos");
+const businessTypes = require("./business-types");
+const { seedDB }   = require("./seed");
 
 // initDB ahora también ejecuta el seed
 async function initDB() {
@@ -63,6 +64,20 @@ module.exports = {
   getPasarelaConfig:       config.getPasarelaConfig,
   getNotifModalidad:       config.getNotifModalidad,
   getNotifDestinoJID:      config.getNotifDestinoJID,
+
+  // business types & item types
+  getAllBusinessTypes:     businessTypes.getAllBusinessTypes,
+  getBusinessType:         businessTypes.getBusinessType,
+  createBusinessType:      businessTypes.createBusinessType,
+  updateBusinessType:      businessTypes.updateBusinessType,
+  getBusinessTypeSlug:     businessTypes.getBusinessTypeSlug,
+  getItemTypes:            businessTypes.getItemTypes,
+  getItemTypeBySlug:       businessTypes.getItemTypeBySlug,
+  createItemType:          businessTypes.createItemType,
+  updateItemType:          businessTypes.updateItemType,
+  deleteItemType:          businessTypes.deleteItemType,
+  invalidarCacheItemTypes: businessTypes.invalidarCacheItemTypes,
+  getTemplateProducts:     businessTypes.getTemplateProducts,
 
   // productos
   getProductos:        modelos.getProductos,

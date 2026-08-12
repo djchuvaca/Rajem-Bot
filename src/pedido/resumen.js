@@ -28,21 +28,17 @@ function getTipoNegocio() {
 }
 
 // ── EMOJIS POR PRESENTACIÓN ───────────────────────────────────────────────────
-function emojiPresentacion(presentacion, tipoNegocio) {
-  const tipo = tipoNegocio || getTipoNegocio();
-  const EMOJIS = {
-    taqueria:   { taco: "🌮", torta: "🥖", gramos: "⚖️", pesos: "⚖️", default: "🍽️" },
-    pizzeria:   { taco: "🍕", torta: "🥪", gramos: "⚖️", pesos: "⚖️", default: "🍕" },
-    hamburguesa:{ taco: "🍔", torta: "🍔", gramos: "⚖️", pesos: "⚖️", default: "🍔" },
-    default:    { taco: "🍽️", torta: "🍽️", gramos: "⚖️", pesos: "⚖️", default: "🍽️" },
-  };
-  // Normalizar tipo_negocio de texto libre a clave del mapa
-  const clave = /taqueria|tacos|carnitas/i.test(tipo) ? "taqueria"
-    : /pizza|pizzeria/i.test(tipo)                    ? "pizzeria"
-    : /hamburguesa|burger/i.test(tipo)                ? "hamburguesa"
-    : tipo;
-  const set = EMOJIS[clave] || EMOJIS.default;
-  return set[presentacion] || set.default;
+function emojiPresentacion(presentacion) {
+  if (presentacion === "gramos" || presentacion === "pesos") return "⚖️";
+  // Buscar en item_types activos para obtener el emoji configurado
+  try {
+    const { getItemTypeBySlug } = require("../db");
+    const itemType = getItemTypeBySlug(presentacion);
+    if (itemType && itemType.emoji) return itemType.emoji;
+  } catch (_) {}
+  // Fallback histórico
+  const FALLBACK = { taco: "🌮", torta: "🥖" };
+  return FALLBACK[presentacion] || "🍽️";
 }
 
 // ── FORMATEAR HORA ────────────────────────────────────────────────────────────
@@ -67,34 +63,38 @@ function procesarItemJSON(item, precios) {
   const pc = (item.corte && precios.porCorte && precios.porCorte[item.corte])
     ? precios.porCorte[item.corte] : precios;
   const { pTaco, pTorta, p100g } = pc;
-  const producto = getNombreProducto();
-  const tipo     = getTipoNegocio();
   const corte    = Array.isArray(item.corte) ? item.corte.join(" con ") : (item.corte || "");
   const combinacion = item.combinacion ? ` (${item.combinacion})` : "";
   const corteStr = corte ? ` de ${corte}${combinacion}` : "";
 
   switch (item.presentacion) {
     case "taco":
-      return `${emojiPresentacion("taco", tipo)} ${item.cantidad} ${item.cantidad > 1 ? "tacos" : "taco"}${corteStr} — $${item.cantidad * pTaco}`;
+      return `${emojiPresentacion("taco")} ${item.cantidad} ${item.cantidad > 1 ? "tacos" : "taco"}${corteStr} — $${item.cantidad * pTaco}`;
 
     case "torta":
-      return `${emojiPresentacion("torta", tipo)} ${item.cantidad} ${item.cantidad > 1 ? "tortas" : "torta"}${corteStr} — $${item.cantidad * pTorta}`;
+      return `${emojiPresentacion("torta")} ${item.cantidad} ${item.cantidad > 1 ? "tortas" : "torta"}${corteStr} — $${item.cantidad * pTorta}`;
 
     case "gramos":
-      return `${emojiPresentacion("gramos", tipo)} ${item.gramos}g${corteStr} — $${Math.round((item.gramos / 100) * p100g)}`;
+      return `${emojiPresentacion("gramos")} ${item.gramos}g${corteStr} — $${Math.round((item.gramos / 100) * p100g)}`;
 
     case "pesos":
-      return `${emojiPresentacion("pesos", tipo)} ~${Math.round((item.monto / p100g) * 100)}g${corteStr} — $${item.monto}`;
+      return `${emojiPresentacion("pesos")} ~${Math.round((item.monto / p100g) * 100)}g${corteStr} — $${item.monto}`;
 
     case "grupo_repetido": {
       const lg = item.items_por_grupo.map(i => {
-        const c = Array.isArray(i.corte) ? i.corte.join(" con ") : (i.corte || "");
+        const c  = Array.isArray(i.corte) ? i.corte.join(" con ") : (i.corte || "");
         const cs = c ? ` de ${c}` : "";
-        if (i.presentacion === "taco")   return `${i.cantidad} ${i.cantidad > 1 ? "tacos" : "taco"}${cs}`;
-        if (i.presentacion === "torta")  return `${i.cantidad} ${i.cantidad > 1 ? "tortas" : "torta"}${cs}`;
-        if (i.presentacion === "gramos") return `${i.gramos}g${cs}`;
-        if (i.presentacion === "pesos")  return `$${i.monto}${cs}`;
-        return "";
+        let nombre;
+        if (i.presentacion === "taco")        nombre = i.cantidad > 1 ? "tacos"  : "taco";
+        else if (i.presentacion === "torta")  nombre = i.cantidad > 1 ? "tortas" : "torta";
+        else {
+          try {
+            const { getItemTypeBySlug } = require("../db");
+            const it = getItemTypeBySlug(i.presentacion);
+            nombre = it ? (i.cantidad > 1 ? it.nombre_plural : it.nombre) : i.presentacion;
+          } catch (_) { nombre = i.presentacion; }
+        }
+        return `${i.cantidad} ${nombre}${cs}`;
       }).filter(Boolean).join(" + ");
       const total = item.grupos * item.items_por_grupo.reduce((s, i) => s + calcularPrecioItem(i, precios), 0);
       const label = item.grupos > 1 ? "platos" : "plato";
@@ -103,10 +103,24 @@ function procesarItemJSON(item, precios) {
 
     case "plato_separado": {
       const lp = item.items.map(i => procesarItemJSON(i, precios)).join(" + ");
-      return `🍽️ Plato ${item.numero}: ${lp.replace(/^[🌮🥖⚖️🍕🍔]\s*/, "")}`;
+      return `🍽️ Plato ${item.numero}: ${lp.replace(/^.\s*/u, "")}`;
     }
 
-    default: return "";
+    default: {
+      // Item type dinámico (ej: pizza_individual, hamburguesa_sencilla…)
+      if (!item.cantidad) return "";
+      try {
+        const { getItemTypeBySlug } = require("../db");
+        const itemType = getItemTypeBySlug(item.presentacion);
+        if (itemType) {
+          const emoji  = itemType.emoji || "🍽️";
+          const nombre = item.cantidad > 1 ? itemType.nombre_plural : itemType.nombre;
+          const precio = calcularPrecioItem(item, precios);
+          return `${emoji} ${item.cantidad} ${nombre}${corteStr} — $${precio}`;
+        }
+      } catch (_) {}
+      return "";
+    }
   }
 }
 

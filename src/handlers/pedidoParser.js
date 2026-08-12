@@ -2,9 +2,9 @@
 // Parser inteligente de pedidos — sin Groq para casos manejables
 // Sistema de score para decidir si parsear local o pasar a Groq
 
-const { getConfig, getProductos } = require("../db");
+const { getConfig, getProductos, getItemTypes, getItemTypeBySlug, invalidarCacheItemTypes } = require("../db");
 
-// ── CARGAR CORTES DESDE BD (con fallback) ────────────────────────────────────
+// ── CACHÉ DE DATOS DINÁMICOS (cortes, refrescos, salsas, item_types) ─────────
 let _cortesCache = null;
 let _cortesCacheTs = 0;
 let _refrescosCache = null;
@@ -13,17 +13,90 @@ let _salsasCache = null;
 let _salsasCacheTs = 0;
 let _cortesRegexCache = null;
 let _cortesRegexCacheTs = 0;
+let _itemTypesCache = null;
+let _itemTypesCacheTs = 0;
 const _CORTES_TTL = 60 * 1000;
 
 function invalidarCacheCortes() {
-  _cortesCache = null;
-  _cortesCacheTs = 0;
-  _refrescosCache = null;
-  _refrescosCacheTs = 0;
-  _salsasCache = null;
-  _salsasCacheTs = 0;
-  _cortesRegexCache = null;
-  _cortesRegexCacheTs = 0;
+  _cortesCache     = null; _cortesCacheTs     = 0;
+  _refrescosCache  = null; _refrescosCacheTs  = 0;
+  _salsasCache     = null; _salsasCacheTs     = 0;
+  _cortesRegexCache = null; _cortesRegexCacheTs = 0;
+  _itemTypesCache  = null; _itemTypesCacheTs  = 0;
+  invalidarCacheItemTypes();
+}
+
+// ── ITEM TYPES DINÁMICOS ──────────────────────────────────────────────────────
+
+function _getItemTypesActivos() {
+  const ahora = Date.now();
+  if (_itemTypesCache && ahora - _itemTypesCacheTs < _CORTES_TTL) return _itemTypesCache;
+  try {
+    _itemTypesCache = getItemTypes() || _itemTypesDefault();
+  } catch (_) {
+    _itemTypesCache = _itemTypesDefault();
+  }
+  _itemTypesCacheTs = ahora;
+  return _itemTypesCache;
+}
+
+function _itemTypesDefault() {
+  return [
+    { slug: 'taco',  nombre: 'taco',  nombre_plural: 'tacos',  emoji: '🌮', aliases_json: '["taquito","taquitos","tacito","tacitos"]', soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco'  },
+    { slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖', aliases_json: '["sandwich","sándwich"]',                   soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta' },
+  ];
+}
+
+function _getItemTypeAliases(type) {
+  try { return JSON.parse(type.aliases_json || '[]'); } catch (_) { return []; }
+}
+
+/** Todas las palabras que identifican tipos de ítem (para regex building) */
+function _getItemTypeWords() {
+  const types = _getItemTypesActivos();
+  const words = [];
+  for (const t of types) {
+    words.push(t.slug, t.nombre, t.nombre_plural, ..._getItemTypeAliases(t));
+  }
+  return [...new Set(words.filter(Boolean))];
+}
+
+/**
+ * Dado un texto, devuelve el item_type cuyo nombre/alias coincide.
+ * Ej: "tacos" → { slug: "taco", nombre: "taco", … }
+ */
+function detectarTipoItemDesdeTexto(texto) {
+  if (!texto) return null;
+  const types  = _getItemTypesActivos();
+  const tNorm  = normalizar(texto);
+  for (const type of types) {
+    const words = [type.slug, type.nombre, type.nombre_plural, ..._getItemTypeAliases(type)].filter(Boolean);
+    for (const word of words) {
+      const wNorm   = normalizar(word);
+      const escaped = wNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`\\b${escaped}s?\\b`, 'i').test(tNorm)) return type;
+    }
+  }
+  return null;
+}
+
+/** Construye el patrón alternativo de todos los item types para usar en RegExp */
+function _buildItemTypesPattern() {
+  const words = _getItemTypeWords();
+  return words
+    .sort((a, b) => b.length - a.length)
+    .map(w => normalizar(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+}
+
+/**
+ * String legible para mostrar al cliente: "tacos o tortas"
+ * O para otro tipo de negocio: "pizza individual o pizza familiar"
+ */
+function listaItemTypes() {
+  const types = _getItemTypesActivos();
+  if (!types.length) return 'tacos o tortas';
+  return types.map(t => t.nombre_plural).join(' o ');
 }
 
 function getCortes() {
@@ -246,7 +319,7 @@ function textoANumero(texto) {
     .replace(/\btres\b/gi,      "3")
     .replace(/\bdos\b/gi,       "2")
     .replace(/\buno\b/gi,       "1")
-    .replace(new RegExp(`\\bun[ao]?\\s+(?=taco|torta|kilo|cuarto|medio|${[...new Set(Object.values(getCortes()))].join("|")})`, "gi"), "1 ");
+    .replace(new RegExp(`\\bun[ao]?\\s+(?=${[..._getItemTypeWords(), 'kilo', 'cuarto', 'medio', ...new Set(Object.values(getCortes()))].filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, "gi"), "1 ");
 }
 
 // ── MEJORA 2: FUZZY MATCHING PARA CORTES ─────────────────────────────────────
@@ -296,9 +369,9 @@ function calcularScore(texto) {
   if (SEÑALES_GROQ.test(t))            score -= 10;
   if (PATRON_DISTRIBUCION.test(texto)) score -= 10;
 
-  if (/\b\d+\b/.test(t))                          score += 2;
-  if (/\b(tacos?|tortas?)\b/.test(t))              score += 2;
-  if (/\b\d+\s*g(?:ramos?)?\b/.test(t))            score += 2;
+  if (/\b\d+\b/.test(t))                                               score += 2;
+  if (detectarTipoItemDesdeTexto(t))                                   score += 2;
+  if (/\b\d+\s*g(?:ramos?)?\b/.test(t))                               score += 2;
   if (MEDIDAS.some(m => m.re.test(t)))             score += 2;
 
   const DESCARTAR_SCORE = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
@@ -364,12 +437,14 @@ function parsearItem(fragmento) {
   const t = normalizar(fragmento);
   const corte = extraerCorte(fragmento);
 
-  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
+  const _itPattern = _buildItemTypesPattern();
+  const matchPieza = _itPattern ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPattern})s?\\b`)) : null;
   if (matchPieza) {
-    const cantidad = parseInt(matchPieza[1]);
-    const tipo = /taco/i.test(matchPieza[2]) ? "taco" : "torta";
-    if (!corte) return { _sinCorte: true, presentacion: tipo, cantidad };
-    return { presentacion: tipo, cantidad, corte };
+    const cantidad        = parseInt(matchPieza[1]);
+    const tipoDetectado   = detectarTipoItemDesdeTexto(matchPieza[2]);
+    const presentacion    = tipoDetectado ? tipoDetectado.slug : matchPieza[2];
+    if (!corte) return { _sinCorte: true, presentacion, cantidad };
+    return { presentacion, cantidad, corte };
   }
 
   for (const medida of MEDIDAS) {
@@ -543,9 +618,12 @@ function parsearMitadMitad(texto) {
   if (!corte1 || !corte2) return null;
   const corteStr = `${corte1}, ${corte2}`;
 
-  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
-  if (matchPieza)
-    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr })] };
+  const _itPat2 = _buildItemTypesPattern();
+  const matchPieza2 = _itPat2 ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPat2})s?\\b`)) : null;
+  if (matchPieza2) {
+    const tipoD2 = detectarTipoItemDesdeTexto(matchPieza2[2]);
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: tipoD2 ? tipoD2.slug : matchPieza2[2], cantidad: parseInt(matchPieza2[1]), corte: corteStr })] };
+  }
 
   for (const medida of MEDIDAS)
     if (medida.re.test(t))
@@ -572,9 +650,12 @@ function parsearTodoMenosCorte(texto) {
   if (!cortesResultantes.length) return null;
   const corteStr = cortesResultantes.join(", ");
 
-  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
-  if (matchPieza)
-    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: /taco/i.test(matchPieza[2]) ? "taco" : "torta", cantidad: parseInt(matchPieza[1]), corte: corteStr })] };
+  const _itPat3 = _buildItemTypesPattern();
+  const matchPieza3 = _itPat3 ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPat3})s?\\b`)) : null;
+  if (matchPieza3) {
+    const tipoD3 = detectarTipoItemDesdeTexto(matchPieza3[2]);
+    return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: tipoD3 ? tipoD3.slug : matchPieza3[2], cantidad: parseInt(matchPieza3[1]), corte: corteStr })] };
+  }
 
   for (const medida of MEDIDAS)
     if (medida.re.test(t))
@@ -689,7 +770,7 @@ function detectarSinTipo(texto) {
   if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
   if (partes.length > 1) return null;
-  if (/\b(tacos?|tortas?)\b/i.test(t)) return null;
+  if (detectarTipoItemDesdeTexto(t)) return null;
   if (MEDIDAS.some(m => m.re.test(t))) return null;
   if (/\b\d+\s*g(?:ramos?)?\b/.test(t)) return null;
   const corte = extraerCorte(texto);
@@ -855,6 +936,7 @@ function separarRefresco(texto) {
 }
 
 module.exports = {
+  // Parsing de pedidos
   parsearPedidoSimple,
   detectarSinCorte,
   detectarSinTipo,
@@ -863,12 +945,17 @@ module.exports = {
   detectarModificacion,
   detectarRepetirPedido,
   calcularScore,
+  // Cortes / variantes de producto
   getCortes,
   getRefrescos,
   detectarRefresco,
   getSalsas,
   detectarSalsa,
   invalidarCacheCortes,
+  // Item types dinámicos (reemplazan el hardcode de taco/torta)
+  detectarTipoItemDesdeTexto,
+  listaItemTypes,
+  // Utilidades de texto
   normalizar,
   separarRefresco,
   textoANumero,

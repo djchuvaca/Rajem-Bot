@@ -4,6 +4,50 @@ async function seedDB() {
   const db = getDB();
 
   // ── CREAR TABLAS ───────────────────────────────────────────────────────────
+  // ── TABLAS DEL CATÁLOGO MULTI-TENANT ──────────────────────────────────────────
+  // Plantillas de tipo de negocio (taquería, pizzería, hamburguesería…)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS business_types (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug        TEXT    UNIQUE NOT NULL,
+      nombre      TEXT    NOT NULL,
+      descripcion TEXT,
+      emoji       TEXT    DEFAULT '🍽️',
+      activo      INTEGER DEFAULT 1
+    )
+  `);
+  // Tipos de ítem por business_type: reemplazan "taco/torta" hardcodeado
+  db.run(`
+    CREATE TABLE IF NOT EXISTS item_types (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_type_id INTEGER NOT NULL REFERENCES business_types(id),
+      slug             TEXT    NOT NULL,
+      nombre           TEXT    NOT NULL,
+      nombre_plural    TEXT    NOT NULL,
+      emoji            TEXT    DEFAULT '🍽️',
+      aliases_json     TEXT    DEFAULT '[]',
+      soporta_gramos   INTEGER DEFAULT 0,
+      soporta_pesos    INTEGER DEFAULT 0,
+      precio_campo     TEXT    DEFAULT 'precio_taco',
+      activo           INTEGER DEFAULT 1,
+      UNIQUE(business_type_id, slug)
+    )
+  `);
+  // Productos-plantilla por business_type (para provisioning de nuevos tenants)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS business_type_products (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_type_id INTEGER NOT NULL REFERENCES business_types(id),
+      nombre           TEXT    NOT NULL,
+      descripcion      TEXT,
+      categoria        TEXT    DEFAULT 'corte',
+      precio_taco      REAL    DEFAULT 30,
+      precio_torta     REAL    DEFAULT 40,
+      precio_100g      REAL    DEFAULT 32,
+      sinonimos        TEXT    DEFAULT ''
+    )
+  `);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS productos (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -461,6 +505,14 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupos_wa_cache', '[]')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('qr_pendiente', '')");
 
+  // ── SEED BUSINESS TYPES ────────────────────────────────────────────────────
+  _seedBusinessTypes(db);
+
+  // Config: business_type_slug (determina qué plantilla NLU usa el bot)
+  // En instalaciones nuevas, usar BUSINESS_TYPE del env si está definido; sino 'taqueria'
+  const _btSlugDefault = (process.env.BUSINESS_TYPE || 'taqueria').trim().toLowerCase();
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('business_type_slug', ?)", [_btSlugDefault]);
+
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -478,6 +530,125 @@ async function seedDB() {
 
   guardarDB();
   console.log("✅ Base de datos lista");
+}
+
+// ── HELPER: SEED BUSINESS TYPES + ITEM TYPES + TEMPLATE PRODUCTS ─────────────
+function _seedBusinessTypes(db) {
+  // ─ Definición de plantillas ───────────────────────────────────────────────
+  const TEMPLATES = [
+    {
+      slug: 'taqueria', nombre: 'Taquería', emoji: '🌮',
+      descripcion: 'Tacos, tortas y venta por gramos de diferentes cortes',
+      itemTypes: [
+        {
+          slug: 'taco', nombre: 'taco', nombre_plural: 'tacos', emoji: '🌮',
+          aliases: ['taquito', 'taquitos', 'tacito', 'tacitos'],
+          soporta_gramos: 1, soporta_pesos: 1, precio_campo: 'precio_taco',
+        },
+        {
+          slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖',
+          aliases: ['sandwich', 'sándwich', 'sándwiches', 'tortas'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
+        },
+      ],
+      products: [
+        { nombre: 'surtido',  categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'surtida,mixto,mixta', descripcion: 'El favorito de la casa. Combinación de todos los cortes: carne, buche, cuero y lengua.' },
+        { nombre: 'carne',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'carnitas,carnita,maciza,masiza', descripcion: 'Espaldilla, pierna y aldilla. Fibra pura, bajo porcentaje de grasa.' },
+        { nombre: 'buche',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'buchito,buchon,buchones', descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
+        { nombre: 'cuero',    categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'cueros,cueritos,cuerito', descripcion: 'Piel del puerco, textura muy suave y delicada.' },
+        { nombre: 'lengua',   categoria: 'corte', precio_taco: 30, precio_torta: 40, precio_100g: 32, sinonimos: 'lenguita,lenguitas', descripcion: 'Textura cremosa, sabor intenso y limpio.' },
+      ],
+    },
+    {
+      slug: 'pizzeria', nombre: 'Pizzería', emoji: '🍕',
+      descripcion: 'Pizzas en diferentes tamaños con variedad de sabores',
+      itemTypes: [
+        {
+          slug: 'pizza_individual', nombre: 'pizza individual', nombre_plural: 'pizzas individuales', emoji: '🍕',
+          aliases: ['individual', 'pizza chica', 'chica', 'pequeña', 'chiquita'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco',
+        },
+        {
+          slug: 'pizza_familiar', nombre: 'pizza familiar', nombre_plural: 'pizzas familiares', emoji: '🍕',
+          aliases: ['familiar', 'pizza grande', 'grande', 'familiar', 'tamaño grande'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
+        },
+      ],
+      products: [
+        { nombre: 'hawaiana',     categoria: 'corte', precio_taco: 120, precio_torta: 200, precio_100g: 0, sinonimos: 'hawaii,piña y jamón,tropical', descripcion: 'Piña fresca y jamón sobre salsa de tomate y queso fundido.' },
+        { nombre: 'pepperoni',    categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0, sinonimos: 'peperoni,peperon', descripcion: 'Rodajas generosas de pepperoni sobre queso mozzarella.' },
+        { nombre: 'mexicana',     categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0, sinonimos: 'con jalapeños,picante,picosa', descripcion: 'Jalapeños, chorizo y cebolla morada. Para los amantes del picante.' },
+        { nombre: 'margarita',    categoria: 'corte', precio_taco: 110, precio_torta: 190, precio_100g: 0, sinonimos: 'margherita,marguerita,queso y jitomate', descripcion: 'La clásica italiana: jitomate fresco, mozzarella y albahaca.' },
+        { nombre: 'cuatro quesos',categoria: 'corte', precio_taco: 140, precio_torta: 240, precio_100g: 0, sinonimos: '4 quesos,quatro quesos,de quesos', descripcion: 'Mezcla de mozzarella, manchego, gouda y parmesano.' },
+      ],
+    },
+    {
+      slug: 'hamburgueseria', nombre: 'Hamburguesería', emoji: '🍔',
+      descripcion: 'Hamburguesas artesanales sencillas y dobles',
+      itemTypes: [
+        {
+          slug: 'hamburguesa_sencilla', nombre: 'hamburguesa sencilla', nombre_plural: 'hamburguesas sencillas', emoji: '🍔',
+          aliases: ['sencilla', 'simple', 'normal', 'sen', 'hamburguesa chica'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_taco',
+        },
+        {
+          slug: 'hamburguesa_doble', nombre: 'hamburguesa doble', nombre_plural: 'hamburguesas dobles', emoji: '🍔',
+          aliases: ['doble', 'double', 'extra', 'hamburguesa grande'],
+          soporta_gramos: 0, soporta_pesos: 0, precio_campo: 'precio_torta',
+        },
+      ],
+      products: [
+        { nombre: 'clásica',   categoria: 'corte', precio_taco: 90,  precio_torta: 130, precio_100g: 0, sinonimos: 'clasica,original,normal,la clasica', descripcion: 'Carne de res, queso americano, lechuga, jitomate y catsup.' },
+        { nombre: 'BBQ',       categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0, sinonimos: 'bbq,barbecue,barbeque,a la parrilla', descripcion: 'Carne de res, salsa BBQ casera, cebolla caramelizada y tocino.' },
+        { nombre: 'chipotle',  categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0, sinonimos: 'chipotl,chipot', descripcion: 'Carne de res, salsa chipotle, jalapeños y queso manchego.' },
+        { nombre: 'crispy',    categoria: 'corte', precio_taco: 95,  precio_torta: 140, precio_100g: 0, sinonimos: 'crujiente,crunchy,pollo crujiente,pollo crispy', descripcion: 'Pechuga de pollo empanizada crujiente con mayonesa de ajo.' },
+        { nombre: 'especial',  categoria: 'corte', precio_taco: 110, precio_torta: 160, precio_100g: 0, sinonimos: 'la especial,la de la casa,de la casa,especial de la casa', descripcion: 'La favorita de la casa: doble carne, tocino, queso derretido y salsa secreta.' },
+      ],
+    },
+  ];
+
+  // ─ Insertar plantillas (idempotente) ─────────────────────────────────────
+  const stmtBT = db.prepare(
+    "INSERT OR IGNORE INTO business_types (slug, nombre, descripcion, emoji) VALUES (?,?,?,?)"
+  );
+  const stmtIT = db.prepare(
+    `INSERT OR IGNORE INTO item_types
+       (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo)
+     VALUES (?,?,?,?,?,?,?,?,?)`
+  );
+  const stmtPT = db.prepare(
+    `INSERT OR IGNORE INTO business_type_products
+       (business_type_id, nombre, descripcion, categoria, precio_taco, precio_torta, precio_100g, sinonimos)
+     VALUES (?,?,?,?,?,?,?,?)`
+  );
+
+  for (const tpl of TEMPLATES) {
+    stmtBT.run(tpl.slug, tpl.nombre, tpl.descripcion, tpl.emoji);
+    const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(tpl.slug);
+    if (!btRow) continue;
+
+    for (const it of tpl.itemTypes) {
+      stmtIT.run(
+        btRow.id, it.slug, it.nombre, it.nombre_plural,
+        it.emoji, JSON.stringify(it.aliases),
+        it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo
+      );
+    }
+
+    for (const prod of tpl.products) {
+      const yaExiste = db.prepare(
+        "SELECT id FROM business_type_products WHERE business_type_id = ? AND nombre = ?"
+      ).get(btRow.id, prod.nombre);
+      if (!yaExiste) {
+        stmtPT.run(
+          btRow.id, prod.nombre, prod.descripcion, prod.categoria,
+          prod.precio_taco, prod.precio_torta, prod.precio_100g, prod.sinonimos
+        );
+      }
+    }
+  }
+
+  console.log("✅ Business types y plantillas de productos registradas");
 }
 
 module.exports = { seedDB };

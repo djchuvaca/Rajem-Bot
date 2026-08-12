@@ -9,7 +9,7 @@ const {
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
 const { getProductos, getConfig } = require("../../db");
-const { textoANumero, getCortes, buscarCorteFuzzy } = require("../pedidoParser");
+const { textoANumero, getCortes, buscarCorteFuzzy, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
 const telefonosReales    = new Map();
@@ -65,7 +65,7 @@ function _textoRecordatorio(numero) {
   }
   if (esperandoTipoItem.has(numero)) {
     const d = esperandoTipoItem.get(numero);
-    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían tacos o tortas?*`;
+    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían ${listaItemTypes()}?*`;
   }
   if (datosCampos.has(numero)) {
     return `${saludo} Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*`;
@@ -189,12 +189,14 @@ function parsearSinCorteItems(texto) {
         if (cf) { corte = cf; break; }
       }
     }
-    const matchPieza = tp.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
-    if (matchPieza) {
-      const pres = /taco/i.test(matchPieza[2]) ? "taco" : "torta";
-      items.push({ presentacion: pres, cantidad: parseInt(matchPieza[1]), corte });
-      ultimoTipo = pres;
-      continue;
+    const tipoDetectado = detectarTipoItemDesdeTexto(parte);
+    if (tipoDetectado) {
+      const matchNum = tp.match(/\b(\d+)\b/);
+      if (matchNum) {
+        items.push({ presentacion: tipoDetectado.slug, cantidad: parseInt(matchNum[1]), corte });
+        ultimoTipo = tipoDetectado.slug;
+        continue;
+      }
     }
     let encontroMedida = false;
     for (const medida of MEDIDAS_ITEMS) {

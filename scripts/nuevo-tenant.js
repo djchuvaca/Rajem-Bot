@@ -2,6 +2,7 @@
 // scripts/nuevo-tenant.js
 // Provisiona una nueva instancia del bot para un tenant distinto.
 // Uso: node scripts/nuevo-tenant.js
+// Flags opcionales: --business-type=pizzeria  (por defecto: taqueria)
 
 const fs       = require("fs");
 const path     = require("path");
@@ -34,6 +35,16 @@ function copiarDir(src, dst) {
   }
 }
 
+// Parsear flags de línea de comandos (--business-type=pizzeria)
+const _cliFlags = {};
+for (const arg of process.argv.slice(2)) {
+  const m = arg.match(/^--([a-z-]+)=(.+)$/);
+  if (m) _cliFlags[m[1]] = m[2];
+}
+
+// Tipos de negocio disponibles
+const BUSINESS_TYPES_DISPONIBLES = ['taqueria', 'pizzeria', 'hamburgueseria'];
+
 async function main() {
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   Provisioning de nuevo tenant — Bot Tacos");
@@ -60,6 +71,14 @@ async function main() {
   const panelSecret = await ask("PANEL_SECRET (cadena aleatoria larga)");
   const negocio   = await ask("Nombre del negocio", tenantId);
 
+  // Tipo de negocio (NLU template)
+  const btDefault = _cliFlags['business-type'] || 'taqueria';
+  if (!BUSINESS_TYPES_DISPONIBLES.includes(btDefault)) {
+    console.warn(`⚠️  Tipo de negocio desconocido: "${btDefault}". Usando "taqueria".`);
+  }
+  const businessType = BUSINESS_TYPES_DISPONIBLES.includes(btDefault) ? btDefault : 'taqueria';
+  console.log(`   Tipo de negocio: ${businessType}`);
+
   rl.close();
 
   // ── Copiar código fuente ──────────────────────────────────────────────────
@@ -82,6 +101,7 @@ async function main() {
     `PANEL_PORT=${panelPort}`,
     `PANEL_SECRET=${panelSecret}`,
     `NOMBRE_NEGOCIO=${negocio}`,
+    `BUSINESS_TYPE=${businessType}`,
   ].join("\n") + "\n";
 
   fs.writeFileSync(path.join(destino, ".env"), envContenido);
@@ -92,6 +112,40 @@ async function main() {
     execSync("npm install --omit=dev", { cwd: destino, stdio: "inherit" });
   } catch (e) {
     console.error("⚠️  npm install falló. Hazlo manualmente dentro de la carpeta del tenant.");
+  }
+
+  // ── Seed inicial + poblar productos desde plantilla ───────────────────────
+  console.log("\n🗄️  Inicializando base de datos y cargando plantilla de productos...");
+  try {
+    const seedScript = `
+      (async () => {
+        require('dotenv').config();
+        const { initDB, run, queryOne } = require('./src/db/core');
+        const { seedDB }                = require('./src/db/seed');
+        const { getTemplateProducts, getBusinessTypeSlug } = require('./src/db');
+        await initDB();
+        await seedDB();
+        // Poblar productos desde la plantilla del business_type activo (si la tabla está vacía)
+        const cnt = queryOne('SELECT COUNT(*) as c FROM productos')?.c || 0;
+        if (cnt > 0) { console.log('Productos ya existen — omitiendo seed de plantilla.'); return; }
+        const slug  = getBusinessTypeSlug();
+        const prods = getTemplateProducts(slug);
+        if (!prods.length) { console.log('Sin productos en plantilla ' + slug); return; }
+        for (const p of prods) {
+          try {
+            run('INSERT OR IGNORE INTO productos (nombre, descripcion, categoria, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?,?)',
+              [p.nombre, p.descripcion, p.categoria, p.precio_taco, p.precio_torta, p.precio_100g, p.sinonimos || '']);
+          } catch(_) {}
+        }
+        console.log('✅ ' + prods.length + ' productos cargados desde la plantilla ' + slug);
+      })().catch(e => { console.error('❌ Error en seed:', e.message); process.exit(1); });
+    `;
+    const tmpScript = path.join(destino, '_seed_init.js');
+    fs.writeFileSync(tmpScript, seedScript);
+    execSync(`node ${tmpScript}`, { cwd: destino, stdio: "inherit" });
+    fs.unlinkSync(tmpScript);
+  } catch (e) {
+    console.error("⚠️  Seed inicial falló:", e.message);
   }
 
   // ── Resultado ─────────────────────────────────────────────────────────────

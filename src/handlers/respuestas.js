@@ -2,7 +2,7 @@
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
-const { getConfig, getMensaje, getProductos, getHorarios, getBanco } = require("../db");
+const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
 
@@ -82,29 +82,65 @@ function respuestaPrecio(producto = null) {
       const nombres = cortes.length
         ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")
         : "Surtido, Carne, Buche, Cuero, Lengua";
+      let lineasPrecios = "";
+      try {
+        const itemTypes = getItemTypes();
+        for (const it of itemTypes) {
+          const campo = it.precio_campo || 'precio_taco';
+          const p     = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+          lineasPrecios += `${it.emoji} *${it.nombre_plural.charAt(0).toUpperCase() + it.nombre_plural.slice(1)}* — $${p} c/u\n`;
+        }
+        if (itemTypes.some(t => t.soporta_gramos)) lineasPrecios += `⚖️ *Por gramos* — $${precios.p100g} / 100g\n`;
+      } catch (_) {
+        lineasPrecios = `🌮 *Tacos* — $${precios.pTaco} c/u\n🥖 *Tortas* — $${precios.pTorta} c/u\n⚖️ *Por gramos* — $${precios.p100g} / 100g\n`;
+      }
       return (
         `💰 *Precios en ${negocio}:*\n\n` +
-        `🌮 *Tacos* — $${precios.pTaco} c/u\n` +
-        `🥖 *Tortas* — $${precios.pTorta} c/u\n` +
-        `⚖️ *Por gramos* — $${precios.p100g} / 100g\n\n` +
-        `🥩 Piezas disponibles: ${nombres}\n\n` +
+        lineasPrecios +
+        `\n🥩 Piezas disponibles: ${nombres}\n\n` +
         notaPrecios
       );
     }
 
     // Precios diferentes por corte — mostrar desglose usando precio efectivo (con fallback global)
     let resp = `💰 *Precios en ${negocio}:*\n\n`;
+    // Construir columnas dinámicamente desde item_types
+    let _itCols = null;
+    try {
+      const its = getItemTypes();
+      if (its.length) _itCols = its;
+    } catch (_) {}
     for (const p of cortes) {
       const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
       const pc = precios.porCorte[p.nombre.toLowerCase()] || precios;
       resp += `🥩 *${nombre}*\n`;
-      resp += `   🌮 $${pc.pTaco} · 🥖 $${pc.pTorta} · ⚖️ $${pc.p100g}/100g\n\n`;
+      if (_itCols) {
+        const partes = _itCols.map(it => {
+          const v = it.precio_campo === 'precio_torta' ? pc.pTorta : pc.pTaco;
+          return `${it.emoji} $${v}`;
+        });
+        const tieneGramos = _itCols.some(it => it.soporta_gramos);
+        if (tieneGramos) partes.push(`⚖️ $${pc.p100g}/100g`);
+        resp += `   ${partes.join(' · ')}\n\n`;
+      } else {
+        resp += `   🌮 $${pc.pTaco} · 🥖 $${pc.pTorta} · ⚖️ $${pc.p100g}/100g\n\n`;
+      }
     }
     const se = productos.find(p => p.nombre === "surtido especial");
     if (se) {
       const sePc = precios.porCorte["surtido especial"] || precios;
       resp += `🌟 *Surtido especial* (combinación a tu gusto)\n`;
-      resp += `   🌮 $${sePc.pTaco} · 🥖 $${sePc.pTorta} · ⚖️ $${sePc.p100g}/100g\n\n`;
+      if (_itCols) {
+        const partes = _itCols.map(it => {
+          const v = it.precio_campo === 'precio_torta' ? sePc.pTorta : sePc.pTaco;
+          return `${it.emoji} $${v}`;
+        });
+        const tieneGramos = _itCols.some(it => it.soporta_gramos);
+        if (tieneGramos) partes.push(`⚖️ $${sePc.p100g}/100g`);
+        resp += `   ${partes.join(' · ')}\n\n`;
+      } else {
+        resp += `   🌮 $${sePc.pTaco} · 🥖 $${sePc.pTorta} · ⚖️ $${sePc.p100g}/100g\n\n`;
+      }
     }
     resp += notaPrecios;
     return resp;
@@ -165,31 +201,50 @@ function respuestaMenu() {
       return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
     });
 
-    let seccionPrecios;
-    if (preciosUniformes) {
-      seccionPrecios =
-        `🌮 *TACOS* — $${precios.pTaco} c/u\n${notaTaco}\n\n` +
-        `🥖 *TORTAS* — $${precios.pTorta} c/u\n${notaTaco}\n\n` +
-        `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`;
-    } else {
-      const minTaco  = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTaco));
-      const minTorta = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTorta));
-      const min100g  = Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).p100g));
-      seccionPrecios =
-        `🌮 *TACOS* — desde $${minTaco} c/u\n` +
-        `🥖 *TORTAS* — desde $${minTorta} c/u\n` +
-        `⚖️ *POR GRAMOS* — desde $${min100g} / 100g\n` +
-        `_(El precio varía por corte — escribe *precios* para ver el desglose)_\n\n`;
+    const itemTypes   = getItemTypes();
+    let seccionPrecios = "";
+    for (const it of itemTypes) {
+      const campo  = it.precio_campo || 'precio_taco';
+      const preKey = campo === 'precio_torta' ? 'pTorta' : 'pTaco';
+      if (preciosUniformes) {
+        const pBase = precios[preKey];
+        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${pBase} c/u\n${notaTaco}\n\n`;
+      } else {
+        const minP = cortes.length
+          ? Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios)[preKey]))
+          : precios[preKey];
+        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — desde $${minP} c/u\n`;
+      }
     }
+    if (!itemTypes.length) {
+      // fallback si no hay item_types configurados
+      seccionPrecios = preciosUniformes
+        ? `🌮 *TACOS* — $${precios.pTaco} c/u\n${notaTaco}\n\n🥖 *TORTAS* — $${precios.pTorta} c/u\n${notaTaco}\n\n`
+        : `🌮 *TACOS* — desde $${Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTaco))} c/u\n🥖 *TORTAS* — desde $${Math.min(...cortes.map(p => (precios.porCorte[p.nombre.toLowerCase()] || precios).pTorta))} c/u\n`;
+    }
+    if (!preciosUniformes && cortes.length) {
+      seccionPrecios += `_(El precio varía por variante — escribe *precios* para ver el desglose)_\n\n`;
+    }
+    const soportaGramos = itemTypes.some(t => t.soporta_gramos);
+    const soportaPesos  = itemTypes.some(t => t.soporta_pesos);
+    if (soportaGramos) {
+      seccionPrecios += preciosUniformes
+        ? `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`
+        : `⚖️ *POR GRAMOS* — desde $${precios.p100g} / 100g\n${notaGramos}\n\n`;
+    }
+    const headerEmoji = itemTypes[0]?.emoji || '🌮';
+    const seccionPesos = soportaPesos ? `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` : "";
+    const tiposNombres = itemTypes.map(t => t.nombre_plural).join(" y ");
+    const notaPieDyn   = getMensaje("menu_pie_salsas") || `🟢 Todos los ${tiposNombres || "tacos y tortas"} incluyen salsas`;
 
     return (
-      `\n🌮 *MENÚ ${negocio.toUpperCase()}* 🌮\n` +
+      `\n${headerEmoji} *MENÚ ${negocio.toUpperCase()}* ${headerEmoji}\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
       seccionPrecios +
-      `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` +
+      seccionPesos +
       `🥩 *Piezas disponibles:* ${nombres}\n\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `${notaPie}\n` +
+      `${notaPieDyn}\n` +
       `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
       `*¿Qué te vamos a preparar?* 😊\n`
     );
@@ -233,9 +288,24 @@ function aplicarQuitarUno(ordenTexto, corteEspecificado = null) {
   const lineas = ordenTexto.split("\n").filter(l => l.trim() && !/subtotal/i.test(l));
   if (!lineas.length) return null;
 
+  // Construir patrón dinámico de nombres de ítem-type (plural y singular)
+  let _itemNombresPat = 'tacos?|tortas?';
+  try {
+    const its = getItemTypes();
+    if (its.length) {
+      const words = [];
+      for (const it of its) {
+        if (it.nombre_plural) words.push(it.nombre_plural.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        if (it.nombre)        words.push(it.nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      }
+      if (words.length) _itemNombresPat = words.sort((a, b) => b.length - a.length).join('|');
+    }
+  } catch (_) {}
+  const _reItem = new RegExp(`(\\d+)\\s+(${_itemNombresPat})`, 'i');
+
   function _reducirLinea(arr, filtroCorte) {
     for (let i = arr.length - 1; i >= 0; i--) {
-      const m = arr[i].match(/(\d+)\s+(tacos?|tortas?)/i);
+      const m = arr[i].match(_reItem);
       if (!m) continue;
       if (filtroCorte && !arr[i].toLowerCase().includes(filtroCorte.toLowerCase())) continue;
       const cantActual = parseInt(m[1]);
@@ -243,7 +313,7 @@ function aplicarQuitarUno(ordenTexto, corteEspecificado = null) {
       if (cantActual <= 1) continue;
       const nuevoQty = cantActual - 1;
       // Actualizar cantidad
-      arr[i] = arr[i].replace(/\d+\s+(tacos?|tortas?)/i, (match) => {
+      arr[i] = arr[i].replace(_reItem, (match) => {
         const partes = match.split(/\s+/);
         return `${nuevoQty} ${partes.slice(1).join(" ")}`;
       });
