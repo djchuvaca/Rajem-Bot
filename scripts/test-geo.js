@@ -18,11 +18,11 @@ const casos = [
   { input: "Col. Los Fresnos",         esperado: "Los Fresnos" },
 
   // ── Parciales legítimas ───────────────────────────────────────────────────────
-  { input: "fresnos infonavit",        esperado: "Los Fresnos INFONAVIT" },
-  { input: "los fresnos infonavit",    esperado: "Los Fresnos INFONAVIT" },
-  { input: "sauces infonavit",         esperado: "Los Sauces INFONAVIT" },
-  { input: "tecolote infonavit",       esperado: "El Tecolote INFONAVIT" },
-  { input: "mirador infonavit",        esperado: "El Mirador INFONAVIT" },
+  { input: "fresnos infonavit",        esperado: "INFONAVIT los Fresnos" },
+  { input: "los fresnos infonavit",    esperado: "INFONAVIT los Fresnos" },
+  { input: "sauces infonavit",         esperado: "INFONAVIT Los Sauces" },
+  { input: "tecolote infonavit",       esperado: "INFONAVIT El Tecolote" },
+  { input: "mirador infonavit",        esperado: "INFONAVIT EL Mirador" },
   { input: "lomas bonitas",            esperado: "Lomas Bonitas" },
   { input: "rincon de san juan",       esperado: "Rincón de San Juan" },
   { input: "brisas de san juan",       esperado: "Brisas de San Juan" },

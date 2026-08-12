@@ -3,7 +3,9 @@ const fs        = require("fs");
 const path      = require("path");
 
 const DATA_DIR = path.join(__dirname, "../../data");
-const DB_PATH  = path.join(DATA_DIR, `${process.env.TENANT_ID || 'tacos_javier'}.db`);
+
+// DB_PATH se resuelve dentro de initDB() para que TENANT_ID pueda setearse antes de la primera llamada
+const _getDbPath = () => path.join(DATA_DIR, `${process.env.TENANT_ID || 'tacos_javier'}.db`);
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -35,7 +37,7 @@ function _makeCompatDB(bsdb) {
 
 async function initDB() {
   if (_bsdb) return _bsdb;
-  _bsdb = new Database(DB_PATH);
+  _bsdb = new Database(_getDbPath());
   // DELETE es más simple para el backup (sin archivos -wal/-shm)
   _bsdb.pragma("journal_mode = DELETE");
   db = _makeCompatDB(_bsdb);

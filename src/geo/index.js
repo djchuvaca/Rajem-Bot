@@ -81,14 +81,33 @@ function buscarColonia(nombre) {
 
   const todas = _colonias();
 
-  // 1. Coincidencia exacta
+  // 1. Coincidencia exacta (normalizada)
   for (const c of todas) {
     if (normalizar(c.nombre) === norm) return c;
   }
 
-  // 2. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos
-  // Umbral 0.5 normal; excepción: si hay exactamente UN candidato con word-boundary
-  // (p.ej. "aztlan" → Aztlán Solidaridad) se devuelve aunque el score sea bajo.
+  // 2. Coincidencia por conjunto de palabras — maneja orden diferente y artículos extra.
+  //    Ej: "fresnos infonavit" encuentra "INFONAVIT los Fresnos".
+  //    Solo aplica cuando el input tiene ≥ 2 palabras significativas (> 2 chars).
+  const inputWords = new Set(norm.split(/\s+/).filter(w => w.length > 2));
+  if (inputWords.size >= 2) {
+    let mejorConj  = null;
+    let mejorScore = 0;
+    let cantConj   = 0;
+    for (const c of todas) {
+      const cnWords = normalizar(c.nombre).split(/\s+/);
+      const cnSet   = new Set(cnWords);
+      if ([...inputWords].every(w => cnSet.has(w))) {
+        cantConj++;
+        const score = inputWords.size / cnWords.length;
+        if (score > mejorScore) { mejorScore = score; mejorConj = c; }
+      }
+    }
+    if (cantConj === 1 || (cantConj > 1 && mejorScore >= 0.7)) return mejorConj;
+  }
+
+  // 3. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos.
+  //    Umbral 0.5 normal; excepción: exactamente UN candidato con word-boundary.
   let mejorMatch = null;
   let mejorPuntaje = 0;
   let candidatos = 0;

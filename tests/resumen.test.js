@@ -1,3 +1,5 @@
+// BD aislada para tests — no usa la BD de producción (que tiene precios del negocio real)
+process.env.TENANT_ID = '_test';
 "use strict";
 // Tests para pedido/resumen.js — procesarItemJSON, jsonALineas, extraerOrdenDeResumen, formatearHora
 

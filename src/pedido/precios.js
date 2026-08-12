@@ -20,9 +20,11 @@ function getPrecios() {
       if (p.categoria === "refresco" || p.categoria === "salsa") continue;
       const key = p.nombre.toLowerCase();
       porCorte[key] = {
-        pTaco:  parseInt(p.precio_taco  || pTaco),
-        pTorta: parseInt(p.precio_torta || pTorta),
-        p100g:  parseInt(p.precio_100g  || p100g),
+        pTaco:   parseInt(p.precio_taco  || pTaco),
+        pTorta:  parseInt(p.precio_torta || pTorta),
+        p100g:   parseInt(p.precio_100g  || p100g),
+        // pTacoBD guarda el valor crudo de BD (0 = sin precio propio; >0 = precio explícito)
+        pTacoBD: p.precio_taco != null ? parseInt(p.precio_taco) : null,
         precios: {},
       };
     }
@@ -68,27 +70,42 @@ function _preciosParaCorte(item, precios) {
  */
 function _precioFormatoDinamico(item, precios) {
   const corteKey = item.corte && item.corte !== 'surtido especial' ? item.corte : null;
-  // Desde tabla cortes (tiene precios_json completo)
-  if (corteKey && precios.porCorte && precios.porCorte[corteKey]) {
-    const pc = precios.porCorte[corteKey];
-    if (pc.precios && pc.precios[item.presentacion] !== undefined) return pc.precios[item.presentacion];
-    return pc.pTaco; // fallback al precio taco del corte
-  }
-  // Desde item_type.precio_base
+
+  // Resolver el precio del item_type (quesadilla, vampiro, burrito, etc.)
+  // Presentaciones desconocidas deben devolver 0, NO pTaco del corte como fallback.
+  let itPrecio = null;
   try {
     const { getItemTypeBySlug } = require("../db");
     const it = getItemTypeBySlug(item.presentacion);
     if (it) {
-      if (it.precio_base) return it.precio_base;
-      return it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+      itPrecio = it.precio_base || (it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
     }
   } catch (_) {}
-  return precios.pTaco;
+
+  // Desde tabla cortes (precios_json puede tener precio específico por formato)
+  if (corteKey && precios.porCorte && precios.porCorte[corteKey]) {
+    const pc = precios.porCorte[corteKey];
+    if (pc.precios && pc.precios[item.presentacion] !== undefined) return pc.precios[item.presentacion];
+    // Usar precio del item_type si existe, sino 0 (presentación desconocida)
+    return itPrecio !== null ? itPrecio : 0;
+  }
+
+  // Desde item_type directamente (sin corte conocido)
+  if (itPrecio !== null) return itPrecio;
+
+  // Presentación completamente desconocida → $0
+  return 0;
 }
 
 function calcularPrecioItem(item, precios) {
   // Ítem mixto con combinacion (mecanismo _aplicarSurtidoEspecial)
   if (item.corte === 'surtido especial' && item.combinacion) {
+    // Si el producto 'surtido especial' tiene precio propio (> 0 en BD), usarlo directamente
+    const pcSE = precios.porCorte && precios.porCorte['surtido especial'];
+    if (pcSE && pcSE.pTacoBD > 0) {
+      return item.cantidad * pcSE.pTaco;
+    }
+    // Sin precio propio → calcular el precio máximo de los cortes componentes
     try {
       const { getCortesBD, calcularPrecioMixto } = require("../db/cortes");
       const mapa = getCortesBD();
