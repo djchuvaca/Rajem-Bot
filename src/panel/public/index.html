@@ -127,6 +127,10 @@ tr:hover td{background:var(--surface2)}
 td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 .fmt-tab-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);white-space:nowrap}
 .fmt-tab-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.fmt-seccion-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;padding:6px 12px;background:var(--surface2);border-radius:6px;display:inline-block}
+.fmt-fila{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;margin-bottom:4px;transition:background .12s,border-color .12s;background:var(--surface2)}
+.fmt-fila.activo{background:var(--accent-dim);border-color:rgba(255,107,43,.22)}
+.fmt-fila:hover{border-color:var(--border2)}
 @media(max-width:900px){#pedidos-table th:nth-child(5),#pedidos-table td:nth-child(5),#pedidos-table th:nth-child(7),#pedidos-table td:nth-child(7),#pedidos-table th:nth-child(9),#pedidos-table td:nth-child(9){display:none}}
 @keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -849,13 +853,13 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 
 <!-- ── MODAL: CONFIGURAR FORMATO ─────────────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-formato">
-  <div class="modal" style="width:520px;max-height:85vh;overflow-y:auto">
+  <div class="modal" style="width:560px;max-height:88vh;overflow-y:auto">
     <div class="modal-title" id="modal-formato-title">Configurar formato</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Marca los cortes disponibles e indica el precio por corte para este formato.</p>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted2);margin-bottom:8px">🥩 Tacos de Asada</div>
-    <div id="fmt-cortes-asada" style="margin-bottom:16px"></div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted2);margin-bottom:8px">🐷 Carnitas</div>
-    <div id="fmt-cortes-carnitas" style="margin-bottom:16px"></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Activa los cortes disponibles y ajusta el precio por corte para este formato. Haz clic en la fila para activar/desactivar.</p>
+    <div class="fmt-seccion-label">🥩 Tacos de Asada</div>
+    <div id="fmt-cortes-asada" style="margin-bottom:20px"></div>
+    <div class="fmt-seccion-label">🐷 Carnitas</div>
+    <div id="fmt-cortes-carnitas" style="margin-bottom:8px"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-formato')">Cancelar</button>
       <button class="btn btn-primary" id="btn-save-formato" onclick="saveFormato()">Guardar</button>
@@ -1818,16 +1822,24 @@ async function openModalFormato(slug, nombrePlural) {
 
   const renderFila = c => {
     const item    = existentes[c.slug];
-    const checked = item ? 'checked' : '';
+    const activo  = !!item;
     const precio  = item ? (item.precio || 0) : (c.precio_base || 0);
-    const dis     = item ? '' : 'opacity:.4;pointer-events:none';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
-      <input type="checkbox" id="fmt-chk-${_esc(c.slug)}" value="${_esc(c.slug)}" ${checked}
-        style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0"
-        onchange="_onFmtCorteToggle(this,'${_esc(c.slug)}')">
-      <label for="fmt-chk-${_esc(c.slug)}" style="flex:1;font-size:13px;cursor:pointer">${_esc(c.nombre)}</label>
-      <input type="number" id="fmt-price-${_esc(c.slug)}" min="0" step="1" value="${precio}"
-        placeholder="$0" style="width:70px;padding:3px 6px;text-align:right;${dis}">
+    return `<div id="fmt-row-${_esc(c.slug)}"
+        class="fmt-fila${activo ? ' activo' : ''}"
+        onclick="_onFmtRowClick('${_esc(c.slug)}')">
+      <input type="checkbox" id="fmt-chk-${_esc(c.slug)}" value="${_esc(c.slug)}" ${activo ? 'checked' : ''}
+        style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;pointer-events:none">
+      <div style="flex:1;min-width:0">
+        <div class="prod-name">${_esc(c.nombre)}</div>
+        ${c.descripcion ? `<div class="prod-desc">${_esc(c.descripcion)}</div>` : ''}
+      </div>
+      <div class="price-pill" id="fmt-pill-${_esc(c.slug)}"
+        style="${activo ? '' : 'opacity:.3;pointer-events:none'}"
+        onclick="event.stopPropagation()">
+        <span class="sym">$</span>
+        <input type="number" id="fmt-price-${_esc(c.slug)}" min="0" step="1" value="${precio}"
+          onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
     </div>`;
   };
 
@@ -1837,11 +1849,19 @@ async function openModalFormato(slug, nombrePlural) {
   document.getElementById('modal-formato').classList.add('show');
 }
 
+function _onFmtRowClick(slug) {
+  const cb = document.getElementById(`fmt-chk-${slug}`);
+  if (cb) { cb.checked = !cb.checked; _onFmtCorteToggle(cb, slug); }
+}
+
 function _onFmtCorteToggle(cb, slug) {
-  const el = document.getElementById(`fmt-price-${slug}`);
-  if (!el) return;
-  el.style.opacity       = cb.checked ? '1' : '.4';
-  el.style.pointerEvents = cb.checked ? '' : 'none';
+  const pill = document.getElementById(`fmt-pill-${slug}`);
+  const row  = document.getElementById(`fmt-row-${slug}`);
+  const on   = cb.checked;
+  if (pill) { pill.style.opacity = on ? '1' : '.3'; pill.style.pointerEvents = on ? '' : 'none'; }
+  if (row)  {
+    row.classList.toggle('activo', on);
+  }
 }
 
 async function saveFormato() {
