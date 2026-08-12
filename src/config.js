@@ -108,16 +108,20 @@ function getMenuFormato() {
       ? itemTypes[0].emoji + " " + itemTypes.map(t => t.nombre_plural.charAt(0).toUpperCase() + t.nombre_plural.slice(1)).join(" / ")
       : "🥩 Piezas";
 
+    const variedadesSeccion = cortes.length > 0 ? `🥩 *Variedades disponibles:* ${nombres}\n\n` : "";
+    const notaDomicilio     = getMensaje("menu_domicilio_nota") ?? "🛵 Domicilio: _precio según distancia a tu colonia_ 📍";
+    const domicilioSeccion  = notaDomicilio ? `${notaDomicilio}\n\n` : "";
+
     return (
       `\n${itemTypes[0]?.emoji || "🍽️"} *MENÚ ${negocio.toUpperCase()}* ${itemTypes[0]?.emoji || "🍽️"}\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
       seccionPrecios +
       seccionPesos +
-      `🥩 *Variedades disponibles:* ${nombres}\n\n` +
+      variedadesSeccion +
       refrescosSeccion +
       salsasSeccion +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `🛵 Domicilio: _precio según distancia a tu colonia_ 📍\n\n` +
+      domicilioSeccion +
       `*¿Qué te vamos a preparar?* 😊\n`
     );
   } catch (e) { return _menuDefault(); }

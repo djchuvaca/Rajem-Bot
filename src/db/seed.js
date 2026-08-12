@@ -226,14 +226,15 @@ async function seedDB() {
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
     // Seed dinámico: los productos vienen del módulo del giro activo, sin hardcoding
+    // activo=0 para que el tenant decida qué mostrar desde el panel
     const productosGiro = _giro?.productos || [];
     for (const p of productosGiro) {
       db.run(
-        "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
         [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']
       );
     }
-    if (productosGiro.length) console.log(`✅ Productos iniciales insertados (${_btSlug})`);
+    if (productosGiro.length) console.log(`✅ Productos iniciales insertados (${_btSlug}) — activo=0, activar desde el panel`);
   } else if (_btSlug === 'taqueria') {
     // 1. Limpiar duplicados por capitalización (conservar el activo con precios reales)
     const _dupes = [
@@ -260,9 +261,9 @@ async function seedDB() {
       const cap = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
       const ya  = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [p.nombre, cap]);
       if (!ya) {
-        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
           [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']);
-        console.log(`✅ Producto nuevo: ${p.nombre}`);
+        console.log(`✅ Producto nuevo: ${p.nombre} (inactivo — activar desde el panel)`);
       }
     }
 
@@ -276,23 +277,24 @@ async function seedDB() {
   }
 
   // ── SEED REFRESCOS (desde módulo de giro) ──────────────────────────────────
+  // activo=0 — el tenant activa desde el panel los refrescos que vende
   for (const r of (_giro?.refrescos || [])) {
-    // Buscar exacto o capitalizado para evitar duplicados por capitalización
     const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
     const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
     if (!ya) {
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
         [r.nombre, r.descripcion || '', r.precio || 0, r.precio || 0, 0, r.sinonimos || '', 'refresco']);
     }
   }
 
   // ── SEED SALSAS (desde módulo de giro) ─────────────────────────────────────
+  // activo=0 — el tenant activa desde el panel las salsas que ofrece
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
   for (const s of (_giro?.salsas || [])) {
     const cap = s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1);
     const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [s.nombre, cap]);
     if (!ya) {
-      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria) VALUES (?,?,?,?,?,?,?)",
+      run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
         [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']);
     } else {
       run("UPDATE productos SET categoria = 'salsa' WHERE (nombre = ? OR nombre = ?) AND (categoria IS NULL OR categoria = '')", [s.nombre, cap]);
@@ -384,7 +386,8 @@ async function seedDB() {
     ["menu_gramos_nota",   "Cualquier pieza o combinación\n_Incluye tortillas y salsas_"],
     ["menu_salsas_nota",   "_(Los tacos y tortas ya incluyen salsas gratis)_"],
     ["menu_por_cantidad",  "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_"],
-    ["menu_pie_salsas",    "🟢 Todos los tacos y tortas incluyen salsas"],
+    ["menu_pie_salsas",       "🟢 Todos los tacos y tortas incluyen salsas"],
+    ["menu_domicilio_nota",   "🛵 Domicilio: _precio según distancia a tu colonia_ 📍"],
   ];
   for (const [clave, valor] of nuevosMsgs) {
     db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
