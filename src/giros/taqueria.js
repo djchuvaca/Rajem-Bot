@@ -14,7 +14,7 @@ module.exports = {
 
   // Config defaults para instalaciones nuevas de este giro
   configDefaults: {
-    tipo_negocio: 'carnitas de puerco',
+    tipo_negocio: '',
     precio_taco:  '30',
     precio_torta: '40',
     precio_100g:  '32',
