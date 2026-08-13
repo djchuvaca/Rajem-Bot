@@ -103,6 +103,40 @@ tr:hover td{background:var(--surface2)}
 .hint{font-size:11px;color:var(--muted);margin-top:4px}
 .msg-var-chip{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-family:'DM Mono',monospace;background:var(--accent-dim);color:var(--accent);cursor:pointer;margin:0 4px 4px 0;border:1px solid rgba(255,107,43,0.25);transition:background .15s;user-select:none}.msg-var-chip:hover{background:rgba(255,107,43,0.22)}
 .msg-separador{border:none;border-top:1px solid var(--border);margin:4px 0 20px}
+/* ── MENSAJES BOT — rediseño UX ── */
+.msgs-page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+.msgs-page-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800}
+.msgs-page-sub{font-size:13px;color:var(--muted);margin-top:4px;max-width:480px;line-height:1.5}
+.msgs-group{margin-bottom:32px}
+.msgs-group-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.msgs-group-icon{font-size:22px}
+.msgs-group-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
+.msgs-group-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.msgs-group-save{margin-left:auto}
+.msg-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;transition:border-color .2s}
+.msg-card:focus-within{border-color:var(--border2)}
+.msg-card-top{padding:13px 15px;background:var(--surface2);display:flex;align-items:center;gap:11px}
+.msg-card-ico{font-size:18px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0}
+.msg-card-name{font-size:13px;font-weight:600}
+.msg-trigger-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;margin-top:3px;white-space:nowrap}
+.msg-card-body{padding:14px 15px}
+.msg-hint-box{font-size:12px;color:var(--muted2);line-height:1.5;background:var(--surface2);border-radius:6px;padding:8px 10px;margin-bottom:12px;border-left:2px solid var(--border2)}
+.msg-vars-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:9px;font-size:11px;color:var(--muted)}
+.msg-textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;line-height:1.65;outline:none;resize:none;overflow:hidden;min-height:76px;transition:border-color .15s;display:block}
+.msg-textarea:focus{border-color:var(--accent)}
+.msg-meta-row{display:flex;align-items:center;justify-content:space-between;margin-top:7px;margin-bottom:12px}
+.msg-char{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+/* WhatsApp preview */
+.wa-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.wa-bar{background:#0e2410;padding:8px 12px;display:flex;align-items:center;gap:8px}
+.wa-bar-dot{width:7px;height:7px;border-radius:50%;background:#25d366}
+.wa-bar-name{font-size:11px;color:#25d366;font-weight:700;letter-spacing:.2px}
+.wa-bar-tag{font-size:10px;color:#4ade80;margin-left:auto;opacity:.7}
+.wa-bg{background:#0b1c0b;padding:14px 12px;min-height:50px}
+.wa-bbl{display:inline-block;background:#1e3320;border-radius:0 10px 10px 10px;padding:8px 12px;max-width:88%;font-size:13px;color:#e8f5e9;line-height:1.55;word-break:break-word;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.wa-bbl::before{content:'';position:absolute;left:-7px;top:0;border:7px solid transparent;border-right-color:#1e3320;border-top:0}
+.wa-bbl b{font-weight:700}.wa-bbl i{font-style:italic}.wa-bbl s{text-decoration:line-through}
+.wa-time{font-size:10px;color:#4ade80;text-align:right;margin-top:4px;opacity:.6}
 .nav-group-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:8px 20px 4px}
 @keyframes badge-pop{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
 .badge-pulso{animation:badge-pop .35s ease-out}
@@ -629,24 +663,14 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 
     <!-- MENSAJES -->
     <div class="section" id="s-mensajes">
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">🤝 Atención al cliente</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Mensajes que el bot envía durante la atención normal de un pedido.</p>
-        <div id="msg-grupo-atencion"></div>
-        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('atencion')">Guardar</button>
+      <div class="msgs-page-header">
+        <div>
+          <div class="msgs-page-title">Mensajes del Bot</div>
+          <div class="msgs-page-sub">Personaliza los textos que tu bot envía a tus clientes por WhatsApp. La vista previa te muestra exactamente cómo verán el mensaje.</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveAllMensajes()">💾 Guardar todo</button>
       </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">🕐 Fuera de horario</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Se envían automáticamente cuando el cliente escribe fuera del horario de servicio.</p>
-        <div id="msg-grupo-horario"></div>
-        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('horario')">Guardar</button>
-      </div>
-      <div class="card">
-        <div class="card-title">📋 Menú</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Textos que complementan el menú cuando el cliente lo solicita.</p>
-        <div id="msg-grupo-menu"></div>
-        <button class="btn btn-primary" style="margin-top:4px" onclick="saveGrupoMensajes('menu')">Guardar</button>
-      </div>
+      <div id="msgs-content"></div>
     </div>
 
     <!-- CONFIG -->
@@ -1980,32 +2004,58 @@ async function saveBanco() {
 }
 
 // ── MENSAJES ──────────────────────────────────────────────────────────────────
+// ── MENSAJES BOT ─────────────────────────────────────────────────────────────
 const MSG_META = {
-  saludo:                { label:'Saludo de bienvenida',              desc:'Se envía cuando el cliente escribe por primera vez o inicia una nueva sesión.',         vars:['{negocio}'] },
-  confirmacion_pedido:   { label:'Confirmación de pedido',            desc:'Se envía cuando el pedido queda registrado y confirmado.',                              vars:['{negocio}'] },
-  cancelacion_enviada:   { label:'Cancelación enviada',               desc:'Se envía cuando el cliente cancela su pedido.',                                         vars:['{negocio}'] },
-  comprobante_recibido:  { label:'Comprobante de pago recibido',      desc:'Se envía cuando el cliente manda foto del comprobante de transferencia.',               vars:['{negocio}'] },
-  fuera_horario_antes:   { label:'Antes de abrir',                    desc:'Se envía cuando el cliente escribe antes de la hora de apertura del día.',              vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
-  fuera_horario_despues: { label:'Después de cerrar',                 desc:'Se envía cuando el cliente escribe después de la hora de cierre.',                      vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
-  fuera_horario_lunes:   { label:'Día de descanso',                   desc:'Se envía cuando el cliente escribe en el día marcado como cerrado en Horarios. Usa {hora_inicio} del día siguiente con servicio.',vars:['{negocio}','{hora_inicio}'] },
-  menu_taco_nota:        { label:'Descripción — tacos y tortas',      desc:'Texto descriptivo que aparece en la sección de tacos y tortas del menú.',               vars:[] },
-  menu_gramos_nota:      { label:'Descripción — por gramos',          desc:'Texto que aparece en la sección de venta por peso (100g).',                            vars:[] },
-  menu_salsas_nota:      { label:'Nota — inicio sección salsas',      desc:'Texto introductorio de la sección de salsas extra en el menú.',                        vars:[] },
-  menu_pie_salsas:       { label:'Pie — sección salsas',              desc:'Texto al pie de la sección de salsas extra. Deja vacío para no mostrar nada.',         vars:[] },
-  menu_nota_precios:     { label:'Nota de precios (pie del menú)',    desc:'Se muestra al final del menú completo.',                                                vars:['{negocio}'] },
-  menu_por_cantidad:     { label:'Descripción — precio por cantidad', desc:'Explica cómo funciona el precio cuando se pide por cantidad en pesos.',                 vars:[] },
-  menu_domicilio_nota:   { label:'Nota de domicilio (pie del menú)',  desc:'Línea sobre domicilio que aparece al final del menú. Deja vacío para ocultarla.',      vars:[] },
+  saludo:                { icon:'👋', label:'Saludo de bienvenida',          trigger:'Primer mensaje del cliente',              hint:'Preséntate, menciona el negocio y pregunta si el pedido es para domicilio o mostrador.',                        vars:['{negocio}'] },
+  confirmacion_pedido:   { icon:'✅', label:'Confirmación de pedido',        trigger:'Al registrar el pedido',                  hint:'Tranquiliza al cliente: su pedido llegó y el equipo lo revisará en breve.',                                    vars:['{negocio}'] },
+  cancelacion_enviada:   { icon:'❌', label:'Cancelación recibida',          trigger:'Al solicitar cancelar',                   hint:'Sé empático. Confirma que la solicitud fue recibida y que el equipo se comunicará.',                            vars:['{negocio}'] },
+  comprobante_recibido:  { icon:'📸', label:'Comprobante recibido',          trigger:'Al enviar foto de transferencia',          hint:'Confirma que recibiste la foto del comprobante y que están verificando el pago.',                              vars:['{negocio}'] },
+  fuera_horario_antes:   { icon:'🌅', label:'Antes de abrir',                trigger:'Escribe antes de la hora de apertura',    hint:'Informa a qué hora abren hoy y ofrece tomar un pedido en preventa.',                                          vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
+  fuera_horario_despues: { icon:'🌙', label:'Después de cerrar',             trigger:'Escribe después de la hora de cierre',    hint:'Informa cuándo abren mañana y ofrece la opción de hacer un pedido en preventa.',                               vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
+  fuera_horario_lunes:   { icon:'😴', label:'Día de descanso',               trigger:'Escribe en el día de cierre semanal',     hint:'Explica que es el día de descanso y cuándo retoman el servicio. El día de cierre se configura en Horarios.',    vars:['{negocio}','{hora_inicio}'] },
+  menu_taco_nota:        { icon:'🌮', label:'Texto bajo tacos y tortas',     trigger:'Aparece en el menú',                      hint:'Ejemplo: "combinaciones al gusto" o "incluyen tortillas y salsas de la casa".',                                 vars:[] },
+  menu_gramos_nota:      { icon:'⚖️', label:'Texto bajo venta por gramos',  trigger:'Aparece en el menú',                      hint:'Aparece cuando el negocio vende por peso. Ejemplo: "Incluye tortillas y salsas".',                               vars:[] },
+  menu_salsas_nota:      { icon:'🌶️', label:'Nota en sección de salsas',   trigger:'Aparece en el menú',                      hint:'Aparece al inicio de la lista de salsas extra. Ejemplo: "Los tacos ya incluyen salsas gratis".',                 vars:[] },
+  menu_pie_salsas:       { icon:'📝', label:'Nota al pie de salsas',        trigger:'Aparece en el menú',                      hint:'Opcional. Línea extra al final de la sección de salsas. Deja vacío para no mostrarla.',                         vars:[] },
+  menu_nota_precios:     { icon:'💬', label:'Nota al pie del menú',         trigger:'Al final del menú completo',              hint:'Cierre del menú. Ejemplo: "Los precios incluyen tortillas y salsas 😊".',                                       vars:['{negocio}'] },
+  menu_por_cantidad:     { icon:'💵', label:'Texto de precio por cantidad',  trigger:'Aparece en el menú',                      hint:'Explica la opción de pedir por monto en pesos. Ejemplo: "Tú decides cuánto gastar, nosotros pesamos".',          vars:[] },
+  menu_domicilio_nota:   { icon:'🛵', label:'Nota de domicilio en menú',    trigger:'Al final del menú',                       hint:'Línea sobre el servicio a domicilio. Deja vacío para ocultarla del menú.',                                       vars:[] },
 };
 
-const GRUPOS_MENSAJES = {
-  atencion: ['saludo','confirmacion_pedido','cancelacion_enviada','comprobante_recibido'],
-  horario:  ['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'],
-  menu:     ['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad','menu_domicilio_nota'],
-};
+const GRUPOS_CONFIG = [
+  { id:'atencion', icon:'🤝', title:'Durante el pedido',   sub:'Mensajes que el bot envía mientras atiende un pedido',                    color:'var(--blue)',   colorBg:'rgba(59,130,246,0.1)',  claves:['saludo','confirmacion_pedido','cancelacion_enviada','comprobante_recibido'] },
+  { id:'horario',  icon:'🕐', title:'Fuera de horario',    sub:'Se activan cuando el cliente escribe fuera del horario de atención',       color:'var(--yellow)', colorBg:'rgba(245,158,11,0.1)', claves:['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'] },
+  { id:'menu',     icon:'📋', title:'Menú del negocio',    sub:'Textos que aparecen dentro del menú cuando el cliente lo solicita',        color:'var(--green)',  colorBg:'rgba(34,197,94,0.1)',  claves:['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad','menu_domicilio_nota'] },
+];
+
+// Derivado para saveGrupoMensajes
+const GRUPOS_MENSAJES = Object.fromEntries(GRUPOS_CONFIG.map(g => [g.id, g.claves]));
+
+function _waFormat(text) {
+  if (!text || !text.trim()) return '<span style="opacity:.35;font-style:italic">El mensaje aparecerá aquí...</span>';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\{negocio\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">Tu Negocio</span>')
+    .replace(/\{hora_inicio\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">8:00 a.m.</span>')
+    .replace(/\{hora_fin\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">12:30 p.m.</span>')
+    .replace(/\*([^*\n]+)\*/g,'<b>$1</b>')
+    .replace(/_([^_\n]+)_/g,'<i>$1</i>')
+    .replace(/~([^~\n]+)~/g,'<s>$1</s>')
+    .replace(/\n/g,'<br>');
+}
 
 function autoResizeMsg(el) {
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
+}
+
+function updateWaPreview(clave) {
+  const ta = document.getElementById(`msg-${clave}`);
+  const pr = document.getElementById(`waprev-${clave}`);
+  const cc = document.getElementById(`charcount-${clave}`);
+  if (!ta || !pr) return;
+  pr.innerHTML = _waFormat(ta.value);
+  if (cc) cc.textContent = ta.value.length + ' caracteres';
 }
 
 function insertarVariable(id, variable) {
@@ -2016,40 +2066,84 @@ function insertarVariable(id, variable) {
   el.selectionStart = el.selectionEnd = s + variable.length;
   el.focus();
   autoResizeMsg(el);
+  // Extraer clave del id (msg-{clave})
+  updateWaPreview(id.replace(/^msg-/, ''));
 }
 
-function renderMsgGrupo(containerId, claves, map) {
-  document.getElementById(containerId).innerHTML = claves.map((clave, i) => {
-    const meta  = MSG_META[clave] || { label: clave, desc: '', vars: [] };
-    const valor = (map[clave] || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const chips = meta.vars.map(v =>
-      `<span class="msg-var-chip" onclick="insertarVariable('msg-${clave}','${v}')">${v}</span>`
-    ).join('');
-    return `${i > 0 ? '<hr class="msg-separador">' : ''}
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">${meta.label}</label>
-        ${meta.desc ? `<p style="font-size:11px;color:var(--muted);margin:2px 0 6px">${meta.desc}</p>` : ''}
-        ${chips ? `<div style="margin-bottom:8px">${chips}</div>` : ''}
-        <textarea class="form-textarea" id="msg-${clave}" oninput="autoResizeMsg(this)" style="min-height:70px;resize:none;overflow:hidden">${valor}</textarea>
-      </div>`;
-  }).join('');
+function _renderMsgCard(clave, valor, color, colorBg) {
+  const meta  = MSG_META[clave] || { icon:'💬', label:clave, trigger:'', hint:'', vars:[] };
+  const esc   = (valor||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const chips = meta.vars.map(v =>
+    `<span class="msg-var-chip" onclick="insertarVariable('msg-${clave}','${v}')" title="Clic para insertar donde está el cursor">${v}</span>`
+  ).join('');
+  return `<div class="msg-card">
+    <div class="msg-card-top">
+      <div class="msg-card-ico" style="background:${colorBg};color:${color}">${meta.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="msg-card-name">${meta.label}</div>
+        ${meta.trigger ? `<div><span class="msg-trigger-pill" style="background:${colorBg};color:${color}">⚡ ${meta.trigger}</span></div>` : ''}
+      </div>
+    </div>
+    <div class="msg-card-body">
+      ${meta.hint ? `<div class="msg-hint-box">💡 ${meta.hint}</div>` : ''}
+      ${chips ? `<div class="msg-vars-row">Insertar dato automático: ${chips}</div>` : ''}
+      <textarea class="msg-textarea" id="msg-${clave}"
+        oninput="autoResizeMsg(this);updateWaPreview('${clave}')"
+        placeholder="Escribe el mensaje aquí…"
+      >${esc}</textarea>
+      <div class="msg-meta-row">
+        <span class="msg-char" id="charcount-${clave}">${(valor||'').length} caracteres</span>
+      </div>
+      <div class="wa-wrap">
+        <div class="wa-bar">
+          <div class="wa-bar-dot"></div>
+          <span class="wa-bar-name">Bot</span>
+          <span class="wa-bar-tag">Vista previa en WhatsApp</span>
+        </div>
+        <div class="wa-bg">
+          <div class="wa-bbl" id="waprev-${clave}">${_waFormat(valor||'')}</div>
+          <div class="wa-time">ahora ✓✓</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderAllMensajes(map) {
+  document.getElementById('msgs-content').innerHTML = GRUPOS_CONFIG.map(g => `
+    <div class="msgs-group">
+      <div class="msgs-group-header">
+        <span class="msgs-group-icon">${g.icon}</span>
+        <div>
+          <div class="msgs-group-title">${g.title}</div>
+          <div class="msgs-group-sub">${g.sub}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm msgs-group-save" onclick="saveGrupoMensajes('${g.id}')">Guardar grupo</button>
+      </div>
+      ${g.claves.map(c => _renderMsgCard(c, map[c]||'', g.color, g.colorBg)).join('')}
+    </div>
+  `).join('');
+  document.querySelectorAll('.msg-textarea').forEach(autoResizeMsg);
 }
 
 async function loadMensajes() {
   const msgs = await api('/api/mensajes');
   const map  = Object.fromEntries(msgs.map(m => [m.clave, m.valor]));
-  renderMsgGrupo('msg-grupo-atencion', GRUPOS_MENSAJES.atencion, map);
-  renderMsgGrupo('msg-grupo-horario',  GRUPOS_MENSAJES.horario,  map);
-  renderMsgGrupo('msg-grupo-menu',     GRUPOS_MENSAJES.menu,     map);
-  document.querySelectorAll('#s-mensajes .form-textarea').forEach(autoResizeMsg);
+  renderAllMensajes(map);
 }
 
-async function saveGrupoMensajes(grupo) {
-  for (const clave of GRUPOS_MENSAJES[grupo]) {
+async function saveGrupoMensajes(grupoId) {
+  const claves = GRUPOS_MENSAJES[grupoId] || [];
+  for (const clave of claves) {
     const el = document.getElementById(`msg-${clave}`);
     if (el) await api('/api/mensajes', 'POST', { clave, valor: el.value });
   }
   toast('Mensajes guardados ✅');
+}
+
+async function saveAllMensajes() {
+  for (const g of GRUPOS_CONFIG) await saveGrupoMensajes(g.id);
+  toast('Todos los mensajes guardados ✅');
 }
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
