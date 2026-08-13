@@ -8,7 +8,7 @@ const assert = require("node:assert/strict");
 const { initDB } = require("../src/db/core");
 const { seedDB } = require("../src/db/seed");
 const { run }    = require("../src/db/core");
-const { estaEnHorario, getRangoHorario } = require("../src/horario");
+const { estaEnHorario, getRangoHorario, mensajeFueraDeHorario } = require("../src/horario");
 const { validarHora }                    = require("../src/handlers/flujos/utils");
 
 before(async () => {
@@ -135,5 +135,75 @@ describe("validarHora", () => {
   test("rechaza '13:00' (fuera de rango)", () => {
     const r = validarHora("1pm");
     assert.equal(r, null);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// mensajeFueraDeHorario() — mensajes configurables desde mensajes_bot
+// ═══════════════════════════════════════════════════════════════════════════
+describe("mensajeFueraDeHorario — mensajes configurables", () => {
+  const DIA_HOY = new Date().getDay();
+
+  test("retorna string no vacío siempre", () => {
+    const r = mensajeFueraDeHorario();
+    assert.ok(typeof r === "string" && r.length > 0);
+  });
+
+  test("fuera_horario_lunes: no contiene 'lunes' ni 'martes' hardcodeados (default genérico)", () => {
+    // Marcar hoy como día cerrado para activar el mensaje de descanso
+    run(`UPDATE horarios SET abierto = 0 WHERE dia = ${DIA_HOY}`);
+    try {
+      const r = mensajeFueraDeHorario();
+      // El default nuevo NO debe hardcodear "lunes" o "martes"
+      assert.doesNotMatch(r, /\blos lunes\b/i);
+      assert.doesNotMatch(r, /\bel martes\b/i);
+      // Pero sí debe ser un mensaje coherente de descanso
+      assert.match(r, /descanso|fuera de servicio|descansamos/i);
+    } finally {
+      run(`UPDATE horarios SET abierto = 1 WHERE dia = ${DIA_HOY}`);
+    }
+  });
+
+  test("fuera_horario_lunes: interpola {hora_inicio} con la hora del siguiente día abierto", () => {
+    run(`UPDATE horarios SET abierto = 0 WHERE dia = ${DIA_HOY}`);
+    // Asegurar que el mensaje contiene la variable para poder verificar interpolación
+    run("UPDATE mensajes_bot SET valor = 'Hoy descansamos. Abrimos mañana a las {hora_inicio}.' WHERE clave = 'fuera_horario_lunes'");
+    try {
+      const r = mensajeFueraDeHorario();
+      // {hora_inicio} debe haberse reemplazado — no puede quedar el placeholder
+      assert.doesNotMatch(r, /\{hora_inicio\}/);
+      // Debe contener una hora en formato HH:MM
+      assert.match(r, /\d{1,2}:\d{2}/);
+    } finally {
+      run(`UPDATE horarios SET abierto = 1 WHERE dia = ${DIA_HOY}`);
+      run("UPDATE mensajes_bot SET valor = '⏰ Por el momento nos encontramos fuera de servicio.\nHoy es nuestro día de descanso 😴\n\nRetomamos el servicio mañana a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?' WHERE clave = 'fuera_horario_lunes'");
+    }
+  });
+
+  test("fuera_horario_lunes: texto personalizado desde BD se respeta", () => {
+    run(`UPDATE horarios SET abierto = 0 WHERE dia = ${DIA_HOY}`);
+    run("UPDATE mensajes_bot SET valor = 'Hoy no atendemos. Nos vemos mañana 🌮' WHERE clave = 'fuera_horario_lunes'");
+    try {
+      const r = mensajeFueraDeHorario();
+      assert.match(r, /Hoy no atendemos/);
+    } finally {
+      run(`UPDATE horarios SET abierto = 1 WHERE dia = ${DIA_HOY}`);
+      run("UPDATE mensajes_bot SET valor = '⏰ Por el momento nos encontramos fuera de servicio.\nHoy es nuestro día de descanso 😴\n\nRetomamos el servicio mañana a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?' WHERE clave = 'fuera_horario_lunes'");
+    }
+  });
+
+  test("fuera_horario_antes: contiene la hora de apertura del día", () => {
+    // Poner apertura 3h en el futuro para garantizar que "ahora" es antes
+    const ahora  = new Date();
+    const hFutura = `${String((ahora.getHours() + 3) % 24).padStart(2, "0")}:00`;
+    run(`UPDATE horarios SET abierto = 1, hora_inicio = '${hFutura}', hora_fin = '23:59' WHERE dia = ${DIA_HOY}`);
+    try {
+      const r = mensajeFueraDeHorario();
+      assert.doesNotMatch(r, /\{hora_inicio\}/);
+      // Debe mencionar la hora configurada
+      assert.match(r, new RegExp(hFutura.replace(":", ":")));
+    } finally {
+      run(`UPDATE horarios SET hora_inicio = '07:00', hora_fin = '12:30' WHERE dia = ${DIA_HOY}`);
+    }
   });
 });

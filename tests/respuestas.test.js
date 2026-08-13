@@ -332,3 +332,65 @@ describe("respuestaMenu filtrado", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// mensajes_bot — menu_pie_salsas en respuestaMenu
+// ═══════════════════════════════════════════════════════════════════════════
+describe("menu_pie_salsas en respuestaMenu", () => {
+  test("aparece en el menú cuando hay salsas y el mensaje está configurado", () => {
+    run("INSERT OR IGNORE INTO productos (nombre, categoria, activo, precio_taco, precio_torta, precio_100g) VALUES ('roja', 'salsa', 1, 0, 0, 0)");
+    run("UPDATE mensajes_bot SET valor = '🟢 Salsas incluidas en tacos y tortas' WHERE clave = 'menu_pie_salsas'");
+    invalidarCacheCortes();
+    try {
+      const r = respuestaMenu();
+      assert.match(r, /🟢 Salsas incluidas en tacos y tortas/);
+    } finally {
+      run("DELETE FROM productos WHERE nombre = 'roja'");
+      run("UPDATE mensajes_bot SET valor = '🟢 Todos los tacos y tortas incluyen salsas' WHERE clave = 'menu_pie_salsas'");
+      invalidarCacheCortes();
+    }
+  });
+
+  test("NO aparece cuando el mensaje está vacío", () => {
+    run("INSERT OR IGNORE INTO productos (nombre, categoria, activo, precio_taco, precio_torta, precio_100g) VALUES ('verde', 'salsa', 1, 0, 0, 0)");
+    run("UPDATE mensajes_bot SET valor = '' WHERE clave = 'menu_pie_salsas'");
+    invalidarCacheCortes();
+    try {
+      const r = respuestaMenu();
+      // La sección de salsas sí aparece (hay una salsa activa)
+      assert.match(r, /SALSAS/i);
+      // Pero el pie no debe dejar una línea en blanco extra visible
+      assert.doesNotMatch(r, /\n\n\n/);
+    } finally {
+      run("DELETE FROM productos WHERE nombre = 'verde'");
+      run("UPDATE mensajes_bot SET valor = '🟢 Todos los tacos y tortas incluyen salsas' WHERE clave = 'menu_pie_salsas'");
+      invalidarCacheCortes();
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// mensajes_bot — menu_domicilio_nota en respuestaMenu
+// ═══════════════════════════════════════════════════════════════════════════
+describe("menu_domicilio_nota en respuestaMenu", () => {
+  test("aparece en el menú cuando está configurada", () => {
+    run("UPDATE mensajes_bot SET valor = '🛵 Domicilio disponible en toda la ciudad' WHERE clave = 'menu_domicilio_nota'");
+    try {
+      const r = respuestaMenu();
+      assert.match(r, /Domicilio disponible en toda la ciudad/);
+    } finally {
+      run("UPDATE mensajes_bot SET valor = '🛵 Domicilio: _precio según distancia a tu colonia_ 📍' WHERE clave = 'menu_domicilio_nota'");
+    }
+  });
+
+  test("NO aparece cuando se deja vacía (tenant la ocultó)", () => {
+    run("UPDATE mensajes_bot SET valor = '' WHERE clave = 'menu_domicilio_nota'");
+    try {
+      const r = respuestaMenu();
+      // No debe aparecer texto de domicilio en el menú
+      assert.doesNotMatch(r, /Domicilio/i);
+    } finally {
+      run("UPDATE mensajes_bot SET valor = '🛵 Domicilio: _precio según distancia a tu colonia_ 📍' WHERE clave = 'menu_domicilio_nota'");
+    }
+  });
+});
