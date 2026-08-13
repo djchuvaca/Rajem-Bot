@@ -2451,6 +2451,12 @@ function wizardOpen() {
   document.getElementById('wizard-overlay').style.display = 'flex';
   _wzRenderProgress();
   _wzRenderStep(0);
+  // Pre-cargar nombre actual (solo lectura) para que el tenant lo vea
+  api('/api/config').then(cfg => {
+    const nombre = cfg.nombre_negocio || '';
+    const el = document.getElementById('wz-nombre');
+    if (el) el.value = nombre;
+  }).catch(() => {});
 }
 
 function _wzRenderProgress() {
