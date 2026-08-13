@@ -1443,10 +1443,6 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
       return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
     })
     .map(c => c.nombre);
-  for (const k of Object.keys(fallback)) {
-    if (new RegExp(`\\b${k}\\b`, 'i').test(tNorm) && !cortesActivos[normalizar(k)])
-      cortesNoDispNombres.push(k);
-  }
 
   const pedidoParcial = parsearSinCorteItems(textoLimpio);
 
