@@ -32,7 +32,12 @@ const _loginAttempts = new Map();
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    // Stripe requiere rawBody para verificar la firma HMAC del webhook
+    if (req.path === '/webhook/stripe') req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 if (!process.env.PANEL_SECRET) {
   console.warn("[SEGURIDAD] PANEL_SECRET no está definido en .env — usando secreto por defecto (INSEGURO en producción)");
@@ -440,52 +445,79 @@ app.get("/api/stats/historico", requireAuth, requireFeature('reportes_avanzados'
   res.json(filas);
 });
 
+// ── HELPER: NOTIFICACIÓN WA TRAS PAGO CONFIRMADO ─────────────────────────────
+async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
+  const waClient = getWhatsappClient();
+  if (!waClient) return;
+  if (resultado.jid) {
+    try {
+      await waClient.sendMessage(resultado.jid,
+        `✅ *¡Pago confirmado!*\n\nTu pedido está en proceso 🌮🔥\nEn breve te avisamos cuando esté listo. ¡Gracias por tu preferencia! 😊`
+      );
+    } catch (_) {}
+  }
+  const notifJID = getNotifDestinoJID();
+  if (notifJID && resultado.resumen) {
+    try {
+      const nombre = resultado.nombre || resultado.telefono || 'Cliente';
+      await waClient.sendMessage(notifJID,
+        `✅ *PAGO CONFIRMADO — ${proveedor}*\n\n👤 ${nombre}\n📦 Pedido #${resultado.pedidoId}\n\n${resultado.resumen}`
+      );
+    } catch (_) {}
+  }
+}
+
 // ── WEBHOOK MERCADOPAGO (público) ─────────────────────────────────────────────
 app.post("/webhook/mercadopago", async (req, res) => {
-  res.sendStatus(200); // responder inmediato para que MP no reintente
-
+  res.sendStatus(200);
   const { type, data } = req.body || {};
   if (type !== "payment" || !data?.id) return;
-
   try {
     const resultado = await mpPagos.procesarPago(data.id);
     if (!resultado?.aprobado) return;
-
-    // Actualizar estado en BD
     try { actualizarEstadoPorId(resultado.pedidoId, "confirmado"); } catch (_) {}
-
-    // Limpiar estado de espera de pago en memoria
-    if (resultado.jid) {
-      try { require("../estado").esperandoPagoMP.delete(resultado.jid); } catch (_) {}
-    }
-
-    const waClient = getWhatsappClient();
-    if (!waClient) return;
-
-    // Notificar al cliente
-    if (resultado.jid) {
-      try {
-        await waClient.sendMessage(resultado.jid,
-          `✅ *¡Pago confirmado!*\n\nTu pedido está en proceso 🌮🔥\nEn breve te avisamos cuando esté listo. ¡Gracias por tu preferencia! 😊`
-        );
-      } catch (_) {}
-    }
-
-    // Notificar al destino configurado
-    const notifJID = getNotifDestinoJID();
-    if (notifJID && resultado.resumen) {
-      try {
-        const nombre = resultado.nombre || resultado.telefono || "Cliente";
-        await waClient.sendMessage(notifJID,
-          `✅ *PAGO CONFIRMADO — MercadoPago*\n\n` +
-          `👤 ${nombre}\n` +
-          `📦 Pedido #${resultado.pedidoId}\n\n` +
-          `${resultado.resumen}`
-        );
-      } catch (_) {}
-    }
+    if (resultado.jid) { try { require("../estado").esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
+    await _notificarPagoConfirmado(resultado, 'MercadoPago');
   } catch (e) {
     console.error("[Webhook MP] Error:", e.message);
+  }
+});
+
+// ── WEBHOOK STRIPE (público) ──────────────────────────────────────────────────
+app.post("/webhook/stripe", async (req, res) => {
+  res.sendStatus(200);
+  const firma = req.headers['stripe-signature'];
+  if (!firma || !req.rawBody) return;
+  try {
+    const stripeDriver = require('../pagos/stripe');
+    const event = stripeDriver.verificarWebhookEvento(req.rawBody, firma);
+    if (!event || event.type !== 'checkout.session.completed') return;
+    const session = event.data.object;
+    if (session.payment_status !== 'paid') return;
+    const resultado = await stripeDriver.procesarPago(session.id);
+    if (!resultado?.aprobado) return;
+    try { actualizarEstadoPorId(parseInt(resultado.pedidoId), 'confirmado'); } catch (_) {}
+    if (resultado.jid) { try { require('../estado').esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
+    await _notificarPagoConfirmado(resultado, 'Stripe');
+  } catch (e) {
+    console.error('[Webhook Stripe] Error:', e.message);
+  }
+});
+
+// ── WEBHOOK CONEKTA (público) ─────────────────────────────────────────────────
+app.post("/webhook/conekta", async (req, res) => {
+  res.sendStatus(200);
+  const { type, data } = req.body || {};
+  if (type !== 'order.paid' || !data?.object?.id) return;
+  try {
+    const conektaDriver = require('../pagos/conekta');
+    const resultado = await conektaDriver.procesarPago(data.object.id);
+    if (!resultado?.aprobado) return;
+    try { actualizarEstadoPorId(parseInt(resultado.pedidoId), 'confirmado'); } catch (_) {}
+    if (resultado.jid) { try { require('../estado').esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
+    await _notificarPagoConfirmado(resultado, 'Conekta');
+  } catch (e) {
+    console.error('[Webhook Conekta] Error:', e.message);
   }
 });
 

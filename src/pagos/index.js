@@ -7,6 +7,8 @@ const { getPasarelaActiva } = require('../db/config');
 function _getDriver() {
   switch (getPasarelaActiva()) {
     case 'mercadopago': return require('./mercadopago');
+    case 'stripe':      return require('./stripe');
+    case 'conekta':     return require('./conekta');
     default:            return null;
   }
 }

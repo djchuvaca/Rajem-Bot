@@ -206,7 +206,7 @@ Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
 |  3   | Formalizar `geo/` como servicio de plataforma — solicitudes geo (tenant→superadmin), seed ciudad-agnóstico, aliases en `buscarColonia()`, 31 tests unitarios                 | Multi-ciudad                  | ✅ Fase 3 completa      |
 |  4   | Feature flags por plan — `src/features/index.js` (PLANES: basico/plus/pro), `plan_activo` en BD tenant, `requireFeature()` en API del panel, gates UI con badge + banners de upgrade, endpoints superadmin `GET/PUT /api/tenants/:id/plan` | Modelo de negocio real | ✅ Fase 4 completa |
 |  5   | Implementar hamburguesería como segundo giro activo (NLU stubs ya existen en `src/giros/hamburgueseria/nlu.js`)                                                               | Valida la abstracción         | Pendiente               |
-|  6   | `pagos/` abstracción + Stripe/Conekta para plan Plus                                                                                                                          | Plan Plus completo            | Pendiente               |
+|  6   | Drivers Stripe (`src/pagos/stripe.js`) y Conekta (`src/pagos/conekta.js`); webhooks `/webhook/stripe` y `/webhook/conekta`; superadmin UI de credenciales; `_notificarPagoConfirmado()` helper compartido | Plan Plus completo | ✅ Fase 6 completa |
 |  7   | `reparto/` + `asistente-ia/`                                                                                                                                                  | Plan Pro                      | Pendiente               |
 
 ## Repo

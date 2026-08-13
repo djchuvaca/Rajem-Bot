@@ -298,8 +298,8 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
             <select id="tc-pasarela" onchange="renderPasarelaFields()">
               <option value="">Sin pasarela</option>
               <option value="mercadopago">MercadoPago</option>
-              <option value="stripe">Stripe (próximamente)</option>
-              <option value="conekta">Conekta (próximamente)</option>
+              <option value="stripe">Stripe</option>
+              <option value="conekta">Conekta</option>
             </select>
           </div>
           <div id="tc-pasarela-fields"></div>
@@ -323,12 +323,14 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <div class="chip">México</div><div class="chip">Argentina</div><div class="chip">Colombia</div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Stripe</div><span class="badge badge-gray">Próximamente</span></div>
-          <p style="font-size:12px;color:var(--muted)">Payment Links y Checkout Session. Cobertura global.</p>
+          <div class="card-header"><div class="card-title">Stripe</div><span class="badge badge-green">Disponible</span></div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Checkout Sessions. Requiere secret key y webhook secret. Cobertura global.</p>
+          <div class="chip">Global</div><div class="chip">MXN</div><div class="chip">Tarjeta</div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Conekta</div><span class="badge badge-gray">Próximamente</span></div>
-          <p style="font-size:12px;color:var(--muted)">Especializada en México. OXXO Pay, tarjetas.</p>
+          <div class="card-header"><div class="card-title">Conekta</div><span class="badge badge-green">Disponible</span></div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Especializada en México. Requiere private key. OXXO Pay, tarjetas, SPEI.</p>
+          <div class="chip">México</div><div class="chip">OXXO</div><div class="chip">SPEI</div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">OpenPay</div><span class="badge badge-gray">Próximamente</span></div>
@@ -988,8 +990,19 @@ function renderPasarelaFields() {
   let cfg={};
   try{ cfg=JSON.parse(_tcConfig.pasarela_config||'{}'); }catch(_){}
   const el=document.getElementById('tc-pasarela-fields');
+  const toggleBtn=(id)=>`<button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="const e=document.getElementById('${id}');e.type=e.type==='password'?'text':'password'">👁</button>`;
+  const baseUrl=(window.location.origin||'').replace(/:3001$/,'');
   if(p==='mercadopago'){
-    el.innerHTML=`<div class="form-group"><label>Access Token (APP_USR-…)</label><input id="tc-mp-token" type="password" value="${cfg.access_token||''}"><button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="document.getElementById('tc-mp-token').type=document.getElementById('tc-mp-token').type==='password'?'text':'password'">👁</button></div>`;
+    el.innerHTML=`<div class="form-group"><label>Access Token (APP_USR-…)</label><input id="tc-mp-token" type="password" value="${cfg.access_token||''}">${toggleBtn('tc-mp-token')}</div>`;
+  } else if(p==='stripe'){
+    el.innerHTML=`
+      <div class="form-group"><label>Secret Key (sk_live_… / sk_test_…)</label><input id="tc-stripe-key" type="password" value="${cfg.secret_key||''}">${toggleBtn('tc-stripe-key')}</div>
+      <div class="form-group"><label>Webhook Secret (whsec_…)</label><input id="tc-stripe-wsecret" type="password" value="${cfg.webhook_secret||''}">${toggleBtn('tc-stripe-wsecret')}</div>
+      <small style="color:var(--muted)">URL webhook: <code>${baseUrl}/webhook/stripe</code></small>`;
+  } else if(p==='conekta'){
+    el.innerHTML=`
+      <div class="form-group"><label>Private Key (key_…)</label><input id="tc-conekta-key" type="password" value="${cfg.private_key||''}">${toggleBtn('tc-conekta-key')}</div>
+      <small style="color:var(--muted)">URL webhook: <code>${baseUrl}/webhook/conekta</code></small>`;
   } else { el.innerHTML=''; }
 }
 
@@ -1010,6 +1023,13 @@ async function saveTenantConfig() {
   if(pasarela==='mercadopago'){
     const token=document.getElementById('tc-mp-token')?.value||'';
     pasarelaConfig=JSON.stringify({access_token:token});
+  } else if(pasarela==='stripe'){
+    const key=document.getElementById('tc-stripe-key')?.value||'';
+    const wsecret=document.getElementById('tc-stripe-wsecret')?.value||'';
+    pasarelaConfig=JSON.stringify({secret_key:key,webhook_secret:wsecret});
+  } else if(pasarela==='conekta'){
+    const key=document.getElementById('tc-conekta-key')?.value||'';
+    pasarelaConfig=JSON.stringify({private_key:key});
   }
   const config={
     grupo_id:          document.getElementById('tc-grupo-id').value.trim(),
