@@ -29,6 +29,32 @@ function _sumarError(num) { _erroresConsec.set(num, (_erroresConsec.get(num) || 
 function _resetError(num) { _erroresConsec.delete(num); }
 
 // ── HELPERS PARA EXTRAS ───────────────────────────────────────────────────────
+/**
+ * Genera descripción legible de un ítem para preguntas al cliente.
+ * Maneja singular/plural y género gramatical leyendo item types de BD.
+ * Ej: {presentacion:"taco", cantidad:1} → "el taco"
+ *     {presentacion:"quesadilla", cantidad:2} → "las 2 quesadillas"
+ */
+function _descItem(item) {
+  if (item.presentacion === 'gramos')                             return `los ${item.gramos}g`;
+  if (item.presentacion === 'por_pesos' || item.presentacion === 'pesos') return `los $${item.monto}`;
+  const n = item.cantidad || 1;
+  try {
+    const { getItemTypes } = require('../../db');
+    const tipos = getItemTypes() || [];
+    const tipo  = tipos.find(t => t.slug === item.presentacion);
+    if (tipo) {
+      const fem = (tipo.nombre_plural || '').endsWith('as');
+      if (n === 1) return fem ? `la ${tipo.nombre}` : `el ${tipo.nombre}`;
+      return fem ? `las ${n} ${tipo.nombre_plural}` : `los ${n} ${tipo.nombre_plural}`;
+    }
+  } catch (_) {}
+  // Fallback hardcoded para taco/torta
+  if (item.presentacion === 'torta') return n === 1 ? 'la torta'  : `las ${n} tortas`;
+  if (item.presentacion === 'taco')  return n === 1 ? 'el taco'   : `los ${n} tacos`;
+  return n === 1 ? `el ${item.presentacion}` : `los ${n} ${item.presentacion}s`;
+}
+
 function _listaNombresRefrescos() {
   const refs = require("../pedidoParser").getRefrescos();
   return refs.length > 0
@@ -905,10 +931,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       pedidoParcial._indiceActual = 0;
       esperandoCorte.set(clienteNumero, pedidoParcial);
       const primerItem = pedidoParcial.items[0];
-      const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
-                 : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
-                 : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
-                 : `los $${primerItem.monto}`;
+      const desc = _descItem(primerItem);
       await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
       return true;
     }
@@ -1145,10 +1168,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
           pedParcDist._indiceActual = siguienteIdx;
           esperandoCorte.set(clienteNumero, pedParcDist);
           const sigItem = pedParcDist.items[siguienteIdx];
-          const desc = sigItem.presentacion === "taco"   ? `los ${sigItem.cantidad} tacos`
-                     : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
-                     : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
-                     : `los $${sigItem.monto}`;
+          const desc = _descItem(sigItem);
           await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
           return true;
         }
@@ -1197,10 +1217,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     if (respFaqCorte) {
       const pedParcFaq = esperandoCorte.get(clienteNumero);
       const itemFaq    = pedParcFaq.items[pedParcFaq._indiceActual || 0];
-      const descFaq    = itemFaq.presentacion === "taco"   ? `los ${itemFaq.cantidad} tacos`
-                       : itemFaq.presentacion === "torta"  ? `las ${itemFaq.cantidad} tortas`
-                       : itemFaq.presentacion === "gramos" ? `los ${itemFaq.gramos}g`
-                       : `los $${itemFaq.monto}`;
+      const descFaq    = _descItem(itemFaq);
       await msg.reply(respFaqCorte);
       await msg.reply(`*¿Y de qué tipo de carne quieres ${descFaq}?*\nTenemos: ${listaCortes()}`);
       return true;
@@ -1233,10 +1250,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   if (!corteDetectado) {
     const _pedPend  = esperandoCorte.get(clienteNumero);
     const _itemPend = _pedPend.items[_pedPend._indiceActual || 0];
-    const _descPend = _itemPend.presentacion === "taco"   ? `los ${_itemPend.cantidad} tacos`
-                    : _itemPend.presentacion === "torta"  ? `las ${_itemPend.cantidad} tortas`
-                    : _itemPend.presentacion === "gramos" ? `los ${_itemPend.gramos}g`
-                    : `los $${_itemPend.monto}`;
+    const _descPend = _descItem(_itemPend);
     const errores = _sumarError(clienteNumero);
     const extra = errores >= 2 ? `\n\n_Por ejemplo escríbeme: *${listaCortes().toLowerCase()}*_` : "";
     await msg.reply(`Necesito que me digas el tipo de carne para ${_descPend}.\n*¿Cuál prefieres?* ${listaCortes()}` + extra);
@@ -1253,10 +1267,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     pedidoParcial._indiceActual = siguienteIdx;
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const sigItem = pedidoParcial.items[siguienteIdx];
-    const desc = sigItem.presentacion === "taco"   ? `los ${sigItem.cantidad} tacos`
-               : sigItem.presentacion === "torta"  ? `las ${sigItem.cantidad} tortas`
-               : sigItem.presentacion === "gramos" ? `los ${sigItem.gramos}g`
-               : `los $${sigItem.monto}`;
+    const desc = _descItem(sigItem);
     await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
     return true;
   }
@@ -1311,10 +1322,7 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
     pedidoParcial._salsasPendientes      = salsasPendientes;
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const primerItem = pedidoParcial.items[pedidoParcial._indiceActual];
-    const desc = primerItem.presentacion === "taco"   ? `los ${primerItem.cantidad} tacos`
-               : primerItem.presentacion === "torta"  ? `las ${primerItem.cantidad} tortas`
-               : primerItem.presentacion === "gramos" ? `los ${primerItem.gramos}g`
-               : `los $${primerItem.monto}`;
+    const desc = _descItem(primerItem);
     await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
   } else {
     await msg.reply(`*¿De qué tipo de carne lo quieres?*\nTenemos: ${listaCortes()}`);
