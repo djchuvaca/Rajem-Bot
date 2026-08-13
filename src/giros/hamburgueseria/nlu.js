@@ -1,0 +1,417 @@
+'use strict';
+
+/**
+ * src/giros/hamburgueseria/nlu.js — NLU específico del giro Hamburguesería
+ *
+ * Implementa la misma interfaz que taqueria/nlu.js adaptada al dominio hamburguesa:
+ *   - "corte" = variante de hamburguesa (clásica, bbq, chipotle…)
+ *   - No soporta mitad-mitad, todo-menos-X ni venta por peso/gramos
+ *   - No gestiona refrescos/salsas (retorna vacío para mantener compat de interfaz)
+ */
+
+const core = require('../../nlu/core');
+const { getProductos } = require('../../db');
+
+const {
+  normalizar,
+  _tieneNegacionAntes,
+  preprocesarCantidades,
+  levenshtein,
+  SEÑALES_COMPLEJO,
+  PATRON_DISTRIBUCION,
+  MEDIDAS,
+  _FILLER_PART,
+  PATRON_EN_CAMINO,
+  PATRON_DESPEDIDA,
+  PREGUNTAS_PRECIO,
+  PREGUNTAS_HORARIO,
+  PREGUNTAS_DOMICILIO,
+  PREGUNTAS_MENU,
+  PREGUNTAS_UBICACION,
+  PREGUNTAS_PAGO,
+  PREGUNTAS_TOTAL,
+  PREGUNTAS_DESCRIPCION_CORTE,
+  _getItemTypesActivos,
+  detectarTipoItemDesdeTexto,
+  _buildItemTypesPattern,
+  listaItemTypes,
+  dividirEnItems,
+  _subDividirSiTipoEmbebido,
+  detectarRepetirPedido,
+  invalidarCacheItemTypes,
+} = core;
+
+// ── CACHÉ LOCAL ───────────────────────────────────────────────────────────────
+let _variantesCache   = null; let _variantesCacheTs   = 0;
+let _cortesRegexCache = null; let _cortesRegexCacheTs = 0;
+const _CACHE_TTL = 60 * 1000;
+
+function invalidarCacheCortes() {
+  _variantesCache   = null; _variantesCacheTs   = 0;
+  _cortesRegexCache = null; _cortesRegexCacheTs = 0;
+  invalidarCacheItemTypes();
+  try { require('../../db/cortes').invalidarCacheCortesBD(); } catch (_) {}
+}
+
+// ── CATÁLOGO DE VARIANTES ─────────────────────────────────────────────────────
+
+function _variantesDefault() {
+  try {
+    const { getGiroActivo } = require('../../giros');
+    const giro = getGiroActivo();
+    if (giro?.fallbackCortes) return { ...giro.fallbackCortes };
+  } catch (_) {}
+  return {};
+}
+
+/** Alias→slug de variantes de hamburguesa (equivale a getCortes() en taquería) */
+function getCortes() {
+  const ahora = Date.now();
+  if (_variantesCache && ahora - _variantesCacheTs < _CACHE_TTL) return _variantesCache;
+  try {
+    const { getCortesBD } = require('../../db');
+    const bd = getCortesBD();
+    if (bd && Object.keys(bd).length > 0) {
+      _variantesCache   = bd;
+      _variantesCacheTs = Date.now();
+      return _variantesCache;
+    }
+  } catch (_) {}
+  try {
+    const productos = getProductos();
+    if (!productos || !productos.length) return _variantesDefault();
+    const mapa = {};
+    for (const p of productos) {
+      if (p.categoria === 'refresco' || p.categoria === 'salsa') continue;
+      const nombre = p.nombre.toLowerCase().trim();
+      mapa[nombre] = nombre;
+      const plural = /[aeiouáéíóú]$/i.test(nombre) ? nombre + 's' : nombre + 'es';
+      mapa[plural] = nombre;
+      if (p.sinonimos) {
+        for (const s of p.sinonimos.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)) {
+          mapa[s] = nombre;
+        }
+      }
+    }
+    _variantesCache   = mapa;
+    _variantesCacheTs = Date.now();
+    return _variantesCache;
+  } catch (_) { return _variantesDefault(); }
+}
+
+function getRefrescos() { return []; }
+function getSalsas()    { return []; }
+
+function getCortesRegex() {
+  const ahora = Date.now();
+  if (_cortesRegexCache && ahora - _cortesRegexCacheTs < _CACHE_TTL) return _cortesRegexCache;
+  const palabras    = Object.keys(getCortes()).sort((a, b) => b.length - a.length).join('|');
+  _cortesRegexCache = new RegExp(`\\b(${palabras || '__ninguna__'})\\b`, 'i');
+  _cortesRegexCacheTs = ahora;
+  return _cortesRegexCache;
+}
+
+function getRegexVariantes() {
+  const palabras = Object.keys(getCortes()).sort((a, b) => b.length - a.length).join('|');
+  return new RegExp(`(?:de\\s*|\\b)(${palabras || '__ninguna__'})\\b`, 'gi');
+}
+
+function textoANumero(texto) {
+  return core.textoANumero(texto, [...new Set(Object.values(getCortes()))]);
+}
+
+// ── FUZZY MATCHING ────────────────────────────────────────────────────────────
+
+function buscarCorteFuzzy(palabra) {
+  const variantes = getCortes();
+  if (variantes[palabra]) return variantes[palabra];
+  if (palabra.length < 4) return null;
+  let mejor = null, mejorDist = Infinity, empate = false;
+  for (const [key, val] of Object.entries(variantes)) {
+    if (Math.abs(key.length - palabra.length) > 2) continue;
+    const dist = levenshtein(palabra, key);
+    if (dist < mejorDist) { mejor = val; mejorDist = dist; empate = false; }
+    else if (dist === mejorDist && val !== mejor) empate = true;
+  }
+  return mejorDist <= 2 && !empate ? mejor : null;
+}
+
+// ── EXTRAER VARIANTE (= "corte" en la interfaz) ───────────────────────────────
+
+function extraerCorte(fragmento) {
+  const regex   = getRegexVariantes();
+  const matches = [...fragmento.matchAll(regex)];
+  const variantes = getCortes();
+
+  if (matches.length) {
+    const encontrados = [...new Set(matches.map(m => variantes[m[1].toLowerCase()]).filter(Boolean))];
+    if (encontrados.length > 0) return encontrados[0]; // hamburguesería: una sola variante por ítem
+  }
+
+  const DESCARTAR = /^(hamburguesa|burger|sencilla|doble|grande|chica|gramo|gramos|kilo|kilos|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|solo|unos|como|nada|cada)$/;
+  for (const palabra of normalizar(fragmento).split(/\s+/)) {
+    if (palabra.length < 4 || DESCARTAR.test(palabra)) continue;
+    if (detectarTipoItemDesdeTexto(palabra)) continue;
+    const variante = buscarCorteFuzzy(palabra);
+    if (variante) return variante;
+  }
+  return null;
+}
+
+// ── SCORE ─────────────────────────────────────────────────────────────────────
+
+function calcularScore(texto) {
+  const t = normalizar(texto);
+  let score = 0;
+  if (SEÑALES_COMPLEJO.test(t))        score -= 10;
+  if (PATRON_DISTRIBUCION.test(texto)) score -= 10;
+  if (/\b\d+\b/.test(t))              score += 2;
+  if (detectarTipoItemDesdeTexto(t))  score += 2;
+  if (getCortesRegex().test(t)) {
+    score += 2;
+  } else if (t.split(/\s+/).some(p => p.length >= 4 && buscarCorteFuzzy(p))) {
+    score += 2;
+  }
+  const partes = dividirEnItems(texto);
+  if (partes.length > 1) {
+    const reales = partes.filter(p => !_FILLER_PART.test(normalizar(p).trim()));
+    score += reales.every(p => /\b\d+\b/.test(normalizar(p))) ? 2 : -2;
+  }
+  return score;
+}
+
+// ── PARSEAR ÍTEM ──────────────────────────────────────────────────────────────
+
+function parsearItem(fragmento) {
+  const t      = normalizar(fragmento);
+  const corte  = extraerCorte(fragmento);
+  const _itPat = _buildItemTypesPattern();
+
+  const matchPieza = _itPat ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPat})s?\\b`)) : null;
+  if (matchPieza) {
+    const cantidad      = parseInt(matchPieza[1]);
+    const tipoDetectado = detectarTipoItemDesdeTexto(matchPieza[2]);
+    const presentacion  = tipoDetectado ? tipoDetectado.slug : matchPieza[2];
+    if (!corte) return { _sinCorte: true, presentacion, cantidad };
+    return { presentacion, cantidad, corte };
+  }
+
+  const matchMonto = t.match(/\b(\d+)\b/);
+  if (matchMonto) {
+    const num = parseInt(matchMonto[1]);
+    if (num > 40) return null; // hamburguesería no vende por pesos
+  }
+  return null;
+}
+
+function parsearItemHeredado(fragmento, tipoPrevio) {
+  const t    = normalizar(fragmento);
+  const corte = extraerCorte(fragmento);
+  if (!corte) return null;
+  const matchNum = t.match(/\b(\d+)\b/);
+  if (!matchNum) return null;
+  return { presentacion: tipoPrevio, cantidad: parseInt(matchNum[1]), corte };
+}
+
+// ── PARSER PRINCIPAL ──────────────────────────────────────────────────────────
+
+function parsearPedidoSimple(texto) {
+  texto = textoANumero(preprocesarCantidades(texto));
+  const t = normalizar(texto);
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  if (calcularScore(texto) < 4) return null;
+
+  const partes = dividirEnItems(texto);
+
+  if (partes.length > 1) {
+    const items = [];
+    let ultimoTipo = null;
+    const _slugsUnidad = new Set(_getItemTypesActivos().filter(it => !it.soporta_gramos && !it.soporta_pesos).map(it => it.slug));
+    for (const parte of partes) {
+      if (_FILLER_PART.test(normalizar(parte).trim())) continue;
+      const subPartes = _subDividirSiTipoEmbebido(parte);
+      for (const sub of subPartes) {
+        let item = parsearItem(sub);
+        if (!item && ultimoTipo) item = parsearItemHeredado(sub, ultimoTipo);
+        if (!item || item._sinCorte) return null;
+        if (_slugsUnidad.has(item.presentacion)) ultimoTipo = item.presentacion;
+        items.push(item);
+      }
+    }
+    if (items.length > 0) return { tipo: 'pedido', items };
+    return null;
+  }
+
+  const corteRaw  = extraerCorte(texto);
+  const _itPat    = _buildItemTypesPattern();
+  const matchPieza = _itPat ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPat})s?\\b`)) : null;
+
+  if (matchPieza) {
+    const cantidad     = parseInt(matchPieza[1]);
+    const tipoDetect   = detectarTipoItemDesdeTexto(matchPieza[2]);
+    const presentacion = tipoDetect ? tipoDetect.slug : 'hamburguesa_sencilla';
+    if (!corteRaw) return null;
+    return { tipo: 'pedido', items: [{ presentacion, cantidad, corte: corteRaw }] };
+  }
+
+  // Fallback: tipo sin número → cantidad 1
+  if (corteRaw) {
+    const matchTipoSolo = _itPat ? t.match(new RegExp(`\\b(${_itPat})s?\\b`)) : null;
+    if (matchTipoSolo) {
+      const tipoDetect   = detectarTipoItemDesdeTexto(matchTipoSolo[1]);
+      const presentacion = tipoDetect ? tipoDetect.slug : 'hamburguesa_sencilla';
+      return { tipo: 'pedido', items: [{ presentacion, cantidad: 1, corte: corteRaw }] };
+    }
+  }
+  return null;
+}
+
+// ── DETECTAR SIN VARIANTE (≡ sinCorte) ───────────────────────────────────────
+
+function detectarSinCorte(texto) {
+  texto = textoANumero(texto);
+  const t = normalizar(texto);
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  const partes = dividirEnItems(texto);
+  for (const parte of partes) {
+    const item = parsearItem(parte);
+    if (item && item._sinCorte) return item.presentacion;
+  }
+  const tipoSolo = detectarTipoItemDesdeTexto(t);
+  const corte    = extraerCorte(texto);
+  if (tipoSolo && !corte) return tipoSolo.slug;
+  return null;
+}
+
+// ── DETECTAR SIN TIPO ─────────────────────────────────────────────────────────
+
+function detectarSinTipo(texto) {
+  texto = textoANumero(texto);
+  const t = normalizar(texto);
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  const partes = dividirEnItems(texto);
+  const reales = partes.filter(p => !_FILLER_PART.test(normalizar(p).trim()));
+  if (reales.length > 1) return null;
+  if (detectarTipoItemDesdeTexto(t)) return null;
+  const corte = extraerCorte(texto);
+  if (!corte) return null;
+  const matchNum = t.match(/\b(\d+)\b/);
+  if (!matchNum) return null;
+  const cantidad = parseInt(matchNum[1]);
+  if (cantidad > 20) return null; // hamburguesería: límite razonable
+  return { cantidad, corte };
+}
+
+// ── MODIFICACIONES ────────────────────────────────────────────────────────────
+
+const PATRON_QUITAR_UNO  = /quita(?:me|le)?\s+(?:uno|una?\s+hamburguesa?)(?:\s+(?:de(?:\s+(?:los?|las?))?\s+)?(\w+))?|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos(?:\s+(?:de\s+)?(\w+))?/i;
+const PATRON_AGREGAR_MAS = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?|(\d+)\s+m[aá]s(?:\s+(?:de\s+)?(\w+))?|(?:ponme|s[úu]mame)\s+(?:otros?\s+)?(\d+)(?:\s+(?:de\s+)?(\w+))?/i;
+
+function detectarModificacion(texto) {
+  const t    = normalizar(texto);
+  const tNum = normalizar(textoANumero(t));
+  if (PATRON_QUITAR_UNO.test(t)) {
+    const mQ      = t.match(PATRON_QUITAR_UNO);
+    const corteRaw = (mQ[1] || mQ[2] || '').toLowerCase().trim();
+    const corte   = corteRaw ? (getCortes()[corteRaw] || buscarCorteFuzzy(corteRaw) || null) : null;
+    return { tipo: 'quitar_uno', corte };
+  }
+  if (PATRON_AGREGAR_MAS.test(tNum)) {
+    const m         = tNum.match(PATRON_AGREGAR_MAS);
+    const cantidad  = parseInt(m[1] || m[3] || m[5] || '1');
+    const corteRaw  = (m[2] || m[4] || m[6] || '').toLowerCase();
+    const corte     = corteRaw ? (getCortes()[corteRaw] || buscarCorteFuzzy(corteRaw) || null) : null;
+    return { tipo: 'agregar_mas', cantidad, corte };
+  }
+  return null;
+}
+
+// ── PREGUNTAS FRECUENTES ──────────────────────────────────────────────────────
+
+function detectarPreguntaFrecuente(texto) {
+  const t = normalizar(texto);
+  if (PATRON_EN_CAMINO.test(t))    return { tipo: 'ya_en_camino' };
+  if (PATRON_DESPEDIDA.test(t))    return { tipo: 'despedida' };
+  if (PREGUNTAS_TOTAL.test(t))     return { tipo: 'total_parcial' };
+  if (PREGUNTAS_DOMICILIO.test(t)) return { tipo: 'domicilio' };
+  if (PREGUNTAS_PRECIO.test(t)) {
+    const m = t.match(getCortesRegex());
+    return { tipo: 'precio', producto: m ? getCortes()[m[1].toLowerCase()] : null };
+  }
+  if (PREGUNTAS_DESCRIPCION_CORTE.test(t)) {
+    const m = t.match(getCortesRegex());
+    if (m) return { tipo: 'descripcion_corte', producto: getCortes()[m[1].toLowerCase()] };
+  }
+  if (/ya\s+(?:est[aá][ns]?\s+(?:listo?|lista?|listos?)|qued[oó]\s+(?:listo?|lista?))/i.test(t))
+    return { tipo: 'pedido_listo' };
+  if (PREGUNTAS_HORARIO.test(t))   return { tipo: 'horario' };
+  if (PREGUNTAS_MENU.test(t))      return { tipo: 'menu' };
+  if (PREGUNTAS_UBICACION.test(t)) return { tipo: 'ubicacion' };
+  if (PREGUNTAS_PAGO.test(t))      return { tipo: 'metodos_pago' };
+  return null;
+}
+
+function detectarTodasPreguntasFrecuentes(texto) {
+  const t          = normalizar(texto);
+  const resultados = [];
+  if (PATRON_EN_CAMINO.test(t))    resultados.push({ tipo: 'ya_en_camino' });
+  if (PATRON_DESPEDIDA.test(t))    resultados.push({ tipo: 'despedida' });
+  if (PREGUNTAS_TOTAL.test(t))     resultados.push({ tipo: 'total_parcial' });
+  if (PREGUNTAS_DOMICILIO.test(t)) resultados.push({ tipo: 'domicilio' });
+  if (PREGUNTAS_PRECIO.test(t)) {
+    const m = t.match(getCortesRegex());
+    resultados.push({ tipo: 'precio', producto: m ? getCortes()[m[1].toLowerCase()] : null });
+  }
+  if (PREGUNTAS_DESCRIPCION_CORTE.test(t)) {
+    const m = t.match(getCortesRegex());
+    if (m) resultados.push({ tipo: 'descripcion_corte', producto: getCortes()[m[1].toLowerCase()] });
+  }
+  if (/ya\s+(?:est[aá][ns]?\s+(?:listo?|lista?|listos?)|qued[oó]\s+(?:listo?|lista?))/i.test(t))
+    resultados.push({ tipo: 'pedido_listo' });
+  if (PREGUNTAS_HORARIO.test(t))   resultados.push({ tipo: 'horario' });
+  if (PREGUNTAS_MENU.test(t))      resultados.push({ tipo: 'menu' });
+  if (PREGUNTAS_UBICACION.test(t)) resultados.push({ tipo: 'ubicacion' });
+  if (PREGUNTAS_PAGO.test(t))      resultados.push({ tipo: 'metodos_pago' });
+  const vistos = new Set();
+  return resultados.filter(r => {
+    const k = r.tipo + (r.producto || '');
+    if (vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+}
+
+// ── STUBS DE INTERFAZ (no aplican a hamburguesería) ──────────────────────────
+
+function detectarSalsa()               { return null; }
+function detectarRefresco()            { return null; }
+function separarRefresco(texto)        { return { textoLimpio: texto, refrescos: [], salsas: [] }; }
+function parsearDistribucionCortes()   { return null; }
+function parsearDistribucionRefrescos(){ return null; }
+
+// ── EXPORTS ───────────────────────────────────────────────────────────────────
+
+module.exports = {
+  parsearPedidoSimple,
+  detectarSinCorte,
+  detectarSinTipo,
+  detectarPreguntaFrecuente,
+  detectarTodasPreguntasFrecuentes,
+  detectarModificacion,
+  detectarRepetirPedido,
+  calcularScore,
+  getCortes,
+  getRefrescos,
+  detectarRefresco,
+  getSalsas,
+  detectarSalsa,
+  invalidarCacheCortes,
+  detectarTipoItemDesdeTexto,
+  listaItemTypes,
+  normalizar,
+  separarRefresco,
+  textoANumero,
+  buscarCorteFuzzy,
+  parsearDistribucionCortes,
+  parsearDistribucionRefrescos,
+};

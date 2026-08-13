@@ -74,6 +74,20 @@ module.exports = {
       descripcion: 'Doble carne, tocino, queso derretido y salsa secreta.' },
   ],
 
+  vocabulario: {
+    corte:         'variante',
+    cortes:        'variantes',
+    preguntaCorte: '¿Qué variante de hamburguesa quieres? %desc%',
+    surtidoSlug:   null,
+  },
+
+  comportamiento: {
+    soportaVentaPorPeso:  false,
+    soportaMitadMitad:    false,
+    soportaTodoMenosX:    false,
+    tarjetaSoloMostrador: false,
+  },
+
   // Mapa alias→slug de emergencia para NLU sin BD
   fallbackCortes: {
     clasica: 'clasica', clásica: 'clasica', original: 'clasica', normal: 'clasica',

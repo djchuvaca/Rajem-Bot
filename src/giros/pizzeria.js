@@ -83,6 +83,20 @@ module.exports = {
       descripcion: 'Champiñones, pimiento, cebolla, aceituna y elote.' },
   ],
 
+  vocabulario: {
+    corte:         'sabor',
+    cortes:        'sabores',
+    preguntaCorte: '¿Qué sabor de pizza quieres? %desc%',
+    surtidoSlug:   null,
+  },
+
+  comportamiento: {
+    soportaVentaPorPeso:  false,
+    soportaMitadMitad:    false,
+    soportaTodoMenosX:    false,
+    tarjetaSoloMostrador: false,
+  },
+
   // Mapa alias→slug de emergencia para NLU sin BD
   fallbackCortes: {
     hawaiana: 'hawaiana', hawaii: 'hawaiana', tropical: 'hawaiana',
