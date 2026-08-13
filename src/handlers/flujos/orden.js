@@ -437,9 +437,14 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const cortesMap   = getCortes();
       if (tipoViejo && tipoNuevo && tipoViejo.slug !== tipoNuevo.slug) {
         const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
-        const lineaViejaIdx = lineas.findIndex(l =>
-          new RegExp(`\\b(${normalizar(tipoViejo.nombre)}|${tipoViejo.slug})\\b`, 'i').test(normalizar(l))
-        );
+        const _patronesViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
+        if (tipoViejo.nombre_plural) _patronesViejo.push(normalizar(tipoViejo.nombre_plural));
+        const lineaViejaIdx = lineas.findIndex(l => {
+          const lNorm = normalizar(l);
+          return _patronesViejo.some(p =>
+            new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lNorm)
+          );
+        });
         if (lineaViejaIdx !== -1) {
           const lineaVieja = lineas[lineaViejaIdx];
           const matchCant = lineaVieja.match(/\b(\d+)\b/);
