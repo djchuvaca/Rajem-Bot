@@ -1432,17 +1432,26 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
   const todosCortes = getCortesBDObj();
   const fallback    = getGiroActivo()?.fallbackCortes || {};
   const tNorm       = normalizar(textoLimpio);
-  const corteNoDisp = todosCortes.find(c => {
-    let aliases = [];
-    try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
-    const palabras = [c.slug, c.nombre.toLowerCase(), ...aliases.map(a => a.toLowerCase())];
-    return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
-  }) || (Object.keys(fallback).find(k => new RegExp(`\\b${k}\\b`, 'i').test(tNorm)) ? {} : null);
+  // Recopilar TODOS los cortes no disponibles mencionados en el texto
+  const cortesActivos = getCortes();
+  const cortesNoDispNombres = todosCortes
+    .filter(c => {
+      if (cortesActivos[normalizar(c.slug)]) return false; // está activo, no aplica
+      let aliases = [];
+      try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
+      const palabras = [c.slug, c.nombre.toLowerCase(), ...aliases.map(a => a.toLowerCase())];
+      return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
+    })
+    .map(c => c.nombre);
+  for (const k of Object.keys(fallback)) {
+    if (new RegExp(`\\b${k}\\b`, 'i').test(tNorm) && !cortesActivos[normalizar(k)])
+      cortesNoDispNombres.push(k);
+  }
 
   const pedidoParcial = parsearSinCorteItems(textoLimpio);
 
-  if (corteNoDisp !== null && !getCortes()[normalizar(corteNoDisp.slug || '')]) {
-    // Informar que ese corte no está disponible y poner en estado esperandoCorte
+  if (cortesNoDispNombres.length > 0) {
+    // Informar todos los cortes no disponibles y poner en estado esperandoCorte
     if (pedidoParcial) {
       const primerSinCorte = pedidoParcial.items.findIndex(i => !i.corte);
       pedidoParcial._indiceActual        = primerSinCorte !== -1 ? primerSinCorte : 0;
@@ -1450,7 +1459,11 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
       pedidoParcial._salsasPendientes    = salsasPendientes;
       esperandoCorte.set(clienteNumero, pedidoParcial);
     }
-    await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+    const listaNoDisp = cortesNoDispNombres.map(n => `*${n}*`).join(' y ');
+    const prefijo = cortesNoDispNombres.length === 1
+      ? `Ese corte (${listaNoDisp}) no está disponible hoy.`
+      : `Esos cortes (${listaNoDisp}) no están disponibles hoy.`;
+    await msg.reply(`${prefijo} Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
     return true;
   }
 

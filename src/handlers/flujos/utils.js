@@ -209,7 +209,8 @@ function parsearSinCorteItems(texto) {
     if (matchMonto) {
       const n = parseInt(matchMonto[1]);
       if (n > 40) { items.push({ presentacion: "pesos", monto: n, corte }); continue; }
-      if (corte && ultimoTipo) { items.push({ presentacion: ultimoTipo, cantidad: n, corte }); continue; }
+      // Heredar ultimoTipo aunque no haya corte — el corte se pedirá después
+      if (ultimoTipo) { items.push({ presentacion: ultimoTipo, cantidad: n, corte }); continue; }
     }
   }
   return items.length > 0 ? { tipo: "pedido", items } : null;
