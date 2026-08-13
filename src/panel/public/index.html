@@ -1651,18 +1651,20 @@ async function loadProductos() {
 
   // Solo formatos ACTIVOS para botones y columnas de precio (los inactivos no aplican al menú actual)
   const formatosActivos = (formatos || []).filter(f => f.activo);
+  // Formatos de corte: excluir gramos y por_pesos — no tienen precio por corte individual
+  const formatosCorte   = formatosActivos.filter(f => !f.soporta_gramos && !f.soporta_pesos);
 
   // Pills de formato en el header de "Mis Cortes"
   const btnsEl = document.getElementById('formatos-btns');
   if (btnsEl) {
-    btnsEl.innerHTML = formatosActivos.map(f =>
+    btnsEl.innerHTML = formatosCorte.map(f =>
       `<button class="fmt-tab-btn" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
         ${f.emoji || ''} ${_ucfirst(f.nombre_plural)}
       </button>`
     ).join('');
   }
 
-  _renderMenuCortes(formatosActivos);
+  _renderMenuCortes(formatosCorte);
   _renderMenuSimples('refresco', 'menu-bebidas-table', 'menu-bebidas-empty', 'Precio');
   _renderMenuSimples('salsa',    'menu-salsas-table',  'menu-salsas-empty',  'Precio extra');
 }
