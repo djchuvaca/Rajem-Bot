@@ -714,6 +714,23 @@ function _seedBusinessTypes(db) {
     }
   }
 
+  // Auto-activar item_types del giro configurado — solo si ninguno está activo aún.
+  // Así el tenant arranca con sus items listos sin pasar por el panel primero.
+  // Si el tenant desactiva alguno después, el reinicio del bot no los vuelve a activar.
+  const businessType = process.env.BUSINESS_TYPE || null;
+  if (businessType && !process.env.BOT_TEST_MODE) {
+    const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(businessType);
+    if (btRow) {
+      const yaActivos = db.prepare(
+        "SELECT COUNT(*) as n FROM item_types WHERE business_type_id = ? AND activo = 1"
+      ).get(btRow.id)?.n || 0;
+      if (yaActivos === 0) {
+        db.prepare("UPDATE item_types SET activo = 1 WHERE business_type_id = ?").run(btRow.id);
+        console.log(`✅ Item types de '${businessType}' activados (primera configuración)`);
+      }
+    }
+  }
+
   console.log("✅ Business types y plantillas de productos registradas");
 }
 

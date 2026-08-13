@@ -133,6 +133,7 @@ async function handleProvisionar(req, res) {
     PROV_CIUDAD:          data.ciudad       || '',
     PROV_ESTADO:          data.estado       || '',
     ...(data.panel_port ? { PROV_PANEL_PORT: String(data.panel_port) } : {}),
+    ...(data.business_type    ? { PROV_BUSINESS_TYPE:    data.business_type    } : {}),
     ...(data.seccion_taqueria ? { PROV_SECCION_TAQUERIA: data.seccion_taqueria } : {}),
     PROV_GRUPO_ID:        data.grupo_id     || '',
     PROV_PANEL_SECRET:    data.panel_secret || '',
