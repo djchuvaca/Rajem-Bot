@@ -8,7 +8,7 @@ const {
   esperandoExtras, ordenPreResumen, datosCampos, limpiarTodo,
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
-const { getProductos, getConfig } = require("../../db");
+const { getProductos, getConfig, getMenuItems, getCortesBDObj } = require("../../db");
 const { textoANumero, getCortes, buscarCorteFuzzy, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
@@ -60,7 +60,7 @@ function _textoRecordatorio(numero) {
                : item.presentacion === "torta"  ? `las ${item.cantidad} tortas`
                : item.presentacion === "gramos" ? `los ${item.gramos}g`
                : `los $${item.monto}`;
-    const listaCortes = getProductos().filter(p => (p.categoria === "corte" || !p.categoria) && p.nombre !== "surtido especial").map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ") || "los cortes disponibles";
+    const listaCortes = _listaCortesDesdeBD();
     return `${saludo} Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
   }
   if (esperandoTipoItem.has(numero)) {
@@ -275,16 +275,28 @@ function validarHora(texto) {
   return `${h > 12 ? h - 12 : h}${minStr} ${sufijo}`;
 }
 
-function listaCortes() {
-  const cortes = getCortes();
-  const unicos = [...new Set(Object.values(cortes))].filter(c => c !== "surtido especial");
-  if (unicos.length > 0) return unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(", ");
+function _listaCortesDesdeBD() {
   try {
-    const { getGiroActivo } = require('../../giros');
-    const giro = getGiroActivo();
-    const slugs = [...new Set(Object.values(giro?.fallbackCortes || {}))].filter(c => c !== 'surtido especial');
-    return slugs.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ') || 'los cortes disponibles';
-  } catch (_) { return 'los cortes disponibles'; }
+    const menuItems = getMenuItems();
+    const cortesItems = menuItems.filter(i => i.categoria === 'corte');
+    if (cortesItems.length > 0) {
+      const cortesDB   = getCortesBDObj();
+      const porSlug    = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
+      const slugsUnicos = [...new Set(cortesItems.map(i => i.producto_slug))].filter(s => s !== 'surtido especial');
+      const nombres    = slugsUnicos.map(s => porSlug[s]?.nombre || s).filter(Boolean);
+      if (nombres.length > 0)
+        return nombres.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ');
+    }
+  } catch (_) { /* caída segura */ }
+  // Fallback: leer de la tabla productos (legacy)
+  const cortes = getCortes();
+  const unicos = [...new Set(Object.values(cortes))].filter(c => c !== 'surtido especial');
+  if (unicos.length > 0) return unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+  return 'los cortes disponibles';
+}
+
+function listaCortes() {
+  return _listaCortesDesdeBD();
 }
 
 const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az|ya|ya\s+dale|ya\s+pues|ya\s+va|vamos|vamos\s+pues|le\s+va|le\s+voy|sale\s+y\s+vale|sale\s+pues|andele|ándele|s[ií]\s+se[nñ]or|s[ií]\s+se[nñ]ora|apunta(?:me)?|anota(?:me)?|ch[eé]ca(?:le)?|ch[eé]cale|a\s+toda\s+madre|a\s+toda|si\s+claro|sí\s+claro|claro\s+que\s+si|claro\s+que\s+sí|con\s+gusto|ándale\s+pues|le\s+entramos|le\s+entro|le\s+echamos|ponme|apuntame)$/i;
