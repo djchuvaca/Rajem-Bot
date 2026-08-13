@@ -1651,8 +1651,9 @@ async function loadProductos() {
 
   // Solo formatos ACTIVOS para botones y columnas de precio (los inactivos no aplican al menú actual)
   const formatosActivos = (formatos || []).filter(f => f.activo);
-  // Formatos de corte: excluir gramos y por_pesos — no tienen precio por corte individual
-  const formatosCorte   = formatosActivos.filter(f => !f.soporta_gramos && !f.soporta_pesos);
+  // Formatos de corte: excluir solo por_pesos (precio global, no por corte)
+  // gramos/100gr sí puede tener precio por corte (carne $30/100g, costilla $35/100g, etc.)
+  const formatosCorte   = formatosActivos.filter(f => !f.soporta_pesos);
 
   // Pills de formato en el header de "Mis Cortes"
   const btnsEl = document.getElementById('formatos-btns');

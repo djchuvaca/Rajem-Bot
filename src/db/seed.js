@@ -688,7 +688,7 @@ function _seedBusinessTypes(db) {
     if (!btRow) continue;
 
     const stmtSyncIT = db.prepare(
-      "UPDATE item_types SET aliases_json=?, soporta_gramos=?, soporta_pesos=?, precio_campo=? WHERE business_type_id=? AND slug=?"
+      "UPDATE item_types SET nombre=?, nombre_plural=?, emoji=?, aliases_json=?, soporta_gramos=?, soporta_pesos=?, precio_campo=? WHERE business_type_id=? AND slug=?"
     );
     for (const it of (giro.itemTypes || [])) {
       stmtIT.run(
@@ -697,11 +697,12 @@ function _seedBusinessTypes(db) {
         it.soporta_gramos ? 1 : 0, it.soporta_pesos ? 1 : 0, it.precio_campo,
         it.precio_base || 0
       );
-      // Sincronizar campos NLU/estructurales para item_types ya existentes.
-      // aliases_json, soporta_gramos, soporta_pesos y precio_campo son config de sistema
-      // (no editables por el tenant desde el panel) → siempre se sobreescriben.
+      // Sincronizar campos de sistema para item_types existentes.
+      // nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo
+      // son config del giro (no editables por el tenant) → siempre se sobreescriben.
       // precio_base NO se toca: el tenant configura sus precios desde el panel.
       stmtSyncIT.run(
+        it.nombre, it.nombre_plural, it.emoji || '🍽️',
         JSON.stringify(it.aliases || []),
         it.soporta_gramos ? 1 : 0,
         it.soporta_pesos ? 1 : 0,
