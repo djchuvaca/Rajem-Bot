@@ -337,6 +337,36 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   if (!esperandoConfirmacionItem.has(clienteNumero)) return false;
 
   const itemData = esperandoConfirmacionItem.get(clienteNumero);
+
+  // Si hay un ítem pendiente (cliente eligió tipo pero el corte no estaba disponible),
+  // interpretar la respuesta como selección de corte para ese ítem.
+  if (itemData._pendienteAgregar) {
+    const cortesValidos = getCortes();
+    const tNorm = normalizar(textoOriginal.trim());
+    const corteKey = Object.keys(cortesValidos).find(k =>
+      new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm)
+    );
+    if (corteKey) {
+      const corteSlug = cortesValidos[corteKey];
+      const { cantidad, tipoSlug } = itemData._pendienteAgregar;
+      const jsonAg = { tipo: "pedido", items: [{ presentacion: tipoSlug, cantidad, corte: corteSlug }] };
+      const lineasBase = itemData.lineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+      const { texto: nuevasLineas } = jsonALineas(jsonAg);
+      const nuevasFiltradas = nuevasLineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+      const ordenCombinada = lineasBase + "\n" + nuevasFiltradas;
+      const subtotal = calcularSubtotal(ordenCombinada);
+      const textoFinal = ordenCombinada + "\n💰 Subtotal: $" + subtotal;
+      const { _pendienteAgregar: _pa, ...itemDataLimpio } = itemData;
+      esperandoConfirmacionItem.set(clienteNumero, { ...itemDataLimpio, lineas: textoFinal });
+      historial.push({ role: "user", content: textoOriginal });
+      historial.push({ role: "assistant", content: textoFinal });
+      await msg.reply(textoFinal + "\n\n*¿Es correcto?*");
+      return true;
+    }
+    await msg.reply(`No entendí el corte. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+    return true;
+  }
+
   const esConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|claro|perfecto|va\s+bien|dale\s+pues|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|ya|ya\s+dale|ya\s+pues|ya\s+va)$/i.test(textoOriginal.trim());
   const esRechazo       = /^(nel|nop|nope|incorrecto|cambia|error|no\s+es\s+correcto|no\s+est[aá]\s+bien)$/i.test(textoOriginal.trim());
 
@@ -387,6 +417,20 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
 
       if (corteNoDisp !== null && !getCortes()[normalizar(corteNoDisp.slug || '')]) {
         // El cliente pidió un corte que existe pero no está disponible hoy
+        // Guardar tipo+cantidad para completar el ítem cuando el cliente elija corte válido
+        const tipoDetectado = detectarTipoItemDesdeTexto(textoAg);
+        const cantMatch = textoAg.match(/\b(\d+|un[ao]?|dos|tres|cuatro|cinco)\b/i);
+        let cantNum = 1;
+        if (cantMatch) {
+          const w = cantMatch[1].toLowerCase();
+          const wMap = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5 };
+          cantNum = wMap[w] !== undefined ? wMap[w] : (parseInt(w, 10) || 1);
+        }
+        const { _pendienteAgregar: _pa, ...itemDataBase } = itemData;
+        esperandoConfirmacionItem.set(clienteNumero, {
+          ...itemDataBase,
+          _pendienteAgregar: { cantidad: cantNum, tipoSlug: tipoDetectado?.slug || 'taco' },
+        });
         await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
         return true;
       }
