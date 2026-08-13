@@ -49,6 +49,8 @@ function getMenuFormato() {
     let seccionPrecios = "";
     for (const it of itemTypes) {
       const campo       = it.precio_campo || 'precio_taco';
+      // Los tipos vendidos por peso/gramos tienen su propia sección "POR GRAMOS" más abajo
+      if (campo === 'precio_100g') continue;
       const pBase       = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
       if (preciosUniformes) {
         seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${pBase} c/u\n${notaTaco}\n\n`;
