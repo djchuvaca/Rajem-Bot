@@ -1987,19 +1987,20 @@ const MSG_META = {
   comprobante_recibido:  { label:'Comprobante de pago recibido',      desc:'Se envía cuando el cliente manda foto del comprobante de transferencia.',               vars:['{negocio}'] },
   fuera_horario_antes:   { label:'Antes de abrir',                    desc:'Se envía cuando el cliente escribe antes de la hora de apertura del día.',              vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
   fuera_horario_despues: { label:'Después de cerrar',                 desc:'Se envía cuando el cliente escribe después de la hora de cierre.',                      vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
-  fuera_horario_lunes:   { label:'Día de descanso (lunes)',           desc:'Se envía cuando el cliente escribe en el día de descanso configurado.',                 vars:['{negocio}','{hora_inicio}'] },
+  fuera_horario_lunes:   { label:'Día de descanso',                   desc:'Se envía cuando el cliente escribe en el día marcado como cerrado en Horarios. Usa {hora_inicio} del día siguiente con servicio.',vars:['{negocio}','{hora_inicio}'] },
   menu_taco_nota:        { label:'Descripción — tacos y tortas',      desc:'Texto descriptivo que aparece en la sección de tacos y tortas del menú.',               vars:[] },
   menu_gramos_nota:      { label:'Descripción — por gramos',          desc:'Texto que aparece en la sección de venta por peso (100g).',                            vars:[] },
-  menu_salsas_nota:      { label:'Nota — inicio sección salsas',      desc:'Texto introductorio de la sección de salsas en el menú.',                              vars:[] },
-  menu_pie_salsas:       { label:'Pie — sección salsas',              desc:'Texto al final de la sección de salsas.',                                              vars:[] },
+  menu_salsas_nota:      { label:'Nota — inicio sección salsas',      desc:'Texto introductorio de la sección de salsas extra en el menú.',                        vars:[] },
+  menu_pie_salsas:       { label:'Pie — sección salsas',              desc:'Texto al pie de la sección de salsas extra. Deja vacío para no mostrar nada.',         vars:[] },
   menu_nota_precios:     { label:'Nota de precios (pie del menú)',    desc:'Se muestra al final del menú completo.',                                                vars:['{negocio}'] },
   menu_por_cantidad:     { label:'Descripción — precio por cantidad', desc:'Explica cómo funciona el precio cuando se pide por cantidad en pesos.',                 vars:[] },
+  menu_domicilio_nota:   { label:'Nota de domicilio (pie del menú)',  desc:'Línea sobre domicilio que aparece al final del menú. Deja vacío para ocultarla.',      vars:[] },
 };
 
 const GRUPOS_MENSAJES = {
   atencion: ['saludo','confirmacion_pedido','cancelacion_enviada','comprobante_recibido'],
   horario:  ['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'],
-  menu:     ['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad'],
+  menu:     ['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad','menu_domicilio_nota'],
 };
 
 function autoResizeMsg(el) {

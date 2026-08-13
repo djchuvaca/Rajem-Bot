@@ -38,6 +38,7 @@ function getMenuFormato() {
     const notaTaco     = getMensaje("menu_taco_nota")    || "_(combinaciones al gusto)_";
     const notaGramos   = getMensaje("menu_gramos_nota")  || "Cualquier pieza o combinación\n_Incluye tortillas y salsas_";
     const notaSalsas   = getMensaje("menu_salsas_nota")  || "_(Los tacos y tortas ya incluyen salsas gratis)_";
+    const pieSalsas    = getMensaje("menu_pie_salsas")   || "";
     const notaCantidad = getMensaje("menu_por_cantidad") || "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_";
     // ── Sección de precios dinámica según item_types ──────────────────────────
     const itemTypes     = getItemTypes();
@@ -89,7 +90,9 @@ function getMenuFormato() {
       salsasSeccion =
         `🌶️ *SALSAS EXTRA* — ${precioDisplay}\n` +
         `${salNombres}\n` +
-        `${notaSalsas}\n\n`;
+        `${notaSalsas}` +
+        (pieSalsas ? `\n${pieSalsas}` : ``) +
+        `\n\n`;
     }
 
     const soportaPesos   = itemTypes.some(t => t.soporta_pesos);
