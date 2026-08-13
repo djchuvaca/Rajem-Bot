@@ -63,19 +63,6 @@ function respuestaPrecio(producto = null) {
     // Obtener item_types activos para construir columnas de precio
     let itemTypes = [];
     try { itemTypes = getItemTypes() || []; } catch (_) {}
-    if (!itemTypes.length) {
-      try {
-        const { getGiroActivo } = require('../giros');
-        const giro = getGiroActivo();
-        if (giro?.itemTypes?.length) {
-          itemTypes = giro.itemTypes.map(it => ({
-            ...it,
-            soporta_gramos: it.soporta_gramos ? 1 : 0,
-            soporta_pesos:  it.soporta_pesos  ? 1 : 0,
-          }));
-        }
-      } catch (_) {}
-    }
 
     // Obtener cortes desde tabla cortes (nueva) con fallback a productos
     let cortes = [];

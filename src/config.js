@@ -130,36 +130,17 @@ function getMenuFormato() {
 function _menuDefault() {
   const negocio = getConfig("nombre_negocio") || "el negocio";
   const precios = getPrecios();
-  try {
-    const itemTypes = getItemTypes();
-    let lineas = "";
-    for (const it of itemTypes) {
-      const campo = it.precio_campo || 'precio_taco';
-      const p     = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
-      lineas += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${p} c/u\n`;
-    }
-    if (itemTypes.some(t => t.soporta_gramos)) {
-      lineas += `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n`;
-    }
-    return `\n${itemTypes[0]?.emoji || '🍽️'} *MENÚ ${negocio.toUpperCase()}* ${itemTypes[0]?.emoji || '🍽️'}\n━━━━━━━━━━━━━━━━━━\n\n${lineas}\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
-  } catch (_) {
-    try {
-      const { getGiroActivo } = require('./giros');
-      const giro = getGiroActivo();
-      const emoji = giro?.emoji || '🍽️';
-      let lineas = '';
-      for (const it of (giro?.itemTypes || [])) {
-        const p = it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
-        lineas += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${p} c/u\n`;
-      }
-      if ((giro?.itemTypes || []).some(t => t.soporta_gramos) && precios.p100g > 0) {
-        lineas += `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n`;
-      }
-      return `\n${emoji} *MENÚ ${negocio.toUpperCase()}* ${emoji}\n━━━━━━━━━━━━━━━━━━\n\n${lineas}\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
-    } catch (_) {
-      return `\n🍽️ *MENÚ ${negocio.toUpperCase()}* 🍽️\n━━━━━━━━━━━━━━━━━━\n\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
-    }
+  const itemTypes = (() => { try { return getItemTypes() || []; } catch (_) { return []; } })();
+  let lineas = "";
+  for (const it of itemTypes) {
+    const campo = it.precio_campo || 'precio_taco';
+    const p     = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+    lineas += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${p} c/u\n`;
   }
+  if (itemTypes.some(t => t.soporta_gramos)) {
+    lineas += `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n`;
+  }
+  return `\n${itemTypes[0]?.emoji || '🍽️'} *MENÚ ${negocio.toUpperCase()}* ${itemTypes[0]?.emoji || '🍽️'}\n━━━━━━━━━━━━━━━━━━\n\n${lineas}\n━━━━━━━━━━━━━━━━━━\n¿Qué te vamos a preparar? 😊\n`;
 }
 
 // ── FORMULARIOS ───────────────────────────────────────────────────────────────

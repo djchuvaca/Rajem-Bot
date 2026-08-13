@@ -2310,14 +2310,16 @@ async function initApp() {
   loadNegocioEstado();
   loadDashboard();
   _restoreSection();
-  // Wizard de onboarding: abrir si es el primer uso y el nombre es el default
-  if (!localStorage.getItem('setup_done')) {
-    try {
-      const cfg = await api('/api/config');
-      const nombre = (cfg.nombre_negocio || '').trim();
-      if (!nombre || nombre === 'Tacos Javier') wizardOpen();
-    } catch(_) {}
-  }
+  // Wizard de onboarding: abre si nombre_negocio es el default de fábrica.
+  // No usa localStorage — así funciona aunque se recree el tenant en el mismo browser.
+  try {
+    const cfg = await api('/api/config');
+    const nombre = (cfg.nombre_negocio || '').trim();
+    if (!nombre || nombre === 'Mi Negocio') {
+      localStorage.removeItem('setup_done');
+      wizardOpen();
+    }
+  } catch(_) {}
 }
 
 setInterval(async () => {
@@ -2480,7 +2482,6 @@ async function _wzSavePaso(n) {
 }
 
 function wizardClose() {
-  localStorage.setItem('setup_done', '1');
   document.getElementById('wizard-overlay').style.display = 'none';
   loadDashboard();
   loadNegocioEstado();

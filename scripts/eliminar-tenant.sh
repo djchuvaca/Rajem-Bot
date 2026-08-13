@@ -2,7 +2,8 @@
 # scripts/eliminar-tenant.sh
 # Elimina completamente un tenant:
 #   - Detiene y elimina el contenedor Docker
-#   - Elimina el servicio de docker-compose.yml
+#   - Elimina el servicio de docker-compose.override.yml
+#   - Elimina la entrada de data/tenants.json
 #   - Elimina envs/{TENANT_ID}.env
 #   - Elimina la base de datos data/{TENANT_ID}.db
 #   - Elimina los backups data/backups/{TENANT_ID}_*.db
@@ -55,7 +56,24 @@ else
   echo "Servicio ${TENANT_ID} no encontrado en docker-compose.override.yml."
 fi
 
-# 3. Eliminar archivo .env del tenant
+# 3. Eliminar de data/tenants.json
+if [[ -f "$RAIZ/data/tenants.json" ]] && command -v python3 &>/dev/null; then
+  python3 - <<PYEOF
+import json
+file = '${RAIZ}/data/tenants.json'
+try:
+    with open(file) as f: data = json.load(f)
+    data['tenants'] = [t for t in data.get('tenants', []) if t['id'] != '${TENANT_ID}']
+    with open(file, 'w') as f: json.dump(data, f, ensure_ascii=False, indent=2)
+    print("data/tenants.json actualizado.")
+except Exception as e:
+    print(f"Advertencia: no se pudo actualizar tenants.json: {e}")
+PYEOF
+else
+  echo "tenants.json no encontrado o python3 no disponible."
+fi
+
+# 4. Eliminar archivo .env del tenant
 if [[ -f "$RAIZ/envs/${TENANT_ID}.env" ]]; then
   rm "$RAIZ/envs/${TENANT_ID}.env"
   echo "Archivo envs/${TENANT_ID}.env eliminado."

@@ -41,25 +41,7 @@ function _getItemTypesActivos() {
   return _itemTypesCache;
 }
 
-function _itemTypesDefault() {
-  try {
-    const { getGiroActivo } = require('../giros');
-    const giro = getGiroActivo();
-    if (giro?.itemTypes?.length) {
-      return giro.itemTypes.map(it => ({
-        slug:           it.slug,
-        nombre:         it.nombre,
-        nombre_plural:  it.nombre_plural,
-        emoji:          it.emoji,
-        aliases_json:   JSON.stringify(it.aliases || []),
-        soporta_gramos: it.soporta_gramos ? 1 : 0,
-        soporta_pesos:  it.soporta_pesos  ? 1 : 0,
-        precio_campo:   it.precio_campo,
-      }));
-    }
-  } catch (_) {}
-  return [];
-}
+function _itemTypesDefault() { return []; }
 
 function _getItemTypeAliases(type) {
   try { return JSON.parse(type.aliases_json || '[]'); } catch (_) { return []; }
