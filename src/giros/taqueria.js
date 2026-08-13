@@ -49,7 +49,7 @@ module.exports = {
       soporta_gramos: false, soporta_pesos: false, precio_campo: 'precio_taco', precio_base: 60,
     },
     {
-      slug: 'gramos', nombre: '100gr', nombre_plural: 'por 100gr', emoji: '⚖️',
+      slug: 'gramos', nombre: '100gr.', nombre_plural: '100gr.', emoji: '⚖️',
       aliases: ['por gr', 'por gr.', 'por gramo', 'por gramos', 'gramo', 'gramos', 'gr', 'kilo', 'kilos', 'medio kilo', 'cuarto kilo', 'tres cuartos', 'por kilo'],
       soporta_gramos: true, soporta_pesos: false, precio_campo: 'precio_100g', precio_base: 32,
     },
