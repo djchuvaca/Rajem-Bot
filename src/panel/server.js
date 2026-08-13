@@ -665,9 +665,8 @@ app.get("/api/item-types", requireAuth, (req, res) => {
 app.post("/api/item-types", requireAuth, (req, res) => {
   try {
     const slug = getBusinessTypeSlug();
-    const bt   = getBusinessType(slug);
-    if (!bt) return res.status(404).json({ error: "business_type no encontrado" });
-    createItemType(bt.id, req.body);
+    if (!getBusinessType(slug)) return res.status(404).json({ error: "business_type no encontrado" });
+    createItemType(slug, req.body);
     invalidarCacheItemTypes(); invalidarCacheCortes();
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

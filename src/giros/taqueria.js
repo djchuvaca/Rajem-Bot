@@ -26,7 +26,7 @@ module.exports = {
     {
       slug: 'taco', nombre: 'taco', nombre_plural: 'tacos', emoji: '🌮',
       aliases: ['taquito', 'taquitos', 'tacito', 'tacitos'],
-      soporta_gramos: true, soporta_pesos: true, precio_campo: 'precio_taco', precio_base: 30,
+      soporta_gramos: false, soporta_pesos: false, precio_campo: 'precio_taco', precio_base: 30,
     },
     {
       slug: 'torta', nombre: 'torta', nombre_plural: 'tortas', emoji: '🥖',
