@@ -89,6 +89,9 @@ module.exports = {
   createCorte:              cortesDB.createCorte,
   updateCorte:              cortesDB.updateCorte,
 
+  // menu_items (menú activo configurado por el tenant)
+  getMenuItems:        modelos.getMenuItems,
+
   // productos (bebidas/salsas — cortes migrados a tabla cortes)
   getProductos:        modelos.getProductos,
   getProducto:         modelos.getProducto,

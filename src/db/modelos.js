@@ -4,6 +4,13 @@ const { queryAll, queryOne, run } = require("./core");
 function getProductos() {
   return queryAll("SELECT * FROM productos WHERE activo = 1");
 }
+
+// ─── MENU ITEMS (menú configurado por el tenant desde el panel) ───────────────
+function getMenuItems(categoria = null) {
+  const where  = categoria ? "WHERE eliminado=0 AND activo=1 AND categoria=?" : "WHERE eliminado=0 AND activo=1";
+  const params = categoria ? [categoria] : [];
+  return queryAll(`SELECT * FROM menu_items ${where} ORDER BY categoria, producto_slug`, params) || [];
+}
 function getProducto(nombre) {
   return queryOne("SELECT * FROM productos WHERE nombre = ? AND activo = 1", [nombre.toLowerCase()]);
 }
@@ -253,6 +260,7 @@ function getDespachosPendientes() {
 
 module.exports = {
   getProductos, getProducto, updateProducto, createProducto, deleteProducto,
+  getMenuItems,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha, getStatsReporte,

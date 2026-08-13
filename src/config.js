@@ -1,4 +1,4 @@
-﻿const { getConfig, getBanco, getMensaje, getProductos, getItemTypes } = require("./db");
+﻿const { getConfig, getBanco, getMensaje, getProductos, getItemTypes, getMenuItems } = require("./db");
 const { getPrecios } = require("./pedido/precios");
 const { getRangoHorario } = require("./horario");
 const { getGiroActivo } = require("./giros");
@@ -32,85 +32,102 @@ function getMenuFormato() {
     const md    = giro?.mensajesDefaults || {};
     const cd    = giro?.configDefaults   || {};
 
-    const productos   = getProductos();
-    const cortes      = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
-    const refrescos   = productos.filter(p => p.categoria === "refresco");
-    const salsas      = productos.filter(p => p.categoria === "salsa");
-    const nombres     = cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ");
     const negocio     = getConfig("nombre_negocio") || "el negocio";
     const pSalsa      = parseInt(getConfig("precio_salsa") || cd.precio_salsa || "15");
     const precios     = getPrecios();
+    const itemTypes   = getItemTypes();
+
     const notaTaco     = getMensaje("menu_taco_nota")    || md.menu_taco_nota    || '';
     const notaGramos   = getMensaje("menu_gramos_nota")  || md.menu_gramos_nota  || '';
     const notaSalsas   = getMensaje("menu_salsas_nota")  || md.menu_salsas_nota  || '';
     const pieSalsas    = getMensaje("menu_pie_salsas")   || md.menu_pie_salsas   || '';
     const notaCantidad = getMensaje("menu_por_cantidad") || md.menu_por_cantidad || '';
-    // ── Sección de precios dinámica según item_types ──────────────────────────
-    const itemTypes     = getItemTypes();
-    const preciosUniformes = cortes.length === 0 || cortes.every(c => {
-      const pc = precios.porCorte[c.nombre.toLowerCase()] || precios;
-      return pc.pTaco === precios.pTaco && pc.pTorta === precios.pTorta && pc.p100g === precios.p100g;
-    });
+
+    // ── Leer el menú configurado por el tenant (menu_items) ───────────────────
+    const miAll       = getMenuItems();
+    const cortesItems = miAll.filter(i => i.categoria === 'corte');
+    const bebidasItems = miAll.filter(i => i.categoria === 'refresco');
+    const salsasItems  = miAll.filter(i => i.categoria === 'salsa');
+
+    // ── Cortes activos: nombres desde tabla cortes por slug ───────────────────
+    const { getCortesBDObj } = require('./db/cortes');
+    const cortesDB      = getCortesBDObj();
+    const cortesPorSlug = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
+    const corteSlugs    = [...new Set(cortesItems.map(i => i.producto_slug))];
+    const cortesActivos = corteSlugs.map(s => cortesPorSlug[s]).filter(Boolean);
+    const nombres       = cortesActivos.map(c => c.nombre.charAt(0).toUpperCase() + c.nombre.slice(1)).join(" · ");
+
+    // ── Sección de precios por item_type ──────────────────────────────────────
     let seccionPrecios = "";
     for (const it of itemTypes) {
-      const campo       = it.precio_campo || 'precio_taco';
-      // Los tipos vendidos por peso/gramos tienen su propia sección "POR GRAMOS" más abajo
-      if (campo === 'precio_100g') continue;
-      const pBase       = campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
-      if (preciosUniformes) {
-        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — $${pBase} c/u\n${notaTaco}\n\n`;
+      const campo = it.precio_campo || 'precio_taco';
+      if (campo === 'precio_100g') continue; // gramos tiene su sección propia más abajo
+
+      // Precios de menu_items para este formato
+      const preciosFormato = cortesItems
+        .filter(i => i.formato_slug === it.slug)
+        .map(i => i.precio || 0)
+        .filter(p => p > 0);
+
+      let precioDisplay;
+      if (preciosFormato.length === 0) {
+        // Sin items configurados → usar precio_base del item_type o global
+        const pBase = it.precio_base || (campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
+        precioDisplay = `$${pBase} c/u`;
       } else {
-        const preKey = campo === 'precio_torta' ? 'pTorta' : 'pTaco';
-        const minP   = cortes.length ? Math.min(...cortes.map(c => (precios.porCorte[c.nombre.toLowerCase()] || precios)[preKey])) : pBase;
-        seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — desde $${minP} c/u\n`;
+        const minP = Math.min(...preciosFormato);
+        const maxP = Math.max(...preciosFormato);
+        precioDisplay = minP === maxP ? `$${minP} c/u` : `desde $${minP} c/u`;
       }
+      seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — ${precioDisplay}\n${notaTaco}\n\n`;
     }
-    if (!preciosUniformes && cortes.length) {
-      seccionPrecios += `_(El precio varía por variante — escribe *precios* para ver el desglose)_\n\n`;
-    }
+
+    // ── Sección por gramos ────────────────────────────────────────────────────
     const soportaGramos = itemTypes.some(t => t.soporta_gramos);
     if (soportaGramos) {
-      seccionPrecios += preciosUniformes
-        ? `⚖️ *POR GRAMOS* — $${precios.p100g} / 100g\n${notaGramos}\n\n`
-        : `⚖️ *POR GRAMOS* — desde $${precios.p100g} / 100g\n${notaGramos}\n\n`;
+      const itGramos = itemTypes.find(t => t.soporta_gramos);
+      const p100g = itGramos?.precio_base || precios.p100g;
+      seccionPrecios += `⚖️ *POR GRAMOS* — $${p100g} / 100g\n${notaGramos}\n\n`;
     }
 
+    // ── Sección por cantidad en $ ─────────────────────────────────────────────
+    const soportaPesos = itemTypes.some(t => t.soporta_pesos);
+    const seccionPesos = soportaPesos ? `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` : "";
+
+    // ── Variedades ─────────────────────────────────────────────────────────────
+    const variedadesSeccion = cortesActivos.length > 0 ? `🥩 *Variedades disponibles:* ${nombres}\n\n` : "";
+
+    // ── Bebidas ───────────────────────────────────────────────────────────────
     let refrescosSeccion = "";
-    if (refrescos.length > 0) {
-      const refNombres = refrescos.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ");
-      refrescosSeccion =
-        `🥤 *REFRESCOS* — $${refrescos[0].precio_taco} c/u\n` +
-        `${refNombres}\n\n`;
+    if (bebidasItems.length > 0) {
+      const refNombres  = bebidasItems.map(b => b.producto_slug.charAt(0).toUpperCase() + b.producto_slug.slice(1)).join(" · ");
+      const presBebidas = bebidasItems.map(b => b.precio || 0).filter(p => p > 0);
+      const minB = presBebidas.length ? Math.min(...presBebidas) : 0;
+      const maxB = presBebidas.length ? Math.max(...presBebidas) : 0;
+      const pBDisplay = presBebidas.length === 0 ? '' : (minB === maxB ? `$${minB} c/u` : `desde $${minB} c/u`);
+      refrescosSeccion = `🥤 *REFRESCOS*${pBDisplay ? ` — ${pBDisplay}` : ''}\n${refNombres}\n\n`;
     }
 
+    // ── Salsas ────────────────────────────────────────────────────────────────
     let salsasSeccion = "";
-    if (salsas.length > 0) {
-      const salNombres = salsas.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ");
-      // Si todas las salsas tienen precio_taco = 0 en BD, usar el global como fallback
-      const precioRef = salsas.every(s => s.precio_taco === 0) ? pSalsa : null;
-      const todosIgual = !precioRef && salsas.every(s => s.precio_taco === salsas[0].precio_taco);
-      const precioDisplay = precioRef
-        ? `$${precioRef} c/u`
-        : todosIgual
-          ? `$${salsas[0].precio_taco} c/u`
-          : `precio variable`;
+    if (salsasItems.length > 0) {
+      const salNombres  = salsasItems.map(s => s.producto_slug.charAt(0).toUpperCase() + s.producto_slug.slice(1)).join(" · ");
+      const presSalsas  = salsasItems.map(s => s.precio || 0);
+      const todosCero   = presSalsas.every(p => p === 0);
+      const todosIgual  = !todosCero && presSalsas.every(p => p === presSalsas[0]);
+      const precioDisplay = todosCero
+        ? (pSalsa ? `$${pSalsa} c/u` : '')
+        : todosIgual ? `$${presSalsas[0]} c/u` : 'precio variable';
       salsasSeccion =
-        `🌶️ *SALSAS EXTRA* — ${precioDisplay}\n` +
+        `🌶️ *SALSAS EXTRA*${precioDisplay ? ` — ${precioDisplay}` : ''}\n` +
         `${salNombres}\n` +
         `${notaSalsas}` +
         (pieSalsas ? `\n${pieSalsas}` : ``) +
         `\n\n`;
     }
 
-    const soportaPesos   = itemTypes.some(t => t.soporta_pesos);
-    const seccionPesos   = soportaPesos ? `💵 *POR CANTIDAD EN $*\n${notaCantidad}\n\n` : "";
-    const etiquetaItems  = itemTypes.length > 0
-      ? itemTypes[0].emoji + " " + itemTypes.map(t => t.nombre_plural.charAt(0).toUpperCase() + t.nombre_plural.slice(1)).join(" / ")
-      : "🥩 Piezas";
-
-    const variedadesSeccion = cortes.length > 0 ? `🥩 *Variedades disponibles:* ${nombres}\n\n` : "";
-    const notaDomicilio     = getMensaje("menu_domicilio_nota") ?? md.menu_domicilio_nota ?? '';
-    const domicilioSeccion  = notaDomicilio ? `${notaDomicilio}\n\n` : "";
+    const notaDomicilio    = getMensaje("menu_domicilio_nota") ?? md.menu_domicilio_nota ?? '';
+    const domicilioSeccion = notaDomicilio ? `${notaDomicilio}\n\n` : "";
 
     return (
       `\n${itemTypes[0]?.emoji || "🍽️"} *MENÚ ${negocio.toUpperCase()}* ${itemTypes[0]?.emoji || "🍽️"}\n` +

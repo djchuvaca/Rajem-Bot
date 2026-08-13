@@ -2,7 +2,7 @@
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
-const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes } = require("../db");
+const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes, getMenuItems } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");
@@ -65,28 +65,39 @@ function respuestaPrecio(producto = null) {
     let itemTypes = [];
     try { itemTypes = getItemTypes() || []; } catch (_) {}
 
-    // Obtener cortes desde tabla cortes (nueva) con fallback a productos
+    // Obtener cortes y precios desde menu_items del tenant (fuente de verdad del panel)
     let cortes = [];
+    let preciosMI = {}; // { slug: { formatoSlug: precio } }
     try {
+      const miCortes = getMenuItems('corte');
+      const slugsUnicos = [...new Set(miCortes.map(i => i.producto_slug))];
+      for (const item of miCortes) {
+        if (!preciosMI[item.producto_slug]) preciosMI[item.producto_slug] = {};
+        if (item.formato_slug) preciosMI[item.producto_slug][item.formato_slug] = item.precio || 0;
+      }
       const { getCortesBDObj } = require("../db/cortes");
-      cortes = (getCortesBDObj() || []).filter(c => c.slug !== 'surtido');
+      const cortesDB = getCortesBDObj();
+      const porSlug  = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
+      cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => c.slug !== 'surtido');
     } catch (_) {}
+    // Fallback si menu_items está vacío: usar cortes activos del catálogo
     if (!cortes.length) {
       try {
-        cortes = getProductos().filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
+        const { getCortesBDObj } = require("../db/cortes");
+        cortes = (getCortesBDObj() || []).filter(c => c.slug !== 'surtido');
       } catch (_) {}
     }
 
     // Precio para un corte en un formato específico
     const precioCorteFormato = (corteId, formatoSlug) => {
+      // 1. Desde menu_items (precio configurado por el tenant desde el panel)
+      if (preciosMI[corteId]?.[formatoSlug] !== undefined) return preciosMI[corteId][formatoSlug];
+      // 2. Fallback: precio_base del item_type o precio global
       const pc = precios.porCorte[corteId] || precios;
       const it = itemTypes.find(t => t.slug === formatoSlug);
-      // 1. Precio explícito por corte+formato (precios_json del corte)
       if (pc.precios && pc.precios[formatoSlug] !== undefined) return pc.precios[formatoSlug];
-      // 2. Formatos clásicos: usar precio por corte de productos
       if (it?.precio_campo === 'precio_torta') return pc.pTorta ?? precios.pTorta;
       if (it?.precio_campo === 'precio_taco')  return pc.pTaco  ?? precios.pTaco;
-      // 3. Formatos dinámicos (quesadilla, vampiro, burrito): precio_base del item_type
       if (it?.precio_base) return it.precio_base;
       return pc.pTaco ?? precios.pTaco;
     };
