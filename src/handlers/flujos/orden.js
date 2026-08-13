@@ -368,8 +368,9 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   }
 
   const esConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|claro|perfecto|va\s+bien|dale\s+pues|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|ya|ya\s+dale|ya\s+pues|ya\s+va)$/i.test(textoOriginal.trim());
-  const esCancel  = /\b(cancel[ae](?:me|la|lo|r(?:\s+(?:mi\s+)?pedido)?)?|ya\s+no\s+quiero|borra(?:lo|la|me)?|elimina(?:lo|la|r)?|no\s+quiero\s+nada|olvida(?:lo|la|r)?|d[eé]jalo?\s+as[ií]|no\s+importa)\b/i.test(textoOriginal);
-  const esNoVariante = /^(no|nel|nop|nope|incorrecto|error|no\s+es\s+correcto|no\s+est[aá]\s+bien)$/i.test(textoOriginal.trim());
+  const _textoNorm = normalizar(textoOriginal); // sin acentos — para cancel/noVariante
+  const esCancel  = /\b(cancel[ae](?:me|la|lo|r(?:\s+(?:mi\s+)?pedido)?)?|ya\s+no\s+quiero|borra(?:lo|la|me)?|elimina(?:lo|la|r)?|no\s+quiero\s+nada|olvida(?:lo|la|r)?|d[eé]jalo?\s+as[ií]|no\s+importa)\b/i.test(_textoNorm);
+  const esNoVariante = /^(no|nel|nop|nope|incorrecto|error|no\s+es\s+correcto|no\s+esta\s+bien)$/i.test(_textoNorm.trim());
 
   const quiereModificar = /quit(a|ar|ame|amelo|amelos)|elimina|borra|cambia|sin\s+los?|no\s+(quiero|pongas?)\s+los?/i.test(textoOriginal);
   if (quiereModificar) {
@@ -390,7 +391,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     }
     // Fallback: "la [item_type] cambia[la/lo/me] por [corte]" / "cambia la [item_type] por [corte]"
     const mItemCorte = textoOriginal.match(
-      /(?:(?:la|el|los|las)\s+)?(\w+)\s+cambia(?:la|lo|me|le|n)?(?:\s+de\s+\w+)?\s+por\s+(\w+)|cambia(?:me|le)?\s+(?:la|el|los|las)\s+(\w+)\s+por\s+(\w+)/i
+      /(?:(?:la|el|los|las)\s+)?(\w+)\s+cambia(?:me(?:la|lo)?|la|lo|le|n)?(?:\s+de\s+\w+)?\s+por\s+(\w+)|cambia(?:me|le)?\s+(?:la|el|los|las)\s+(\w+)\s+por\s+(\w+)/i
     );
     if (mItemCorte) {
       const rawItem    = normalizar(mItemCorte[1] || mItemCorte[3] || '');
@@ -439,8 +440,10 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const tipoViejo   = detectarTipoItemDesdeTexto(rawOld);
       const tipoNuevo   = detectarTipoItemDesdeTexto(rawNuevo);
       const cortesMap   = getCortes();
+      const _escReG = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Caso A: swap de tipo de ítem (tipoViejo → tipoNuevo)
       if (tipoViejo && tipoNuevo && tipoViejo.slug !== tipoNuevo.slug) {
-        const _escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const _escRe = _escReG;
         const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
         const _patsViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
         if (tipoViejo.nombre_plural) _patsViejo.push(normalizar(tipoViejo.nombre_plural));
@@ -496,6 +499,58 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           historial.push({ role: "assistant", content: textoFinalMod });
           await msg.reply(textoFinalMod + '\n\n*¿Es correcto?*');
           return true;
+        }
+      }
+      // Caso B: "cambia la [tipo] de [corteViejo] por [corteNuevo]" — swap de corte con tipo especificado
+      if (tipoViejo && !tipoNuevo) {
+        const corteNuevoSlug = cortesMap[rawNuevo] || buscarCorteFuzzy(rawNuevo);
+        if (corteNuevoSlug) {
+          const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
+          const _patsViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
+          if (tipoViejo.nombre_plural) _patsViejo.push(normalizar(tipoViejo.nombre_plural));
+          const lineasMatch = lineas
+            .map((l, i) => ({ l, i }))
+            .filter(({ l }) => {
+              const lNorm = normalizar(l);
+              if (!_patsViejo.some(p => new RegExp(`\\b${_escReG(p)}\\b`, 'i').test(lNorm))) return false;
+              // Si el cliente especificó el corte viejo ("de buche"), filtrar por él
+              if (rawOldCort) {
+                const slugViejoFiltro = cortesMap[rawOldCort] || buscarCorteFuzzy(rawOldCort);
+                if (slugViejoFiltro) {
+                  const ckL = Object.keys(cortesMap).find(k => new RegExp(`\\b${_escReG(k)}\\b`, 'i').test(lNorm));
+                  if (ckL && cortesMap[ckL] !== slugViejoFiltro) return false;
+                }
+              }
+              return true;
+            });
+          if (lineasMatch.length > 1) {
+            const cortesOpc = lineasMatch.map(({ l }) => {
+              const ck = Object.keys(cortesMap).find(k => new RegExp(`\\b${_escReG(k)}\\b`, 'i').test(normalizar(l)));
+              return ck || null;
+            }).filter(Boolean);
+            const nombreViejo = tipoViejo.nombre_plural || tipoViejo.nombre;
+            const listaCort = cortesOpc.map(c => `*de ${c}*`).join(' o ');
+            await msg.reply(`Tienes varias *${nombreViejo}* (${listaCort}).\n¿Cuál quieres cambiar a ${rawNuevo}?\n_(Ej: 'cambia la ${tipoViejo.nombre} de ${cortesOpc[0] || '...'} por ${rawNuevo}')_`);
+            return true;
+          }
+          if (lineasMatch.length === 1) {
+            const { l: lineaVieja, i: lineaViejaIdx } = lineasMatch[0];
+            const matchCant = lineaVieja.match(/\b(\d+)\b/);
+            const cantidad = matchCant ? parseInt(matchCant[1], 10) : 1;
+            const jsonNuevo = { tipo: "pedido", items: [{ presentacion: tipoViejo.slug, cantidad, corte: corteNuevoSlug }] };
+            const { texto: nuevasLineas } = jsonALineas(jsonNuevo);
+            const nuevaLinea = nuevasLineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l)).join('\n');
+            lineas[lineaViejaIdx] = nuevaLinea;
+            const ordenNueva = lineas.join('\n');
+            const subtotalMod = calcularSubtotal(ordenNueva);
+            const textoFinalMod = ordenNueva + '\n💰 Subtotal: $' + subtotalMod;
+            pedidoJSONActual.delete(clienteNumero);
+            esperandoConfirmacionItem.set(clienteNumero, { ...itemData, lineas: textoFinalMod });
+            historial.push({ role: "user",      content: textoOriginal });
+            historial.push({ role: "assistant", content: textoFinalMod });
+            await msg.reply(textoFinalMod + '\n\n*¿Es correcto?*');
+            return true;
+          }
         }
       }
     }

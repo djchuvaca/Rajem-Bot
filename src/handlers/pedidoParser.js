@@ -630,15 +630,16 @@ function detectarTodasPreguntasFrecuentes(texto) {
 
 // ── DETECTAR MODIFICACIÓN ─────────────────────────────────────────────────────
 function detectarModificacion(texto) {
-  const t = normalizar(texto);
+  const t    = normalizar(texto);
+  const tNum = normalizar(textoANumero(t)); // con números convertidos — solo para AGREGAR_MAS
   if (PATRON_QUITAR_UNO.test(t)) {
     const mQ = t.match(PATRON_QUITAR_UNO);
     const corteRaw = (mQ[1] || mQ[2] || mQ[3] || mQ[4] || "").toLowerCase().trim();
     const corte = corteRaw ? (getCortes()[corteRaw] || buscarCorteFuzzy(corteRaw) || null) : null;
     return { tipo: "quitar_uno", corte };
   }
-  if (PATRON_AGREGAR_MAS.test(t)) {
-    const m = t.match(PATRON_AGREGAR_MAS);
+  if (PATRON_AGREGAR_MAS.test(tNum)) {
+    const m = tNum.match(PATRON_AGREGAR_MAS);
     const cantidad = parseInt(m[1] || m[3] || m[5] || m[7] || "1");
     const _corteRaw = (m[2] || m[4] || m[6] || m[8] || "").toLowerCase();
     const _corte = _corteRaw ? (getCortes()[_corteRaw] || buscarCorteFuzzy(_corteRaw) || null) : null;
