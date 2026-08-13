@@ -361,6 +361,35 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     return true;
   }
 
+  // Detectar intento de agregar más ítems durante la confirmación
+  const quiereAgregar = /agrega(?:le|me)?|a[ñn]ade(?:me)?|ponme\s+m[aá]s|sum[aá]me|también\s+(?:quiero|pido|ponme)|tambi[eé]n\s+(?:quiero|pido)/i.test(textoOriginal)
+    || /(\d+|una?)\s+m[aá]s/i.test(textoOriginal);
+  if (quiereAgregar) {
+    const { textoLimpio: textoAg } = separarRefresco(textoOriginal);
+    let jsonAg = parsearPedidoSimple(textoAg);
+    if (!jsonAg) {
+      // Sin corte en el mensaje — inferir desde el pedido actual
+      const CORTES_MAP_AG = getCortes();
+      const palabrasCAg   = Object.keys(CORTES_MAP_AG).join("|");
+      const mCorteAg      = itemData.lineas.match(new RegExp(`\\b(${palabrasCAg})\\b`, "i"));
+      const corteInferido = mCorteAg ? CORTES_MAP_AG[mCorteAg[1].toLowerCase()] : null;
+      if (corteInferido) jsonAg = parsearPedidoSimple(textoAg + " de " + corteInferido);
+    }
+    if (jsonAg?.tipo === "pedido") {
+      const lineasBase   = itemData.lineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+      const { texto: nuevasLineas } = jsonALineas(jsonAg);
+      const nuevasFiltradas = nuevasLineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
+      const ordenCombinada  = lineasBase + "\n" + nuevasFiltradas;
+      const subtotal        = calcularSubtotal(ordenCombinada);
+      const textoFinal      = ordenCombinada + "\n💰 Subtotal: $" + subtotal;
+      esperandoConfirmacionItem.set(clienteNumero, { ...itemData, lineas: textoFinal });
+      historial.push({ role: "user",      content: textoOriginal });
+      historial.push({ role: "assistant", content: textoFinal });
+      await msg.reply(textoFinal + "\n\n*¿Es correcto?*");
+      return true;
+    }
+  }
+
   if (esRechazo || /^no$/i.test(textoOriginal.trim())) {
     esperandoConfirmacionItem.delete(clienteNumero);
     esperandoAgregarMas.delete(clienteNumero);
