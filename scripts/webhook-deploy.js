@@ -56,35 +56,37 @@ async function handleDeploy(req, res) {
   const changed = (payload.commits || [])
     .flatMap(c => [...(c.added || []), ...(c.removed || []), ...(c.modified || [])]);
 
-  const needsRebuild = changed.some(f =>
-    ['package.json', 'package-lock.json', 'Dockerfile'].includes(f)
-  );
-  // src/panel/public/ está baked en la imagen (COPY . .) — necesita --build
-  // src/superadmin/public/ está montado como volumen — no necesita restart de PM2
+  // Archivos que viven en Docker (imagen baked con COPY . .) — siempre necesitan --build
+  const SUPERADMIN_DIRS = ['src/superadmin/'];
+  const isDockerFile = f =>
+    !SUPERADMIN_DIRS.some(d => f.startsWith(d)) &&           // superadmin corre en PM2, no Docker
+    !['scripts/webhook-deploy.js'].includes(f);              // webhook corre en PM2, no Docker
+
+  // src/superadmin/public/ montado como volumen — no necesita restart de PM2
   const onlySuperadminStatic = changed.length > 0 && changed.every(f =>
     f.startsWith('src/superadmin/public/')
   );
-  const hasPanelStatic  = changed.some(f => f.startsWith('src/panel/public/'));
-  // JS del superadmin corre en PM2 en el VPS (fuera de Docker) — necesita pm2 restart
+  // JS del superadmin corre en PM2 en el VPS (fuera de Docker)
   const needsSuperadmin = changed.some(f =>
     f.startsWith('src/superadmin/') && f.endsWith('.js') && !f.startsWith('src/superadmin/public/')
   );
-  const needsRestart = !needsRebuild && !onlySuperadminStatic && changed.some(f => f.endsWith('.js') || f.endsWith('.sh') || hasPanelStatic);
-  const needsPm2     = changed.includes('scripts/webhook-deploy.js');
+  // Cualquier cambio en archivos que van dentro del contenedor Docker requiere rebuild
+  const needsDockerBuild = !onlySuperadminStatic && changed.some(f => isDockerFile(f));
+  const needsPm2         = changed.includes('scripts/webhook-deploy.js');
 
   let dockerCmd;
-  if (needsRebuild || hasPanelStatic) {
+  if (needsDockerBuild) {
     dockerCmd = 'docker compose up -d --build';
-    console.log('[webhook] Cambios en dependencias/Dockerfile/panel-public — rebuild completo');
+    const razon = changed.some(f => ['package.json','package-lock.json','Dockerfile'].includes(f))
+      ? 'dependencias/Dockerfile'
+      : 'código fuente';
+    console.log(`[webhook] Cambios en ${razon} — rebuild completo de imagen`);
   } else if (onlySuperadminStatic) {
     dockerCmd = null;
     console.log('[webhook] Solo estáticos de superadmin — volumen actualiza sin reiniciar');
-  } else if (needsRestart) {
-    dockerCmd = 'docker compose up -d --force-recreate';
-    console.log('[webhook] Cambios en lógica JS — force-recreate (recarga codigo en contenedores)');
   } else {
-    dockerCmd = 'docker compose up -d --force-recreate';
-    console.log('[webhook] Cambios mixtos — force-recreate sin rebuild');
+    dockerCmd = null;
+    console.log('[webhook] Solo cambios en PM2 — sin acción Docker');
   }
 
   // git stash/pop falla si no hay cambios locales — simplemente pullamos directo
