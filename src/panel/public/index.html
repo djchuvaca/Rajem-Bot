@@ -288,8 +288,8 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
       <!-- PASO 0: Datos del Negocio -->
       <div class="wizard-step active" id="wz-s0">
         <div class="form-group">
-          <label class="form-label">Nombre del negocio</label>
-          <input class="form-input" id="wz-nombre" type="text" placeholder="Ej: Tacos El Güero">
+          <label class="form-label">Nombre del negocio <small style="color:var(--muted)">(solo lectura — configúralo desde el superadmin)</small></label>
+          <input class="form-input" id="wz-nombre" type="text" readonly disabled style="opacity:0.5;cursor:not-allowed">
         </div>
         <div class="form-group">
           <label class="form-label">Dirección / Ubicación <small style="color:var(--muted)">(opcional)</small></label>
@@ -2158,12 +2158,13 @@ const configLabels = {
 async function loadConfig() {
   const conf = await api('/api/config');
   const filtrados = conf.filter(c => !c.clave.startsWith('tel_real_') && configLabels[c.clave]);
-  document.getElementById('config-list').innerHTML = filtrados.map(c =>
-    `<div class="form-group">
-      <label class="form-label">${configLabels[c.clave] || c.clave}</label>
-      <input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}">
-    </div>`
-  ).join('');
+  document.getElementById('config-list').innerHTML = filtrados.map(c => {
+    const readonly = c.clave === 'nombre_negocio';
+    return `<div class="form-group">
+      <label class="form-label">${configLabels[c.clave] || c.clave}${readonly ? ' <small style="color:var(--muted)">(solo lectura)</small>' : ''}</label>
+      <input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}"${readonly ? ' readonly disabled style="opacity:0.5;cursor:not-allowed"' : ''}>
+    </div>`;
+  }).join('');
   // Cargar estrategia mixto por separado
   const estrategia = conf.find(c => c.clave === 'estrategia_precio_mixto')?.valor || 'mas_caro';
   const elEst = document.getElementById('cfg-estrategia-mixto');
@@ -2178,8 +2179,10 @@ async function saveEstrategiaMixto() {
 }
 
 async function saveConfig() {
+  const READONLY_KEYS = ['nombre_negocio'];
   const conf = await api('/api/config');
   for (const c of conf) {
+    if (READONLY_KEYS.includes(c.clave)) continue;
     const el = document.getElementById(`cfg-${c.clave}`);
     if (el) await api('/api/config', 'POST', { clave: c.clave, valor: el.value });
   }
@@ -2541,15 +2544,8 @@ async function _wzSavePaso(n) {
   try {
     if (n === 0) {
       // Datos del negocio
-      const nombre    = document.getElementById('wz-nombre').value.trim();
       const ubicacion = document.getElementById('wz-ubicacion').value.trim();
-      if (nombre)    await api('/api/config', 'POST', { clave:'nombre_negocio', valor: nombre });
       if (ubicacion) await api('/api/config', 'POST', { clave:'ubicacion', valor: ubicacion });
-      if (nombre) {
-        const el = document.getElementById('sidebar-negocio');
-        if (el) el.textContent = nombre;
-        document.title = `Panel — ${nombre}`;
-      }
     } else if (n === 1 && _wzDias) {
       // Horarios
       for (const d of _wzDias) {
