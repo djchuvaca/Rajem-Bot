@@ -399,9 +399,13 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const cortesMap  = getCortes();
       const corteNuevo = cortesMap[rawCorte] || buscarCorteFuzzy(rawCorte);
       if (tipoItem && corteNuevo) {
-        const lineaItem = itemData.lineas.split('\n').find(l =>
-          new RegExp(`\\b(${normalizar(tipoItem.nombre)}|${tipoItem.slug})\\b`, 'i').test(normalizar(l))
-        );
+        const _patsTipo = [normalizar(tipoItem.nombre), tipoItem.slug];
+        if (tipoItem.nombre_plural) _patsTipo.push(normalizar(tipoItem.nombre_plural));
+        const lineaItem = itemData.lineas.split('\n').find(l => {
+          if (!l.trim() || /subtotal/i.test(l)) return false;
+          const lNorm = normalizar(l);
+          return _patsTipo.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lNorm));
+        });
         if (lineaItem) {
           const corteActualKey = Object.keys(cortesMap).find(k =>
             new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(normalizar(lineaItem))
@@ -436,16 +440,35 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const tipoNuevo   = detectarTipoItemDesdeTexto(rawNuevo);
       const cortesMap   = getCortes();
       if (tipoViejo && tipoNuevo && tipoViejo.slug !== tipoNuevo.slug) {
+        const _escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
-        const _patronesViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
-        if (tipoViejo.nombre_plural) _patronesViejo.push(normalizar(tipoViejo.nombre_plural));
-        const lineaViejaIdx = lineas.findIndex(l => {
-          const lNorm = normalizar(l);
-          return _patronesViejo.some(p =>
-            new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lNorm)
+        const _patsViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
+        if (tipoViejo.nombre_plural) _patsViejo.push(normalizar(tipoViejo.nombre_plural));
+        const lineasMatch = lineas
+          .map((l, i) => ({ l, i }))
+          .filter(({ l }) => {
+            const lNorm = normalizar(l);
+            return _patsViejo.some(p => new RegExp(`\\b${_escRe(p)}\\b`, 'i').test(lNorm));
+          });
+        if (lineasMatch.length > 1) {
+          // Ambigüedad — hay varias líneas del mismo tipo, pedir corte específico
+          const cortesOpciones = lineasMatch
+            .map(({ l }) => {
+              const ck = Object.keys(cortesMap).find(k =>
+                new RegExp(`\\b${_escRe(k)}\\b`, 'i').test(normalizar(l))
+              );
+              return ck || null;
+            })
+            .filter(Boolean);
+          const nombreViejo = tipoViejo.nombre_plural || tipoViejo.nombre;
+          const listaCort = cortesOpciones.map(c => `*de ${c}*`).join(' o ');
+          await msg.reply(
+            `Tienes varias *${nombreViejo}* (${listaCort}).\n¿Cuál quieres cambiar por ${tipoNuevo.nombre}?\n_(Ej: 'cambia la ${tipoViejo.nombre} de ${cortesOpciones[0] || '...'} por ${tipoNuevo.nombre}')_`
           );
-        });
-        if (lineaViejaIdx !== -1) {
+          return true;
+        }
+        if (lineasMatch.length === 1) {
+          const lineaViejaIdx = lineasMatch[0].i;
           const lineaVieja = lineas[lineaViejaIdx];
           const matchCant = lineaVieja.match(/\b(\d+)\b/);
           const cantidad = matchCant ? parseInt(matchCant[1], 10) : 1;
@@ -453,7 +476,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           let corteSlug = rawOldCort ? (cortesMap[rawOldCort] || buscarCorteFuzzy(rawOldCort)) : null;
           if (!corteSlug) {
             const ck = Object.keys(cortesMap).find(k =>
-              new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(normalizar(lineaVieja))
+              new RegExp(`\\b${_escRe(k)}\\b`, 'i').test(normalizar(lineaVieja))
             );
             corteSlug = ck ? cortesMap[ck] : null;
           }
