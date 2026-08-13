@@ -372,6 +372,25 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     const { textoLimpio: textoAg } = separarRefresco(textoOriginal);
     let jsonAg = parsearPedidoSimple(textoAg);
     if (!jsonAg) {
+      // Distinguir: ¿el cliente mencionó un corte no disponible, o no mencionó ninguno?
+      const { getCortesBDObj } = require('../../db/cortes');
+      const todosCortes  = getCortesBDObj();
+      const { getGiroActivo } = require('../../giros');
+      const fallback     = getGiroActivo()?.fallbackCortes || {};
+      const tNorm        = normalizar(textoAg);
+      const corteNoDisp  = todosCortes.find(c => {
+        let aliases = [];
+        try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
+        const palabras = [c.slug, c.nombre.toLowerCase(), ...aliases.map(a => a.toLowerCase())];
+        return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
+      }) || (Object.keys(fallback).find(k => new RegExp(`\\b${k}\\b`, 'i').test(tNorm)) ? {} : null);
+
+      if (corteNoDisp !== null && !getCortes()[normalizar(corteNoDisp.slug || '')]) {
+        // El cliente pidió un corte que existe pero no está disponible hoy
+        await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+        return true;
+      }
+
       // Sin corte en el mensaje — inferir desde el pedido actual
       const CORTES_MAP_AG = getCortes();
       const palabrasCAg   = Object.keys(CORTES_MAP_AG).join("|");
