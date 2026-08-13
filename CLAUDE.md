@@ -91,6 +91,8 @@ SENTRY_DSN=                    # Opcional — activa Sentry si se define
 MERCADOPAGO_ACCESS_TOKEN=      # Opcional — activa pagos con link
 APP_URL=https://mi-servidor.com # Necesario si MP está activo (webhook)
 GROQ_TIMEOUT_MS=15000          # Opcional — timeout para llamadas a Groq (default 15000ms)
+WEBHOOK_PORT=4000              # Puerto del servidor de deploy automático (default 4000)
+WEBHOOK_SECRET=...             # Secreto compartido con GitHub para verificar firma HMAC
 ```
 
 ## Configuración desde BD (tabla `configuracion`)

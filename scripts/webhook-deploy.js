@@ -60,24 +60,28 @@ async function handleDeploy(req, res) {
     ['package.json', 'package-lock.json', 'Dockerfile'].includes(f)
   );
   // src/panel/public/ está baked en la imagen (COPY . .) — necesita --build
-  // src/superadmin/public/ está montado como volumen — no necesita restart
+  // src/superadmin/public/ está montado como volumen — no necesita restart de PM2
   const onlySuperadminStatic = changed.length > 0 && changed.every(f =>
     f.startsWith('src/superadmin/public/')
   );
-  const hasPanelStatic = changed.some(f => f.startsWith('src/panel/public/'));
+  const hasPanelStatic  = changed.some(f => f.startsWith('src/panel/public/'));
+  // JS del superadmin corre en PM2 en el VPS (fuera de Docker) — necesita pm2 restart
+  const needsSuperadmin = changed.some(f =>
+    f.startsWith('src/superadmin/') && f.endsWith('.js') && !f.startsWith('src/superadmin/public/')
+  );
   const needsRestart = !needsRebuild && !onlySuperadminStatic && changed.some(f => f.endsWith('.js') || f.endsWith('.sh') || hasPanelStatic);
-  const needsPm2    = changed.includes('scripts/webhook-deploy.js');
+  const needsPm2     = changed.includes('scripts/webhook-deploy.js');
 
   let dockerCmd;
   if (needsRebuild || hasPanelStatic) {
     dockerCmd = 'docker compose up -d --build';
     console.log('[webhook] Cambios en dependencias/Dockerfile/panel-public — rebuild completo');
-  } else if (needsRestart) {
-    dockerCmd = 'docker compose up -d --force-recreate';
-    console.log('[webhook] Cambios en lógica JS — force-recreate (recarga codigo en contenedores)');
   } else if (onlySuperadminStatic) {
     dockerCmd = null;
     console.log('[webhook] Solo estáticos de superadmin — volumen actualiza sin reiniciar');
+  } else if (needsRestart) {
+    dockerCmd = 'docker compose up -d --force-recreate';
+    console.log('[webhook] Cambios en lógica JS — force-recreate (recarga codigo en contenedores)');
   } else {
     dockerCmd = 'docker compose up -d --force-recreate';
     console.log('[webhook] Cambios mixtos — force-recreate sin rebuild');
@@ -86,6 +90,7 @@ async function handleDeploy(req, res) {
   // git stash/pop falla si no hay cambios locales — simplemente pullamos directo
   const cmds = [`cd ${PROJECT}`, 'git pull'];
   if (dockerCmd) cmds.push(dockerCmd);
+  if (needsSuperadmin) cmds.push('pm2 restart superadmin');
   if (needsPm2) cmds.push('pm2 restart webhook-deploy');
 
   const cmd = cmds.join(' && ');
