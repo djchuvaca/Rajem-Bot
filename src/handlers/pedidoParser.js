@@ -281,7 +281,7 @@ const SEÑALES_COMPLEJO    = /para\s+ella|para\s+[eé]l|separado|otro\s+plato|en
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
 
 // ── PATRONES DE MODIFICACIÓN ──────────────────────────────────────────────────
-const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+(?:uno|un[ao]?\s+(?:taco|torta))(?:\s+(?:de(?:\s+(?:los?|las?))?\s+)?(\w+))?|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos(?:\s+(?:de\s+)?(\w+))?|menos\s+uno(?:\s+(?:de\s+)?(\w+))?|un\s+(?:taco|torta)\s+menos(?:\s+(?:de\s+)?(\w+))?|reduce\s+uno/i;
+const PATRON_QUITAR_UNO    = /quita(?:me|le)?\s+(?:uno|un[ao]?\s+(?:taco|torta))(?:\s+(?:de(?:\s+(?:los?|las?))?\s+)?(\w+))?|quita(?:me|le)?\s+(?:el|la|los|las)(?:\s+de)?\s+(\w+)|b[aá]ja(?:le|me)?\s+uno|saca\s+uno|uno\s+menos(?:\s+(?:de\s+)?(\w+))?|menos\s+uno(?:\s+(?:de\s+)?(\w+))?|un\s+(?:taco|torta)\s+menos(?:\s+(?:de\s+)?(\w+))?|reduce\s+uno/i;
 const PATRON_AGREGAR_MAS   = /agrega(?:le|me)?\s+(?:otros?|m[aá]s)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?|(\d+)\s+m[aá]s(?:\s+(?:de\s+)?(\w+))?|(?:ponme|s[úu]mame|a[ñn]ade(?:me)?)\s+(?:(?:otros?|m[aá]s)\s+)?(\d+)(?:\s+(?:de\s+)?(\w+))?|tambi[eé]n\s+(?:quiero|quieres?|pide|agrega|manda)\s+(\d+)(?:\s+(?:de\s+)?(\w+))?/i;
 const PATRON_CAMBIAR_CORTE = /cambia(?:me|le)?\s+(?:el|la|los|las)?\s*(\w+)\s+(?:por|a)\s+(\w+)|(?:sin|quita)\s+(\w+)\s+(?:y\s+)?(?:pon|agrega)\s+(\w+)|en\s+(?:lugar|vez)\s+de\s+(?:(?:el|la|los|las)\s+)?(\w+)\s+(?:ponme|quiero|dame|pon)\s+(\w+)|mejor\s+(\w+)\s+(?:que|en\s+lugar\s+de)\s+(?:(?:el|la|los|las)\s+)?(\w+)/i;
 
@@ -294,7 +294,7 @@ const PREGUNTAS_UBICACION = /d[oó]nde\s+(?:est[aá]n?|quedan?)|direcci[oó]n|ub
 const PREGUNTAS_PAGO      = /(?:c[oó]mo|de\s+qu[eé]\s+forma)\s+(?:pago|puedo\s+pagar|aceptan?)|m[eé]todos?\s+de\s+pago|aceptan?\s+(?:tarjeta|transferencia|efectivo)/i;
 const PREGUNTAS_TOTAL     = /cu[aá]nto\s+(?:llevo|voy|me\s+toca|es\s+(?:mi\s+)?total|va\s+(?:mi\s+)?total|va\s+todo|es\s+en\s+total|llevo\s+acumulado|tengo\s+acumulado)|(?:mi\s+)?total\s+(?:hasta\s+ahora|parcial|por\s+favor)|cu[aá]nto\s+es\s+(?:en\s+total|todo|lo\s+que\s+llevo)|cu[aá]nto\s+suma|cu[aá]nto\s+(?:va|asciende|llega)\s+(?:mi\s+)?(?:pedido|total|cuenta)/i;
 const PATRON_EN_CAMINO    = /\b(?:ya\s+(?:voy|vengo|andamos|vamos|sal[ií]|estoy\s+(?:en\s+camino|saliendo|yendo|por\s+llegar|cerca))|estoy\s+(?:en\s+camino|por\s+llegar|cerca|llegando)|en\s+camino|ya\s+lleg[uú][eé]|ya\s+llegamos|ya\s+estoy\s+afuera?|ya\s+llegamos|ya\s+andamos)\b/i;
-const PATRON_DESPEDIDA    = /^(?:gracias|grax|grac|muchas\s+gracias|muy\s+amable|que\s+les?\s+vaya\s+bien|hasta\s+luego|hasta\s+pronto|nos\s+vemos|buen\s+provecho|adios|adi[oó]s|hasta\s+ma[nñ]ana|chao|chau|bye|ciao)$/i;
+const PATRON_DESPEDIDA    = /^(?:gracias(?:[,.]?\s+(?:hasta\s+(?:luego|pronto|ma[nñ]ana)|nos\s+vemos|bye|adios|adi[oó]s|chao|chau|ciao))?|grax|grac|muchas\s+gracias|muy\s+amable|que\s+les?\s+vaya\s+bien|hasta\s+luego|hasta\s+pronto|nos\s+vemos|buen\s+provecho|adios|adi[oó]s|hasta\s+ma[nñ]ana|chao|chau|bye|ciao)$/i;
 
 // Detecta preguntas sobre qué es un corte específico ("¿qué es el buche?")
 const PREGUNTAS_DESCRIPCION_CORTE = /qu[eé]\s+(?:es|son|tiene|lleva|contiene)|c[oó]mo\s+(?:es|est[aá]|sabe|queda|se\s+come)|de\s+qu[eé]\s+(?:es|est[aá]\s+hecho|parte)|qu[eé]\s+parte\s+es/i;
@@ -420,6 +420,10 @@ function getCortesRegex() {
   return _cortesRegexCache;
 }
 
+// Palabras relleno que pueden preceder un pedido sin aportar contenido semántico.
+// "dame 200 de carne", "ponme para 100 de buche" → "dame"/"ponme para" son fillers.
+const _FILLER_PART = /^(?:quiero|dame|ponme|para|pues|manda|tambi[eé]n|oye|hola|buenas?|oiga|me\s+da|me\s+pones?|a\s+ver|d[eé]jame|y\s+pues|y\s+bueno)(?:\s+(?:favor|me|pues|por\s+favor|tambi[eé]n|para|por|un[ao]?))*$/i;
+
 // ── SISTEMA DE SCORE ──────────────────────────────────────────────────────────
 function calcularScore(texto) {
   const t = normalizar(texto);
@@ -430,8 +434,8 @@ function calcularScore(texto) {
 
   if (/\b\d+\b/.test(t))                                               score += 2;
   if (detectarTipoItemDesdeTexto(t))                                   score += 2;
-  if (/\b\d+\s*g(?:ramos?)?\b/.test(t))                               score += 2;
-  if (MEDIDAS.some(m => m.re.test(t)))             score += 2;
+  if (/\b\d+\s*g(?:r(?:amos?)?)?\b/.test(t))                          score += 2;
+  if (MEDIDAS.some(m => m.re.test(t)))                                 score += 2;
 
   const DESCARTAR_SCORE = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
   if (getCortesRegex().test(t)) {
@@ -442,7 +446,9 @@ function calcularScore(texto) {
 
   const partes = dividirEnItems(texto);
   if (partes.length > 1) {
-    const todasTienenNumero = partes.every(p => /\b\d+\b/.test(normalizar(p)));
+    // Excluir fillers antes de penalizar: "dame 200 de carne" no penaliza por "dame"
+    const partesReales = partes.filter(p => !_FILLER_PART.test(normalizar(p).trim()));
+    const todasTienenNumero = partesReales.every(p => /\b\d+\b/.test(normalizar(p)));
     score += todasTienenNumero ? 2 : -2;
   }
 
@@ -476,11 +482,43 @@ function extraerCorte(fragmento) {
 
 // ── DIVIDIR EN ÍTEMS ──────────────────────────────────────────────────────────
 function dividirEnItems(texto) {
+  const _itPat = _buildItemTypesPattern();
+  // Si el texto arranca con "N tipoItem" (multi-pedido sin conectores explícitos),
+  // también partir antes de cada "N tipoItem" siguiente: "1 taco de X 1 torta de Y"
+  const _itReInicio = _itPat ? new RegExp(`^\\d+\\s+(?:${_itPat})s?\\b`, 'i') : null;
+  const _addItemSplit = (_itReInicio && _itReInicio.test(texto))
+    ? [`\\s+(?=\\d+\\s+(?:${_itPat})s?\\b)`]
+    : [];
+
+  const _splitRe = new RegExp(
+    [
+      String.raw`\n+`,
+      String.raw`,\s*(?:y\s+)?`,
+      String.raw`\s+m[aá]s\s+(?=\d|\bun[ao]?\b|\bmedio\b)`,
+      String.raw`\s+y\s+tambi[eé]n\s+`,
+      String.raw`\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)`,
+      String.raw`\s+(?=\d+\s+(?:de|del|se)\s+)`,
+      ..._addItemSplit,
+    ].join('|'),
+    'i'
+  );
+
   const partes = texto
-    .split(/\n+|,\s*(?:y\s+)?|\s+m[aá]s\s+(?=\d|\bun[ao]?\b|\bmedio\b)|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)/i)
-    .map(p => p.trim().replace(/^(?:y|m[aá]s)\s+/i, ""))
+    .split(_splitRe)
+    .map(p => p.trim().replace(/^(?:y|m[aá]s)\s+/i, ''))
     .filter(Boolean);
   return partes.length > 1 ? partes : [texto];
+}
+
+// Sub-divide un fragmento si contiene un tipo de ítem embebido con número.
+// Ej: "2 de surtido 1 quesadilla de costilla" → ["2 de surtido", "1 quesadilla de costilla"]
+// Solo se llama dentro del loop multi-item para evitar romper pedidos simples.
+function _subDividirSiTipoEmbebido(fragmento) {
+  const _itPat = _buildItemTypesPattern();
+  if (!_itPat) return [fragmento];
+  const re = new RegExp(`\\s+(?=\\d+\\s+(?:${_itPat})s?\\b)`, 'i');
+  const partes = fragmento.split(re).map(p => p.trim()).filter(Boolean);
+  return partes.length > 1 ? partes : [fragmento];
 }
 
 function parsearItemHeredado(fragmento, tipoPrevio) {
@@ -516,7 +554,7 @@ function parsearItem(fragmento) {
     }
   }
 
-  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  const matchGramos = t.match(/\b(\d+)\s*g(?:r(?:amos?)?)?\b/);
   if (matchGramos) {
     const gramos = parseInt(matchGramos[1]);
     if (!corte) return { _sinCorte: true, presentacion: "gramos", gramos };
@@ -541,10 +579,17 @@ function detectarSinCorte(texto) {
   const t = normalizar(texto);
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
+  let tieneItemConCorte = false;
   for (const parte of partes) {
     const item = parsearItem(parte);
     if (item && item._sinCorte) return item.presentacion;
+    if (item && !item._sinCorte) tieneItemConCorte = true;
   }
+  if (tieneItemConCorte) return null;
+  // Fallback: tipo mencionado sin número ni corte ("quiero tortas", "dame un taco")
+  const tipoSolo = detectarTipoItemDesdeTexto(t);
+  const corte = extraerCorte(texto);
+  if (tipoSolo && !corte) return tipoSolo.slug;
   return null;
 }
 
@@ -634,7 +679,7 @@ function detectarModificacion(texto) {
   const tNum = normalizar(textoANumero(t)); // con números convertidos — solo para AGREGAR_MAS
   if (PATRON_QUITAR_UNO.test(t)) {
     const mQ = t.match(PATRON_QUITAR_UNO);
-    const corteRaw = (mQ[1] || mQ[2] || mQ[3] || mQ[4] || "").toLowerCase().trim();
+    const corteRaw = (mQ[1] || mQ[2] || mQ[3] || mQ[4] || mQ[5] || "").toLowerCase().trim();
     const corte = corteRaw ? (getCortes()[corteRaw] || buscarCorteFuzzy(corteRaw) || null) : null;
     return { tipo: "quitar_uno", corte };
   }
@@ -692,7 +737,7 @@ function parsearMitadMitad(texto) {
     if (medida.re.test(t))
       return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: medida.gramos, corte: corteStr })] };
 
-  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  const matchGramos = t.match(/\b(\d+)\s*g(?:r(?:amos?)?)?\b/);
   if (matchGramos)
     return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr })] };
 
@@ -724,7 +769,7 @@ function parsearTodoMenosCorte(texto) {
     if (medida.re.test(t))
       return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: medida.gramos, corte: corteStr })] };
 
-  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  const matchGramos = t.match(/\b(\d+)\s*g(?:r(?:amos?)?)?\b/);
   if (matchGramos)
     return { tipo: "pedido", items: [_aplicarSurtidoEspecial({ presentacion: "gramos", gramos: parseInt(matchGramos[1]), corte: corteStr })] };
 
@@ -780,11 +825,15 @@ function parsearPedidoSimple(texto) {
     let ultimoTipo = null;
     const _slugsUnidad = new Set(_getItemTypesActivos().filter(it => !it.soporta_gramos && !it.soporta_pesos).map(it => it.slug));
     for (const parte of partes) {
-      let item = parsearItem(parte);
-      if (!item && ultimoTipo) item = parsearItemHeredado(parte, ultimoTipo);
-      if (!item || item._sinCorte) return null;
-      if (_slugsUnidad.has(item.presentacion)) ultimoTipo = item.presentacion;
-      items.push(_aplicarSurtidoEspecial(item));
+      if (_FILLER_PART.test(normalizar(parte).trim())) continue; // "dame", "ponme para", etc.
+      const subPartes = _subDividirSiTipoEmbebido(parte);
+      for (const sub of subPartes) {
+        let item = parsearItem(sub);
+        if (!item && ultimoTipo) item = parsearItemHeredado(sub, ultimoTipo);
+        if (!item || item._sinCorte) return null;
+        if (_slugsUnidad.has(item.presentacion)) ultimoTipo = item.presentacion;
+        items.push(_aplicarSurtidoEspecial(item));
+      }
     }
     if (items.length > 0) return { tipo: "pedido", items };
     return null;
@@ -812,7 +861,7 @@ function parsearPedidoSimple(texto) {
     }
   }
 
-  const matchGramos = t.match(/\b(\d+)\s*g(?:ramos?)?\b/);
+  const matchGramos = t.match(/\b(\d+)\s*g(?:r(?:amos?)?)?\b/);
   if (matchGramos) {
     const gramos = parseInt(matchGramos[1]);
     if (!corteRaw) return null;
@@ -826,6 +875,17 @@ function parsearPedidoSimple(texto) {
     if (num <= 100) return null;
   }
 
+  // Fallback: tipo de ítem sin número explícito → cantidad implícita 1 ("taco de buche")
+  if (corteRaw) {
+    const _itPatSolo = _buildItemTypesPattern();
+    const matchTipoSolo = _itPatSolo ? t.match(new RegExp(`\\b(${_itPatSolo})s?\\b`)) : null;
+    if (matchTipoSolo) {
+      const tipoDetect = detectarTipoItemDesdeTexto(matchTipoSolo[1]);
+      const presentacion = tipoDetect ? tipoDetect.slug : 'taco';
+      return { tipo: "pedido", items: [{ presentacion, cantidad: 1, ...corteInfo }] };
+    }
+  }
+
   return null;
 }
 
@@ -835,10 +895,12 @@ function detectarSinTipo(texto) {
   const t = normalizar(texto);
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
-  if (partes.length > 1) return null;
+  // Filtrar fillers antes de verificar si hay múltiples partes
+  const partesReales = partes.filter(p => !_FILLER_PART.test(normalizar(p).trim()));
+  if (partesReales.length > 1) return null;
   if (detectarTipoItemDesdeTexto(t)) return null;
   if (MEDIDAS.some(m => m.re.test(t))) return null;
-  if (/\b\d+\s*g(?:ramos?)?\b/.test(t)) return null;
+  if (/\b\d+\s*g(?:r(?:amos?)?)?\b/.test(t)) return null;
   const corte = extraerCorte(texto);
   if (!corte) return null;
   const matchNum = t.match(/\b(\d+)\b/);
