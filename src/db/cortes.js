@@ -41,10 +41,24 @@ function getCortesBD() {
   try {
     const giroId = _getGiroId();
     if (!giroId) { _cache = {}; _cacheTs = ahora; return {}; }
-    const rows = queryAll(
-      'SELECT * FROM cortes WHERE giro_id = ? AND activo = 1 ORDER BY id',
-      [giroId]
-    ) || [];
+    // Si menu_items tiene cortes activos, solo incluir los disponibles en el NLU.
+    // Fallback al catálogo completo si menu_items aún no está configurado.
+    const miActivos = queryOne(
+      "SELECT COUNT(*) as n FROM menu_items WHERE categoria='corte' AND activo=1 AND eliminado=0",
+      []
+    );
+    const rows = (miActivos && miActivos.n > 0)
+      ? queryAll(
+          `SELECT DISTINCT c.* FROM cortes c
+           INNER JOIN menu_items mi ON mi.producto_slug = c.slug
+             AND mi.activo = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
+           WHERE c.giro_id = ? AND c.activo = 1 ORDER BY c.id`,
+          [giroId]
+        ) || []
+      : queryAll(
+          'SELECT * FROM cortes WHERE giro_id = ? AND activo = 1 ORDER BY id',
+          [giroId]
+        ) || [];
     const mapa = {};
     for (const c of rows) {
       const slug = c.slug;
