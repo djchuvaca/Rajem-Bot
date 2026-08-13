@@ -1649,17 +1649,20 @@ async function loadProductos() {
   const _allCortes = [...(catCortes?.asada || []), ...(catCortes?.carnitas || [])];
   _descCortes  = _allCortes.reduce((m, c) => ({ ...m, [c.slug]: c }), {});
 
+  // Solo formatos ACTIVOS para botones y columnas de precio (los inactivos no aplican al menú actual)
+  const formatosActivos = (formatos || []).filter(f => f.activo);
+
   // Pills de formato en el header de "Mis Cortes"
   const btnsEl = document.getElementById('formatos-btns');
   if (btnsEl) {
-    btnsEl.innerHTML = (formatos || []).map(f =>
+    btnsEl.innerHTML = formatosActivos.map(f =>
       `<button class="fmt-tab-btn" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
         ${f.emoji || ''} ${_ucfirst(f.nombre_plural)}
       </button>`
     ).join('');
   }
 
-  _renderMenuCortes(formatos || []);
+  _renderMenuCortes(formatosActivos);
   _renderMenuSimples('refresco', 'menu-bebidas-table', 'menu-bebidas-empty', 'Precio');
   _renderMenuSimples('salsa',    'menu-salsas-table',  'menu-salsas-empty',  'Precio extra');
 }
@@ -1842,7 +1845,7 @@ async function openModalFormato(slug, nombrePlural) {
 
   const renderFila = c => {
     const item    = existentes[c.slug];
-    const activo  = !!item;
+    const activo  = !!(item?.activo);  // item existe con activo=1 → checked; activo=0 → unchecked
     const precio  = item ? (item.precio || 0) : (c.precio_base || 0);
     return `<div id="fmt-row-${_esc(c.slug)}"
         class="fmt-fila${activo ? ' activo' : ''}"
