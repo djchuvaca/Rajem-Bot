@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-WORKDIR /-Rajem-Bot
+WORKDIR /Rajem-Bot
 
 COPY package*.json ./
 RUN npm install --omit=dev
@@ -38,4 +38,4 @@ RUN mkdir -p data/backups logs
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "rm -f /-Rajem-Bot/.wwebjs_auth/session-${TENANT_ID:-tacos-javier-tepic}/SingletonLock && node index.js"]
+CMD ["sh", "-c", "rm -f /Rajem-Bot/.wwebjs_auth/session-${TENANT_ID:-tacos-javier-tepic}/SingletonLock && node index.js"]

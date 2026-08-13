@@ -14,9 +14,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./data:/-Rajem-Bot/data
-      - ./logs:/-Rajem-Bot/logs
-      - ./src/superadmin:/-Rajem-Bot/src/superadmin
+      - ./data:/Rajem-Bot/data
+      - ./logs:/Rajem-Bot/logs
+      - ./src/superadmin:/Rajem-Bot/src/superadmin
 
   # Los tenants van en docker-compose.override.yml (gitignoreado).
   # Docker Compose fusiona ambos archivos automaticamente.
