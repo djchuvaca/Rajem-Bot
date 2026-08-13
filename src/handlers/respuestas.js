@@ -58,7 +58,8 @@ function respuestaPrecio(producto = null) {
   try {
     const precios     = getPrecios();
     const negocio     = getNegocio();
-    const notaPrecios = (getMensaje("menu_nota_precios") || "_Los precios incluyen tortillas y salsas_ 😊").replace(/{negocio}/g, negocio);
+    const _giroR = (() => { try { const { getGiroActivo } = require('../giros'); return getGiroActivo(); } catch(_) { return null; } })();
+    const notaPrecios = (getMensaje("menu_nota_precios") || _giroR?.mensajesDefaults?.menu_nota_precios || '').replace(/{negocio}/g, negocio);
 
     // Obtener item_types activos para construir columnas de precio
     let itemTypes = [];

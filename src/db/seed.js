@@ -357,20 +357,14 @@ async function seedDB() {
   }
 
   // ── SEED MENSAJES BOT ──────────────────────────────────────────────────────
+  // Los mensajes de cada giro vienen de giro.mensajesDefaults (INSERT OR IGNORE más abajo).
+  // El bloque de instalación nueva usa los defaults del giro activo como fuente de verdad.
   const countMsg = db.exec("SELECT COUNT(*) as c FROM mensajes_bot")[0]?.values[0][0] || 0;
-  if (countMsg === 0) {
-    const mensajes = [
-      ["saludo",                "¡Bienvenido a *{negocio}*! 🌮🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?"],
-      ["fuera_horario_lunes",   "⏰ Por el momento nos encontramos fuera de servicio.\nHoy es nuestro día de descanso 😴\n\nRetomamos el servicio mañana a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
-      ["fuera_horario_antes",   "⏰ Por el momento nos encontramos fuera de servicio.\nIniciamos atención a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
-      ["fuera_horario_despues", "⏰ Por el momento nos encontramos fuera de servicio.\nNuestro horario es de *Martes a Domingo de {hora_inicio} a {hora_fin}* 🌮\n\nMañana iniciamos a las *{hora_inicio}*\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?"],
-      ["confirmacion_pedido",   "Listo! Tu pedido fue recibido y esta en espera de confirmacion de nuestro equipo.\nEn breve te avisamos. Gracias por tu preferencia!\n\n_Si deseas cancelar tu pedido escribe *cancelar*._"],
-      ["cancelacion_enviada",   "Tu solicitud de cancelacion fue enviada a nuestro equipo.\nEn breve se comunicaran contigo para confirmarte. Disculpa los inconvenientes!"],
-    ];
-    for (const [clave, valor] of mensajes) {
+  if (countMsg === 0 && _giro?.mensajesDefaults) {
+    for (const [clave, valor] of Object.entries(_giro.mensajesDefaults)) {
       db.run("INSERT INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
     }
-    console.log("✅ Mensajes del bot insertados");
+    console.log("✅ Mensajes del bot insertados desde módulo giro");
   }
   // Migración: fuera_horario_lunes tenía días hardcodeados ("lunes"/"martes") en el default original.
   // Si el tenant nunca lo editó, lo reemplazamos por el texto genérico.
@@ -382,12 +376,10 @@ async function seedDB() {
     ]
   );
 
-  // Migración: claves nuevas en mensajes_bot (INSERT OR IGNORE para instancias existentes)
-  // Solo mensajes genéricos aquí; los específicos de cada giro vienen de giro.mensajesDefaults
+  // Migración: claves genéricas (aplican a todos los giros) — INSERT OR IGNORE
+  // Las específicas de cada giro vienen del bloque giro.mensajesDefaults más abajo
   const nuevosMsgs = [
     ["comprobante_recibido", "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏"],
-    ["menu_nota_precios",    "_Los precios incluyen tortillas y salsas_ 😊"],
-    ["menu_domicilio_nota",  "🛵 Domicilio: _precio según distancia a tu colonia_ 📍"],
   ];
   for (const [clave, valor] of nuevosMsgs) {
     db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
@@ -554,6 +546,20 @@ async function seedDB() {
 
   // ── SEED BUSINESS TYPES ────────────────────────────────────────────────────
   _seedBusinessTypes(db);
+
+  // Migración: 'por_pesos' es el nuevo item_type dedicado para soporta_pesos (antes 'gramos' tenía ambos flags).
+  // Si el tenant tenía 'gramos' activo, activar 'por_pesos' automáticamente para no romper el flujo.
+  {
+    const _btTaq = db.prepare("SELECT id FROM business_types WHERE slug = 'taqueria'").get();
+    if (_btTaq) {
+      const _gramos   = db.prepare("SELECT activo FROM item_types WHERE business_type_id = ? AND slug = 'gramos'").get(_btTaq.id);
+      const _porPesos = db.prepare("SELECT id, activo FROM item_types WHERE business_type_id = ? AND slug = 'por_pesos'").get(_btTaq.id);
+      if (_gramos?.activo && _porPesos && !_porPesos.activo) {
+        db.prepare("UPDATE item_types SET activo = 1 WHERE id = ?").run(_porPesos.id);
+        console.log("✅ Migración: item_type 'por_pesos' activado (gramos tenía soporta_pesos)");
+      }
+    }
+  }
 
   // Config: business_type_slug (determina qué plantilla NLU usa el bot)
   // En instalaciones nuevas, usar BUSINESS_TYPE del env si está definido; sino 'taqueria'

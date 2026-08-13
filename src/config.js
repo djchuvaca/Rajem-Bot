@@ -109,7 +109,7 @@ function getMenuFormato() {
       : "🥩 Piezas";
 
     const variedadesSeccion = cortes.length > 0 ? `🥩 *Variedades disponibles:* ${nombres}\n\n` : "";
-    const notaDomicilio     = getMensaje("menu_domicilio_nota") ?? "🛵 Domicilio: _precio según distancia a tu colonia_ 📍";
+    const notaDomicilio     = getMensaje("menu_domicilio_nota") ?? md.menu_domicilio_nota ?? '';
     const domicilioSeccion  = notaDomicilio ? `${notaDomicilio}\n\n` : "";
 
     return (
@@ -208,15 +208,14 @@ function getFormPreventaDomicilio(tel = "") {
 
 function getSaludo() {
   const negocio = getConfig("nombre_negocio") || "el negocio";
-  const emojiGiro = (() => {
-    try { const { getGiroActivo } = require('./giros'); return getGiroActivo()?.emoji || '🍽️'; }
-    catch (_) { return '🍽️'; }
-  })();
+  const giro = (() => { try { return getGiroActivo(); } catch (_) { return null; } })();
   try {
-    const msg = getMensaje("saludo") || `¡Bienvenido a *${negocio}*! ${emojiGiro}🔥\n\n*¿Tu pedido será para domicilio* 🛵 *o pasas a recoger al mostrador?* 🏪`;
+    const fallback = giro?.mensajesDefaults?.saludo
+      || `¡Bienvenido a *${negocio}*! ${giro?.emoji || '🍽️'}🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
+    const msg = getMensaje("saludo") || fallback;
     return msg.replace(/{negocio}/g, negocio);
   } catch (e) {
-    return `¡Bienvenido a *${negocio}*! ${emojiGiro}🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
+    return `¡Bienvenido a *${negocio}*! ${giro?.emoji || '🍽️'}🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?`;
   }
 }
 

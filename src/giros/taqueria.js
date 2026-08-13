@@ -51,7 +51,12 @@ module.exports = {
     {
       slug: 'gramos', nombre: 'grameado', nombre_plural: 'grameados', emoji: '⚖️',
       aliases: ['por gr', 'por gr.', 'por gramo', 'por gramos', 'gramo', 'gramos', 'gr', 'kilo', 'kilos', 'medio kilo', 'cuarto kilo', 'tres cuartos', 'por kilo'],
-      soporta_gramos: true, soporta_pesos: true, precio_campo: 'precio_100g', precio_base: 32,
+      soporta_gramos: true, soporta_pesos: false, precio_campo: 'precio_100g', precio_base: 32,
+    },
+    {
+      slug: 'por_pesos', nombre: 'por cantidad', nombre_plural: 'por cantidad en $', emoji: '💵',
+      aliases: ['por pesos', 'por cantidad', 'en pesos', 'tengo para', 'con cuanto', 'con cuánto', 'cuanto tengo', 'cuánto tengo', 'dame para', 'ponme para'],
+      soporta_gramos: false, soporta_pesos: true, precio_campo: 'precio_100g', precio_base: 0,
     },
   ],
 
@@ -222,13 +227,25 @@ module.exports = {
     surtidoSlug:   'surtido',
   },
 
-  // Mensajes del bot específicos de este giro — se usan como default en mensajes_bot
+  // Mensajes del bot específicos de este giro — fuente de verdad para mensajes_bot
   mensajesDefaults: {
-    menu_taco_nota:    '_(combinaciones al gusto)_',
-    menu_gramos_nota:  'Cualquier pieza o combinación\n_Incluye tortillas y salsas_',
-    menu_salsas_nota:  '_(Los tacos y tortas ya incluyen salsas gratis)_',
-    menu_por_cantidad: 'Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_',
-    menu_pie_salsas:   '🟢 Todos los tacos y tortas incluyen salsas',
+    // Bienvenida y pedido
+    saludo:               '¡Bienvenido a *{negocio}*! 🌮🔥\n\n¿Tu pedido será para *domicilio* 🛵 o pasas a *recoger al mostrador* 🏪?',
+    confirmacion_pedido:  'Listo! Tu pedido fue recibido y está en espera de confirmación de nuestro equipo.\nEn breve te avisamos. Gracias por tu preferencia!\n\n_Si deseas cancelar tu pedido escribe *cancelar*._',
+    cancelacion_enviada:  'Tu solicitud de cancelación fue enviada a nuestro equipo.\nEn breve se comunicarán contigo para confirmarte. Disculpa los inconvenientes!',
+    comprobante_recibido: '¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏',
+    // Fuera de horario
+    fuera_horario_antes:   '⏰ Por el momento nos encontramos fuera de servicio.\nIniciamos atención a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?',
+    fuera_horario_despues: '⏰ Por el momento nos encontramos fuera de servicio.\nNuestro horario es de *{hora_inicio} a {hora_fin}* 🌮\n\nMañana iniciamos a las *{hora_inicio}*\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?',
+    fuera_horario_lunes:   '⏰ Por el momento nos encontramos fuera de servicio.\nHoy es nuestro día de descanso 😴\n\nRetomamos el servicio mañana a las *{hora_inicio}* 🌮\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?',
+    // Menú
+    menu_taco_nota:        '_(combinaciones al gusto)_',
+    menu_gramos_nota:      'Cualquier pieza o combinación\n_Incluye tortillas y salsas_',
+    menu_salsas_nota:      '_(Los tacos y tortas ya incluyen salsas gratis)_',
+    menu_por_cantidad:     'Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_',
+    menu_pie_salsas:       '🟢 Todos los tacos y tortas incluyen salsas',
+    menu_nota_precios:     '_Los precios incluyen tortillas y salsas_ 😊',
+    menu_domicilio_nota:   '🛵 Domicilio: _precio según distancia a tu colonia_ 📍',
   },
 
   // Flags de comportamiento — activan/desactivan lógica en parsers y prompts

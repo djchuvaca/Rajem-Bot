@@ -52,7 +52,10 @@ function mensajeFueraDeHorario() {
     const esHoy_cerrado = horarioDia && !horarioDia.abierto;
     const esAntesDe     = horaDecimal < hIni;
 
-    let msg = getMensaje(esHoy_cerrado ? "fuera_horario_lunes" : esAntesDe ? "fuera_horario_antes" : "fuera_horario_despues")
+    const _claveFH = esHoy_cerrado ? "fuera_horario_lunes" : esAntesDe ? "fuera_horario_antes" : "fuera_horario_despues";
+    const _giroH = (() => { try { const { getGiroActivo } = require('./giros'); return getGiroActivo(); } catch(_) { return null; } })();
+    let msg = getMensaje(_claveFH)
+      || _giroH?.mensajesDefaults?.[_claveFH]
       || "⏰ Por el momento nos encontramos fuera de servicio.\n\n¿Te gustaría hacer un pedido en *preventa* para cuando abramos?";
 
     const _negocio = getConfig("nombre_negocio") || "el negocio";
