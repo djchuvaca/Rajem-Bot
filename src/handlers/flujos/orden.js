@@ -362,8 +362,12 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   }
 
   // Detectar intento de agregar más ítems durante la confirmación
-  const quiereAgregar = /agrega(?:le|me)?|a[ñn]ade(?:me)?|ponme\s+m[aá]s|sum[aá]me|también\s+(?:quiero|pido|ponme)|tambi[eé]n\s+(?:quiero|pido)/i.test(textoOriginal)
-    || /(\d+|una?)\s+m[aá]s/i.test(textoOriginal);
+  const quiereAgregar =
+    /agrega(?:le|me|n)?|a[ñn]ade(?:me)?|sum[aá]me|inclu(?:ye|ir)(?:me)?/i.test(textoOriginal)
+    || /pon(?:me|le|gan?me|gale)\s+(?:m[aá]s\s+|otros?\s+|un[ao]?s?\s+|otra?s?\s+|\d+)/i.test(textoOriginal)
+    || /m[aá]nda(?:me)?\s+(?:m[aá]s\s+|otros?\s+|un[ao]?\s+|\d+)/i.test(textoOriginal)
+    || /tambi[eé]n\s+(?:quiero|pido|ponme|manda|agrega)/i.test(textoOriginal)
+    || /(?:un[ao]?|una?s?|otros?|\d+)\s+(?:m[aá]s|extra|adicional)/i.test(textoOriginal);
   if (quiereAgregar) {
     const { textoLimpio: textoAg } = separarRefresco(textoOriginal);
     let jsonAg = parsearPedidoSimple(textoAg);
