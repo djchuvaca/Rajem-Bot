@@ -464,6 +464,9 @@ function extraerCorte(fragmento) {
   const DESCARTAR = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
   for (const palabra of normalizar(fragmento).split(/\s+/)) {
     if (palabra.length < 4 || DESCARTAR.test(palabra)) continue;
+    // Evitar falsos positivos del fuzzy: si la palabra es un item type (ej. "burritos"),
+    // no buscarla como corte — podría matchear por distancia a aliases cercanos (ej. "cueritos").
+    if (detectarTipoItemDesdeTexto(palabra)) continue;
     const corte = buscarCorteFuzzy(palabra);
     if (corte) return corte;
   }
