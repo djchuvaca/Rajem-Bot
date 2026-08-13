@@ -121,11 +121,13 @@ function getTenantConfig(tenant) {
 }
 
 function setTenantConfig(tenant, clave, valor) {
-  // Para escritura usamos conexión de lectura/escritura (no la readonly del caché)
   const dbPath = path.isAbsolute(tenant.db_path)
     ? tenant.db_path
     : path.join(ROOT_PATH, tenant.db_path);
-  if (!fs.existsSync(dbPath)) return false;
+  if (!fs.existsSync(dbPath)) {
+    console.error(`[tenant-reader] DB no encontrada: ${dbPath} (tenant=${tenant.id}, db_path=${tenant.db_path})`);
+    return false;
+  }
   const db = new Database(dbPath);
   try {
     db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)').run(clave, String(valor ?? ''));

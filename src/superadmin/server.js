@@ -181,10 +181,16 @@ app.post('/api/tenants/:id/config', requireAuth, (req, res) => {
 app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const { config } = req.body; // { clave: valor, ... }
+  const { config } = req.body;
   if (!config || typeof config !== 'object') return res.status(400).json({ error: 'Formato inválido' });
+  const fallidas = [];
   for (const [clave, valor] of Object.entries(config)) {
-    setTenantConfig(tenant, clave, valor);
+    const ok = setTenantConfig(tenant, clave, valor);
+    if (!ok) fallidas.push(clave);
+  }
+  if (fallidas.length) {
+    console.error(`[superadmin] setTenantConfig falló para tenant=${tenant.id} claves=${fallidas.join(',')} db_path=${tenant.db_path}`);
+    return res.status(500).json({ error: `BD no accesible. Verifica que el tenant esté corriendo. Claves fallidas: ${fallidas.join(', ')}` });
   }
   res.json({ ok: true });
 });
