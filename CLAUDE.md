@@ -25,7 +25,7 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 
 ### Handlers
 - `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. Usa `detectarTodasPreguntasFrecuentes()` para el bloque global de FAQs (multi-intent).
-- `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Cachés: `_cortesCache` + `_cortesRegexCache` (TTL 60s, invalidables con `invalidarCacheCortes()`). Exporta `detectarPreguntaFrecuente` (primera coincidencia) y `detectarTodasPreguntasFrecuentes` (multi-intent, array). Intents: `precio`, `horario`, `domicilio`, `menu`, `ubicacion`, `metodos_pago`, `descripcion_corte`, `pedido_listo`, `ya_en_camino`, `despedida`, `total_parcial`.
+- `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Cachés: `_cortesCache` + `_cortesRegexCache` (TTL 60s, invalidables con `invalidarCacheCortes()`). Exporta `detectarPreguntaFrecuente` (primera coincidencia) y `detectarTodasPreguntasFrecuentes` (multi-intent, array). Intents: `precio`, `horario`, `domicilio`, `menu`, `ubicacion`, `metodos_pago`, `descripcion_corte`, `pedido_listo`, `ya_en_camino`, `despedida`, `total_parcial`. Funciones clave del NLU multi-giro: `_buildItemTypesPattern()` (regex dinámica de todos los item types activos), `_getItemTypesActivos()` (cache TTL 60s desde BD), `detectarTipoItemDesdeTexto(texto)` (retorna objeto item_type o null), `listaItemTypes(soloUnidad?)` (lista legible; `soloUnidad=true` excluye gramos/pesos), `parsearItem(fragmento)` (parsea un fragmento con tipo+cantidad+corte).
 - `src/handlers/respuestas.js` — respuestas FAQ sin Groq. `aplicarQuitarUno(ordenTexto, corte?)` acepta corte opcional para reducir ítem específico.
 - `src/handlers/comandos.js` — comandos de grupo: ver pedidos (!pedidos, !pendientes, !confirmados, !cancelados, !rechazados, !domicilios, !mostradores, !pedido), gestionar (!confirmar, !listo, !cancelar, !rechazar), clientes (!cliente, !buscar, !historial, !top, !editar, !mensaje), reportes (!stats, !reporte ayer/semana/mes), menú (!precios, !precio, !agotado, !disponible), control (!cerrar, !abrir, !pausar, !reanudar, !sesiones, !resetear, !limpiar, !estado, !ayuda)
 - `src/handlers/imagenes.js` — recibe comprobantes de transferencia vía imagen
@@ -45,9 +45,18 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 - `src/estado/sesiones.js` — serialización/restauración de sesiones a BD. TTL: 48h. Todos los Maps críticos incluyendo `pendientesConfirmacion` se serializan.
 - `src/estado/index.js` — re-exporta todo el estado incluyendo `extraerTelefono` y `extraerTelefonoDeJID`
 
+### Giros (módulos de negocio)
+- `src/giros/taqueria.js` — **fuente de verdad del giro taquería**. Define:
+  - `itemTypes[]` — formatos de venta: taco, torta, quesadilla, vampiro, burrito, gramos (100gr.), por_pesos. Cada uno con `slug`, `nombre`, `nombre_plural`, `aliases`, `soporta_gramos`, `soporta_pesos`, `precio_campo`.
+  - `cortes[]` — 16 cortes con `slug`, `nombre`, `aliases`, `seccion` (asada|carnitas), `subclase`, `precio_base`.
+  - `configDefaults`, `vocabulario`, `mensajesDefaults`, `comportamiento`.
+  - Consumido por `seed.js` al provisionar y sincronizado a BD en cada arranque.
+- `src/giros/index.js` — `getGiroActivo()` devuelve el módulo del giro configurado en BD.
+
 ### Base de datos (better-sqlite3)
 - `src/db/core.js` — **mejor-sqlite3** nativo. `initDB()` abre el archivo SQLite en `data/tacos_javier.db`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente). `queryAll()`, `queryOne()`, `run()` usan `prepare().all/get/run`. Shim de compatibilidad en `getDB()` para código legacy que usa la API sql.js (`run()/exec()`). `journal_mode = DELETE` (sin archivos WAL, simplifica backups).
-- `src/db/seed.js` — crea tablas y datos iniciales. Migraciones inline con `ALTER TABLE ... ADD COLUMN`.
+- `src/db/seed.js` — crea tablas y datos iniciales. Migraciones inline con `ALTER TABLE ... ADD COLUMN`. `_seedBusinessTypes()` sincroniza `item_types` desde el módulo giro en cada arranque. `BOT_TEST_MODE=1` activa todos los item_types y seedea productos de prueba.
+- `src/db/cortes.js` — catálogo de cortes/ingredientes del giro. `getCortesBD()` devuelve mapa `{alias→slug}` para NLU (TTL 60s). `getCortesBDObj()` devuelve objetos completos. `getPrecioCorteFormato(corteSlug, formatoSlug)` con fallback a `precio_base` y luego a config global. Invalida con `invalidarCacheCortesBD()`.
 - `src/db/modelos.js` — CRUD de productos, clientes, pedidos. `actualizarEstadoPedido()` busca por teléfono, `actualizarEstadoPorId()` busca por ID (usa el webhook de MP). Funciones adicionales: `setProductoActivo`, `updateProductoPrecio`, `getTopClientes`, `getPedidosPorCliente`, `actualizarEstadoConfirmado`, `getPedidosPorFecha`.
 - `src/db/config.js` — configuración, horarios, banco, mensajes_bot, `guardarTelefonoReal()`, `getJIDReal()`, `guardarJIDReal()`
 - `src/db/index.js` — re-exporta todo el módulo db
@@ -65,6 +74,7 @@ Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → 
 - `scripts/backup-db.js` — copia `data/tacos_javier.db` a `data/backups/tacos_javier_YYYY-MM-DD_HH-mm-ss.db`. Se ejecuta automáticamente cada 6h desde `index.js` via `child_process.fork()`. También disponible como `npm run backup`.
 - `scripts/reset-password.js` — resetea la contraseña del panel sin necesitar la actual.
 - `scripts/nuevo-tenant.js` — provisiona una nueva instancia del bot (SaaS).
+- `scripts/check-nuevos-tipos.js` — suite de 27 casos de prueba para NLU multi-tipo (quesadillas, burritos, vampiros, gramos, pesos, multi-ítem, herencia `ultimoTipo`). Usar con `BOT_TEST_MODE=1`. **No usar `npm test`** — correr directo: `node scripts/check-nuevos-tipos.js`.
 
 ### Otros
 - `src/prompts/base.js` — prompt de sistema para Groq
@@ -93,6 +103,7 @@ APP_URL=https://mi-servidor.com # Necesario si MP está activo (webhook)
 GROQ_TIMEOUT_MS=15000          # Opcional — timeout para llamadas a Groq (default 15000ms)
 WEBHOOK_PORT=4000              # Puerto del servidor de deploy automático (default 4000)
 WEBHOOK_SECRET=...             # Secreto compartido con GitHub para verificar firma HMAC
+BOT_TEST_MODE=1                # Solo scripts — activa todos los item_types y seedea productos de prueba
 ```
 
 ## Configuración desde BD (tabla `configuracion`)
@@ -173,6 +184,9 @@ Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
 - Nuevo intent `pedido_listo` — evaluado ANTES que `horario` para que "¿ya están listos?" no responda con el horario de apertura.
 - En `handleEsperandoCorte`: "de todos"/"de todo"/"cualquiera" → "surtido" antes de llegar al error path.
 - En `handleFAQDurantePedido`: cuando el tipo es "precio" y hay pedido acumulado, añade el subtotal actual a la respuesta.
+- **NLU multi-tipo (quesadillas, vampiros, burritos):** `_buildItemTypesPattern()` construye regex dinámica desde BD. `parsearPedidoSimple()` usa esta regex tanto en el path multi-ítem como en el single-ítem. El path multi-ítem extiende `ultimoTipo` a todos los item types de unidad (`!soporta_gramos && !soporta_pesos`), no solo taco/torta.
+- **`extraerCorte` y fuzzy:** `buscarCorteFuzzy(palabra)` usa Levenshtein ≤ 2. **Importante**: antes del fuzzy se hace `if (detectarTipoItemDesdeTexto(palabra)) continue` para evitar que nombres de item types (ej. "burritos") coincidan por distancia con aliases de cortes (ej. "burritos" → "cueritos" → corte "cuero", distancia=2). Sin esta guardia, `detectarSinCorte("3 burritos")` retornaría null.
+- `listaItemTypes(soloUnidad = false)` — con `soloUnidad=true` filtra para excluir gramos/pesos. Usar en mensajes al cliente cuando no aplica venta por peso (ej. `handleEsperandoTipoItem`, `_textoRecordatorio`).
 
 ## Notas de implementación importantes
 - `extraerTelefono(texto)` — usar siempre esta función para extraer teléfonos de texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52 prefijo y separadores (331-234-5678, 331 234 5678).
