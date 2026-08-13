@@ -1,8 +1,7 @@
 name: Deploy al VPS
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:    # Solo manual desde GitHub Actions UI — deploy automático lo maneja webhook-deploy (PM2)
 
 jobs:
   deploy:

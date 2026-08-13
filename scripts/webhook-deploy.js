@@ -70,7 +70,7 @@ async function handleDeploy(req, res) {
 
   let dockerCmd;
   if (needsDockerBuild) {
-    dockerCmd = 'docker compose up -d --build';
+    dockerCmd = 'docker compose down && docker compose up -d --build';
     const razon = changed.some(f => ['package.json','package-lock.json','Dockerfile'].includes(f))
       ? 'dependencias/Dockerfile'
       : 'código fuente';
