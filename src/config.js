@@ -1,6 +1,7 @@
 ﻿const { getConfig, getBanco, getMensaje, getProductos, getItemTypes } = require("./db");
 const { getPrecios } = require("./pedido/precios");
 const { getRangoHorario } = require("./horario");
+const { getGiroActivo } = require("./giros");
 
 // ── DATOS BANCO ───────────────────────────────────────────────────────────────
 function getDatosBanco() {
@@ -27,19 +28,23 @@ function _datosBancoDefault() {
 
 function getMenuFormato() {
   try {
+    const giro  = (() => { try { return getGiroActivo(); } catch { return null; } })();
+    const md    = giro?.mensajesDefaults || {};
+    const cd    = giro?.configDefaults   || {};
+
     const productos   = getProductos();
     const cortes      = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
     const refrescos   = productos.filter(p => p.categoria === "refresco");
     const salsas      = productos.filter(p => p.categoria === "salsa");
     const nombres     = cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ");
-    const negocio    = getConfig("nombre_negocio")  || "el negocio";
-    const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
-    const precios    = getPrecios();
-    const notaTaco     = getMensaje("menu_taco_nota")    || "_(combinaciones al gusto)_";
-    const notaGramos   = getMensaje("menu_gramos_nota")  || "Cualquier pieza o combinación\n_Incluye tortillas y salsas_";
-    const notaSalsas   = getMensaje("menu_salsas_nota")  || "_(Los tacos y tortas ya incluyen salsas gratis)_";
-    const pieSalsas    = getMensaje("menu_pie_salsas")   || "";
-    const notaCantidad = getMensaje("menu_por_cantidad") || "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_";
+    const negocio     = getConfig("nombre_negocio") || "el negocio";
+    const pSalsa      = parseInt(getConfig("precio_salsa") || cd.precio_salsa || "15");
+    const precios     = getPrecios();
+    const notaTaco     = getMensaje("menu_taco_nota")    || md.menu_taco_nota    || '';
+    const notaGramos   = getMensaje("menu_gramos_nota")  || md.menu_gramos_nota  || '';
+    const notaSalsas   = getMensaje("menu_salsas_nota")  || md.menu_salsas_nota  || '';
+    const pieSalsas    = getMensaje("menu_pie_salsas")   || md.menu_pie_salsas   || '';
+    const notaCantidad = getMensaje("menu_por_cantidad") || md.menu_por_cantidad || '';
     // ── Sección de precios dinámica según item_types ──────────────────────────
     const itemTypes     = getItemTypes();
     const preciosUniformes = cortes.length === 0 || cortes.every(c => {
