@@ -423,6 +423,54 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         }
       }
     }
+    // Fallback 2: "cambia la [item_type] [de [corte]] por [una] [nuevo_item_type]" — swap de tipo de ítem
+    const mCambioTipo = textoOriginal.match(
+      /cambia(?:me|le)?\s+(?:(?:la|el|los|las)\s+)?(\w+)(?:\s+de\s+(\w+))?\s+por\s+(?:un[ao]?\s+)?(\w+)(?:\s+de\s+(\w+))?/i
+    );
+    if (mCambioTipo) {
+      const rawOld      = normalizar(mCambioTipo[1] || '');
+      const rawOldCort  = normalizar(mCambioTipo[2] || '');
+      const rawNuevo    = normalizar(mCambioTipo[3] || '');
+      const rawNuevoCort = normalizar(mCambioTipo[4] || '');
+      const tipoViejo   = detectarTipoItemDesdeTexto(rawOld);
+      const tipoNuevo   = detectarTipoItemDesdeTexto(rawNuevo);
+      const cortesMap   = getCortes();
+      if (tipoViejo && tipoNuevo && tipoViejo.slug !== tipoNuevo.slug) {
+        const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
+        const lineaViejaIdx = lineas.findIndex(l =>
+          new RegExp(`\\b(${normalizar(tipoViejo.nombre)}|${tipoViejo.slug})\\b`, 'i').test(normalizar(l))
+        );
+        if (lineaViejaIdx !== -1) {
+          const lineaVieja = lineas[lineaViejaIdx];
+          const matchCant = lineaVieja.match(/\b(\d+)\b/);
+          const cantidad = matchCant ? parseInt(matchCant[1], 10) : 1;
+          // Corte: del descriptor "de X" primero, luego buscarlo en la línea vieja
+          let corteSlug = rawOldCort ? (cortesMap[rawOldCort] || buscarCorteFuzzy(rawOldCort)) : null;
+          if (!corteSlug) {
+            const ck = Object.keys(cortesMap).find(k =>
+              new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(normalizar(lineaVieja))
+            );
+            corteSlug = ck ? cortesMap[ck] : null;
+          }
+          const corteNuevoSlug = rawNuevoCort
+            ? (cortesMap[rawNuevoCort] || buscarCorteFuzzy(rawNuevoCort) || corteSlug)
+            : corteSlug;
+          const jsonNuevo = { tipo: "pedido", items: [{ presentacion: tipoNuevo.slug, cantidad, corte: corteNuevoSlug }] };
+          const { texto: nuevasLineas } = jsonALineas(jsonNuevo);
+          const nuevaLinea = nuevasLineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l)).join('\n');
+          lineas[lineaViejaIdx] = nuevaLinea;
+          const ordenNueva = lineas.join('\n');
+          const subtotalMod = calcularSubtotal(ordenNueva);
+          const textoFinalMod = ordenNueva + '\n💰 Subtotal: $' + subtotalMod;
+          pedidoJSONActual.delete(clienteNumero);
+          esperandoConfirmacionItem.set(clienteNumero, { ...itemData, lineas: textoFinalMod });
+          historial.push({ role: "user",      content: textoOriginal });
+          historial.push({ role: "assistant", content: textoFinalMod });
+          await msg.reply(textoFinalMod + '\n\n*¿Es correcto?*');
+          return true;
+        }
+      }
+    }
     await msg.reply("No entendí qué quieres cambiar. *¿Me dices qué modificar?*\n_(Ej: 'quita uno', 'cámbiame el surtido a buche')_");
     return true;
   }
