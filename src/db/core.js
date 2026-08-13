@@ -5,7 +5,11 @@ const path      = require("path");
 const DATA_DIR = path.join(__dirname, "../../data");
 
 // DB_PATH se resuelve dentro de initDB() para que TENANT_ID pueda setearse antes de la primera llamada
-const _getDbPath = () => path.join(DATA_DIR, `${process.env.TENANT_ID || 'tacos_javier'}.db`);
+// En modo pruebas (BOT_TEST_MODE=1) usa base de datos en memoria para no tocar el archivo real.
+const _getDbPath = () => {
+  if (process.env.BOT_TEST_MODE) return ':memory:';
+  return path.join(DATA_DIR, `${process.env.TENANT_ID || 'tacos_javier'}.db`);
+};
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 

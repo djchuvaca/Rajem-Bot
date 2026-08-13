@@ -1,6 +1,6 @@
 "use strict";
 // Tests para estado/campos.js — extraerTelefono, extraerTelefonoDeJID, interpretarCampos
-// Usa sql.js real (sin mocks de BD).
+// Usa better-sqlite3 en memoria (sin mocks de BD, sin tocar el archivo de producción).
 
 const { test, describe, before } = require("node:test");
 const assert = require("node:assert/strict");

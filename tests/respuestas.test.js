@@ -1,7 +1,7 @@
 "use strict";
 // Tests para handlers/respuestas.js — respuestaPrecio, respuestaHorario,
 // respuestaDomicilio, respuestaMenu, respuestaDescripcionCorte.
-// Usa sql.js real (sin mocks de BD).
+// Usa better-sqlite3 en memoria (sin mocks de BD, sin tocar el archivo de producción).
 
 const { test, describe, before } = require("node:test");
 const assert = require("node:assert/strict");

@@ -1,6 +1,6 @@
 "use strict";
 // Tests unitarios de pedidoParser.js
-// Usa sql.js real (sin mocks de BD).
+// Usa better-sqlite3 en memoria (sin mocks de BD, sin tocar el archivo de producción).
 // Ejecutar: npm test
 
 const { test, describe, before } = require("node:test");
@@ -66,7 +66,7 @@ describe("calcularScore", () => {
   test("frase vaga obtiene score bajo (< 4)", () => {
     assert.ok(calcularScore("quiero tacos") < 4);
   });
-  test("señal groq penaliza (< 0)", () => {
+  test("señal compleja penaliza (< 0)", () => {
     assert.ok(calcularScore("3 tacos y aparte 2 para ella") < 0);
   });
   test("solo número sin contexto no alcanza umbral", () => {
@@ -328,10 +328,10 @@ describe("parsearPedidoSimple — retorna null", () => {
   test("'sí' — confirmación, no pedido", () => {
     assert.equal(parsearPedidoSimple("sí"), null);
   });
-  test("señal groq: 'y aparte' descarta el mensaje", () => {
+  test("señal compleja: 'y aparte' descarta el mensaje", () => {
     assert.equal(parsearPedidoSimple("3 tacos y aparte 2 para ella"), null);
   });
-  test("señal groq: 'separado'", () => {
+  test("señal compleja: 'separado'", () => {
     assert.equal(parsearPedidoSimple("3 tacos separado y 2 tortas"), null);
   });
   test("'3 tacos' sin corte — retorna null (sinCorte se maneja aparte)", () => {
@@ -358,7 +358,7 @@ describe("detectarSinCorte", () => {
   test("frase sin pedido → null", () => {
     assert.equal(detectarSinCorte("hola buenas"), null);
   });
-  test("señal groq → null", () => {
+  test("señal compleja → null", () => {
     assert.equal(detectarSinCorte("3 tacos y aparte 2 para ella"), null);
   });
 });
