@@ -383,18 +383,21 @@ async function seedDB() {
   );
 
   // Migración: claves nuevas en mensajes_bot (INSERT OR IGNORE para instancias existentes)
+  // Solo mensajes genéricos aquí; los específicos de cada giro vienen de giro.mensajesDefaults
   const nuevosMsgs = [
     ["comprobante_recibido", "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏"],
-    ["menu_nota_precios",  "_Los precios incluyen tortillas y salsas_ 😊"],
-    ["menu_taco_nota",     "_(combinaciones al gusto)_"],
-    ["menu_gramos_nota",   "Cualquier pieza o combinación\n_Incluye tortillas y salsas_"],
-    ["menu_salsas_nota",   "_(Los tacos y tortas ya incluyen salsas gratis)_"],
-    ["menu_por_cantidad",  "Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_"],
-    ["menu_pie_salsas",       "🟢 Todos los tacos y tortas incluyen salsas"],
-    ["menu_domicilio_nota",   "🛵 Domicilio: _precio según distancia a tu colonia_ 📍"],
+    ["menu_nota_precios",    "_Los precios incluyen tortillas y salsas_ 😊"],
+    ["menu_domicilio_nota",  "🛵 Domicilio: _precio según distancia a tu colonia_ 📍"],
   ];
   for (const [clave, valor] of nuevosMsgs) {
     db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
+  }
+
+  // Mensajes específicos del giro activo (fuente de verdad: src/giros/<giro>.mensajesDefaults)
+  if (_giro?.mensajesDefaults) {
+    for (const [clave, valor] of Object.entries(_giro.mensajesDefaults)) {
+      db.run("INSERT OR IGNORE INTO mensajes_bot (clave, valor) VALUES (?,?)", [clave, valor]);
+    }
   }
 
   // ── SEED USUARIO PANEL ─────────────────────────────────────────────────────

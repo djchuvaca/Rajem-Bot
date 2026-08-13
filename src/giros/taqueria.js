@@ -222,6 +222,15 @@ module.exports = {
     surtidoSlug:   'surtido',
   },
 
+  // Mensajes del bot específicos de este giro — se usan como default en mensajes_bot
+  mensajesDefaults: {
+    menu_taco_nota:    '_(combinaciones al gusto)_',
+    menu_gramos_nota:  'Cualquier pieza o combinación\n_Incluye tortillas y salsas_',
+    menu_salsas_nota:  '_(Los tacos y tortas ya incluyen salsas gratis)_',
+    menu_por_cantidad: 'Tú decides cuánto gastar, nosotros pesamos\n_Incluye tortillas y salsas_',
+    menu_pie_salsas:   '🟢 Todos los tacos y tortas incluyen salsas',
+  },
+
   // Flags de comportamiento — activan/desactivan lógica en parsers y prompts
   comportamiento: {
     soportaVentaPorPeso:  true,
