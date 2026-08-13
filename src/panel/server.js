@@ -796,18 +796,19 @@ app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
 
 // ── CATÁLOGO DEL GIRO (para selección en modales) ────────────────────────────
 
-// GET /api/catalogo/cortes — cortes del giro agrupados por sección
+// GET /api/catalogo/cortes — cortes del giro agrupados por sección, filtrados por seccion_taqueria
 app.get("/api/catalogo/cortes", requireAuth, (req, res) => {
   try {
     const slug = getBusinessTypeSlug() || 'taqueria';
     const bt   = queryOne("SELECT id FROM business_types WHERE slug=?", [slug]);
     if (!bt) return res.json({ asada: [], carnitas: [] });
     const cortes = queryAll(
-      "SELECT slug, nombre, precio_base, seccion FROM cortes WHERE giro_id=? ORDER BY id",
+      "SELECT slug, nombre, precio_base, seccion, descripcion FROM cortes WHERE giro_id=? ORDER BY id",
       [bt.id]
     );
-    const asada    = cortes.filter(c => c.seccion === 'asada');
-    const carnitas = cortes.filter(c => c.seccion !== 'asada');
+    const seccion = getConfig('seccion_taqueria') || 'ambas';
+    const asada    = seccion !== 'carnitas' ? cortes.filter(c => c.seccion === 'asada')  : [];
+    const carnitas = seccion !== 'asada'    ? cortes.filter(c => c.seccion !== 'asada') : [];
     res.json({ asada, carnitas });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
