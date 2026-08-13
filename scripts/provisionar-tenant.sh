@@ -10,7 +10,7 @@
 #   bash scripts/provisionar-tenant.sh
 #
 # Modo no-interactivo (desde super admin / webhook-deploy):
-#   PROV_NON_INTERACTIVE=1 TENANT_ID=tacos-pepe PROV_GROQ_KEY=gsk_... bash scripts/provisionar-tenant.sh
+#   PROV_NON_INTERACTIVE=1 TENANT_ID=tacos-pepe bash scripts/provisionar-tenant.sh
 
 set -euo pipefail
 
@@ -71,9 +71,6 @@ fi
 NOMBRE=$(get_val    "PROV_NOMBRE"     "Nombre del negocio"      "$TENANT_ID")
 CIUDAD=$(get_val    "PROV_CIUDAD"     "Ciudad"                  "")
 ESTADO=$(get_val    "PROV_ESTADO"     "Estado"                  "")
-GROQ_KEY=$(get_val  "PROV_GROQ_KEY"  "GROQ_API_KEY (gsk_...)"  "")
-[[ -z "$GROQ_KEY" ]] && error "La GROQ_API_KEY es requerida."
-
 GRUPO_ID=$(get_val  "PROV_GRUPO_ID"    "GRUPO_ID de WhatsApp (enter para omitir)"  "")
 PLAN=$(get_val      "PROV_PLAN"        "Plan (basico / plus / pro)"                "basico")
 NOTAS=$(get_val     "PROV_NOTAS"       "Notas (opcional)"                          "")
@@ -110,7 +107,6 @@ cat > "$ENVS_DIR/${TENANT_ID}.env" <<EOF
 # Generado por provisionar-tenant.sh — $(date)
 TENANT_ID=${TENANT_ID}
 NOMBRE_NEGOCIO=${NOMBRE}
-GROQ_API_KEY=${GROQ_KEY}
 GRUPO_ID=${GRUPO_ID}
 PANEL_PORT=3000
 PANEL_SECRET=${PANEL_SECRET}

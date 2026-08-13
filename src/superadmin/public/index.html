@@ -126,7 +126,6 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div class="nav-item" onclick="showSection('tenants')" data-s="tenants"><span class="icon">🏪</span> Negocios</div>
     <div class="nav-item" onclick="showSection('geo')" data-s="geo"><span class="icon">🗺️</span> Geo & Colonias</div>
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
-    <div class="nav-item" onclick="showSection('ia')" data-s="ia"><span class="icon">🤖</span> IA Global</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
     <div class="nav-item" onclick="showSection('global')" data-s="global"><span class="icon">🌐</span> Config Global</div>
     <div class="sidebar-bottom">
@@ -310,32 +309,6 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <button class="btn btn-primary" onclick="saveTenantConfig()">Guardar cambios</button>
           <button class="btn btn-secondary" onclick="loadTenantConfig()">Revertir</button>
         </div>
-      </div>
-    </div>
-
-    <!-- ── IA GLOBAL ── -->
-    <div id="sec-ia" class="section">
-      <h1>IA Global</h1>
-      <p class="subtitle">Configuración de Groq compartida entre todos los tenants con IA activa</p>
-      <div class="card" style="max-width:500px">
-        <div class="form-group">
-          <label>GROQ_API_KEY</label>
-          <input id="ia-key" type="password" placeholder="gsk_…">
-          <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="toggleIaKey()">👁 Mostrar / Ocultar</button>
-        </div>
-        <div class="form-group">
-          <label>Modelo</label>
-          <select id="ia-modelo">
-            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (recomendado)</option>
-            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (más rápido)</option>
-            <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Timeout (ms)</label>
-          <input id="ia-timeout" type="number" min="5000" max="60000" step="1000" value="15000">
-        </div>
-        <button class="btn btn-primary" onclick="saveIaConfig()">Guardar</button>
       </div>
     </div>
 
@@ -595,7 +568,7 @@ async function doLogin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     document.getElementById('sa-user-label').textContent = u;
-    loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+    loadDashboard(); populateTenantSelects(); loadGlobalConfig();
     _restoreSection();
   } else {
     const e = await r.json();
@@ -614,7 +587,7 @@ fetch('/api/me').then(r => {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     document.getElementById('sa-user-label').textContent = d.usuario;
-    loadDashboard(); populateTenantSelects(); loadGlobalConfig(); loadIaConfig();
+    loadDashboard(); populateTenantSelects(); loadGlobalConfig();
     _restoreSection();
   });
 });
@@ -652,7 +625,6 @@ async function loadDashboard() {
     const _BL = {activo:'Activo',pausado:'En pausa',inactivo:'Inactivo'};
     const badge = `<span class="badge ${_BE[t.bot_estado]||'badge-gray'}">${_BL[t.bot_estado]||'Inactivo'}</span>`;
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
-    const ia = s.groq_activo ? `<span class="badge badge-purple" style="background:#2e1b69;color:#a78bfa">IA</span>` : '';
     return `<div class="card">
       <div class="card-header"><div class="card-title">${s.nombre_negocio||t.nombre}</div>${badge}</div>
       <div style="display:flex;gap:6px;margin-bottom:10px">${plan}${ia}</div>
@@ -1240,25 +1212,6 @@ async function openGruposWA() {
       <div><div style="font-weight:600">${g.nombre}</div><code style="font-size:11px;color:var(--muted)">${g.id}</code></div>
       <button class="btn btn-secondary btn-sm" onclick="document.getElementById('tc-grupo-id').value='${g.id}';closeModal('modal-grupos');toast('JID copiado al campo')">Usar</button>
     </div>`).join('');
-}
-
-// ── IA GLOBAL ─────────────────────────────────────────────────────────────────
-async function loadIaConfig() {
-  const r=await fetch('/api/global-config'); if(!r.ok) return;
-  const data=await r.json();
-  const m=Object.fromEntries(data.map(d=>[d.clave,d.valor]));
-  document.getElementById('ia-key').value=m.groq_api_key||'';
-  document.getElementById('ia-modelo').value=m.groq_modelo||'llama-3.3-70b-versatile';
-  document.getElementById('ia-timeout').value=m.groq_timeout_ms||'15000';
-}
-async function saveIaConfig() {
-  const config={groq_api_key:document.getElementById('ia-key').value.trim(),groq_modelo:document.getElementById('ia-modelo').value,groq_timeout_ms:document.getElementById('ia-timeout').value};
-  const r=await fetch('/api/global-config/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
-  r.ok ? toast('Config IA guardada') : toast('Error','err');
-}
-function toggleIaKey() {
-  const el=document.getElementById('ia-key');
-  el.type=el.type==='password'?'text':'password';
 }
 
 // ── CONFIG GLOBAL ─────────────────────────────────────────────────────────────

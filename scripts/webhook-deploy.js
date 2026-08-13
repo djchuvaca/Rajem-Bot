@@ -113,8 +113,8 @@ async function handleProvisionar(req, res) {
     res.writeHead(400); res.end('JSON inválido'); return;
   }
 
-  if (!data.tenant_id || !data.groq_key) {
-    res.writeHead(400); res.end('Faltan campos requeridos: tenant_id, groq_key'); return;
+  if (!data.tenant_id) {
+    res.writeHead(400); res.end('Faltan campos requeridos: tenant_id'); return;
   }
 
   // Respuesta en streaming (chunked) para que el super admin muestre logs en tiempo real
@@ -133,7 +133,6 @@ async function handleProvisionar(req, res) {
     PROV_CIUDAD:          data.ciudad       || '',
     PROV_ESTADO:          data.estado       || '',
     ...(data.panel_port ? { PROV_PANEL_PORT: String(data.panel_port) } : {}),
-    PROV_GROQ_KEY:        data.groq_key,
     PROV_GRUPO_ID:        data.grupo_id     || '',
     PROV_PANEL_SECRET:    data.panel_secret || '',
     PROV_PLAN:            data.plan         || 'basico',

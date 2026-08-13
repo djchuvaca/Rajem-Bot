@@ -71,7 +71,6 @@ async function main() {
     process.exit(1);
   }
 
-  const groqKey   = await ask("GROQ_API_KEY (gsk_...)");
   const grupoId   = await ask("GRUPO_ID del WhatsApp (521XXXXXXXXXX@g.us)");
   const panelPort = await ask("Puerto del panel", "3001");
   const panelSecret = await ask("PANEL_SECRET (cadena aleatoria larga)");
@@ -102,7 +101,6 @@ async function main() {
   const envContenido = [
     `# Generado por scripts/nuevo-tenant.js`,
     `TENANT_ID=${tenantId}`,
-    `GROQ_API_KEY=${groqKey}`,
     `GRUPO_ID=${grupoId}`,
     `PANEL_PORT=${panelPort}`,
     `PANEL_SECRET=${panelSecret}`,
