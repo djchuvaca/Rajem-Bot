@@ -84,12 +84,4 @@ module.exports = {
     hawaiana: 'hawaiana_burger', 'con piña': 'hawaiana_burger',
   },
 
-  // Instrucciones específicas de hamburguesería para el prompt de Groq
-  promptOverride: ({ negocio }) =>
-    `\nNOMENCLATURA DE HAMBURGUESERÍA (${negocio}):` +
-    `\n- Las "variantes" son: clásica, BBQ, chipotle, crispy, especial, hawaiana.` +
-    `\n- Los "tamaños" son: sencilla o doble.` +
-    `\n- NUNCA uses "taco" o "torta" — usa "hamburguesa sencilla" o "hamburguesa doble".` +
-    `\n- Formato de respuesta: "1 hamburguesa BBQ sencilla — $100".` +
-    `\n- Si el cliente no especifica tamaño, pregunta: "¿la quieres sencilla o doble?"`,
 };

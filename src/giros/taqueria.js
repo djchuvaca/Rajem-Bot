@@ -227,9 +227,4 @@ module.exports = {
     tarjetaSoloMostrador: true,
   },
 
-  // Nomenclatura específica de taquería para el prompt de Groq
-  promptOverride: ({ negocio, tipoNegocio }) =>
-    `\n\nNOMENCLATURA EN RESPUESTAS DE TEXTO (${negocio}):` +
-    `\n- SIEMPRE usa nombres como "3 tacos de carne", "200g de buche", "2 tortas de surtido".` +
-    `\n- En JSON, el campo "corte" usa solo el nombre del producto: "carne", "buche", "surtido".`,
 };

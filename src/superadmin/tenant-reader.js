@@ -102,7 +102,6 @@ function getTenantStats(tenant) {
       total_clientes:   totalClientes,
       sesiones_activas: sesiones,
       nombre_negocio:   config.nombre_negocio || tenant.nombre,
-      groq_activo:      config.groq_activo === '1',
       pasarela_activa:  config.pasarela_activa || null,
     };
   } catch (e) {

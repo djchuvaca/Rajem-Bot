@@ -24,7 +24,7 @@ const {
   handleExtras, handleAgregarMas,
   handleFAQDurantePedido, handleRepetirPedido, handlePedidoSimple,
   handleEsperandoCorte, handleSinCorte, handleSinTipo,
-  handleModificacionAgregarMas, handlePresupuestoInverso, handleGroqFallback,
+  handleModificacionAgregarMas, handlePresupuestoInverso, handleNoEntendi,
 } = require("./flujos/orden");
 
 async function handleMensaje(msg, client) {
@@ -188,7 +188,7 @@ async function handleMensaje(msg, client) {
   if (await handleModificacionAgregarMas(msg, textoOriginal, clienteNumero)) return;
   if (await handlePresupuestoInverso(msg, textoOriginal)) return;
 
-  await handleGroqFallback(msg, textoOriginal, clienteNumero, historial, esPreventa);
+  await handleNoEntendi(msg, clienteNumero);
 }
 
 module.exports = { handleMensaje };

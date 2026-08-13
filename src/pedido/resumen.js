@@ -23,10 +23,6 @@ function getDomCosto() {
   try { return parseInt(getConfig("domicilio_costo") || "50"); } catch (e) { return 50; }
 }
 
-function getTipoNegocio() {
-  try { return getConfig("tipo_negocio") || "taqueria"; } catch (e) { return "taqueria"; }
-}
-
 // ── EMOJIS POR PRESENTACIÓN ───────────────────────────────────────────────────
 function emojiPresentacion(presentacion) {
   if (presentacion === "gramos" || presentacion === "pesos") return "⚖️";

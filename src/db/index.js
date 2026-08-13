@@ -60,7 +60,6 @@ module.exports = {
   getJIDReal:          config.getJIDReal,
   getGrupoId:              config.getGrupoId,
   getGrupoMandaditosId:    config.getGrupoMandaditosId,
-  isGroqActivo:            config.isGroqActivo,
   getPasarelaActiva:       config.getPasarelaActiva,
   getPasarelaConfig:       config.getPasarelaConfig,
   getNotifModalidad:       config.getNotifModalidad,

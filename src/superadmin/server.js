@@ -10,7 +10,7 @@ const path     = require('path');
 const {
   getAdminDB, getGlobalConfig, setGlobalConfig, getAllGlobalConfig,
   getSuperadminUsuario, updateSuperadminPassword,
-  getGroqApiKey, getGroqTimeoutMs, getGroqModelo, getAppUrl, getGrupoMandaditosGlobal,
+  getAppUrl, getGrupoMandaditosGlobal,
 } = require('../db/admin');
 const SqliteSessionStore = require('../db/session-store');
 
@@ -294,12 +294,7 @@ app.get('/api/grupos-wa', requireAuth, async (req, res) => {
 app.post('/api/provisionar', requireAuth, (req, res) => {
   const webhookPort = process.env.WEBHOOK_PORT || 4000;
   const secret      = process.env.WEBHOOK_SECRET || '';
-  // Inyectar GROQ key global si el cliente no la envía
   const reqBody = { ...req.body };
-  if (!reqBody.groq_key) {
-    const k = getGroqApiKey();
-    if (k) reqBody.groq_key = k;
-  }
   const body = JSON.stringify(reqBody);
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');

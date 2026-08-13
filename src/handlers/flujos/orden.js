@@ -1,5 +1,4 @@
 // src/handlers/flujos/orden.js
-const Groq = require("groq-sdk");
 const {
   esperandoTipoItem, esperandoConfirmacionItem, esperandoAgregarMas,
   esperandoCorte, resumenPendiente, pedidoJSONActual, tipoEntregaCliente,
@@ -19,44 +18,15 @@ const {
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
 const { getUltimoPedido } = require("../../db");
-const { buildPrompt } = require("../../prompts/index");
 const { MENU_FORMATO } = require("../../config");
 const {
   telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, palabrasConfirmacion, listaCortes,
 } = require("./utils");
 
-// Groq se inicializa en tiempo de llamada para leer la key desde admin.db
-let _groqInstance = null;
-let _groqKeyCache = null;
-
-function _getGroq() {
-  const { getGroqApiKey } = require('../../db/admin');
-  const key = getGroqApiKey();
-  if (!key) return null;
-  if (!_groqInstance || _groqKeyCache !== key) {
-    _groqInstance = new Groq({ apiKey: key });
-    _groqKeyCache = key;
-  }
-  return _groqInstance;
-}
-
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
 const _erroresConsec = new Map();
 function _sumarError(num) { _erroresConsec.set(num, (_erroresConsec.get(num) || 0) + 1); return _erroresConsec.get(num); }
 function _resetError(num) { _erroresConsec.delete(num); }
-
-function groqConTimeout(params) {
-  const groqClient = _getGroq();
-  if (!groqClient) return Promise.reject(new Error("GROQ_NO_CONFIGURADO"));
-  const { getGroqTimeoutMs } = require('../../db/admin');
-  const timeout = getGroqTimeoutMs();
-  return Promise.race([
-    groqClient.chat.completions.create(params),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("GROQ_TIMEOUT")), timeout)
-    ),
-  ]);
-}
 
 // ── HELPERS PARA EXTRAS ───────────────────────────────────────────────────────
 function _listaNombresRefrescos() {
@@ -1499,98 +1469,11 @@ async function handlePresupuestoInverso(msg, textoOriginal) {
   } catch (_) { return false; }
 }
 
-// ── FALLBACK A GROQ ───────────────────────────────────────────────────────────
-async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial, esPreventa) {
-  // Si el tenant no tiene IA activa y no hay API key, responder sin Groq
-  const { isGroqActivo } = require('../../db/config');
-  if (!isGroqActivo() && !_getGroq()) {
-    await msg.reply("Lo siento, no entendí tu mensaje. ¿Puedes repetirme qué deseas ordenar? 😊");
-    return;
-  }
-
-  historial.push({ role: "user", content: textoOriginal });
-  if (historial.length > 15) historial.splice(0, 2);
-
+// ── FALLBACK LOCAL ────────────────────────────────────────────────────────────
+async function handleNoEntendi(msg, clienteNumero) {
   const { enFlujoActivo } = require("./utils");
-  try {
-    const systemPrompt = buildPrompt({
-      tomandoPedido:  true,
-      textoCliente:   textoOriginal,
-      horaConfirmada: horaEntregaPreventa.get(clienteNumero) || null,
-      esPreventa,
-    });
-    const respuestaGroq = await groqConTimeout({
-      model:       require('../../db/admin').getGroqModelo(),
-      max_tokens:  400,
-      temperature: 0.2,
-      messages:    [{ role: "system", content: systemPrompt }, ...historial],
-    });
-    let respuestaTexto = respuestaGroq.choices[0]?.message?.content?.trim() || "";
-    historial.push({ role: "assistant", content: respuestaTexto });
-
-    let jsonData = null;
-    try { const clean = respuestaTexto.replace(/```json|```/g, "").trim(); jsonData = JSON.parse(clean); } catch (_) {}
-
-    if (jsonData && jsonData.tipo === "pedido" && Array.isArray(jsonData.items)) {
-      pedidoJSONActual.set(clienteNumero, jsonData);
-      persistirEstado(clienteNumero);
-      const resultado = jsonALineas(jsonData);
-      esperandoConfirmacionItem.set(clienteNumero, { lineas: resultado.texto });
-      await replyConTyping(msg, resultado.texto + "\n\n*¿Es correcto?*");
-      console.log(`Bot: [JSON→LÍNEAS] Subtotal: $${resultado.subtotal}`);
-      return;
-    }
-    if (jsonData && jsonData.tipo === "pregunta" && jsonData.mensaje) {
-      await replyConTyping(msg, jsonData.mensaje); return;
-    }
-    if (jsonData && jsonData.tipo === "info" && jsonData.mensaje) {
-      await replyConTyping(msg, jsonData.mensaje);
-      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO());
-      return;
-    }
-    if (respuestaTexto) {
-      await replyConTyping(msg, respuestaTexto);
-      console.log(`Bot: ${respuestaTexto.substring(0, 80)}...`);
-      if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO());
-    } else {
-      await msg.reply("Disculpa, no entendi. Me repites tu pedido?");
-      if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO());
-    }
-  } catch (error) {
-    if (error.message === "GROQ_TIMEOUT") {
-      console.warn("Groq timeout — sin respuesta en 15s");
-      try { await msg.reply("Disculpa, tardé demasiado en responder. ¿Me repites qué deseas ordenar? 😊"); } catch (_) {}
-      return;
-    }
-    console.error("Error Groq (1er intento):", error.message);
-    try {
-      await new Promise(r => setTimeout(r, 1000));
-      const systemPromptRetry = buildPrompt({
-        tomandoPedido:  true,
-        textoCliente:   textoOriginal,
-        horaConfirmada: horaEntregaPreventa.get(clienteNumero) || null,
-        esPreventa,
-      });
-      const respuestaRetry = await groqConTimeout({
-        model:       require('../../db/admin').getGroqModelo(),
-        max_tokens:  400,
-        temperature: 0.35,
-        messages:    [{ role: "system", content: systemPromptRetry }, ...historial],
-      });
-      const textoRetry = respuestaRetry.choices[0]?.message?.content?.trim() || "";
-      if (textoRetry) {
-        historial.push({ role: "assistant", content: textoRetry });
-        await replyConTyping(msg, textoRetry);
-      } else {
-        await msg.reply("Disculpa, no entendi. Me repites tu pedido?");
-        if (!enFlujoActivo(clienteNumero)) await msg.reply(MENU_FORMATO());
-      }
-    } catch (retryErr) {
-      const esTimeout = retryErr.message === "GROQ_TIMEOUT";
-      console.error(`Error Groq (reintento${esTimeout ? " — timeout" : ""}):`, retryErr.message);
-      try { await msg.reply("Disculpa, tuve un problemita. Me vuelves a decir que quieres?"); } catch (_) {}
-    }
-  }
+  await replyConTyping(msg, "No entendí tu mensaje. ¿Puedes decirme qué deseas ordenar? 😊");
+  if (!enFlujoActivo(clienteNumero)) await replyConTyping(msg, MENU_FORMATO());
 }
 
 module.exports = {
@@ -1607,5 +1490,5 @@ module.exports = {
   handleSinTipo,
   handleModificacionAgregarMas,
   handlePresupuestoInverso,
-  handleGroqFallback,
+  handleNoEntendi,
 };

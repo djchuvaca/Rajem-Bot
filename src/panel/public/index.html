@@ -258,14 +258,6 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <input class="form-input" id="wz-nombre" type="text" placeholder="Ej: Tacos El Güero">
         </div>
         <div class="form-group">
-          <label class="form-label">Especialidad de la taquería <small style="color:var(--muted)">(para el bot de IA)</small></label>
-          <select class="form-select" id="wz-tipo">
-            <option value="">— Sin especificar —</option>
-            <option value="Tacos de asada">🥩 Tacos de asada</option>
-            <option value="Tacos de carnitas">🐷 Tacos de carnitas</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label class="form-label">Dirección / Ubicación <small style="color:var(--muted)">(opcional)</small></label>
           <input class="form-input" id="wz-ubicacion" type="text" placeholder="Ej: Av. López Mateos 123, Col. Centro">
         </div>
@@ -2061,7 +2053,7 @@ async function saveGrupoMensajes(grupo) {
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const configLabels = {
-  nombre_negocio:'Nombre del negocio', tipo_negocio:'Especialidad de la taquería',
+  nombre_negocio:'Nombre del negocio',
   tiempo_cancelacion:'Tiempo para cancelar (min)',
   timeout_recordatorio_min:'Recordatorio de inactividad (min)',
   timeout_sesion_min:'Limpiar sesión inactiva (min)',
@@ -2071,21 +2063,12 @@ const configLabels = {
 async function loadConfig() {
   const conf = await api('/api/config');
   const filtrados = conf.filter(c => !c.clave.startsWith('tel_real_') && configLabels[c.clave]);
-  const _TIPOS_TAQUERIA = [
-    { v: '',                  t: '— Sin especificar —' },
-    { v: 'Tacos de asada',    t: '🥩 Tacos de asada' },
-    { v: 'Tacos de carnitas', t: '🐷 Tacos de carnitas' },
-  ];
-  document.getElementById('config-list').innerHTML = filtrados.map(c => {
-    const label = `<label class="form-label">${configLabels[c.clave] || c.clave}</label>`;
-    if (c.clave === 'tipo_negocio') {
-      const opts = _TIPOS_TAQUERIA.map(o =>
-        `<option value="${o.v}"${c.valor === o.v ? ' selected' : ''}>${o.t}</option>`
-      ).join('');
-      return `<div class="form-group">${label}<select class="form-select" id="cfg-tipo_negocio">${opts}</select></div>`;
-    }
-    return `<div class="form-group">${label}<input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}"></div>`;
-  }).join('');
+  document.getElementById('config-list').innerHTML = filtrados.map(c =>
+    `<div class="form-group">
+      <label class="form-label">${configLabels[c.clave] || c.clave}</label>
+      <input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}">
+    </div>`
+  ).join('');
   // Cargar estrategia mixto por separado
   const estrategia = conf.find(c => c.clave === 'estrategia_precio_mixto')?.valor || 'mas_caro';
   const elEst = document.getElementById('cfg-estrategia-mixto');
@@ -2464,10 +2447,8 @@ async function _wzSavePaso(n) {
     if (n === 0) {
       // Datos del negocio
       const nombre    = document.getElementById('wz-nombre').value.trim();
-      const tipo      = document.getElementById('wz-tipo').value.trim();
       const ubicacion = document.getElementById('wz-ubicacion').value.trim();
       if (nombre)    await api('/api/config', 'POST', { clave:'nombre_negocio', valor: nombre });
-      if (tipo)      await api('/api/config', 'POST', { clave:'tipo_negocio', valor: tipo });
       if (ubicacion) await api('/api/config', 'POST', { clave:'ubicacion', valor: ubicacion });
       if (nombre) {
         const el = document.getElementById('sidebar-negocio');

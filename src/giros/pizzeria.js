@@ -95,13 +95,4 @@ module.exports = {
     vegetariana: 'vegetariana', veggie: 'vegetariana', 'sin carne': 'vegetariana',
   },
 
-  // Instrucciones específicas de pizzería para el prompt de Groq
-  promptOverride: ({ negocio }) =>
-    `\nNOMENCLATURA DE PIZZERÍA (${negocio}):` +
-    `\n- Los "sabores" son: hawaiana, pepperoni, mexicana, margarita, cuatro quesos, carnes, vegetariana.` +
-    `\n- Los "tamaños" son: individual o familiar.` +
-    `\n- NUNCA uses "taco" o "torta" — usa "pizza individual" o "pizza familiar".` +
-    `\n- Formato de respuesta: "1 pizza hawaiana individual — $120".` +
-    `\n- Combinaciones válidas: "mitad pepperoni, mitad mexicana".` +
-    `\n- Si el cliente no especifica tamaño, pregunta: "¿la quieres individual o familiar?"`,
 };

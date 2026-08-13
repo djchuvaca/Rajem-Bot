@@ -25,23 +25,13 @@ function _datosBancoDefault() {
 
 // ── MENÚ FORMATO ──────────────────────────────────────────────────────────────
 
-function _nombresCortesFallback() {
-  try {
-    const { getGiroActivo } = require('./giros');
-    const giro = getGiroActivo();
-    return (giro?.cortes || []).map(c => c.nombre.charAt(0).toUpperCase() + c.nombre.slice(1)).join(' · ');
-  } catch (_) { return ''; }
-}
-
 function getMenuFormato() {
   try {
     const productos   = getProductos();
     const cortes      = productos.filter(p => p.categoria === "corte" && p.nombre !== "surtido especial");
     const refrescos   = productos.filter(p => p.categoria === "refresco");
     const salsas      = productos.filter(p => p.categoria === "salsa");
-    const nombres     = cortes.length > 0
-      ? cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ")
-      : _nombresCortesFallback();
+    const nombres     = cortes.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(" · ");
     const negocio    = getConfig("nombre_negocio")  || "el negocio";
     const pSalsa     = parseInt(getConfig("precio_salsa") || "15");
     const precios    = getPrecios();

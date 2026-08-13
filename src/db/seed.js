@@ -521,8 +521,7 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_referencia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupo_mandaditos_id', '')");
 
-  // Config: IA y pasarela de pagos (administradas desde super-admin)
-  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('groq_activo', '0')");
+  // Config: pasarela de pagos (administrada desde super-admin)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_activa', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_config', '{}')");
 

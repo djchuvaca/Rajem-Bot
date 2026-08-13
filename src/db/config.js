@@ -129,10 +129,6 @@ function getGrupoMandaditosId() {
   return getGrupoMandaditosGlobal() || getConfig("grupo_mandaditos_id") || null;
 }
 
-function isGroqActivo() {
-  return getConfig("groq_activo") === "1";
-}
-
 function getPasarelaActiva() {
   return getConfig("pasarela_activa") || null;
 }
@@ -178,6 +174,6 @@ module.exports = {
   guardarTelefonoReal, getTelefonoReal,
   guardarJIDReal, getJIDReal,
   getGrupoId, getGrupoMandaditosId,
-  isGroqActivo, getPasarelaActiva, getPasarelaConfig,
+  getPasarelaActiva, getPasarelaConfig,
   getNotifModalidad, getNotifDestinoJID,
 };

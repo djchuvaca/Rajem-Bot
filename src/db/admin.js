@@ -33,9 +33,6 @@ function _init() {
 
   // Defaults de global_config — solo inserta si no existe
   const defaults = [
-    ['groq_api_key',        process.env.GROQ_API_KEY        || ''],
-    ['groq_timeout_ms',     process.env.GROQ_TIMEOUT_MS     || '15000'],
-    ['groq_modelo',         'llama-3.3-70b-versatile'],
     ['app_url',             process.env.APP_URL              || ''],
     ['grupo_mandaditos_id', process.env.GRUPO_MANDADITOS_ID || ''],
     ['sentry_dsn',          process.env.SENTRY_DSN          || ''],
@@ -76,9 +73,6 @@ function updateSuperadminPassword(usuario, hash) {
 }
 
 // ── Getters de conveniencia ────────────────────────────────────────────────────
-function getGroqApiKey()    { return getGlobalConfig('groq_api_key')    || process.env.GROQ_API_KEY        || ''; }
-function getGroqTimeoutMs() { return parseInt(getGlobalConfig('groq_timeout_ms') || process.env.GROQ_TIMEOUT_MS || '15000'); }
-function getGroqModelo()    { return getGlobalConfig('groq_modelo')     || 'llama-3.3-70b-versatile'; }
 function getAppUrl()        { return getGlobalConfig('app_url')         || process.env.APP_URL              || ''; }
 function getGrupoMandaditosGlobal() { return getGlobalConfig('grupo_mandaditos_id') || process.env.GRUPO_MANDADITOS_ID || ''; }
 
@@ -86,5 +80,5 @@ module.exports = {
   getAdminDB,
   getGlobalConfig, setGlobalConfig, getAllGlobalConfig,
   getSuperadminUsuario, updateSuperadminPassword,
-  getGroqApiKey, getGroqTimeoutMs, getGroqModelo, getAppUrl, getGrupoMandaditosGlobal,
+  getAppUrl, getGrupoMandaditosGlobal,
 };

@@ -245,8 +245,8 @@ const MEDIDAS = [
   { re: /\bun\s+kilo\b|\b1\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,                            gramos: 1000 },
 ];
 
-// ── SEÑALES DE COMPLEJIDAD → GROQ ─────────────────────────────────────────────
-const SEÑALES_GROQ        = /para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
+// ── SEÑALES DE PEDIDO COMPLEJO (multi-persona, distribución, etc.) ─────────────
+const SEÑALES_COMPLEJO    = /para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
 
 // ── PATRONES DE MODIFICACIÓN ──────────────────────────────────────────────────
@@ -394,7 +394,7 @@ function calcularScore(texto) {
   const t = normalizar(texto);
   let score = 0;
 
-  if (SEÑALES_GROQ.test(t))            score -= 10;
+  if (SEÑALES_COMPLEJO.test(t))            score -= 10;
   if (PATRON_DISTRIBUCION.test(texto)) score -= 10;
 
   if (/\b\d+\b/.test(t))                                               score += 2;
@@ -505,7 +505,7 @@ function parsearItem(fragmento) {
 function detectarSinCorte(texto) {
   texto = textoANumero(texto);
   const t = normalizar(texto);
-  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
   for (const parte of partes) {
     const item = parsearItem(parte);
@@ -735,7 +735,7 @@ function parsearPedidoSimple(texto) {
   texto = textoANumero(preprocesarCantidades(texto));
   const t = normalizar(texto);
 
-  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 
   const partes = dividirEnItems(texto);
@@ -795,7 +795,7 @@ function parsearPedidoSimple(texto) {
 function detectarSinTipo(texto) {
   texto = textoANumero(texto);
   const t = normalizar(texto);
-  if (SEÑALES_GROQ.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
+  if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   const partes = dividirEnItems(texto);
   if (partes.length > 1) return null;
   if (detectarTipoItemDesdeTexto(t)) return null;
