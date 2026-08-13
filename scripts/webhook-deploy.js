@@ -56,21 +56,15 @@ async function handleDeploy(req, res) {
   const changed = (payload.commits || [])
     .flatMap(c => [...(c.added || []), ...(c.removed || []), ...(c.modified || [])]);
 
-  // Archivos que viven en Docker (imagen baked con COPY . .) — siempre necesitan --build
-  const SUPERADMIN_DIRS = ['src/superadmin/'];
-  const isDockerFile = f =>
-    !SUPERADMIN_DIRS.some(d => f.startsWith(d)) &&           // superadmin corre en PM2, no Docker
-    !['scripts/webhook-deploy.js'].includes(f);              // webhook corre en PM2, no Docker
-
-  // src/superadmin/public/ montado como volumen — no necesita restart de PM2
+  // Arquitectura: todo corre en Docker EXCEPTO scripts/webhook-deploy.js (PM2 en host)
+  // src/superadmin/public/ está montado como volumen — no necesita rebuild
   const onlySuperadminStatic = changed.length > 0 && changed.every(f =>
     f.startsWith('src/superadmin/public/')
   );
-  // JS del superadmin corre en PM2 en el VPS (fuera de Docker)
-  const needsSuperadmin = changed.some(f =>
-    f.startsWith('src/superadmin/') && f.endsWith('.js') && !f.startsWith('src/superadmin/public/')
-  );
-  // Cualquier cambio en archivos que van dentro del contenedor Docker requiere rebuild
+  const isDockerFile = f =>
+    f !== 'scripts/webhook-deploy.js' &&        // webhook corre en PM2, no Docker
+    !f.startsWith('src/superadmin/public/');    // volumen montado, no baked en imagen
+  // Cualquier cambio en archivos baked en la imagen Docker requiere rebuild
   const needsDockerBuild = !onlySuperadminStatic && changed.some(f => isDockerFile(f));
   const needsPm2         = changed.includes('scripts/webhook-deploy.js');
 
@@ -92,7 +86,6 @@ async function handleDeploy(req, res) {
   // git stash/pop falla si no hay cambios locales — simplemente pullamos directo
   const cmds = [`cd ${PROJECT}`, 'git pull'];
   if (dockerCmd) cmds.push(dockerCmd);
-  if (needsSuperadmin) cmds.push('pm2 restart superadmin');
   if (needsPm2) cmds.push('pm2 restart webhook-deploy');
 
   const cmd = cmds.join(' && ');
