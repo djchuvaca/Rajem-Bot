@@ -457,7 +457,14 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     }
   }
 
-  if (esRechazo || /^no$/i.test(textoOriginal.trim())) {
+  // "no" solo → preguntar qué quiere cambiar sin cancelar la orden
+  if (/^no$/i.test(textoOriginal.trim())) {
+    _resetError(clienteNumero);
+    await msg.reply(itemData.lineas + "\n\n¿Qué deseas cambiar? _(Dime qué quitar, agregar o corregir)_");
+    return true;
+  }
+
+  if (esRechazo) {
     esperandoConfirmacionItem.delete(clienteNumero);
     esperandoAgregarMas.delete(clienteNumero);
     esperandoExtras.delete(clienteNumero);
