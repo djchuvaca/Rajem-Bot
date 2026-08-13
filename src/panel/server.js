@@ -840,12 +840,19 @@ app.get("/api/formatos", requireAuth, (req, res) => {
 });
 
 // PUT /api/formatos/:id — editar precio_base de un formato
+// cascade:true propaga el precio a todos los menu_items del formato (útil desde el wizard)
 app.put("/api/formatos/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
-  const { precio_base, activo } = req.body;
+  const { precio_base, activo, cascade } = req.body;
   try {
     const { run } = require("../db/core");
-    if (precio_base !== undefined) run("UPDATE item_types SET precio_base = ? WHERE id = ?", [precio_base, id]);
+    if (precio_base !== undefined) {
+      run("UPDATE item_types SET precio_base = ? WHERE id = ?", [precio_base, id]);
+      if (cascade) {
+        const it = queryOne("SELECT slug FROM item_types WHERE id=?", [id]);
+        if (it) run("UPDATE menu_items SET precio=? WHERE formato_slug=? AND eliminado=0", [precio_base, it.slug]);
+      }
+    }
     if (activo !== undefined) run("UPDATE item_types SET activo = ? WHERE id = ?", [activo ? 1 : 0, id]);
     invalidarCacheItemTypes();
     invalidarCacheCortes();

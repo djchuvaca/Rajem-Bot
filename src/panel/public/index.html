@@ -2500,13 +2500,16 @@ function _wzToggleHoraDia(i) {
 }
 
 let _wzItemTypes = null;
+let _wzConfigMap  = {};
 async function _wzInitPrecios() {
   if (_wzItemTypes !== null) return;
   try {
-    const its = await api('/api/item-types');
+    const [its, cfg] = await Promise.all([api('/api/item-types'), api('/api/config')]);
     _wzItemTypes = its || [];
+    _wzConfigMap  = Object.fromEntries((cfg || []).map(c => [c.clave, c.valor]));
   } catch(_) {
     _wzItemTypes = [];
+    _wzConfigMap  = {};
   }
   const el = document.getElementById('wz-precios-rows');
   if (!_wzItemTypes.length) {
@@ -2519,13 +2522,11 @@ async function _wzInitPrecios() {
     const campo = it.precio_campo || 'precio_taco';
     if (camposVistos.has(campo)) continue;
     camposVistos.add(campo);
-    const def = campo === 'precio_torta' ? 40 : 30;
-    filas.push(`<div class="wz-precio-row"><span>${it.emoji} ${it.nombre_plural || it.nombre}</span>
-      <input class="form-input" type="number" min="1" step="1" value="${def}" id="wz-p-${campo}" style="width:90px;text-align:right" placeholder="${def}"></div>`);
-  }
-  if (_wzItemTypes.some(t => t.soporta_gramos)) {
-    filas.push(`<div class="wz-precio-row"><span>⚖️ Por 100g</span>
-      <input class="form-input" type="number" min="1" step="1" value="32" id="wz-p-precio_100g" style="width:90px;text-align:right" placeholder="32"></div>`);
+    const defFallback = campo === 'precio_torta' ? 40 : 30;
+    // Lee precio_base real de la BD; fallback a configuracion; fallback a default
+    const precio = it.precio_base || parseInt(_wzConfigMap[campo]) || defFallback;
+    filas.push(`<div class="wz-precio-row" data-it-id="${it.id}"><span>${it.emoji} ${it.nombre_plural || it.nombre}</span>
+      <input class="form-input" type="number" min="1" step="1" value="${precio}" id="wz-p-${campo}" style="width:90px;text-align:right" placeholder="${defFallback}"></div>`);
   }
   el.innerHTML = filas.join('');
 }
@@ -2564,11 +2565,17 @@ async function _wzSavePaso(n) {
       const clabe        = document.getElementById('wz-clabe').value.trim();
       if (banco || beneficiario || clabe) await api('/api/banco', 'POST', { banco, beneficiario, clabe });
     } else if (n === 3) {
-      // Precios base
-      for (const campo of ['precio_taco','precio_torta','precio_100g']) {
+      // Precios base: guarda en item_types (con cascade a menu_items) y en configuracion (NLU)
+      const reqs = [];
+      for (const it of (_wzItemTypes || [])) {
+        const campo = it.precio_campo || 'precio_taco';
         const el = document.getElementById(`wz-p-${campo}`);
-        if (el && el.value) await api('/api/config', 'POST', { clave: campo, valor: el.value });
+        if (!el || !el.value) continue;
+        const precio = parseInt(el.value) || 0;
+        reqs.push(api(`/api/formatos/${it.id}`, 'PUT', { precio_base: precio, cascade: true }));
+        reqs.push(api('/api/config', 'POST', { clave: campo, valor: String(precio) }));
       }
+      await Promise.all(reqs);
     } else if (n === 4) {
       // Contraseña
       const p1 = document.getElementById('wz-pass1').value;
