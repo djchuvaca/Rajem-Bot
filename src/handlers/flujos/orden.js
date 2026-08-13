@@ -1426,12 +1426,39 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
   const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
   if (!detectarSinCorte(textoLimpio)) return false;
 
+  // Verificar si el cliente mencionó un corte del catálogo que hoy no está disponible
+  const { getCortesBDObj } = require('../../db/cortes');
+  const { getGiroActivo } = require('../../giros');
+  const todosCortes = getCortesBDObj();
+  const fallback    = getGiroActivo()?.fallbackCortes || {};
+  const tNorm       = normalizar(textoLimpio);
+  const corteNoDisp = todosCortes.find(c => {
+    let aliases = [];
+    try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
+    const palabras = [c.slug, c.nombre.toLowerCase(), ...aliases.map(a => a.toLowerCase())];
+    return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
+  }) || (Object.keys(fallback).find(k => new RegExp(`\\b${k}\\b`, 'i').test(tNorm)) ? {} : null);
+
   const pedidoParcial = parsearSinCorteItems(textoLimpio);
+
+  if (corteNoDisp !== null && !getCortes()[normalizar(corteNoDisp.slug || '')]) {
+    // Informar que ese corte no está disponible y poner en estado esperandoCorte
+    if (pedidoParcial) {
+      const primerSinCorte = pedidoParcial.items.findIndex(i => !i.corte);
+      pedidoParcial._indiceActual        = primerSinCorte !== -1 ? primerSinCorte : 0;
+      pedidoParcial._refrescosPendientes = refrescosPendientes;
+      pedidoParcial._salsasPendientes    = salsasPendientes;
+      esperandoCorte.set(clienteNumero, pedidoParcial);
+    }
+    await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+    return true;
+  }
+
   if (pedidoParcial) {
     const primerSinCorte = pedidoParcial.items.findIndex(i => !i.corte);
-    pedidoParcial._indiceActual = primerSinCorte !== -1 ? primerSinCorte : 0;
+    pedidoParcial._indiceActual        = primerSinCorte !== -1 ? primerSinCorte : 0;
     pedidoParcial._refrescosPendientes = refrescosPendientes;
-    pedidoParcial._salsasPendientes      = salsasPendientes;
+    pedidoParcial._salsasPendientes    = salsasPendientes;
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const primerItem = pedidoParcial.items[pedidoParcial._indiceActual];
     const desc = _descItem(primerItem);
