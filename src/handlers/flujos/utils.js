@@ -65,7 +65,7 @@ function _textoRecordatorio(numero) {
   }
   if (esperandoTipoItem.has(numero)) {
     const d = esperandoTipoItem.get(numero);
-    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían ${listaItemTypes()}?*`;
+    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían ${listaItemTypes(true)}?*`;
   }
   if (datosCampos.has(numero)) {
     return `${saludo} Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*`;

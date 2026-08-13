@@ -215,7 +215,7 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
 
   if (!tipoDetectado && !soloCorteTipoItem) {
     const errores     = _sumarError(clienteNumero);
-    const listaEj     = listaItemTypes();
+    const listaEj     = listaItemTypes(true);
     const [ej1, ...resto] = listaEj.split(" o ");
     const extra       = errores >= 2 ? `\n\n_Por ejemplo: *${ej1}*${resto.length ? ` o *${resto.join(" o ")}*` : ""}_` : "";
     await msg.reply(`Disculpa, no entendí. *¿Serían ${listaEj}?*` + extra);

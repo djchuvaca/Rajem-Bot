@@ -88,14 +88,19 @@ function _buildItemTypesPattern() {
 /**
  * String legible para mostrar al cliente: "tacos o tortas"
  * O para otro tipo de negocio: "pizza individual o pizza familiar"
+ * soloUnidad=true excluye tipos por gramos/pesos (útil al preguntar tipo de ítem).
  */
-function listaItemTypes() {
+function listaItemTypes(soloUnidad = false) {
   const types = _getItemTypesActivos();
-  if (types.length) return types.map(t => t.nombre_plural).join(' o ');
+  const filtered = soloUnidad ? types.filter(t => !t.soporta_gramos && !t.soporta_pesos) : types;
+  if (filtered.length) return filtered.map(t => t.nombre_plural).join(' o ');
   try {
     const { getGiroActivo } = require('../giros');
     const giro = getGiroActivo();
-    if (giro?.itemTypes?.length) return giro.itemTypes.map(t => t.nombre_plural).join(' o ');
+    if (giro?.itemTypes?.length) {
+      const gf = soloUnidad ? giro.itemTypes.filter(t => !t.soporta_gramos && !t.soporta_pesos) : giro.itemTypes;
+      return gf.map(t => t.nombre_plural).join(' o ');
+    }
   } catch (_) {}
   return '';
 }
@@ -769,11 +774,12 @@ function parsearPedidoSimple(texto) {
   if (partes.length > 1) {
     const items = [];
     let ultimoTipo = null;
+    const _slugsUnidad = new Set(_getItemTypesActivos().filter(it => !it.soporta_gramos && !it.soporta_pesos).map(it => it.slug));
     for (const parte of partes) {
       let item = parsearItem(parte);
       if (!item && ultimoTipo) item = parsearItemHeredado(parte, ultimoTipo);
       if (!item || item._sinCorte) return null;
-      if (item.presentacion === "taco" || item.presentacion === "torta") ultimoTipo = item.presentacion;
+      if (_slugsUnidad.has(item.presentacion)) ultimoTipo = item.presentacion;
       items.push(_aplicarSurtidoEspecial(item));
     }
     if (items.length > 0) return { tipo: "pedido", items };
@@ -785,12 +791,14 @@ function parsearPedidoSimple(texto) {
     ? { corte: "surtido especial", combinacion: corteRaw.split(", ").join(" con ") }
     : { corte: corteRaw };
 
-  const matchPieza = t.match(/\b(\d+)\s+(tacos?|tortas?)\b/);
+  const _itPatSingle = _buildItemTypesPattern();
+  const matchPieza = _itPatSingle ? t.match(new RegExp(`\\b(\\d+)\\s+(${_itPatSingle})s?\\b`)) : null;
   if (matchPieza) {
-    const cantidad = parseInt(matchPieza[1]);
-    const esTaco   = /taco/i.test(matchPieza[2]);
+    const cantidad     = parseInt(matchPieza[1]);
+    const tipoDetect   = detectarTipoItemDesdeTexto(matchPieza[2]);
+    const presentacion = tipoDetect ? tipoDetect.slug : 'taco';
     if (!corteRaw) return null;
-    return { tipo: "pedido", items: [{ presentacion: esTaco ? "taco" : "torta", cantidad, ...corteInfo }] };
+    return { tipo: "pedido", items: [{ presentacion, cantidad, ...corteInfo }] };
   }
 
   for (const medida of MEDIDAS) {
