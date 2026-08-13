@@ -55,6 +55,22 @@ function _descItem(item) {
   return n === 1 ? `el ${item.presentacion}` : `los ${n} ${item.presentacion}s`;
 }
 
+/**
+ * Pregunta el corte usando el vocabulario del giro activo.
+ * desc puede ser null para preguntar sin referencia al ítem ("¿De qué corte lo quieres?").
+ */
+function _preguntaCorte(desc) {
+  try {
+    const { getGiroActivo } = require('../../giros');
+    const giro = getGiroActivo();
+    const plantilla = giro?.vocabulario?.preguntaCorte || '¿De qué corte quieres %desc%?';
+    if (!desc) return plantilla.replace(' %desc%', '').replace('%desc%', '');
+    return plantilla.replace('%desc%', desc);
+  } catch (_) {
+    return desc ? `¿De qué corte quieres ${desc}?` : '¿De qué corte lo quieres?';
+  }
+}
+
 function _listaNombresRefrescos() {
   const refs = require("../pedidoParser").getRefrescos();
   return refs.length > 0
@@ -932,7 +948,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       esperandoCorte.set(clienteNumero, pedidoParcial);
       const primerItem = pedidoParcial.items[0];
       const desc = _descItem(primerItem);
-      await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
       return true;
     }
   }
@@ -1169,7 +1185,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
           esperandoCorte.set(clienteNumero, pedParcDist);
           const sigItem = pedParcDist.items[siguienteIdx];
           const desc = _descItem(sigItem);
-          await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+          await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
           return true;
         }
         esperandoCorte.delete(clienteNumero);
@@ -1219,7 +1235,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       const itemFaq    = pedParcFaq.items[pedParcFaq._indiceActual || 0];
       const descFaq    = _descItem(itemFaq);
       await msg.reply(respFaqCorte);
-      await msg.reply(`*¿Y de qué tipo de carne quieres ${descFaq}?*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*¿Y ${_preguntaCorte(descFaq).toLowerCase()}*\nTenemos: ${listaCortes()}`);
       return true;
     }
   }
@@ -1253,7 +1269,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const _descPend = _descItem(_itemPend);
     const errores = _sumarError(clienteNumero);
     const extra = errores >= 2 ? `\n\n_Por ejemplo escríbeme: *${listaCortes().toLowerCase()}*_` : "";
-    await msg.reply(`Necesito que me digas el tipo de carne para ${_descPend}.\n*¿Cuál prefieres?* ${listaCortes()}` + extra);
+    await msg.reply(`Necesito el corte para ${_descPend}.\n*${_preguntaCorte(null)}* ${listaCortes()}` + extra);
     return true;
   }
 
@@ -1268,7 +1284,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const sigItem = pedidoParcial.items[siguienteIdx];
     const desc = _descItem(sigItem);
-    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
     return true;
   }
 
@@ -1323,9 +1339,9 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const primerItem = pedidoParcial.items[pedidoParcial._indiceActual];
     const desc = _descItem(primerItem);
-    await msg.reply(`*¿De qué tipo de carne quieres ${desc}?*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
   } else {
-    await msg.reply(`*¿De qué tipo de carne lo quieres?*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(null)}*\nTenemos: ${listaCortes()}`);
   }
   return true;
 }
