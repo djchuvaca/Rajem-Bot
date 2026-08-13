@@ -368,7 +368,8 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   }
 
   const esConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|claro|perfecto|va\s+bien|dale\s+pues|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|ya|ya\s+dale|ya\s+pues|ya\s+va)$/i.test(textoOriginal.trim());
-  const esRechazo       = /^(nel|nop|nope|incorrecto|cambia|error|no\s+es\s+correcto|no\s+est[aá]\s+bien)$/i.test(textoOriginal.trim());
+  const esCancel  = /\b(cancel[ae](?:me|la|lo|r(?:\s+(?:mi\s+)?pedido)?)?|ya\s+no\s+quiero|borra(?:lo|la|me)?|elimina(?:lo|la|r)?|no\s+quiero\s+nada|olvida(?:lo|la|r)?|d[eé]jalo?\s+as[ií]|no\s+importa)\b/i.test(textoOriginal);
+  const esNoVariante = /^(no|nel|nop|nope|incorrecto|error|no\s+es\s+correcto|no\s+est[aá]\s+bien)$/i.test(textoOriginal.trim());
 
   const quiereModificar = /quit(a|ar|ame|amelo|amelos)|elimina|borra|cambia|sin\s+los?|no\s+(quiero|pongas?)\s+los?/i.test(textoOriginal);
   if (quiereModificar) {
@@ -457,52 +458,25 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     }
   }
 
-  // "no" solo → preguntar qué quiere cambiar sin cancelar la orden
-  if (/^no$/i.test(textoOriginal.trim())) {
-    _resetError(clienteNumero);
-    await msg.reply(itemData.lineas + "\n\n¿Qué deseas cambiar? _(Dime qué quitar, agregar o corregir)_");
-    return true;
-  }
-
-  if (esRechazo) {
+  // Cancelación explícita → limpiar todo y mostrar menú
+  if (esCancel) {
     esperandoConfirmacionItem.delete(clienteNumero);
     esperandoAgregarMas.delete(clienteNumero);
     esperandoExtras.delete(clienteNumero);
     _resetError(clienteNumero);
-    const textoSinNo = textoOriginal.replace(/^(?:no|nel|nop)[,\s]+/i, "").trim();
-    if (textoSinNo.length > 3) {
-      let jsonRechazoPed = parsearPedidoSimple(textoSinNo);
-      if (!jsonRechazoPed) {
-        const matchNum     = textoSinNo.match(/\b(\d+)\b/);
-        const tipoRechazado = detectarTipoItemDesdeTexto(textoSinNo);
-        if (matchNum && tipoRechazado) {
-          const cortesMap = getCortes();
-          const palabrasC = Object.keys(cortesMap).join("|");
-          const mCorte    = itemData.lineas.match(new RegExp(`\\b(${palabrasC})\\b`, "i"));
-          if (mCorte) {
-            const corteR = cortesMap[mCorte[1].toLowerCase()];
-            jsonRechazoPed = { tipo: "pedido", items: [{ presentacion: tipoRechazado.slug, cantidad: parseInt(matchNum[1]), corte: corteR }] };
-          }
-        }
-      }
-      if (jsonRechazoPed && jsonRechazoPed.tipo === "pedido") {
-        pedidoJSONActual.set(clienteNumero, jsonRechazoPed);
-        persistirEstado(clienteNumero);
-        const resRechazo = jsonALineas(jsonRechazoPed);
-        esperandoConfirmacionItem.set(clienteNumero, { lineas: resRechazo.texto });
-        historial.push({ role: "user",      content: textoOriginal });
-        historial.push({ role: "assistant", content: resRechazo.texto });
-        await msg.reply(resRechazo.texto + "\n\n*¿Es correcto?*");
-        console.log(`Bot: [RECHAZO+PEDIDO] sin llamar a Groq`);
-        return true;
-      }
-    }
     const hist = historial;
     if (hist.length >= 2 && hist[hist.length - 1].role === "assistant")
       hist.splice(hist.length - 2, 2);
-    await msg.reply("No pasa nada! *¿Qué deseas ordenar?* 😊");
+    await msg.reply("Tu pedido fue cancelado. *¿Qué deseas ordenar?* 😊");
     await new Promise(r => setTimeout(r, 400));
     await msg.reply(MENU_FORMATO());
+    return true;
+  }
+
+  // Cualquier variante de "no" → mostrar orden y preguntar qué cambiar
+  if (esNoVariante) {
+    _resetError(clienteNumero);
+    await msg.reply(itemData.lineas + "\n\n¿Qué deseas cambiar? _(Dime qué quitar, agregar o corregir)_");
     return true;
   }
 
