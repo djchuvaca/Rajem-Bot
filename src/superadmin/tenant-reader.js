@@ -255,6 +255,29 @@ function getTenantQR(tenant) {
   }
 }
 
+// ── PLAN DE MEMBRESÍA ─────────────────────────────────────────────────────────
+function getTenantPlan(tenant) {
+  // Preferir plan en tenants.json (sin acceso a BD) para el dashboard de velocidad.
+  // Si no está ahí, leer de la BD del tenant como fallback.
+  if (tenant.plan && ['basico', 'plus', 'pro'].includes(tenant.plan)) return tenant.plan;
+  try {
+    const cfg = getTenantConfig(tenant);
+    return cfg.plan_activo || 'basico';
+  } catch (_) { return 'basico'; }
+}
+
+function setTenantPlan(tenant, plan) {
+  if (!['basico', 'plus', 'pro'].includes(plan)) return false;
+  const ok = setTenantConfig(tenant, 'plan_activo', plan);
+  if (ok) {
+    // Sincronizar en tenants.json para que el dashboard no necesite acceder a cada BD
+    const tenants = getTenants();
+    const idx = tenants.findIndex(t => t.id === tenant.id);
+    if (idx >= 0) { tenants[idx].plan = plan; saveTenants(tenants); }
+  }
+  return ok;
+}
+
 // ── SOLICITUDES GEO ───────────────────────────────────────────────────────────
 function getTenantSolicitudesGeo(tenant) {
   const db = _getTenantDB(tenant);
@@ -319,4 +342,5 @@ module.exports = {
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
+  getTenantPlan, setTenantPlan,
 };

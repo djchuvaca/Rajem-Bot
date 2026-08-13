@@ -384,6 +384,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 
   </nav>
   <div class="sidebar-footer">
+    <div id="plan-badge" style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;margin-bottom:8px;background:var(--surface2);color:var(--muted2)">Plan Básico</div>
     <div class="user-info">👤 <span id="sidebar-user">admin</span></div>
     <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
   </div>
@@ -1509,6 +1510,7 @@ function exportarReporteCSV() {
 }
 
 function loadReportes() {
+  if (!_tieneFeature('reportes_avanzados')) { _showUpgradeBanner('s-reportes', 'Reportes y Análisis Avanzados', 'plus'); return; }
   const hoy = new Date().toISOString().substring(0, 10);
   if (!document.getElementById('rep-hasta').value) {
     document.getElementById('rep-hasta').value = hoy;
@@ -2236,6 +2238,7 @@ let _sortDir      = 1; // 1 asc, -1 desc
 let _geoConfig    = {}; // valores actuales cacheados para pre-rellenar el formulario de solicitud
 
 async function loadEnvios() {
+  if (!_tieneFeature('geo_zonas')) { _showUpgradeBanner('s-envios', 'Zonas de Envío y Geolocalización', 'plus'); return; }
   const conf = await api('/api/config');
   const get  = k => conf.find(c => c.clave === k)?.valor || '';
 
@@ -2556,6 +2559,52 @@ async function checkWaStatus() {
   }
 }
 
+// ── PLAN DE MEMBRESÍA ─────────────────────────────────────────────────────────
+let _planActual = 'basico';
+let _featuresActivas = new Set(['pedidos','clientes','productos','horarios','config_basica','solicitudes_producto','stats_basicas']);
+
+function _tieneFeature(f) { return _featuresActivas.has(f); }
+
+async function loadMiPlan() {
+  try {
+    const data = await api('/api/mi-plan');
+    _planActual = data.plan || 'basico';
+    _featuresActivas = new Set(data.features || []);
+    const badge = document.getElementById('plan-badge');
+    if (badge) {
+      const info = {
+        basico: { label: 'Plan Básico',    color: 'var(--muted2)', bg: 'var(--surface2)' },
+        plus:   { label: 'Plan Plus ✦',    color: 'var(--blue)',   bg: 'rgba(59,130,246,0.12)' },
+        pro:    { label: 'Plan Pro ✦✦',   color: 'var(--accent)', bg: 'var(--accent-dim)' },
+      };
+      const i = info[_planActual] || info.basico;
+      badge.textContent = i.label;
+      badge.style.color = i.color;
+      badge.style.background = i.bg;
+    }
+    // Icono de candado en nav items de funciones restringidas
+    if (!_tieneFeature('geo_zonas')) {
+      const el = document.querySelector('[data-s="envios"] .icon');
+      if (el) el.textContent = '🔒';
+    }
+    if (!_tieneFeature('reportes_avanzados')) {
+      const el = document.querySelector('[data-s="reportes"] .icon');
+      if (el) el.textContent = '🔒';
+    }
+  } catch(_) {}
+}
+
+function _showUpgradeBanner(containerId, featureLabel, planRequerido) {
+  const el = document.getElementById(containerId);
+  if (!el || el.querySelector('.upgrade-banner')) return;
+  const planLabel = planRequerido === 'pro' ? 'Plan Pro' : 'Plan Plus';
+  const banner = document.createElement('div');
+  banner.className = 'upgrade-banner';
+  banner.style.cssText = 'background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:12px;padding:32px 24px;text-align:center;margin-bottom:20px';
+  banner.innerHTML = `<div style="font-size:36px;margin-bottom:12px">🔒</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:8px">${featureLabel}</div><p style="font-size:13px;color:var(--muted);max-width:360px;margin:0 auto">Disponible en el <strong style="color:var(--blue)">${planLabel}</strong>. Contacta a tu administrador para actualizar tu plan y desbloquear esta función.</p>`;
+  el.insertBefore(banner, el.firstChild);
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function initApp() {
   fetch('/api/negocio').then(r=>r.json()).then(d=>{
@@ -2565,6 +2614,7 @@ async function initApp() {
   if (!me.usuario) { document.getElementById('login-screen').style.display='flex'; return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('sidebar-user').textContent = me.usuario;
+  await loadMiPlan();
   checkWaStatus();
   loadNegocioEstado();
   loadDashboard();

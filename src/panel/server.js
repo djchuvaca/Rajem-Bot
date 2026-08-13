@@ -56,6 +56,24 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: "No autorizado" });
 }
 
+const { planIncluye, getPlanActivo, PLANES } = require("../features");
+
+function requireFeature(feature) {
+  return (req, res, next) => {
+    const plan = getPlanActivo();
+    if (!planIncluye(plan, feature)) {
+      const requiere = ['pagos_mp', 'geo_zonas', 'reportes_avanzados', 'multi_formatos'].includes(feature) ? 'plus' : 'pro';
+      return res.status(403).json({ error: 'Función no disponible en tu plan actual', feature, plan_actual: plan, requiere });
+    }
+    next();
+  };
+}
+
+app.get("/api/mi-plan", requireAuth, (req, res) => {
+  const plan = getPlanActivo();
+  res.json({ plan, features: [...(PLANES[plan] || PLANES.basico)] });
+});
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post("/api/login", (req, res) => {
   const ip  = req.ip || req.socket?.remoteAddress || "unknown";
@@ -210,11 +228,11 @@ app.post("/api/solicitudes-producto", requireAuth, (req, res) => {
 // ── SOLICITUDES GEO ───────────────────────────────────────────────────────────
 const _TIPOS_GEO_VALIDOS = new Set(['ubicacion', 'direccion', 'domicilio_costo', 'tarifas']);
 
-app.get("/api/solicitudes-geo", requireAuth, (req, res) => {
+app.get("/api/solicitudes-geo", requireAuth, requireFeature('geo_zonas'), (req, res) => {
   res.json(queryAll("SELECT * FROM solicitudes_geo ORDER BY created_at DESC"));
 });
 
-app.post("/api/solicitudes-geo", requireAuth, (req, res) => {
+app.post("/api/solicitudes-geo", requireAuth, requireFeature('geo_zonas'), (req, res) => {
   const { tipo, datos_propuestos, motivo } = req.body;
   if (!tipo || !_TIPOS_GEO_VALIDOS.has(tipo)) {
     return res.status(400).json({ error: "tipo inválido. Valores permitidos: ubicacion, direccion, domicilio_costo, tarifas" });
@@ -377,7 +395,7 @@ app.get("/api/stats", requireAuth, (req, res) => {
 });
 
 // ── REPORTES POR RANGO DE FECHAS ──────────────────────────────────────────────
-app.get("/api/reportes", requireAuth, (req, res) => {
+app.get("/api/reportes", requireAuth, requireFeature('reportes_avanzados'), (req, res) => {
   const { desde, hasta } = req.query;
   if (!desde || !hasta) return res.status(400).json({ error: "Parámetros desde y hasta requeridos" });
   const { queryAll } = require("../db/core");
@@ -397,13 +415,13 @@ app.get("/api/reportes", requireAuth, (req, res) => {
 });
 
 // ── TOP CLIENTES ──────────────────────────────────────────────────────────────
-app.get("/api/stats/top-clientes", requireAuth, (req, res) => {
+app.get("/api/stats/top-clientes", requireAuth, requireFeature('reportes_avanzados'), (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 10, 50);
   res.json(getTopClientes(limit));
 });
 
 // ── STATS HISTÓRICO ───────────────────────────────────────────────────────────
-app.get("/api/stats/historico", requireAuth, (req, res) => {
+app.get("/api/stats/historico", requireAuth, requireFeature('reportes_avanzados'), (req, res) => {
   const dias  = req.query.periodo === "mes" ? 30 : 7;
   const { queryAll } = require("../db/core");
   const filas = queryAll(

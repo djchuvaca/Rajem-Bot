@@ -20,6 +20,7 @@ const {
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
+  getTenantPlan, setTenantPlan,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -79,8 +80,9 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
   const tenants = getTenants();
   const data = tenants.map(t => ({
     ...t,
+    plan:      t.plan || 'basico',
     bot_estado: getTenantBotEstado(t),
-    stats: getTenantStats(t),
+    stats:     getTenantStats(t),
   }));
   res.json(data);
 });
@@ -243,6 +245,22 @@ app.put('/api/tenants/:id/zonas', requireAuth, (req, res) => {
   if (!Array.isArray(zonas)) return res.status(400).json({ error: 'Formato inválido' });
   setTenantZonas(tenant, zonas);
   res.json({ ok: true });
+});
+
+// ── PLAN DE MEMBRESÍA POR TENANT ─────────────────────────────────────────────
+app.get('/api/tenants/:id/plan', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json({ plan: getTenantPlan(tenant) });
+});
+
+app.put('/api/tenants/:id/plan', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { plan } = req.body;
+  const ok = setTenantPlan(tenant, plan);
+  if (!ok) return res.status(400).json({ error: 'Plan inválido. Valores permitidos: basico, plus, pro' });
+  res.json({ ok: true, plan });
 });
 
 // ── SOLICITUDES GEO POR TENANT ────────────────────────────────────────────────

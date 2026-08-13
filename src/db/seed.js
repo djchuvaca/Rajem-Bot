@@ -320,6 +320,7 @@ async function seedDB() {
     ["tiempo_cancelacion",       "15"],
     ["timeout_recordatorio_min", "20"],
     ["timeout_sesion_min",       "35"],
+    ["plan_activo",              "basico"],
   ];
 
   // Config del giro activo — reutiliza _btSlug y _giro resueltos en la sección de productos
