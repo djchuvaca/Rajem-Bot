@@ -91,12 +91,19 @@ app.post("/api/cambiar-password", requireAuth, (req, res) => {
 });
 
 // ── CONFIGURACION ─────────────────────────────────────────────────────────────
+// Claves protegidas — solo el super-admin puede modificarlas; el tenant envía una solicitud.
+const _CLAVES_GEO = new Set([
+  'negocio_lat', 'negocio_lon',
+  'negocio_calle', 'negocio_colonia', 'negocio_referencia',
+  'domicilio_costo',
+]);
+
 app.get("/api/config", requireAuth, (req, res) => res.json(getAllConfig()));
 app.post("/api/config", requireAuth, (req, res) => {
-  setConfig(req.body.clave, req.body.valor);
-  if (['negocio_lat', 'negocio_lon', 'domicilio_costo'].includes(req.body.clave)) {
-    invalidarCacheConfig();
+  if (_CLAVES_GEO.has(req.body.clave)) {
+    return res.status(403).json({ error: "Esta configuración es administrada por el equipo de soporte. Usa el formulario de solicitud de cambio en la sección Zonas de Envío." });
   }
+  setConfig(req.body.clave, req.body.valor);
   res.json({ ok: true });
 });
 
@@ -194,6 +201,38 @@ app.post("/api/solicitudes-producto", requireAuth, (req, res) => {
     const client  = getClienteWA();
     if (client && grupoId) {
       const msg = `📋 *Nueva solicitud de producto*\n\n*Nombre:* ${nombre_propuesto}\n*Categoría:* ${categoria || 'corte'}\n*Descripción:* ${descripcion || '—'}\n*Motivo:* ${motivo || '—'}\n\n_Revisar en el panel de super-admin._`;
+      client.sendMessage(grupoId, msg).catch(() => {});
+    }
+  } catch (_) {}
+  res.json({ ok: true });
+});
+
+// ── SOLICITUDES GEO ───────────────────────────────────────────────────────────
+const _TIPOS_GEO_VALIDOS = new Set(['ubicacion', 'direccion', 'domicilio_costo', 'tarifas']);
+
+app.get("/api/solicitudes-geo", requireAuth, (req, res) => {
+  res.json(queryAll("SELECT * FROM solicitudes_geo ORDER BY created_at DESC"));
+});
+
+app.post("/api/solicitudes-geo", requireAuth, (req, res) => {
+  const { tipo, datos_propuestos, motivo } = req.body;
+  if (!tipo || !_TIPOS_GEO_VALIDOS.has(tipo)) {
+    return res.status(400).json({ error: "tipo inválido. Valores permitidos: ubicacion, direccion, domicilio_costo, tarifas" });
+  }
+  if (!datos_propuestos || typeof datos_propuestos !== 'object') {
+    return res.status(400).json({ error: "datos_propuestos es requerido y debe ser un objeto" });
+  }
+  run(
+    "INSERT INTO solicitudes_geo (tipo, datos_propuestos, motivo) VALUES (?,?,?)",
+    [tipo, JSON.stringify(datos_propuestos), motivo || '']
+  );
+  try {
+    const { getClienteWA } = require("./whatsapp-bridge");
+    const grupoId = process.env.GRUPO_ID;
+    const client  = getClienteWA();
+    if (client && grupoId) {
+      const etiquetas = { ubicacion: 'coordenadas GPS', direccion: 'dirección del negocio', domicilio_costo: 'costo de domicilio', tarifas: 'tarifas por zona' };
+      const msg = `📍 *Nueva solicitud de cambio geográfico*\n\n*Tipo:* ${etiquetas[tipo] || tipo}\n*Motivo:* ${motivo || '—'}\n\n_Revisar en el panel de super-admin._`;
       client.sendMessage(grupoId, msg).catch(() => {});
     }
   } catch (_) {}
@@ -612,15 +651,10 @@ app.get("/api/tarifas-zonas", requireAuth, (req, res) => {
   res.json(queryAll("SELECT * FROM tarifas_zonas ORDER BY distancia_max ASC"));
 });
 
+// Las tarifas de envío son administradas exclusivamente por el super-admin.
+// El tenant solicita cambios a través de POST /api/solicitudes-geo.
 app.put("/api/tarifas-zonas", requireAuth, (req, res) => {
-  const { zonas } = req.body;
-  if (!Array.isArray(zonas)) return res.status(400).json({ error: "Formato inválido" });
-  run("DELETE FROM tarifas_zonas");
-  for (const z of zonas) {
-    run("INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)",
-      [z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa)]);
-  }
-  res.json({ ok: true });
+  res.status(403).json({ error: "Las tarifas de envío son administradas por el equipo de soporte. Usa el formulario de solicitud de cambio en la sección Zonas de Envío." });
 });
 
 // ── BUSINESS TYPES ────────────────────────────────────────────────────────────

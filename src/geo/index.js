@@ -73,6 +73,13 @@ function _esPalabraEn(haystack, needle) {
   return new RegExp(`(?:^|\\s)${esc}(?:\\s|$)`).test(haystack);
 }
 
+// Retorna todos los strings de búsqueda de una colonia: nombre + aliases normalizados.
+function _targets(colonia) {
+  let aliases = [];
+  try { if (colonia.aliases) aliases = JSON.parse(colonia.aliases); } catch (_) {}
+  return [colonia.nombre, ...aliases.filter(Boolean)].map(normalizar).filter(s => s.length >= 2);
+}
+
 // ── Búsqueda con scoring ──────────────────────────────────────────────────────
 function buscarColonia(nombre) {
   if (!nombre) return null;
@@ -81,13 +88,14 @@ function buscarColonia(nombre) {
 
   const todas = _colonias();
 
-  // 1. Coincidencia exacta (normalizada)
+  // 1. Coincidencia exacta contra nombre o cualquier alias (normalizado)
   for (const c of todas) {
-    if (normalizar(c.nombre) === norm) return c;
+    if (_targets(c).includes(norm)) return c;
   }
 
   // 2. Coincidencia por conjunto de palabras — maneja orden diferente y artículos extra.
-  //    Ej: "fresnos infonavit" encuentra "INFONAVIT los Fresnos".
+  //    Se evalúa contra nombre y aliases.
+  //    Ej: "fresnos infonavit" → "INFONAVIT los Fresnos".
   //    Solo aplica cuando el input tiene ≥ 2 palabras significativas (> 2 chars).
   const inputWords = new Set(norm.split(/\s+/).filter(w => w.length > 2));
   if (inputWords.size >= 2) {
@@ -95,34 +103,40 @@ function buscarColonia(nombre) {
     let mejorScore = 0;
     let cantConj   = 0;
     for (const c of todas) {
-      const cnWords = normalizar(c.nombre).split(/\s+/);
-      const cnSet   = new Set(cnWords);
-      if ([...inputWords].every(w => cnSet.has(w))) {
-        cantConj++;
-        const score = inputWords.size / cnWords.length;
-        if (score > mejorScore) { mejorScore = score; mejorConj = c; }
+      for (const target of _targets(c)) {
+        const cnWords = target.split(/\s+/);
+        const cnSet   = new Set(cnWords);
+        if ([...inputWords].every(w => cnSet.has(w))) {
+          cantConj++;
+          const score = inputWords.size / cnWords.length;
+          if (score > mejorScore) { mejorScore = score; mejorConj = c; }
+          break; // una coincidencia por colonia es suficiente
+        }
       }
     }
     if (cantConj === 1 || (cantConj > 1 && mejorScore >= 0.7)) return mejorConj;
   }
 
-  // 3. Coincidencia parcial con puntaje — word-boundary para evitar falsos positivos.
+  // 3. Coincidencia parcial con puntaje — word-boundary contra nombre y aliases.
   //    Umbral 0.5 normal; excepción: exactamente UN candidato con word-boundary.
   let mejorMatch = null;
   let mejorPuntaje = 0;
   let candidatos = 0;
 
   for (const c of todas) {
-    const cn = normalizar(c.nombre);
-    let puntaje = 0;
-    if (_esPalabraEn(cn, norm)) {
-      puntaje = norm.length / cn.length;
-    } else if (_esPalabraEn(norm, cn)) {
-      puntaje = cn.length / norm.length;
+    let maxPuntaje = 0;
+    for (const target of _targets(c)) {
+      let puntaje = 0;
+      if (_esPalabraEn(target, norm)) {
+        puntaje = norm.length / target.length;
+      } else if (_esPalabraEn(norm, target)) {
+        puntaje = target.length / norm.length;
+      }
+      if (puntaje > maxPuntaje) maxPuntaje = puntaje;
     }
-    if (puntaje > 0) candidatos++;
-    if (puntaje > mejorPuntaje) {
-      mejorPuntaje = puntaje;
+    if (maxPuntaje > 0) candidatos++;
+    if (maxPuntaje > mejorPuntaje) {
+      mejorPuntaje = maxPuntaje;
       mejorMatch = c;
     }
   }

@@ -255,9 +255,68 @@ function getTenantQR(tenant) {
   }
 }
 
+// ── SOLICITUDES GEO ───────────────────────────────────────────────────────────
+function getTenantSolicitudesGeo(tenant) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    return db.prepare('SELECT * FROM solicitudes_geo ORDER BY created_at DESC').all();
+  } catch (_) { return []; }
+}
+
+function updateTenantSolicitudGeo(tenant, id, { estado, respuesta }) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path
+    : path.join(ROOT_PATH, tenant.db_path);
+  const db = new Database(dbPath);
+  try {
+    db.prepare('UPDATE solicitudes_geo SET estado=?, respuesta=? WHERE id=?')
+      .run(estado, respuesta || null, id);
+    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+function applyTenantGeoSolicitud(tenant, solicitud) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path
+    : path.join(ROOT_PATH, tenant.db_path);
+  const db = new Database(dbPath);
+  try {
+    const datos = typeof solicitud.datos_propuestos === 'string'
+      ? JSON.parse(solicitud.datos_propuestos)
+      : solicitud.datos_propuestos;
+
+    if (solicitud.tipo === 'tarifas') {
+      const zonas = Array.isArray(datos.zonas) ? datos.zonas : [];
+      db.prepare('DELETE FROM tarifas_zonas').run();
+      const stmt = db.prepare('INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)');
+      for (const z of zonas) {
+        stmt.run(z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa));
+      }
+    } else {
+      const clavesPorTipo = {
+        ubicacion:      ['negocio_lat', 'negocio_lon'],
+        direccion:      ['negocio_calle', 'negocio_colonia', 'negocio_referencia'],
+        domicilio_costo: ['domicilio_costo'],
+      };
+      const claves = clavesPorTipo[solicitud.tipo] || [];
+      const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
+      for (const clave of claves) {
+        if (datos[clave] !== undefined) stmt.run(clave, String(datos[clave]));
+      }
+    }
+    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
+  getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
 };

@@ -704,55 +704,61 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 
     <div class="section" id="s-envios">
       <div class="card">
-        <div class="card-title">📍 Ubicación del negocio</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Coordenadas del lugar donde se preparan los pedidos. Se usan para calcular la distancia a cada colonia.</p>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+          <div class="card-title" style="margin:0">📍 Ubicación del negocio</div>
+          <button class="btn btn-secondary btn-sm" onclick="abrirSolicitudGeo('ubicacion')">Solicitar cambio</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Coordenadas del lugar donde se preparan los pedidos. Solo el equipo de soporte puede modificarlas.</p>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Latitud</label>
-            <input class="form-input" id="negocio-lat" type="number" step="any" placeholder="21.4900000">
+            <div class="form-input" id="negocio-lat" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
           </div>
           <div class="form-group">
             <label class="form-label">Longitud</label>
-            <input class="form-input" id="negocio-lon" type="number" step="any" placeholder="-104.8900000">
+            <div class="form-input" id="negocio-lon" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
           </div>
         </div>
-        <button class="btn btn-primary" onclick="saveUbicacion()">Guardar ubicación</button>
-        <div class="hint" style="margin-top:8px">💡 En Google Maps haz clic derecho sobre tu negocio y copia las coordenadas.</div>
       </div>
       <div class="card">
-        <div class="card-title">🏠 Dirección del negocio</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Dirección completa del punto de recolección. Se envía al repartidor cuando toma un pedido a domicilio.</p>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+          <div class="card-title" style="margin:0">🏠 Dirección del negocio</div>
+          <button class="btn btn-secondary btn-sm" onclick="abrirSolicitudGeo('direccion')">Solicitar cambio</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Dirección completa del punto de recolección. Solo el equipo de soporte puede modificarla.</p>
         <div class="form-group">
           <label class="form-label">Calle y número</label>
-          <input class="form-input" id="negocio-calle" placeholder="Ej: Av. Insurgentes 123">
+          <div class="form-input" id="negocio-calle" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Colonia</label>
-          <input class="form-input" id="negocio-colonia" placeholder="Ej: Centro">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Colonia</label>
+            <div class="form-input" id="negocio-colonia" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Referencia</label>
+            <div class="form-input" id="negocio-referencia" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Referencia <span style="color:var(--muted)">(opcional)</span></label>
-          <input class="form-input" id="negocio-referencia" placeholder="Ej: Junto a la farmacia Similares">
-        </div>
-        <button class="btn btn-primary" onclick="saveDireccionNegocio()">Guardar dirección</button>
       </div>
       <div class="card" style="max-width:480px">
-        <div class="card-title">🛵 Costo de domicilio fijo</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Se aplica cuando no hay tarifas por zona configuradas o el cliente queda fuera de todas las zonas.</p>
-        <div class="form-group"><label class="form-label">Costo fijo ($)</label><input class="form-input" id="env-domicilio-costo" type="number" min="0" placeholder="50"></div>
-        <button class="btn btn-primary" onclick="saveDomicilioCosto()">Guardar</button>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+          <div class="card-title" style="margin:0">🛵 Costo de domicilio fijo</div>
+          <button class="btn btn-secondary btn-sm" onclick="abrirSolicitudGeo('domicilio_costo')">Solicitar cambio</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Se aplica cuando no hay tarifas por zona o el cliente queda fuera de cobertura. Solo el equipo de soporte puede modificarlo.</p>
+        <div class="form-group">
+          <label class="form-label">Costo fijo ($)</label>
+          <div class="form-input" id="env-domicilio-costo" style="background:var(--bg);color:var(--muted);cursor:default">—</div>
+        </div>
       </div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div class="card-title" style="margin:0">🛵 Tarifas por zona</div>
-          <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Agregar zona</button>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <div class="card-title" style="margin:0">🗺️ Tarifas por zona</div>
+          <button class="btn btn-secondary btn-sm" onclick="abrirSolicitudGeo('tarifas')">Solicitar cambio</button>
         </div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Define el costo de envío según distancia. Se evalúan en orden de menor a mayor km.</p>
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:0 0 6px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
-          <span>Nombre de zona</span><span>Máx km</span><span>Tarifa $</span><span></span>
-        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Costo de envío según distancia. Solo el equipo de soporte puede modificar estas tarifas.</p>
         <div id="zonas-list"></div>
-        <button class="btn btn-primary" style="margin-top:14px" onclick="saveZonas()">Guardar tarifas</button>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
@@ -778,6 +784,23 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL SOLICITUD GEO -->
+<div class="modal-overlay" id="modal-solicitud-geo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" id="sgeo-titulo">Solicitar cambio de configuración</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" id="sgeo-desc"></p>
+    <div id="sgeo-campos"></div>
+    <div class="form-group" style="margin-top:14px">
+      <label class="form-label">Motivo del cambio <span style="color:var(--accent)">*</span></label>
+      <textarea class="form-input" id="sgeo-motivo" rows="3" placeholder="Describe brevemente por qué necesitas este cambio…" style="resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-solicitud-geo')">Cancelar</button>
+      <button class="btn btn-primary" id="sgeo-btn-enviar" onclick="enviarSolicitudGeo()">Enviar solicitud</button>
+    </div>
   </div>
 </div>
 
@@ -2210,26 +2233,35 @@ let _coloniasData = [];
 let _zonasData    = [];
 let _sortField    = 'nombre';
 let _sortDir      = 1; // 1 asc, -1 desc
-
-async function saveDomicilioCosto() {
-  const valor = document.getElementById('env-domicilio-costo').value;
-  await api('/api/config', 'POST', { clave: 'domicilio_costo', valor });
-  toast('Costo de domicilio guardado ✅');
-}
+let _geoConfig    = {}; // valores actuales cacheados para pre-rellenar el formulario de solicitud
 
 async function loadEnvios() {
   const conf = await api('/api/config');
   const get  = k => conf.find(c => c.clave === k)?.valor || '';
-  document.getElementById('env-domicilio-costo').value = get('domicilio_costo');
-  document.getElementById('negocio-lat').value         = get('negocio_lat');
-  document.getElementById('negocio-lon').value         = get('negocio_lon');
-  document.getElementById('negocio-calle').value       = get('negocio_calle');
-  document.getElementById('negocio-colonia').value     = get('negocio_colonia');
-  document.getElementById('negocio-referencia').value  = get('negocio_referencia');
+
+  const lat        = get('negocio_lat');
+  const lon        = get('negocio_lon');
+  const calle      = get('negocio_calle');
+  const colonia    = get('negocio_colonia');
+  const referencia = get('negocio_referencia');
+  const costo      = get('domicilio_costo');
+
+  _geoConfig = { negocio_lat: lat, negocio_lon: lon, negocio_calle: calle, negocio_colonia: colonia, negocio_referencia: referencia, domicilio_costo: costo };
+
+  const _setText = (id, val, fallback = '—') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val || fallback;
+  };
+  _setText('negocio-lat',        lat);
+  _setText('negocio-lon',        lon);
+  _setText('negocio-calle',      calle);
+  _setText('negocio-colonia',    colonia);
+  _setText('negocio-referencia', referencia || 'Sin referencia');
+  _setText('env-domicilio-costo', costo ? `$${costo}` : '—');
+
   _zonasData    = await api('/api/tarifas-zonas');
   _coloniasData = await api('/api/colonias');
   renderZonas();
-  // Inicializar indicador de sort por defecto
   const siNombre = document.getElementById('si-nombre');
   if (siNombre) { siNombre.textContent = ' ▲'; siNombre.closest('th').classList.add('sort-active'); }
   filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
@@ -2238,58 +2270,185 @@ async function loadEnvios() {
 function renderZonas() {
   const el = document.getElementById('zonas-list');
   if (!_zonasData.length) { el.innerHTML = '<div class="empty">Sin zonas configuradas</div>'; return; }
-  el.innerHTML = _zonasData.map((z, i) => `
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-      <input class="form-input" placeholder="Nombre de zona" value="${z.nombre_zona||''}" id="zona-nombre-${i}">
-      <input class="form-input" type="number" step="0.1" min="0.1" placeholder="km" value="${z.distancia_max}" id="zona-maxkm-${i}">
-      <input class="form-input" type="number" step="1" min="0" placeholder="$" value="${z.tarifa}" id="zona-tarifa-${i}">
-      <button class="btn btn-danger btn-sm" onclick="removeZonaRow(${i})">✕</button>
+  const header = `<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:0 0 6px 0;border-bottom:1px solid var(--border);margin-bottom:4px"><span>Nombre de zona</span><span>Máx km</span><span>Tarifa $</span></div>`;
+  el.innerHTML = header + _zonasData.map(z => `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px">${z.nombre_zona || '—'}</span>
+      <span style="color:var(--muted);font-size:13px">${z.distancia_max} km</span>
+      <span style="color:var(--muted);font-size:13px">$${z.tarifa}</span>
     </div>`).join('');
 }
 
-function addZonaRow() {
-  _zonasData.push({ nombre_zona: '', distancia_max: 5, tarifa: 50 });
-  renderZonas();
+// ── SOLICITUD DE CAMBIO GEO ───────────────────────────────────────────────────
+const _SGEO_META = {
+  ubicacion: {
+    titulo:  'Solicitar cambio de coordenadas GPS',
+    desc:    'Las coordenadas se usan para calcular distancias a colonias y tarifas de envío. El equipo de soporte verificará y aplicará el cambio.',
+    campos: () => `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Latitud <span style="color:var(--accent)">*</span></label>
+          <input class="form-input" id="sgeo-negocio_lat" type="number" step="any" placeholder="21.4900000" value="${_geoConfig.negocio_lat || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Longitud <span style="color:var(--accent)">*</span></label>
+          <input class="form-input" id="sgeo-negocio_lon" type="number" step="any" placeholder="-104.8900000" value="${_geoConfig.negocio_lon || ''}">
+        </div>
+      </div>
+      <div class="hint">💡 En Google Maps haz clic derecho sobre tu negocio y copia las coordenadas.</div>`,
+    validar: () => {
+      const lat = parseFloat(document.getElementById('sgeo-negocio_lat')?.value);
+      const lon = parseFloat(document.getElementById('sgeo-negocio_lon')?.value);
+      if (isNaN(lat) || isNaN(lon)) return 'Ingresa latitud y longitud válidas';
+      if (lat < -90 || lat > 90)   return 'Latitud fuera de rango (-90 a 90)';
+      if (lon < -180 || lon > 180) return 'Longitud fuera de rango (-180 a 180)';
+      return null;
+    },
+    datos: () => ({
+      negocio_lat: document.getElementById('sgeo-negocio_lat').value.trim(),
+      negocio_lon: document.getElementById('sgeo-negocio_lon').value.trim(),
+    }),
+  },
+  direccion: {
+    titulo: 'Solicitar cambio de dirección del negocio',
+    desc:   'La dirección se envía al repartidor cuando toma un pedido a domicilio. El equipo de soporte verificará y aplicará el cambio.',
+    campos: () => `
+      <div class="form-group">
+        <label class="form-label">Calle y número <span style="color:var(--accent)">*</span></label>
+        <input class="form-input" id="sgeo-negocio_calle" placeholder="Ej: Av. Insurgentes 123" value="${_geoConfig.negocio_calle || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Colonia <span style="color:var(--accent)">*</span></label>
+        <input class="form-input" id="sgeo-negocio_colonia" placeholder="Ej: Centro" value="${_geoConfig.negocio_colonia || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Referencia <span style="color:var(--muted)">(opcional)</span></label>
+        <input class="form-input" id="sgeo-negocio_referencia" placeholder="Ej: Junto a la farmacia Similares" value="${_geoConfig.negocio_referencia || ''}">
+      </div>`,
+    validar: () => {
+      if (!document.getElementById('sgeo-negocio_calle')?.value.trim()) return 'Ingresa la calle y número';
+      if (!document.getElementById('sgeo-negocio_colonia')?.value.trim()) return 'Ingresa la colonia';
+      return null;
+    },
+    datos: () => ({
+      negocio_calle:      document.getElementById('sgeo-negocio_calle').value.trim(),
+      negocio_colonia:    document.getElementById('sgeo-negocio_colonia').value.trim(),
+      negocio_referencia: document.getElementById('sgeo-negocio_referencia').value.trim(),
+    }),
+  },
+  domicilio_costo: {
+    titulo: 'Solicitar cambio de costo de domicilio',
+    desc:   'El costo fijo se aplica cuando el cliente queda fuera de las zonas configuradas. El equipo de soporte verificará y aplicará el cambio.',
+    campos: () => `
+      <div class="form-group" style="max-width:200px">
+        <label class="form-label">Costo fijo ($) <span style="color:var(--accent)">*</span></label>
+        <input class="form-input" id="sgeo-domicilio_costo" type="number" min="0" step="1" placeholder="50" value="${_geoConfig.domicilio_costo || ''}">
+      </div>`,
+    validar: () => {
+      const v = parseFloat(document.getElementById('sgeo-domicilio_costo')?.value);
+      if (isNaN(v) || v < 0) return 'Ingresa un costo válido (mayor o igual a 0)';
+      return null;
+    },
+    datos: () => ({ domicilio_costo: document.getElementById('sgeo-domicilio_costo').value.trim() }),
+  },
+  tarifas: {
+    titulo: 'Solicitar cambio de tarifas por zona',
+    desc:   'Define el costo de envío según distancia al negocio. El equipo de soporte verificará y aplicará el cambio.',
+    campos: () => {
+      const filas = _zonasData.map((z, i) => `
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <input class="form-input" placeholder="Nombre de zona" value="${z.nombre_zona || ''}" id="sgeo-zona-nombre-${i}">
+          <input class="form-input" type="number" step="0.1" min="0.1" placeholder="km" value="${z.distancia_max}" id="sgeo-zona-km-${i}">
+          <input class="form-input" type="number" step="1" min="0" placeholder="$" value="${z.tarifa}" id="sgeo-zona-tarifa-${i}">
+          <button class="btn btn-danger btn-sm" type="button" onclick="sgeoQuitarZona(${i})">✕</button>
+        </div>`).join('');
+      return `
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;padding:0 0 6px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+          <span>Nombre de zona</span><span>Máx km</span><span>Tarifa $</span><span></span>
+        </div>
+        <div id="sgeo-zonas-rows">${filas}</div>
+        <button class="btn btn-secondary btn-sm" type="button" style="margin-top:10px" onclick="sgeoAgregarZona()">+ Agregar zona</button>`;
+    },
+    validar: () => {
+      const zonas = _sgeoLeerZonas();
+      if (!zonas.length) return 'Agrega al menos una zona';
+      if (zonas.some(z => !z.nombre_zona)) return 'Todos los nombres de zona son requeridos';
+      if (zonas.some(z => z.distancia_max <= 0)) return 'Todos los km máximos deben ser mayores a 0';
+      return null;
+    },
+    datos: () => ({ zonas: _sgeoLeerZonas() }),
+  },
+};
+
+let _sgeoZonasTmp = [];
+
+function _sgeoLeerZonas() {
+  const rows = document.querySelectorAll('#sgeo-zonas-rows > div');
+  return [...rows].map((_, i) => ({
+    nombre_zona:   document.getElementById(`sgeo-zona-nombre-${i}`)?.value?.trim() || '',
+    distancia_max: parseFloat(document.getElementById(`sgeo-zona-km-${i}`)?.value) || 0,
+    tarifa:        parseFloat(document.getElementById(`sgeo-zona-tarifa-${i}`)?.value) || 0,
+  }));
 }
 
-function removeZonaRow(i) {
-  _zonasData.splice(i, 1);
-  renderZonas();
+function sgeoAgregarZona() {
+  _sgeoZonasTmp = _sgeoLeerZonas();
+  _sgeoZonasTmp.push({ nombre_zona: '', distancia_max: 5, tarifa: 50 });
+  _sgeoRedibujarZonas();
 }
 
-async function saveZonas() {
-  const zonas = _zonasData.map((_, i) => ({
-    nombre_zona:   document.getElementById(`zona-nombre-${i}`)?.value?.trim() || '',
-    distancia_max: parseFloat(document.getElementById(`zona-maxkm-${i}`)?.value) || 0,
-    tarifa:        parseFloat(document.getElementById(`zona-tarifa-${i}`)?.value) || 0,
-  })).filter(z => z.nombre_zona && z.distancia_max > 0);
-  if (!zonas.length) return toast('Agrega al menos una zona', false);
-  const r = await api('/api/tarifas-zonas', 'PUT', { zonas });
-  if (r.ok) { toast('Tarifas guardadas ✅'); _zonasData = zonas; renderZonas(); }
-  else toast(r.error || 'Error al guardar', false);
+function sgeoQuitarZona(i) {
+  _sgeoZonasTmp = _sgeoLeerZonas();
+  _sgeoZonasTmp.splice(i, 1);
+  _sgeoRedibujarZonas();
 }
 
-async function saveDireccionNegocio() {
-  const calle     = document.getElementById('negocio-calle').value.trim();
-  const colonia   = document.getElementById('negocio-colonia').value.trim();
-  const referencia = document.getElementById('negocio-referencia').value.trim();
-  if (!calle || !colonia) return toast('Ingresa calle y colonia', false);
-  await api('/api/config', 'POST', { clave: 'negocio_calle',     valor: calle });
-  await api('/api/config', 'POST', { clave: 'negocio_colonia',   valor: colonia });
-  await api('/api/config', 'POST', { clave: 'negocio_referencia', valor: referencia });
-  toast('Dirección guardada ✅');
+function _sgeoRedibujarZonas() {
+  const container = document.getElementById('sgeo-zonas-rows');
+  if (!container) return;
+  container.innerHTML = _sgeoZonasTmp.map((z, i) => `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <input class="form-input" placeholder="Nombre de zona" value="${z.nombre_zona || ''}" id="sgeo-zona-nombre-${i}">
+      <input class="form-input" type="number" step="0.1" min="0.1" placeholder="km" value="${z.distancia_max}" id="sgeo-zona-km-${i}">
+      <input class="form-input" type="number" step="1" min="0" placeholder="$" value="${z.tarifa}" id="sgeo-zona-tarifa-${i}">
+      <button class="btn btn-danger btn-sm" type="button" onclick="sgeoQuitarZona(${i})">✕</button>
+    </div>`).join('');
 }
 
-async function saveUbicacion() {
-  const lat = document.getElementById('negocio-lat').value.trim();
-  const lon = document.getElementById('negocio-lon').value.trim();
-  if (!lat || !lon) return toast('Ingresa latitud y longitud', false);
-  if (isNaN(parseFloat(lat)) || isNaN(parseFloat(lon))) return toast('Coordenadas inválidas', false);
-  await api('/api/config', 'POST', { clave: 'negocio_lat', valor: lat });
-  await api('/api/config', 'POST', { clave: 'negocio_lon', valor: lon });
-  toast('Ubicación guardada ✅');
-  _coloniasData = await api('/api/colonias');
-  filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
+function abrirSolicitudGeo(tipo) {
+  const meta = _SGEO_META[tipo];
+  if (!meta) return;
+  if (tipo === 'tarifas') _sgeoZonasTmp = [..._zonasData];
+  document.getElementById('sgeo-titulo').textContent   = meta.titulo;
+  document.getElementById('sgeo-desc').textContent     = meta.desc;
+  document.getElementById('sgeo-campos').innerHTML     = meta.campos();
+  document.getElementById('sgeo-motivo').value         = '';
+  document.getElementById('sgeo-btn-enviar').dataset.tipo = tipo;
+  document.getElementById('modal-solicitud-geo').classList.add('show');
+}
+
+async function enviarSolicitudGeo() {
+  const btn  = document.getElementById('sgeo-btn-enviar');
+  const tipo = btn?.dataset?.tipo;
+  const meta = _SGEO_META[tipo];
+  if (!meta) return;
+
+  const error = meta.validar();
+  if (error) return toast(error, false);
+
+  const motivo = document.getElementById('sgeo-motivo').value.trim();
+  if (!motivo) return toast('Describe el motivo del cambio', false);
+
+  btn.disabled = true;
+  const r = await api('/api/solicitudes-geo', 'POST', { tipo, datos_propuestos: meta.datos(), motivo });
+  btn.disabled = false;
+
+  if (r.ok) {
+    toast('Solicitud enviada. El equipo de soporte la revisará a la brevedad ✅');
+    closeModal('modal-solicitud-geo');
+  } else {
+    toast(r.error || 'Error al enviar la solicitud', false);
+  }
 }
 
 function renderColonias(lista) {

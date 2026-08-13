@@ -197,5 +197,17 @@ Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
 - Nombre compuesto en BD: 1 palabra→solo nombre, 2→nombre+apellido, 3+→primeras dos palabras como nombre, resto como apellido.
 - **`guardarDB()`** es no-op desde la migración a better-sqlite3 — better-sqlite3 persiste cada escritura automáticamente. El shim existe para no romper llamadas legacy.
 
+## Hoja de ruta — Arquitectura multi-giro/multi-tenant
+
+| Fase | Qué se construye                                                                                                                                                              | Impacto                       | Estado                  |
+|:----:|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|-------------------------|
+|  1   | Separar ecosistema taquería — `src/nlu/core.js`, `src/giros/taqueria/index.js`, `src/giros/taqueria/nlu.js`, `pedidoParser.js` como router delegante                         | Habilita multi-giro           | ✅ Commit `50a7414`     |
+|  2   | Extraer `nlu/core.js` con utilidades genéricas puras (completado junto con Fase 1)                                                                                            | Reutilizable por todos giros  | ✅ Incluido en Fase 1   |
+|  3   | Formalizar `geo/` como servicio de plataforma — solicitudes geo (tenant→superadmin), seed ciudad-agnóstico, aliases en `buscarColonia()`, 31 tests unitarios                 | Multi-ciudad                  | ✅ Fase 3 completa      |
+|  4   | BD compartida de giro + feature flags por plan de membresía                                                                                                                   | Modelo de negocio real        | Pendiente               |
+|  5   | Implementar hamburguesería como segundo giro activo (NLU stubs ya existen en `src/giros/hamburgueseria/nlu.js`)                                                               | Valida la abstracción         | Pendiente               |
+|  6   | `pagos/` abstracción + Stripe/Conekta para plan Plus                                                                                                                          | Plan Plus completo            | Pendiente               |
+|  7   | `reparto/` + `asistente-ia/`                                                                                                                                                  | Plan Pro                      | Pendiente               |
+
 ## Repo
 GitHub privado: `djchuvaca/Tacos-Javier-Bot` — rama `main`

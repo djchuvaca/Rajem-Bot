@@ -19,6 +19,7 @@ const {
   getTenantStats, getTenantConfig, setTenantConfig,
   getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
+  getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -241,6 +242,46 @@ app.put('/api/tenants/:id/zonas', requireAuth, (req, res) => {
   const { zonas } = req.body;
   if (!Array.isArray(zonas)) return res.status(400).json({ error: 'Formato inválido' });
   setTenantZonas(tenant, zonas);
+  res.json({ ok: true });
+});
+
+// ── SOLICITUDES GEO POR TENANT ────────────────────────────────────────────────
+app.get('/api/tenants/:id/solicitudes-geo', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json(getTenantSolicitudesGeo(tenant));
+});
+
+app.post('/api/tenants/:id/solicitudes-geo/:solId/aprobar', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const solId = parseInt(req.params.solId);
+  const { respuesta } = req.body;
+
+  const solicitudes = getTenantSolicitudesGeo(tenant);
+  const solicitud = solicitudes.find(s => s.id === solId);
+  if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
+  if (solicitud.estado !== 'pendiente') return res.status(409).json({ error: `La solicitud ya fue ${solicitud.estado}` });
+
+  const aplicado = applyTenantGeoSolicitud(tenant, solicitud);
+  if (!aplicado) return res.status(500).json({ error: 'No se pudo aplicar la configuración. Verifica que la BD del tenant esté accesible.' });
+
+  updateTenantSolicitudGeo(tenant, solId, { estado: 'aprobada', respuesta: respuesta || '' });
+  res.json({ ok: true });
+});
+
+app.post('/api/tenants/:id/solicitudes-geo/:solId/rechazar', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const solId = parseInt(req.params.solId);
+  const { respuesta } = req.body;
+
+  const solicitudes = getTenantSolicitudesGeo(tenant);
+  const solicitud = solicitudes.find(s => s.id === solId);
+  if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
+  if (solicitud.estado !== 'pendiente') return res.status(409).json({ error: `La solicitud ya fue ${solicitud.estado}` });
+
+  updateTenantSolicitudGeo(tenant, solId, { estado: 'rechazada', respuesta: respuesta || '' });
   res.json({ ok: true });
 });
 
