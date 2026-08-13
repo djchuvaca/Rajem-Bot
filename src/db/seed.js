@@ -552,6 +552,13 @@ async function seedDB() {
   // 'promedio' = promedio de precios de los cortes combinados
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('estrategia_precio_mixto', 'mas_caro')");
 
+  // Config: sección del giro taquería visible para el NLU (SUPERADMIN-ONLY)
+  // Cambiar este valor sin coordinación con el tenant puede romper la detección de todos los pedidos.
+  // 'ambas'    → carnitas + asada (default)
+  // 'carnitas' → solo cortes de carnitas (taquería de carnitas pura)
+  // 'asada'    → solo cortes de asada/trompo
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('seccion_taqueria', 'ambas')");
+
   // ── SEED CORTES DE TODOS LOS GIROS REGISTRADOS ────────────────────────────
   const { listGiros: _listGirosSeed } = require('../giros');
   for (const _giro of _listGirosSeed()) {
@@ -572,6 +579,38 @@ async function seedDB() {
     hora_despacho   TEXT    NOT NULL,
     ejecutado       INTEGER NOT NULL DEFAULT 0
   )`);
+
+  // ── ENTORNO DE PRUEBAS: activar item_types y poblar productos ────────────────
+  // En producción, el tenant activa item_types y agrega productos desde el panel.
+  // En tests (BOT_TEST_MODE=1), se activan automáticamente para que el NLU funcione.
+  if (process.env.BOT_TEST_MODE) {
+    run("UPDATE item_types SET activo = 1");
+    for (const p of (_giro?.productos || [])) {
+      try {
+        run(
+          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
+          [p.nombre, p.descripcion || '', p.precio_taco || 30, p.precio_torta || 40, p.precio_100g || 32, p.sinonimos || '', p.categoria || 'corte']
+        );
+      } catch (_) {}
+    }
+    for (const r of (_giro?.refrescos || [])) {
+      try {
+        run(
+          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
+          [r.nombre, r.descripcion || '', r.precio || 20, r.precio || 20, 0, r.sinonimos || '', 'refresco']
+        );
+      } catch (_) {}
+    }
+    for (const s of (_giro?.salsas || [])) {
+      try {
+        run(
+          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
+          [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']
+        );
+      } catch (_) {}
+    }
+    console.log("🧪 Modo test: item_types activados y productos seeded en memoria");
+  }
 
   guardarDB();
   console.log("✅ Base de datos lista");

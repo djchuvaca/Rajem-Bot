@@ -200,7 +200,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <!-- ── CONFIG TENANT ── -->
     <div id="sec-tenant-config" class="section">
       <h1>Configuración Técnica por Negocio</h1>
-      <p class="subtitle">GRUPO_ID, modalidad, timeouts, IA y pasarela por tenant</p>
+      <p class="subtitle">GRUPO_ID, modalidad, timeouts, giro y pasarela por tenant</p>
       <div class="form-group" style="max-width:300px">
         <label>Selecciona negocio</label>
         <select id="tc-tenant-select" onchange="loadTenantConfig()"><option value="">-- selecciona --</option></select>
@@ -264,15 +264,16 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 
           <div>
             <div class="card">
-              <div class="card-header"><div class="card-title">🤖 Inteligencia Artificial</div></div>
+              <div class="card-header"><div class="card-title">🏪 Configuración de Giro</div></div>
               <div class="form-group">
-                <label>Plan con IA activa</label>
-                <div class="toggle-wrap">
-                  <label class="toggle"><input type="checkbox" id="tc-groq-activo"><span class="toggle-slider"></span></label>
-                  <span id="tc-groq-label">Desactivado</span>
-                </div>
+                <label>Sección de taquería activa</label>
+                <select id="tc-seccion-taqueria">
+                  <option value="ambas">Ambas (carnitas + asada)</option>
+                  <option value="carnitas">Solo carnitas</option>
+                  <option value="asada">Solo asada / trompo</option>
+                </select>
               </div>
-              <small style="color:var(--muted);font-size:11px">La API Key de IA se configura en la sección IA Global</small>
+              <small style="color:var(--muted);font-size:11px">⚠️ Crítico — determina qué cortes detecta el NLU. Un cambio incorrecto rompe la toma de pedidos del tenant.</small>
             </div>
 
             <div class="card" style="margin-top:16px">
@@ -969,9 +970,7 @@ async function loadTenantConfig() {
   toggleNotifJIDField();
   document.getElementById('tc-timeout-rec').value=_tcConfig.timeout_recordatorio_min||'20';
   document.getElementById('tc-timeout-ses').value=_tcConfig.timeout_sesion_min||'35';
-  const groqAct=_tcConfig.groq_activo==='1';
-  document.getElementById('tc-groq-activo').checked=groqAct;
-  document.getElementById('tc-groq-label').textContent=groqAct?'Activado':'Desactivado';
+  document.getElementById('tc-seccion-taqueria').value=_tcConfig.seccion_taqueria||'ambas';
   document.getElementById('tc-lat').value=_tcConfig.negocio_lat||'';
   document.getElementById('tc-lon').value=_tcConfig.negocio_lon||'';
   document.getElementById('tc-pasarela').value=_tcConfig.pasarela_activa||'';
@@ -993,9 +992,6 @@ async function loadTenantConfig() {
       if(_tcMarker)_tcMarker.setLatLng([lat,lon]); else _tcMarker=L.marker([lat,lon]).addTo(_tcMap);
     }
   },200);
-  document.getElementById('tc-groq-activo').onchange=function(){
-    document.getElementById('tc-groq-label').textContent=this.checked?'Activado':'Desactivado';
-  };
 }
 
 function renderPasarelaFields() {
@@ -1032,7 +1028,7 @@ async function saveTenantConfig() {
     notif_privado_jid: document.getElementById('tc-privado-jid').value.trim(),
     timeout_recordatorio_min: document.getElementById('tc-timeout-rec').value,
     timeout_sesion_min:       document.getElementById('tc-timeout-ses').value,
-    groq_activo:       document.getElementById('tc-groq-activo').checked?'1':'0',
+    seccion_taqueria:  document.getElementById('tc-seccion-taqueria').value,
     negocio_lat:       document.getElementById('tc-lat').value,
     negocio_lon:       document.getElementById('tc-lon').value,
     pasarela_activa:   pasarela,

@@ -100,6 +100,31 @@ function listaItemTypes() {
   return '';
 }
 
+/**
+ * Filtra un mapa alias→slug según la sección del giro configurada en BD.
+ * Si seccion_taqueria='ambas' (o hay cualquier error), devuelve el mapa sin cambios.
+ * El giro activo actúa como autoridad para mapear slug→seccion.
+ */
+function _filtrarPorSeccion(mapa) {
+  try {
+    const seccion = getConfig('seccion_taqueria') || 'ambas';
+    if (seccion === 'ambas') return mapa;
+    const { getGiroActivo } = require('../giros');
+    const giro = getGiroActivo();
+    if (!giro?.cortes) return mapa;
+    const permitidos = new Set(
+      giro.cortes.filter(c => c.seccion === seccion).map(c => c.slug)
+    );
+    const filtrado = {};
+    for (const [alias, slug] of Object.entries(mapa)) {
+      if (permitidos.has(slug)) filtrado[alias] = slug;
+    }
+    return filtrado;
+  } catch (_) {
+    return mapa;
+  }
+}
+
 function getCortes() {
   const ahora = Date.now();
   if (_cortesCache && ahora - _cortesCacheTs < _CORTES_TTL) return _cortesCache;
@@ -127,9 +152,9 @@ function getCortes() {
           }
         }
       } catch (_) {}
-      _cortesCache = mapa;
+      _cortesCache = _filtrarPorSeccion(mapa);
       _cortesCacheTs = Date.now();
-      return mapa;
+      return _cortesCache;
     }
   } catch (_) {}
   // Fallback: leer de tabla productos (compat con instancias sin tabla cortes)
@@ -149,8 +174,9 @@ function getCortes() {
         }
       }
     }
-    _cortesCache = mapa; _cortesCacheTs = Date.now();
-    return mapa;
+    _cortesCache = _filtrarPorSeccion(mapa);
+    _cortesCacheTs = Date.now();
+    return _cortesCache;
   } catch (e) { return _cortesDefault(); }
 }
 
@@ -159,7 +185,7 @@ function getRefrescos() {
   if (_refrescosCache && ahora - _refrescosCacheTs < _CORTES_TTL) return _refrescosCache;
   try {
     const productos = getProductos();
-    _refrescosCache = (productos || []).filter(p => p.categoria === "refresco");
+    _refrescosCache = (productos || []).filter(p => p.categoria === "refresco" && p.activo !== 0);
     _refrescosCacheTs = Date.now();
     return _refrescosCache;
   } catch (e) { return []; }
@@ -170,7 +196,7 @@ function getSalsas() {
   if (_salsasCache && ahora - _salsasCacheTs < _CORTES_TTL) return _salsasCache;
   try {
     const productos = getProductos();
-    _salsasCache = (productos || []).filter(p => p.categoria === "salsa");
+    _salsasCache = (productos || []).filter(p => p.categoria === "salsa" && p.activo !== 0);
     _salsasCacheTs = Date.now();
     return _salsasCache;
   } catch (e) { return []; }
