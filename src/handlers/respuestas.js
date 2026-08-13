@@ -115,7 +115,7 @@ function respuestaPrecio(producto = null) {
         const p = precioCorteFormato(slugProducto, it.slug);
         resp += `   ${it.emoji} ${it.nombre_plural}: *$${p}*\n`;
       }
-      if (tieneGramos) resp += `   ⚖️ Por 100g: *$${itGramos?.precio_base || pc.p100g ?? precios.p100g}*\n`;
+      if (tieneGramos) resp += `   ⚖️ Por 100g: *$${itGramos?.precio_base || (pc.p100g ?? precios.p100g)}*\n`;
       return resp + `\n` + notaPrecios;
     }
 
@@ -155,7 +155,7 @@ function respuestaPrecio(producto = null) {
       const pc     = precios.porCorte[key] || precios;
       resp += `🥩 *${nombre}*\n`;
       const partes = formatosPrecio.map(it => `${it.emoji} $${precioCorteFormato(key, it.slug)}`);
-      if (tieneGramos) partes.push(`⚖️ $${itGramos?.precio_base || pc.p100g ?? precios.p100g}/100g`);
+      if (tieneGramos) partes.push(`⚖️ $${itGramos?.precio_base || (pc.p100g ?? precios.p100g)}/100g`);
       resp += `   ${partes.join(' · ')}\n\n`;
     }
     resp += `*(Combina cualquier corte al gusto — precio del más caro)*\n\n` + notaPrecios;
