@@ -388,6 +388,41 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         return true;
       }
     }
+    // Fallback: "la [item_type] cambia[la/lo/me] por [corte]" / "cambia la [item_type] por [corte]"
+    const mItemCorte = textoOriginal.match(
+      /(?:(?:la|el|los|las)\s+)?(\w+)\s+cambia(?:la|lo|me|le|n)?(?:\s+de\s+\w+)?\s+por\s+(\w+)|cambia(?:me|le)?\s+(?:la|el|los|las)\s+(\w+)\s+por\s+(\w+)/i
+    );
+    if (mItemCorte) {
+      const rawItem    = normalizar(mItemCorte[1] || mItemCorte[3] || '');
+      const rawCorte   = normalizar(mItemCorte[2] || mItemCorte[4] || '');
+      const tipoItem   = detectarTipoItemDesdeTexto(rawItem);
+      const cortesMap  = getCortes();
+      const corteNuevo = cortesMap[rawCorte] || buscarCorteFuzzy(rawCorte);
+      if (tipoItem && corteNuevo) {
+        const lineaItem = itemData.lineas.split('\n').find(l =>
+          new RegExp(`\\b(${normalizar(tipoItem.nombre)}|${tipoItem.slug})\\b`, 'i').test(normalizar(l))
+        );
+        if (lineaItem) {
+          const corteActualKey = Object.keys(cortesMap).find(k =>
+            new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(normalizar(lineaItem))
+          );
+          const slugActual = corteActualKey ? cortesMap[corteActualKey] : null;
+          if (slugActual) {
+            const textoMod = aplicarModificacion({ tipo: "cambiar_corte", de: slugActual, por: corteNuevo }, itemData.lineas);
+            if (textoMod) {
+              const subtotalMod = calcularSubtotal(textoMod);
+              const textoFinalMod = textoMod + "\n💰 Subtotal: $" + subtotalMod;
+              pedidoJSONActual.delete(clienteNumero);
+              esperandoConfirmacionItem.set(clienteNumero, { ...itemData, lineas: textoFinalMod });
+              historial.push({ role: "user",      content: textoOriginal });
+              historial.push({ role: "assistant", content: textoFinalMod });
+              await msg.reply(textoFinalMod + "\n\n*¿Es correcto?*");
+              return true;
+            }
+          }
+        }
+      }
+    }
     await msg.reply("No entendí qué quieres cambiar. *¿Me dices qué modificar?*\n_(Ej: 'quita uno', 'cámbiame el surtido a buche')_");
     return true;
   }
