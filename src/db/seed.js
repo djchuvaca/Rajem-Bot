@@ -567,7 +567,8 @@ async function seedDB() {
   // 'ambas'    → carnitas + asada (default)
   // 'carnitas' → solo cortes de carnitas (taquería de carnitas pura)
   // 'asada'    → solo cortes de asada/trompo
-  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('seccion_taqueria', 'ambas')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('seccion_taqueria', ?)",
+    [process.env.SECCION_TAQUERIA_INICIAL || 'ambas']);
 
   // ── SEED CORTES DE TODOS LOS GIROS REGISTRADOS ────────────────────────────
   const { listGiros: _listGirosSeed } = require('../giros');

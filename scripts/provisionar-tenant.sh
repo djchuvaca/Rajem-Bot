@@ -71,8 +71,9 @@ fi
 NOMBRE=$(get_val    "PROV_NOMBRE"     "Nombre del negocio"      "$TENANT_ID")
 CIUDAD=$(get_val    "PROV_CIUDAD"     "Ciudad"                  "")
 ESTADO=$(get_val    "PROV_ESTADO"     "Estado"                  "")
-GRUPO_ID=$(get_val  "PROV_GRUPO_ID"    "GRUPO_ID de WhatsApp (enter para omitir)"  "")
-PLAN=$(get_val      "PROV_PLAN"        "Plan (basico / plus / pro)"                "basico")
+GRUPO_ID=$(get_val        "PROV_GRUPO_ID"         "GRUPO_ID de WhatsApp (enter para omitir)"           "")
+SECCION_TAQUERIA=$(get_val "PROV_SECCION_TAQUERIA" "Sección taquería (ambas/carnitas/asada)"            "ambas")
+PLAN=$(get_val            "PROV_PLAN"             "Plan (basico / plus / pro)"                         "basico")
 NOTAS=$(get_val     "PROV_NOTAS"       "Notas (opcional)"                          "")
 
 # Puerto: auto-detectar el siguiente libre
@@ -110,6 +111,7 @@ NOMBRE_NEGOCIO=${NOMBRE}
 GRUPO_ID=${GRUPO_ID}
 PANEL_PORT=3000
 PANEL_SECRET=${PANEL_SECRET}
+SECCION_TAQUERIA_INICIAL=${SECCION_TAQUERIA}
 EOF
 ok "envs/${TENANT_ID}.env creado."
 

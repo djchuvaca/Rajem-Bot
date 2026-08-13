@@ -385,10 +385,18 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     </div>
     <div class="form-group">
       <label>Giro de negocio</label>
-      <select id="mt-business-type">
+      <select id="mt-business-type" onchange="_mtToggleSeccion()">
         <option value="taqueria">🌮 Taquería</option>
         <option value="pizzeria">🍕 Pizzería</option>
         <option value="hamburgueseria">🍔 Hamburguesería</option>
+      </select>
+    </div>
+    <div class="form-group" id="mt-seccion-row">
+      <label>Sección de taquería</label>
+      <select id="mt-seccion-taqueria">
+        <option value="ambas">Ambas (carnitas + asada)</option>
+        <option value="carnitas">Solo carnitas</option>
+        <option value="asada">Solo asada / trompo</option>
       </select>
     </div>
     <div class="grid2">
@@ -669,7 +677,13 @@ function openTenantModal() {
   document.getElementById('mt-plan').value = 'basico';
   document.getElementById('mt-business-type').value = 'taqueria';
   document.getElementById('mt-btn').textContent = 'Crear y provisionar';
+  document.getElementById('mt-seccion-taqueria').value = 'ambas';
+  _mtToggleSeccion();
   openModal('modal-tenant');
+}
+function _mtToggleSeccion() {
+  const giro = document.getElementById('mt-business-type').value;
+  document.getElementById('mt-seccion-row').style.display = giro === 'taqueria' ? '' : 'none';
 }
 async function editTenant(id) {
   const r = await fetch('/api/tenants'); const data = await r.json();
@@ -714,13 +728,16 @@ async function saveTenant() {
       _provTenantId  = id;
       _provPanelPort = 0;
       await _ejecutarProvisionamientoDirecto({
-        tenant_id:     id,
-        nombre:        body.nombre,
-        ciudad:        body.ciudad,
-        estado:        body.estado,
-        plan:          body.plan,
-        business_type: body.business_type,
-        grupo_id:      document.getElementById('mt-grupo').value.trim(),
+        tenant_id:        id,
+        nombre:           body.nombre,
+        ciudad:           body.ciudad,
+        estado:           body.estado,
+        plan:             body.plan,
+        business_type:    body.business_type,
+        seccion_taqueria: body.business_type === 'taqueria'
+          ? document.getElementById('mt-seccion-taqueria').value
+          : undefined,
+        grupo_id:         document.getElementById('mt-grupo').value.trim(),
       });
     }
   } else toast('Error al guardar','err');
