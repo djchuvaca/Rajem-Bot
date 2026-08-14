@@ -2,6 +2,10 @@ const { getDB, guardarDB, run, queryOne } = require("./core");
 
 async function seedDB() {
   const db = getDB();
+  db.run(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  )`);
 
   // ── CREAR TABLAS ───────────────────────────────────────────────────────────
   // ── TABLAS DEL CATÁLOGO MULTI-TENANT ──────────────────────────────────────────
@@ -583,6 +587,7 @@ function _seedBusinessTypes(db) {
     }
   }
 
+  db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)").run('2026-08-14-giro-geotepic-security');
   console.log("✅ Giros y formatos sincronizados desde src/giros");
 }
 

@@ -8,11 +8,17 @@ const { exec, spawn } = require('child_process');
 const PORT    = process.env.WEBHOOK_PORT   || 4000;
 const SECRET  = process.env.WEBHOOK_SECRET || '';
 const PROJECT = path.resolve(__dirname, '..');
+if (process.env.NODE_ENV === 'production' && (!SECRET || SECRET.length < 32)) {
+  throw new Error('WEBHOOK_SECRET es obligatorio en producción y debe tener al menos 32 caracteres');
+}
 
 function leerBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      body += chunk;
+      if (Buffer.byteLength(body) > 1024 * 1024) req.destroy(new Error('Payload demasiado grande'));
+    });
     req.on('end', () => resolve(body));
     req.on('error', reject);
   });
@@ -27,7 +33,9 @@ function verificarFirmaGitHub(payload, firma) {
 function verificarBearer(req) {
   if (!SECRET) return true;
   const auth = req.headers['authorization'] || '';
-  return auth === `Bearer ${SECRET}`;
+  const recibido = Buffer.from(auth);
+  const esperado = Buffer.from(`Bearer ${SECRET}`);
+  return recibido.length === esperado.length && crypto.timingSafeEqual(recibido, esperado);
 }
 
 // ── /deploy — webhook de GitHub ───────────────────────────────────────────────
@@ -52,45 +60,12 @@ async function handleDeploy(req, res) {
 
   res.writeHead(200); res.end('Deploy iniciado');
 
-  // Analizar qué archivos cambiaron
-  const changed = (payload.commits || [])
-    .flatMap(c => [...(c.added || []), ...(c.removed || []), ...(c.modified || [])]);
-
-  const needsNpmInstall  = changed.some(f => ['package.json', 'package-lock.json'].includes(f));
-  const needsWebhookSelf = changed.includes('scripts/webhook-deploy.js');
-  const onlyStatic       = changed.length > 0 && changed.every(f => f.startsWith('src/superadmin/public/'));
-
-  // git pull siempre
-  const cmds = [`cd ${PROJECT}`, 'git pull'];
-
-  if (needsNpmInstall) {
-    cmds.push('npm install --omit=dev --silent');
-    console.log('[webhook] package.json cambió — npm install incluido');
-  }
-
-  if (!onlyStatic) {
-    // Reiniciar superadmin y todos los bots de tenant (todos excepto webhook-deploy)
-    cmds.push(
-      `pm2 list --no-color 2>/dev/null | awk '/online|stopped|errored/{print $4}' | grep -v '^webhook-deploy$' | xargs -r pm2 restart 2>/dev/null || true`
-    );
-    console.log('[webhook] Reiniciando apps PM2 (excepto webhook-deploy)');
-  } else {
-    console.log('[webhook] Solo estáticos de superadmin — no se reinician procesos');
-  }
-
-  const cmd = cmds.join(' && ');
-  console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — ejecutando: ${cmd}`);
-
-  exec(cmd, { timeout: 300_000 }, (err, stdout, stderr) => {
+  console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — iniciando deploy seguro`);
+  exec(`bash "${path.join(PROJECT, 'scripts/deploy-safe.sh')}"`, { timeout: 600_000, cwd: PROJECT }, (err, stdout, stderr) => {
     if (err) { console.error('[webhook] Error en deploy:', err.message); return; }
     if (stdout) console.log('[webhook]', stdout.trim());
     if (stderr) console.error('[webhook]', stderr.trim());
     console.log('[webhook] ✅ Deploy completado');
-    // Reiniciar webhook-deploy al final si el propio script cambió
-    if (needsWebhookSelf) {
-      console.log('[webhook] Reiniciando webhook-deploy en 3s...');
-      setTimeout(() => exec('pm2 restart webhook-deploy'), 3000);
-    }
   });
 }
 

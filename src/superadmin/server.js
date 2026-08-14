@@ -10,6 +10,7 @@ const path     = require('path');
 const {
   getAdminDB, getGlobalConfig, setGlobalConfig, getAllGlobalConfig,
   getSuperadminUsuario, updateSuperadminPassword,
+  registrarAuditoria, listarAuditoriaAdmin,
   getAppUrl, getGrupoMandaditosGlobal,
 } = require('../db/admin');
 const SqliteSessionStore = require('../db/session-store');
@@ -36,14 +37,16 @@ if (process.env.NODE_ENV === 'production' && (!_superadminSecret || _superadminS
 }
 const app = express();
 app.disable('x-powered-by');
+if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(session({
   name:              'rajem.superadmin.sid',
   secret:            _superadminSecret || 'rajem-superadmin-secret-local-dev',
@@ -160,6 +163,13 @@ app.delete('/api/tenants/:id', requireAuth, (req, res) => {
 
 // Eliminacion completa: baja contenedor, limpia compose y env (streaming)
 app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const superadmin = getSuperadminUsuario(req.session.usuario);
+  if (req.body?.autorizado !== true || !superadmin || typeof req.body?.superadmin_password !== 'string' || !bcrypt.compareSync(req.body.superadmin_password, superadmin.password)) {
+    registrarAuditoria({ usuario: req.session.usuario, accion: 'eliminar_tenant_rechazado', entidad: 'tenant', entidadId: req.params.id, detalles: { motivo: 'reauth_fallida' }, ip: req.ip });
+    return res.status(403).json({ error: 'Autorización o contraseña del superadmin incorrecta' });
+  }
   const webhookPort = process.env.WEBHOOK_PORT || 4000;
   const secret      = process.env.WEBHOOK_SECRET || '';
   const body        = JSON.stringify({ tenant_id: req.params.id });
@@ -186,7 +196,10 @@ app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
     let salida = '';
     proxyRes.on('data', chunk => { salida += chunk.toString(); res.write(chunk); });
     proxyRes.on('end', () => {
-      if (proxyRes.statusCode >= 200 && proxyRes.statusCode < 300 && /\[DONE:0\]/.test(salida)) deleteTenant(req.params.id);
+      if (proxyRes.statusCode >= 200 && proxyRes.statusCode < 300 && /\[DONE:0\]/.test(salida)) {
+        deleteTenant(req.params.id);
+        registrarAuditoria({ usuario: req.session.usuario, accion: 'eliminar_tenant', entidad: 'tenant', entidadId: req.params.id, detalles: { nombre: tenant.nombre }, ip: req.ip });
+      }
       else res.write('\nEl registro se conserva porque la eliminación no terminó correctamente.\n');
       res.end();
     });
@@ -217,7 +230,12 @@ app.get('/api/tenants/:id/pedidos', requireAuth, (req, res) => {
 app.get('/api/tenants/:id/config', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  res.json(getTenantConfig(tenant));
+  const config = getTenantConfig(tenant);
+  try {
+    const secretos = JSON.parse(config.pasarela_config || '{}');
+    config.pasarela_config = JSON.stringify(Object.fromEntries(Object.keys(secretos).map(k => [k, secretos[k] ? '__KEEP__' : ''])));
+  } catch (_) { config.pasarela_config = '{}'; }
+  res.json(config);
 });
 
 app.post('/api/tenants/:id/config', requireAuth, (req, res) => {
@@ -235,7 +253,15 @@ app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { config } = req.body;
   if (!config || typeof config !== 'object') return res.status(400).json({ error: 'Formato inválido' });
-  if (!setTenantConfigBulk(tenant, config)) return res.status(500).json({ error: 'No se pudo guardar la configuración de forma atómica' });
+  if (config.pasarela_config !== undefined) {
+    try {
+      const nuevos = JSON.parse(config.pasarela_config || '{}');
+      const actuales = JSON.parse(getTenantConfig(tenant).pasarela_config || '{}');
+      for (const [clave, valor] of Object.entries(nuevos)) if (valor === '__KEEP__') nuevos[clave] = actuales[clave] || '';
+      config.pasarela_config = JSON.stringify(nuevos);
+    } catch (_) { return res.status(400).json({ error: 'Configuración de pasarela inválida' }); }
+  }
+  if (!setTenantConfigBulk(tenant, config)) return res.status(500).json({ error: 'No se pudo guardar la configuración de forma atómica. Verifica el PANEL_SECRET del tenant.' });
   res.json({ ok: true });
 });
 
@@ -250,8 +276,13 @@ app.get('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
 app.put('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const { usuario, password_nuevo, autorizado } = req.body;
+  const { usuario, password_nuevo, autorizado, superadmin_password } = req.body;
   if (autorizado !== true) return res.status(403).json({ error: 'Debes autorizar expresamente el cambio de credenciales' });
+  const superadmin = getSuperadminUsuario(req.session.usuario);
+  if (!superadmin || typeof superadmin_password !== 'string' || !bcrypt.compareSync(superadmin_password, superadmin.password)) {
+    registrarAuditoria({ usuario: req.session.usuario, accion: 'credenciales_tenant_rechazadas', entidad: 'tenant', entidadId: tenant.id, detalles: { motivo: 'reauth_fallida' }, ip: req.ip });
+    return res.status(403).json({ error: 'Contraseña del superadmin incorrecta' });
+  }
   if (typeof usuario !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(usuario.trim())) {
     return res.status(400).json({ error: 'El usuario debe tener entre 3 y 50 caracteres y usar solo letras, números, punto, guion o guion bajo' });
   }
@@ -262,8 +293,13 @@ app.put('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
     usuario: usuario.trim(),
     passwordHash: password_nuevo ? bcrypt.hashSync(password_nuevo, 10) : null,
   });
-  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'No se pudieron actualizar las credenciales del tenant' });
+  if (ok) {
+    registrarAuditoria({ usuario: req.session.usuario, accion: 'actualizar_credenciales_panel', entidad: 'tenant', entidadId: tenant.id, detalles: { usuario_nuevo: usuario.trim(), password_reemplazada: !!password_nuevo }, ip: req.ip });
+    res.json({ ok: true });
+  } else res.status(500).json({ error: 'No se pudieron actualizar las credenciales del tenant' });
 });
+
+app.get('/api/auditoria', requireAuth, (req, res) => res.json(listarAuditoriaAdmin(req.query.limit)));
 
 // ── GEOTEPIC — diccionario maestro administrado exclusivamente aquí ──────────
 app.get('/api/geo/tepic/colonias', requireAuth, (_req, res) => {

@@ -5,6 +5,7 @@
 const path     = require('path');
 const fs       = require('fs');
 const Database = require('better-sqlite3');
+const { encrypt, decrypt } = require('../security/secrets');
 
 const TENANTS_PATH = path.join(__dirname, '../../data/tenants.json');
 const ROOT_PATH    = path.join(__dirname, '../../');
@@ -57,6 +58,24 @@ function _openWritable(tenant) {
   const db = new Database(dbPath, { fileMustExist: true });
   db.pragma('busy_timeout = 5000');
   return db;
+}
+
+function _tenantSecret(tenant) {
+  const envPath = path.join(ROOT_PATH, 'envs', `${tenant.id}.env`);
+  try {
+    const line = fs.readFileSync(envPath, 'utf8').split(/\r?\n/).find(l => l.startsWith('PANEL_SECRET='));
+    return line ? line.slice('PANEL_SECRET='.length).trim() : '';
+  } catch (_) { return ''; }
+}
+
+function _decodeTenantConfig(tenant, clave, valor) {
+  if (clave !== 'pasarela_config') return valor;
+  return decrypt(valor, _tenantSecret(tenant));
+}
+
+function _encodeTenantConfig(tenant, clave, valor) {
+  if (clave !== 'pasarela_config') return String(valor ?? '');
+  return encrypt(String(valor ?? '{}'), _tenantSecret(tenant));
 }
 
 function _invalidateTenant(tenant) {
@@ -133,7 +152,7 @@ function getTenantConfig(tenant) {
   try {
     const rows = db.prepare('SELECT clave, valor FROM configuracion').all();
     const cfg = {};
-    rows.forEach(r => { cfg[r.clave] = r.valor; });
+    rows.forEach(r => { cfg[r.clave] = _decodeTenantConfig(tenant, r.clave, r.valor); });
     return cfg;
   } catch (_) { return {}; }
 }
@@ -142,7 +161,7 @@ function setTenantConfig(tenant, clave, valor) {
   const db = _openWritable(tenant);
   if (!db) return false;
   try {
-    db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)').run(clave, String(valor ?? ''));
+    db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)').run(clave, _encodeTenantConfig(tenant, clave, valor));
     // Invalidar caché de readonly para que próxima lectura vea el cambio
     _invalidateTenant(tenant);
     return true;
@@ -156,7 +175,7 @@ function setTenantConfigBulk(tenant, config) {
   try {
     const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
     db.transaction(() => {
-      for (const [clave, valor] of Object.entries(config)) stmt.run(clave, String(valor ?? ''));
+      for (const [clave, valor] of Object.entries(config)) stmt.run(clave, _encodeTenantConfig(tenant, clave, valor));
     })();
     _invalidateTenant(tenant);
     return true;

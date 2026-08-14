@@ -35,14 +35,24 @@ const catalogoTenant = require('../giros/catalogo-tenant');
 const _loginAttempts = new Map();
 
 const app = express();
+app.disable('x-powered-by');
+if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 app.use(express.json({
+  limit: '1mb',
   verify: (req, _res, buf) => {
     // Stripe requiere rawBody para verificar la firma HMAC del webhook
     if (req.path === '/webhook/stripe') req.rawBody = buf;
   },
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 if (process.env.NODE_ENV === 'production' && (!process.env.PANEL_SECRET || process.env.PANEL_SECRET.length < 32)) {
   throw new Error('PANEL_SECRET es obligatorio en producción y debe tener al menos 32 caracteres');
 }
@@ -58,6 +68,16 @@ app.use(session({
   cookie:            { maxAge: 8 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE === '1' },
 }));
 app.use(express.static(path.join(__dirname, "public")));
+
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  if (!origin) return next();
+  try {
+    if (new URL(origin).host !== req.get('host')) return res.status(403).json({ error: 'Origen no permitido' });
+  } catch (_) { return res.status(403).json({ error: 'Origen inválido' }); }
+  next();
+});
 
 app.get("/api/negocio", (req, res) => {
   res.json({ nombre: getConfig("nombre_negocio") || "el negocio" });
@@ -116,6 +136,8 @@ app.post("/api/cambiar-password", requireAuth, (req, res) => {
   const user = getUsuarioPanel(req.session.usuario);
   if (!bcrypt.compareSync(password_actual, user.password))
     return res.status(400).json({ error: "Contraseña actual incorrecta" });
+  if (typeof password_nuevo !== 'string' || password_nuevo.length < 12)
+    return res.status(400).json({ error: "La contraseña nueva debe tener al menos 12 caracteres" });
   updatePasswordPanel(req.session.usuario, bcrypt.hashSync(password_nuevo, 10));
   res.json({ ok: true });
 });
@@ -465,55 +487,59 @@ async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
 
 // ── WEBHOOK MERCADOPAGO (público) ─────────────────────────────────────────────
 app.post("/webhook/mercadopago", async (req, res) => {
-  res.sendStatus(200);
   const { type, data } = req.body || {};
-  if (type !== "payment" || !data?.id) return;
+  if (type !== "payment" || !data?.id) return res.sendStatus(202);
   try {
     const resultado = await mpPagos.procesarPago(data.id);
-    if (!resultado?.aprobado) return;
+    if (!resultado?.aprobado) return res.sendStatus(202);
     try { actualizarEstadoPorId(resultado.pedidoId, "confirmado"); } catch (_) {}
     if (resultado.jid) { try { require("../estado").esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
     await _notificarPagoConfirmado(resultado, 'MercadoPago');
+    res.sendStatus(200);
   } catch (e) {
     console.error("[Webhook MP] Error:", e.message);
+    res.sendStatus(500);
   }
 });
 
 // ── WEBHOOK STRIPE (público) ──────────────────────────────────────────────────
 app.post("/webhook/stripe", async (req, res) => {
-  res.sendStatus(200);
   const firma = req.headers['stripe-signature'];
-  if (!firma || !req.rawBody) return;
+  if (!firma || !req.rawBody) return res.sendStatus(400);
   try {
     const stripeDriver = require('../pagos/stripe');
     const event = stripeDriver.verificarWebhookEvento(req.rawBody, firma);
-    if (!event || event.type !== 'checkout.session.completed') return;
+    if (!event) return res.sendStatus(400);
+    if (event.type !== 'checkout.session.completed') return res.sendStatus(202);
     const session = event.data.object;
-    if (session.payment_status !== 'paid') return;
+    if (session.payment_status !== 'paid') return res.sendStatus(202);
     const resultado = await stripeDriver.procesarPago(session.id);
-    if (!resultado?.aprobado) return;
+    if (!resultado?.aprobado) return res.sendStatus(202);
     try { actualizarEstadoPorId(parseInt(resultado.pedidoId), 'confirmado'); } catch (_) {}
     if (resultado.jid) { try { require('../estado').esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
     await _notificarPagoConfirmado(resultado, 'Stripe');
+    res.sendStatus(200);
   } catch (e) {
     console.error('[Webhook Stripe] Error:', e.message);
+    res.sendStatus(500);
   }
 });
 
 // ── WEBHOOK CONEKTA (público) ─────────────────────────────────────────────────
 app.post("/webhook/conekta", async (req, res) => {
-  res.sendStatus(200);
   const { type, data } = req.body || {};
-  if (type !== 'order.paid' || !data?.object?.id) return;
+  if (type !== 'order.paid' || !data?.object?.id) return res.sendStatus(202);
   try {
     const conektaDriver = require('../pagos/conekta');
     const resultado = await conektaDriver.procesarPago(data.object.id);
-    if (!resultado?.aprobado) return;
+    if (!resultado?.aprobado) return res.sendStatus(202);
     try { actualizarEstadoPorId(parseInt(resultado.pedidoId), 'confirmado'); } catch (_) {}
     if (resultado.jid) { try { require('../estado').esperandoPagoMP.delete(resultado.jid); } catch (_) {} }
     await _notificarPagoConfirmado(resultado, 'Conekta');
+    res.sendStatus(200);
   } catch (e) {
     console.error('[Webhook Conekta] Error:', e.message);
+    res.sendStatus(500);
   }
 });
 

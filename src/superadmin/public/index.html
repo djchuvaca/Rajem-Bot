@@ -128,6 +128,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
     <div class="nav-item" onclick="showSection('mandaditos')" data-s="mandaditos"><span class="icon">🛵</span> Mandaditos</div>
+    <div class="nav-item" onclick="showSection('auditoria');loadAuditoria()" data-s="auditoria"><span class="icon">🧾</span> Auditoría</div>
     <div class="nav-item" onclick="showSection('global')" data-s="global"><span class="icon">🌐</span> Config Global</div>
     <div class="sidebar-bottom">
       <div class="user-info" id="sa-user-label"></div>
@@ -348,6 +349,17 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <button class="btn btn-primary" onclick="saveTenantConfig()">Guardar cambios</button>
           <button class="btn btn-secondary" onclick="loadTenantConfig()">Revertir</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ── AUDITORÍA ── -->
+    <div id="sec-auditoria" class="section">
+      <h1>Auditoría administrativa</h1>
+      <p class="subtitle">Acciones críticas y verificaciones rechazadas del superadmin</p>
+      <button class="btn btn-secondary btn-sm" onclick="loadAuditoria()">🔄 Actualizar</button>
+      <div class="table-wrap" style="margin-top:14px">
+        <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Detalles</th><th>IP</th></tr></thead>
+          <tbody id="auditoria-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
       </div>
     </div>
 
@@ -665,6 +677,10 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div style="background:#2d1515;border:1px solid var(--red);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px">
       <strong id="elim-nombre-label"></strong>
     </div>
+    <div class="form-group">
+      <label>Contraseña actual del superadmin</label>
+      <input type="password" id="elim-superadmin-password" autocomplete="current-password" placeholder="Confirma tu identidad">
+    </div>
     <div class="form-group" style="display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid var(--red);border-radius:6px;padding:10px 14px">
       <input type="checkbox" id="elim-confirmar" style="width:auto;accent-color:var(--red)" onchange="document.getElementById('elim-btn').disabled=!this.checked">
       <label for="elim-confirmar" style="margin:0;font-size:13px;color:var(--red)">Entiendo que esta acción es irreversible y no hay forma de recuperar los datos</label>
@@ -682,6 +698,10 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <h2 style="color:var(--yellow)">Autorizar cambio de acceso</h2>
     <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Modificarás las credenciales con las que el negocio entra a su panel. Las sesiones ya abiertas pueden continuar activas, pero el siguiente inicio de sesión requerirá los datos nuevos.</p>
     <div style="background:#2b2413;border:1px solid var(--yellow);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px" id="tc-cred-resumen"></div>
+    <div class="form-group">
+      <label>Contraseña actual del superadmin</label>
+      <input type="password" id="tc-cred-superadmin-password" autocomplete="current-password" placeholder="Confirma tu identidad">
+    </div>
     <div class="form-group" style="display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid var(--yellow);border-radius:6px;padding:10px 14px">
       <input type="checkbox" id="tc-cred-confirmar" style="width:auto;accent-color:var(--yellow)" onchange="document.getElementById('tc-cred-btn').disabled=!this.checked">
       <label for="tc-cred-confirmar" style="margin:0;font-size:13px;color:var(--yellow)">Confirmo que deseo cambiar el acceso al panel de este tenant</label>
@@ -775,6 +795,18 @@ function toast(msg, type='ok') {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+async function loadAuditoria(){
+  const tbody=document.getElementById('auditoria-tbody');
+  const r=await fetch('/api/auditoria?limit=300');
+  if(!r.ok){tbody.innerHTML='<tr><td colspan="6" class="empty">No se pudo cargar la auditoría</td></tr>';return;}
+  const rows=await r.json();
+  tbody.innerHTML=rows.map(a=>`<tr>
+    <td>${esc(a.created_at)}</td><td>${esc(a.usuario)}</td><td>${esc(a.accion)}</td>
+    <td>${esc(a.entidad||'—')} ${a.entidad_id?`<code>${esc(a.entidad_id)}</code>`:''}</td>
+    <td><small>${esc(a.detalles||'—')}</small></td><td>${esc(a.ip||'—')}</td>
+  </tr>`).join('')||'<tr><td colspan="6" class="empty">Todavía no hay acciones registradas</td></tr>';
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   const r = await fetch('/api/dashboard'); if(!r.ok) return;
@@ -788,7 +820,7 @@ async function loadDashboard() {
     const badge = `<span class="badge ${_BE[t.bot_estado]||'badge-gray'}">${_BL[t.bot_estado]||'Inactivo'}</span>`;
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
     return `<div class="card">
-      <div class="card-header"><div class="card-title">${s.nombre_negocio||t.nombre}</div>${badge}</div>
+      <div class="card-header"><div class="card-title">${esc(s.nombre_negocio||t.nombre)}</div>${badge}</div>
       <div style="display:flex;gap:6px;margin-bottom:10px">${plan}</div>
       <div class="stat-row">Pedidos hoy <span>${s.pedidos_hoy||0}</span></div>
       <div class="stat-row">Confirmados hoy <span>${s.confirmados_hoy||0}</span></div>
@@ -796,8 +828,8 @@ async function loadDashboard() {
       <div class="stat-row">Pendientes <span style="${(s.pendientes||0)>0?'color:var(--yellow)':''}">${s.pendientes||0}</span></div>
       <div class="stat-row">Sesiones activas <span>${s.sesiones_activas||0}</span></div>
       <div class="stat-row">Clientes totales <span>${s.total_clientes||0}</span></div>
-      ${s.error?`<div style="color:var(--red);font-size:11px;margin-top:8px">⚠️ ${s.error}</div>`:''}
-      <div style="margin-top:12px;font-size:11px;color:var(--muted2)">${t.ciudad}, ${t.estado} · Puerto ${t.panel_port}</div>
+      ${s.error?`<div style="color:var(--red);font-size:11px;margin-top:8px">⚠️ ${esc(s.error)}</div>`:''}
+      <div style="margin-top:12px;font-size:11px;color:var(--muted2)">${esc(t.ciudad)}, ${esc(t.estado)} · Puerto ${Number(t.panel_port)||'—'}</div>
     </div>`;
   }).join('');
 }
@@ -904,11 +936,14 @@ function confirmDelete(id, nombre) {
   _elimId = id;
   document.getElementById('elim-nombre-label').textContent = `${nombre || id} (${id})`;
   document.getElementById('elim-confirmar').checked = false;
+  document.getElementById('elim-superadmin-password').value = '';
   document.getElementById('elim-btn').disabled = true;
   openModal('modal-eliminar-tenant');
 }
 async function ejecutarEliminacion() {
   if (!_elimId) return;
+  const superadminPassword=document.getElementById('elim-superadmin-password').value;
+  if(!superadminPassword){toast('Ingresa tu contraseña de superadmin','err');return;}
   document.getElementById('elim-btn').disabled = true;
   closeModal('modal-eliminar-tenant');
   const logsEl = document.getElementById('elim-logs');
@@ -919,8 +954,15 @@ async function ejecutarEliminacion() {
     const r = await fetch(`/api/tenants/${_elimId}/eliminar`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({}),
+      body: JSON.stringify({autorizado:true,superadmin_password:superadminPassword}),
     });
+    if(!r.ok){
+      const e=await r.json().catch(()=>({}));
+      closeModal('modal-elim-logs');
+      openModal('modal-eliminar-tenant');
+      document.getElementById('elim-btn').disabled=false;
+      toast(e.error||'No autorizado','err'); return;
+    }
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let exito = false;
@@ -1171,15 +1213,15 @@ function renderPasarelaFields() {
   const toggleBtn=(id)=>`<button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="const e=document.getElementById('${id}');e.type=e.type==='password'?'text':'password'">👁</button>`;
   const baseUrl=document.getElementById('tc-public-url')?.value.trim()||'[URL pública del tenant]';
   if(p==='mercadopago'){
-    el.innerHTML=`<div class="form-group"><label>Access Token (APP_USR-…)</label><input id="tc-mp-token" type="password" value="${cfg.access_token||''}">${toggleBtn('tc-mp-token')}</div>`;
+    el.innerHTML=`<div class="form-group"><label>Access Token (APP_USR-…)</label><input id="tc-mp-token" type="password" value="" placeholder="${cfg.access_token==='__KEEP__'?'Configurado — dejar vacío para conservar':'Sin configurar'}">${toggleBtn('tc-mp-token')}</div>`;
   } else if(p==='stripe'){
     el.innerHTML=`
-      <div class="form-group"><label>Secret Key (sk_live_… / sk_test_…)</label><input id="tc-stripe-key" type="password" value="${cfg.secret_key||''}">${toggleBtn('tc-stripe-key')}</div>
-      <div class="form-group"><label>Webhook Secret (whsec_…)</label><input id="tc-stripe-wsecret" type="password" value="${cfg.webhook_secret||''}">${toggleBtn('tc-stripe-wsecret')}</div>
+      <div class="form-group"><label>Secret Key (sk_live_… / sk_test_…)</label><input id="tc-stripe-key" type="password" value="" placeholder="${cfg.secret_key==='__KEEP__'?'Configurada — dejar vacío para conservar':'Sin configurar'}">${toggleBtn('tc-stripe-key')}</div>
+      <div class="form-group"><label>Webhook Secret (whsec_…)</label><input id="tc-stripe-wsecret" type="password" value="" placeholder="${cfg.webhook_secret==='__KEEP__'?'Configurado — dejar vacío para conservar':'Sin configurar'}">${toggleBtn('tc-stripe-wsecret')}</div>
       <small style="color:var(--muted)">URL webhook: <code>${baseUrl}/webhook/stripe</code></small>`;
   } else if(p==='conekta'){
     el.innerHTML=`
-      <div class="form-group"><label>Private Key (key_…)</label><input id="tc-conekta-key" type="password" value="${cfg.private_key||''}">${toggleBtn('tc-conekta-key')}</div>
+      <div class="form-group"><label>Private Key (key_…)</label><input id="tc-conekta-key" type="password" value="" placeholder="${cfg.private_key==='__KEEP__'?'Configurada — dejar vacío para conservar':'Sin configurar'}">${toggleBtn('tc-conekta-key')}</div>
       <small style="color:var(--muted)">URL webhook: <code>${baseUrl}/webhook/conekta</code></small>`;
   } else { el.innerHTML=''; }
 }
@@ -1200,14 +1242,14 @@ async function saveTenantConfig() {
   let pasarelaConfig='{}';
   if(pasarela==='mercadopago'){
     const token=document.getElementById('tc-mp-token')?.value||'';
-    pasarelaConfig=JSON.stringify({access_token:token});
+    pasarelaConfig=JSON.stringify({access_token:token||'__KEEP__'});
   } else if(pasarela==='stripe'){
     const key=document.getElementById('tc-stripe-key')?.value||'';
     const wsecret=document.getElementById('tc-stripe-wsecret')?.value||'';
-    pasarelaConfig=JSON.stringify({secret_key:key,webhook_secret:wsecret});
+    pasarelaConfig=JSON.stringify({secret_key:key||'__KEEP__',webhook_secret:wsecret||'__KEEP__'});
   } else if(pasarela==='conekta'){
     const key=document.getElementById('tc-conekta-key')?.value||'';
-    pasarelaConfig=JSON.stringify({private_key:key});
+    pasarelaConfig=JSON.stringify({private_key:key||'__KEEP__'});
   }
   const config={
     grupo_id:          document.getElementById('tc-grupo-id').value.trim(),
@@ -1239,6 +1281,7 @@ async function saveTenantConfig() {
     if(passwordNuevo) cambios.push('Contraseña: será reemplazada por una nueva');
     document.getElementById('tc-cred-resumen').textContent=cambios.join(' · ');
     document.getElementById('tc-cred-confirmar').checked=false;
+    document.getElementById('tc-cred-superadmin-password').value='';
     document.getElementById('tc-cred-btn').disabled=true;
     openModal('modal-credenciales-tenant');
     return;
@@ -1260,11 +1303,13 @@ function cancelarCambioCredenciales(){
 async function confirmarCambioCredenciales(){
   if(!_tcPendingSave || !document.getElementById('tc-cred-confirmar').checked) return;
   const pendiente=_tcPendingSave;
+  const superadminPassword=document.getElementById('tc-cred-superadmin-password').value;
+  if(!superadminPassword){toast('Ingresa tu contraseña de superadmin para autorizar','err');return;}
   const btn=document.getElementById('tc-cred-btn');
   btn.disabled=true;
   const r=await fetch(`/api/tenants/${_tcTenant}/panel-credentials`,{
     method:'PUT',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({usuario:pendiente.usuario,password_nuevo:pendiente.passwordNuevo,autorizado:true})
+    body:JSON.stringify({usuario:pendiente.usuario,password_nuevo:pendiente.passwordNuevo,autorizado:true,superadmin_password:superadminPassword})
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));

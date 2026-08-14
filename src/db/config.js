@@ -139,7 +139,14 @@ function getPasarelaActiva() {
 }
 
 function getPasarelaConfig() {
-  try { return JSON.parse(getConfig("pasarela_config") || "{}"); } catch (_) { return {}; }
+  try {
+    const { decrypt } = require('../security/secrets');
+    const raw = getConfig('pasarela_config') || '{}';
+    return JSON.parse(decrypt(raw, process.env.PANEL_SECRET || ''));
+  } catch (e) {
+    console.error('[SEGURIDAD] No se pudo descifrar pasarela_config:', e.message);
+    return {};
+  }
 }
 
 function getNotifModalidad() {

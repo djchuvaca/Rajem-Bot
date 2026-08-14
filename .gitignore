@@ -53,6 +53,7 @@ desktop.ini
 # ── Backups de BD ───────────────────────────────────────────────
 backups/*
 !backups/.gitkeep
+data/backups/
 
 # ── Archivos de respaldo ────────────────────────────────────────
 *.bak

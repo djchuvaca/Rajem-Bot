@@ -30,6 +30,20 @@ function _init() {
       usuario  TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS admin_auditoria (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario TEXT NOT NULL,
+      accion TEXT NOT NULL,
+      entidad TEXT,
+      entidad_id TEXT,
+      detalles TEXT,
+      ip TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
     CREATE TABLE IF NOT EXISTS geo_tepic_colonias (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre     TEXT NOT NULL,
@@ -62,6 +76,7 @@ function _init() {
     id INTEGER PRIMARY KEY AUTOINCREMENT, colonia_id INTEGER, accion TEXT NOT NULL,
     datos_antes TEXT, datos_despues TEXT, usuario TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
   )`);
+  _db.prepare('INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)').run('2026-08-14-geotepic-security');
 
   // Defaults de global_config — solo inserta si no existe
   const defaults = [
@@ -109,6 +124,15 @@ function updateSuperadminPassword(usuario, hash) {
   getAdminDB().prepare('UPDATE superadmin_usuarios SET password = ? WHERE usuario = ?').run(hash, usuario);
 }
 
+function registrarAuditoria({ usuario, accion, entidad = null, entidadId = null, detalles = null, ip = null }) {
+  getAdminDB().prepare('INSERT INTO admin_auditoria (usuario,accion,entidad,entidad_id,detalles,ip) VALUES (?,?,?,?,?,?)')
+    .run(usuario, accion, entidad, entidadId, detalles ? JSON.stringify(detalles) : null, ip);
+}
+
+function listarAuditoriaAdmin(limite = 200) {
+  return getAdminDB().prepare('SELECT * FROM admin_auditoria ORDER BY id DESC LIMIT ?').all(Math.min(1000, Math.max(1, Number(limite) || 200)));
+}
+
 // ── Getters de conveniencia ────────────────────────────────────────────────────
 function getAppUrl()        { return getGlobalConfig('app_url')         || process.env.APP_URL              || ''; }
 function getGrupoMandaditosGlobal() { return getGlobalConfig('grupo_mandaditos_id') || process.env.GRUPO_MANDADITOS_ID || ''; }
@@ -116,6 +140,6 @@ function getGrupoMandaditosGlobal() { return getGlobalConfig('grupo_mandaditos_i
 module.exports = {
   getAdminDB,
   getGlobalConfig, setGlobalConfig, getAllGlobalConfig,
-  getSuperadminUsuario, updateSuperadminPassword,
+  getSuperadminUsuario, updateSuperadminPassword, registrarAuditoria, listarAuditoriaAdmin,
   getAppUrl, getGrupoMandaditosGlobal,
 };

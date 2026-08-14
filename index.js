@@ -284,6 +284,7 @@ function _runBackup() {
 process.on("uncaughtException", (err) => {
   logger.error(`Error no capturado: ${err.message}\n${err.stack}`);
   Sentry.captureException(err);
+  setTimeout(() => process.exit(1), 250).unref();
 });
 
 process.on("unhandledRejection", (reason) => {
