@@ -14,6 +14,7 @@ rollback() {
     log "ERROR: deploy falló; restaurando $OLD_COMMIT"
     git reset --hard "$OLD_COMMIT"
     npm ci --omit=dev --silent
+    node scripts/actualizar-tenants.js --no-restart || true
     pm2 restart all --update-env || true
     pm2 save || true
   fi
@@ -45,6 +46,10 @@ if ! git diff --quiet "$OLD_COMMIT" "$TARGET" -- package.json package-lock.json;
 fi
 npm test
 
+# Los tenants viven en directorios independientes para aislar sus datos y
+# sesiones. Copiarles el código nuevo antes del restart es indispensable:
+# reiniciar PM2 por sí solo conserva la versión antigua de cada directorio.
+node scripts/actualizar-tenants.js --no-restart
 pm2 restart all --update-env
 sleep 3
 curl --fail --silent --max-time 10 http://127.0.0.1:${SUPERADMIN_PORT:-3001}/health >/dev/null

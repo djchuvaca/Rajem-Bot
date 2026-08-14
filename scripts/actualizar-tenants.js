@@ -191,6 +191,10 @@ function main() {
     log(SEP2);
     log(`🔄 ${tenantId}`);
 
+    // Comparar dependencias antes de copiar package.json; después de sincronizar
+    // ambos archivos serían iguales y nunca se ejecutaría npm install.
+    const requiereNpm = pkgCambio(dir);
+
     // a. Sincronizar código
     const { cambiados, total } = sincronizar(ORIGEN, dir);
     if (cambiados > 0) {
@@ -201,7 +205,7 @@ function main() {
 
     // b. npm install si package.json cambió
     let npmEstado = 'omitido';
-    if (!SKIP_NPM && pkgCambio(dir)) {
+    if (!SKIP_NPM && requiereNpm) {
       log('   📦 package.json cambió — npm install...');
       if (!DRY_RUN) {
         try {
