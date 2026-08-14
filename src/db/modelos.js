@@ -154,7 +154,9 @@ function getStatsReporte(fechaInicio, fechaFin) {
   const ticket      = confirmados.length ? Math.round(ventas / confirmados.length) : 0;
 
   const catalogo = require('../giros/catalogo-tenant');
-  const activos = new Set(catalogo.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  // Los reportes históricos consideran todo lo habilitado por Superadmin;
+  // la disponibilidad temporal solo afecta la oferta actual en WhatsApp.
+  const activos = new Set(catalogo.getMenuItemsTenant('corte').filter(i => i.activo).map(i => i.producto_slug));
   const productos = catalogo.getCortesTenant().filter(c => activos.has(c.slug));
   const conteoCortes = {};
   for (const p of pedidos) {

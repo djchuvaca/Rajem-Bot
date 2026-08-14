@@ -19,6 +19,7 @@ test('agotado oculta el producto de WhatsApp sin quitar la habilitación del Sup
   const agotado = queryOne('SELECT activo,disponible FROM menu_items WHERE id=?', [item.id]);
   assert.equal(agotado.activo, 1);
   assert.equal(agotado.disponible, 0);
+  assert.equal(catalogo.getMenuItemsTenant('corte').some(i => i.producto_slug === item.producto_slug), true);
   assert.equal(catalogo.getMenuItemsActivos('corte').some(i => i.producto_slug === item.producto_slug), false);
 
   assert.ok(catalogo.setMenuItemDisponibilidad(item.producto_slug, 'corte', true) > 0);
@@ -28,4 +29,3 @@ test('agotado oculta el producto de WhatsApp sin quitar la habilitación del Sup
 test('el tenant no puede cambiar disponibilidad de un producto no habilitado', () => {
   assert.equal(catalogo.setMenuItemDisponibilidad('producto-inventado', 'corte', false), 0);
 });
-

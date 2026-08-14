@@ -437,7 +437,8 @@ app.get("/api/stats", requireAuth, (req, res) => {
   const mostradores = confirmados.filter(p => p.tipo === "mostrador");
 
   const conteoCortes = {};
-  const cortesMenu = new Set(catalogoTenant.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  // Las estadísticas no pierden productos por un estado temporal de agotado.
+  const cortesMenu = new Set(catalogoTenant.getMenuItemsTenant('corte').filter(i => i.activo).map(i => i.producto_slug));
   const CORTES_STAT = catalogoTenant.getCortesTenant()
     .filter(c => cortesMenu.has(c.slug)).map(c => c.nombre.toLowerCase());
   for (const p of pedidosHoy) {
@@ -922,7 +923,7 @@ app.put("/api/menu-items/:id", requireAuth, (req, res) => {
 
 // DELETE /api/menu-items/:id — soft delete
 app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
+  res.status(403).json({ error: 'El Superadmin controla la habilitación de productos' });
 });
 
 // Disponibilidad operativa: no cambia la habilitación asignada por Superadmin.
