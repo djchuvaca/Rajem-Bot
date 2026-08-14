@@ -168,7 +168,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
         <label>Negocio de Tepic para consultar zonas</label>
         <select id="geo-tenant-select" onchange="loadGeo()"><option value="">-- selecciona --</option></select>
       </div>
-      <div id="geo-content" style="display:none">
+      <div id="geo-content">
         <div class="tabs">
           <div class="tab active" onclick="geoTab('colonias',this)">Colonias</div>
           <div class="tab" onclick="geoTab('zonas',this)">Zonas Tarifa</div>
@@ -897,6 +897,7 @@ async function ejecutarEliminacion() {
 
 // ── GEO ───────────────────────────────────────────────────────────────────────
 function geoTab(tab, el) {
+  if(tab==='zonas' && !_geoTenant){ toast('Selecciona un negocio de Tepic para administrar sus zonas','err'); return; }
   document.querySelectorAll('#sec-geo .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('geo-colonias').style.display = tab==='colonias'?'':'none';
@@ -905,8 +906,7 @@ function geoTab(tab, el) {
 }
 async function loadGeo() {
   const id = document.getElementById('geo-tenant-select').value;
-  if(!id){document.getElementById('geo-content').style.display='none';return;}
-  _geoTenant = id;
+  _geoTenant = id || null;
   document.getElementById('geo-content').style.display='block';
   await loadColonias();
 }
@@ -1403,7 +1403,7 @@ async function populateTenantSelects() {
   if (geoOpts) {
     document.getElementById('geo-tenant-select').selectedIndex = 1;
     loadGeo();
-  }
+  } else loadColonias();
   document.getElementById('tc-tenant-select').innerHTML=base;
   document.getElementById('mand-tenant-select').innerHTML=base;
   loadTenants();
