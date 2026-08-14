@@ -168,7 +168,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. Usa `journal_mode = DELETE` y `busy_timeout = 5000`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
 - **`src/db/seed.js`** — crea tablas, proyecta las definiciones del Giro y migra una sola vez los valores de `productos` antiguos hacia `menu_items`. `productos` queda únicamente como almacenamiento heredado de migración y no participa en panel, NLU, respuestas ni cobro.
 - **`src/db/cortes.js`** — proyecta los cortes definidos por el Giro y cruza obligatoriamente su disponibilidad con `menu_items`. Un menú vacío permanece vacío; nunca reactiva automáticamente el catálogo completo. Los precios efectivos se resuelven desde `menu_items`.
-- **`src/db/modelos.js`** — CRUD productos, clientes, pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhook MP).
+- **`src/db/modelos.js`** — CRUD de clientes y pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhooks de pago). No expone CRUD operativo de la tabla histórica `productos`.
 - **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
 - **`src/db/repartidores.js`** — CRUD repartidores + historial de entregas. `registrarEntregaConfirmada()` (actualiza promedio, escribe a `entregas_historial`), `registrarEntregaTimeout()` (escribe con `confirmado=0, minutos=NULL`), `getHistorialTenant()`, `getReporteDesempeno()`, `resetEntregasHoy()`.
 - **`src/db/admin.js`** — BD del superadmin (`data/admin.db`). Config global (GROQ_API_KEY global, APP_URL, Sentry DSN), usuarios superadmin, sesiones.
@@ -192,7 +192,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 ### Scripts
 - **`scripts/backup-db.js`** — copia `data/{TENANT_ID}.db` a `data/backups/{TENANT_ID}_YYYY-MM-DD_HH-mm-ss.db`. Se ejecuta automáticamente cada 6h desde `index.js` via `fork()`. También: `npm run backup`.
 - **`scripts/reset-password.js`** — resetea la contraseña del panel sin necesitar la actual.
-- **`scripts/check-nuevos-tipos.js`** — 27 casos de prueba para NLU multi-tipo. Correr con `BOT_TEST_MODE=1`, **no** con `npm test`: `node scripts/check-nuevos-tipos.js`.
+- **`scripts/check-nuevos-tipos.js`** — casos manuales para NLU multi-tipo. Correr con `BOT_TEST_MODE=1`, **no** con `npm test`: `node scripts/check-nuevos-tipos.js`.
 - **`scripts/auto-pull.sh`** — git pull automático (alternativa lightweight al webhook).
 
 ### Otros

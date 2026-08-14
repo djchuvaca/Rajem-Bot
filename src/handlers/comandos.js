@@ -8,7 +8,6 @@ const {
   actualizarEstadoPedido, actualizarEstadoConfirmado, actualizarEstadoPorId,
   getPedidosHoy, getPedidosPorCliente, getPedidosPorFecha,
   getCliente, getAllClientes, getTopClientes,
-  getProductos,
   upsertCliente, getConfig, setConfig, getJIDReal, limpiarTodasLasSesionesDB,
   guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes,
 } = require("../db");

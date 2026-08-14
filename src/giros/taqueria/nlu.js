@@ -154,9 +154,13 @@ function textoANumero(texto) {
 // ── FUZZY MATCHING ────────────────────────────────────────────────────────────
 
 function buscarCorteFuzzy(palabra) {
+  palabra = normalizar(String(palabra || '')).trim();
   const cortes = getCortes();
   if (cortes[palabra]) return cortes[palabra];
   if (palabra.length < 4) return null;
+  // Los tipos de producto pertenecen al catálogo del Giro y nunca deben
+  // reinterpretarse como cortes por similitud (p. ej. "burritos" → "cuero").
+  if (detectarTipoItemDesdeTexto(palabra)) return null;
   let mejorCorte = null, mejorDist = Infinity, empate = false;
   for (const [key, val] of Object.entries(cortes)) {
     if (Math.abs(key.length - palabra.length) > 2) continue;

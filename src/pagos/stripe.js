@@ -3,20 +3,11 @@
 // pasarela_config debe tener: { secret_key: "sk_live/test_...", webhook_secret: "whsec_..." }
 // La secret_key la emite el dashboard de Stripe. El webhook_secret se obtiene al registrar
 // el endpoint en Stripe Dashboard → Developers → Webhooks.
+const { VIGENCIA_PAGO_MS, getAppUrl, registrarContextoPago, consumirContextoPago } = require('./contexto');
 
 function _getConfig() {
   const { getPasarelaConfig } = require('../db/config');
   return getPasarelaConfig();
-}
-
-function _getAppUrl() {
-  try {
-    const { getConfig } = require('../db/config');
-    const tenantUrl = getConfig('public_url');
-    if (tenantUrl) return tenantUrl.replace(/\/$/, '');
-    const { getAppUrl } = require('../db/admin');
-    return getAppUrl() || process.env.APP_URL || '';
-  } catch (_) { return process.env.APP_URL || ''; }
 }
 
 // Caché del cliente Stripe para evitar re-instanciar por cada llamada.
@@ -36,14 +27,13 @@ function _getClient() {
 function estaConfigurado() {
   const { getPasarelaActiva } = require('../db/config');
   const { secret_key } = _getConfig();
-  return getPasarelaActiva() === 'stripe' && !!secret_key && !!_getAppUrl();
+  return getPasarelaActiva() === 'stripe' && !!secret_key && !!getAppUrl();
 }
 
 async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resumen, nombre }) {
   const stripe = _getClient();
   if (!stripe) throw new Error('Stripe no configurado');
-  const appUrl = _getAppUrl();
-  const { guardarPagoPendiente } = require('../db');
+  const appUrl = getAppUrl();
 
   const session = await stripe.checkout.sessions.create({
     mode:       'payment',
@@ -58,27 +48,21 @@ async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resume
     metadata:    { pedido_id: String(pedidoId) },
     success_url: `${appUrl}/pago-exitoso?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appUrl}/pago-cancelado`,
-    expires_at:  Math.floor((Date.now() + 30 * 60 * 1000) / 1000), // Unix timestamp 30 min
+    expires_at:  Math.floor((Date.now() + VIGENCIA_PAGO_MS) / 1000),
   });
 
-  const expiraEn = new Date(Date.now() + 30 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  guardarPagoPendiente(String(pedidoId), { jid, telefono, resumen, nombre }, expiraEn);
+  registrarContextoPago(pedidoId, { jid, telefono, resumen, nombre });
   return session.url;
 }
 
 async function procesarPago(sessionId) {
   const stripe = _getClient();
   if (!stripe) return null;
-  const { obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados } = require('../db');
-
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   if (session.payment_status !== 'paid') return null;
 
-  limpiarPagosPendientesExpirados();
   const pedidoId = String(session.metadata?.pedido_id || '');
-  const pendiente = obtenerPagoPendiente(pedidoId);
-  eliminarPagoPendiente(pedidoId);
-  return { pedidoId, aprobado: true, sinContexto: !pendiente, ...(pendiente || {}) };
+  return consumirContextoPago(pedidoId);
 }
 
 // Verifica la firma del webhook de Stripe y retorna el Event o null si es inválida.

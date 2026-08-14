@@ -2,7 +2,7 @@ const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { getCatalogo, getGiro } = require('../src/giros');
-const { getTemplateProducts, initDB } = require('../src/db');
+const { initDB } = require('../src/db');
 const { run } = require('../src/db/core');
 const { getPrecios, calcularPrecioItem } = require('../src/pedido/precios');
 const parser = require('../src/handlers/pedidoParser');
@@ -16,11 +16,10 @@ test('taquería expone todo su catálogo desde el módulo de giro', () => {
   assert.deepEqual(catalogo.salsas.map(p => p.nombre), ['picada', 'suave', 'roja', 'cebolla']);
 });
 
-test('la API de compatibilidad deriva productos del giro, no de una tabla plantilla', () => {
-  const productos = getTemplateProducts('taqueria');
-  assert.ok(productos.some(p => p.categoria === 'corte' && p.catalogo_slug === 'buche'));
-  assert.ok(productos.some(p => p.categoria === 'refresco' && p.nombre === 'fanta'));
-  assert.ok(productos.some(p => p.categoria === 'salsa' && p.nombre === 'picada'));
+test('el giro no conserva una segunda plantilla productos[]', () => {
+  assert.equal(Object.hasOwn(getGiro('taqueria'), 'productos'), false);
+  assert.equal(Object.hasOwn(getGiro('pizzeria'), 'productos'), false);
+  assert.equal(Object.hasOwn(getGiro('hamburgueseria'), 'productos'), false);
 });
 
 test('bebidas y salsas canónicas no aceptan definiciones externas al giro', () => {

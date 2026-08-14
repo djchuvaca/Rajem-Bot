@@ -13,6 +13,7 @@ const {
   persistirEstado,
 } = require("../estado");
 const { ordenPendientePreventa, telefonosReales } = require("./flujos/utils");
+const { dividirNombreCompleto } = require('../clientes/nombre');
 
 async function handleImagen(msg, client) {
   if (!msg.hasMedia || (msg.type !== "image" && msg.type !== "document")) return false;
@@ -52,12 +53,7 @@ async function handleImagen(msg, client) {
     if (!pedidoId) {
       try {
         const telefonoLimpio = infoPedido.telefono || datos.telefono || null;
-        const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
-        const partes = nombreCompleto.split(/\s+/);
-        let nombre, apellido;
-        if (partes.length === 1)      { nombre = partes[0];                    apellido = null; }
-        else if (partes.length === 2) { nombre = partes[0];                    apellido = partes[1]; }
-        else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
+        const { nombre, apellido } = dividirNombreCompleto(infoPedido.nombre);
         const cliente = upsertCliente({
           nombre, apellido, telefono: telefonoLimpio,
           calle_numero: camposCliente.calle    || null,

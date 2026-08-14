@@ -9,14 +9,13 @@ const {
   getHorarios, updateHorario,
   getBanco, updateBanco,
   getAllMensajes, setMensaje,
-  getProductos, updateProducto, createProducto, deleteProducto,
   getAllClientes, getCliente, upsertCliente, deleteCliente,
   getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
   getConfig, guardarTelefonoReal, getJIDReal, getGrupoId, getNotifDestinoJID,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
-  getAllBusinessTypes, getBusinessType, getBusinessTypeSlug,
-  getItemTypes, getItemTypeBySlug, createItemType, updateItemType, deleteItemType,
-  invalidarCacheItemTypes, getTemplateProducts,
+  getBusinessType, getBusinessTypeSlug,
+  getItemTypes,
+  invalidarCacheItemTypes,
 } = require("../db");
 const { queryOne, queryAll, run, getBsdb } = require("../db/core");
 const SqliteSessionStore = require("../db/session-store");
@@ -180,26 +179,6 @@ app.get("/api/mensajes", requireAuth, (req, res) => res.json(getAllMensajes()));
 app.post("/api/mensajes", requireAuth, (req, res) => {
   setMensaje(req.body.clave, req.body.valor);
   res.json({ ok: true });
-});
-
-// ── PRODUCTOS ─────────────────────────────────────────────────────────────────
-app.get("/api/productos", requireAuth, (req, res) => res.json([
-  ...catalogoTenant.getBebidasTenant(), ...catalogoTenant.getSalsasTenant(),
-]));
-
-// Tenant solo puede modificar precios y estado activo — el resto lo gestiona el super-admin
-app.put("/api/productos/:id", requireAuth, (req, res) => {
-  res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
-});
-
-// Desactivar producto (no eliminar físicamente — el catálogo lo define el super-admin)
-app.delete("/api/productos/:id", requireAuth, (req, res) => {
-  res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
-});
-
-// Adoptar un producto del catálogo al menú del tenant
-app.post("/api/productos/adoptar", requireAuth, (req, res) => {
-  res.status(410).json({ error: 'Endpoint legacy retirado; el catálogo se adopta desde el menú del giro' });
 });
 
 // Solicitud de nuevo producto (no disponible en el catálogo actual)
@@ -808,13 +787,7 @@ app.put("/api/tarifas-zonas", requireAuth, (req, res) => {
 });
 
 // ── BUSINESS TYPES ────────────────────────────────────────────────────────────
-// GET  /api/business-types        — lista de todas las plantillas disponibles
 // GET  /api/business-types/actual — plantilla activa del tenant
-// POST /api/business-types/seleccionar — cambia la plantilla activa (slug en body)
-app.get("/api/business-types", requireAuth, (req, res) => {
-  try { res.json(getAllBusinessTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 app.get("/api/business-types/actual", requireAuth, (req, res) => {
   try {
     const slug = getBusinessTypeSlug();
@@ -824,30 +797,11 @@ app.get("/api/business-types/actual", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/business-types/seleccionar", requireAuth, (req, res) => {
-  try {
-    const { slug } = req.body;
-    if (!slug) return res.status(400).json({ error: "Falta slug" });
-    const bt = getBusinessType(slug);
-    if (!bt) return res.status(404).json({ error: "Plantilla no encontrada" });
-    run("UPDATE configuracion SET valor=? WHERE clave='business_type_slug'", [slug]);
-    invalidarCacheItemTypes();
-    invalidarCacheCortes();
-    res.json({ ok: true, slug });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── ITEM TYPES (tipos de ítem del negocio actual) ─────────────────────────────
 // GET    /api/item-types           — lista los item_types del negocio activo
-// POST   /api/item-types           — crear nuevo item_type
 // PUT    /api/item-types/:slug     — editar item_type existente
-// DELETE /api/item-types/:slug     — eliminar item_type
 app.get("/api/item-types", requireAuth, (req, res) => {
   try { res.json(getItemTypes()); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post("/api/item-types", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'Las presentaciones se definen exclusivamente en el módulo Giro' });
 });
 
 app.put("/api/item-types/:id", requireAuth, (req, res) => {
@@ -862,26 +816,7 @@ app.put("/api/item-types/:id", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete("/api/item-types/:id", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'Las presentaciones del Giro no se eliminan; únicamente se desactivan' });
-});
-
-// GET /api/business-types/:slug/productos — productos-plantilla de una plantilla específica
-app.get("/api/business-types/:slug/productos", requireAuth, (req, res) => {
-  try { res.json(getTemplateProducts(req.params.slug)); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// GET /api/business-types/products — productos del catálogo del giro activo del tenant
-app.get("/api/business-types/products", requireAuth, (req, res) => {
-  try {
-    const slug = getBusinessTypeSlug();
-    res.json(getTemplateProducts(slug));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── CORTES ────────────────────────────────────────────────────────────────────
-const { invalidarCacheCortesBD } = require("../db/cortes");
-
 // GET /api/cortes — todos los cortes del giro (incluye inactivos)
 app.get("/api/cortes", requireAuth, (req, res) => {
   try { res.json(catalogoTenant.getCortesTenant()); } catch (e) { res.status(500).json({ error: e.message }); }
@@ -952,7 +887,6 @@ app.put("/api/menu-items/:id", requireAuth, (req, res) => {
 // DELETE /api/menu-items/:id — soft delete
 app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
-  const item = queryOne("SELECT producto_slug,categoria FROM menu_items WHERE id=?", [id]);
   run("UPDATE menu_items SET eliminado=1 WHERE id=?", [id]);
   invalidarCacheCortes();
   res.json({ ok: true });
@@ -1009,7 +943,7 @@ app.get("/api/formatos", requireAuth, (req, res) => {
 app.put("/api/formatos/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Formato no definido por el giro activo' });
-  const { precio_base, activo, cascade } = req.body;
+  const { precio_base, activo } = req.body;
   try {
     const { run } = require("../db/core");
     if (precio_base !== undefined) {

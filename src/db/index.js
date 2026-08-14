@@ -69,40 +69,16 @@ module.exports = {
   getTipoServicio:         config.getTipoServicio,
 
   // business types & item types
-  getAllBusinessTypes:     businessTypes.getAllBusinessTypes,
   getBusinessType:         businessTypes.getBusinessType,
-  createBusinessType:      businessTypes.createBusinessType,
-  updateBusinessType:      businessTypes.updateBusinessType,
   getBusinessTypeSlug:     businessTypes.getBusinessTypeSlug,
   getItemTypes:            businessTypes.getItemTypes,
-  getItemTypeBySlug:       businessTypes.getItemTypeBySlug,
-  createItemType:          businessTypes.createItemType,
-  updateItemType:          businessTypes.updateItemType,
-  deleteItemType:          businessTypes.deleteItemType,
   invalidarCacheItemTypes: businessTypes.invalidarCacheItemTypes,
-  getTemplateProducts:     businessTypes.getTemplateProducts,
 
   // cortes (catálogo de cortes/ingredientes — nuevo modelo)
   getCortesBD:              cortesDB.getCortesBD,
-  getCortesBDObj:           cortesDB.getCortesBDObj,
-  getAllCortesBD:            cortesDB.getAllCortesBD,
-  getPrecioCorteFormato:    cortesDB.getPrecioCorteFormato,
-  calcularPrecioMixto:      cortesDB.calcularPrecioMixto,
-  invalidarCacheCortesBD:   cortesDB.invalidarCacheCortesBD,
-  createCorte:              cortesDB.createCorte,
-  updateCorte:              cortesDB.updateCorte,
 
   // menu_items (menú activo configurado por el tenant)
   getMenuItems:        modelos.getMenuItems,
-
-  // productos (bebidas/salsas — cortes migrados a tabla cortes)
-  getProductos:        modelos.getProductos,
-  getProducto:         modelos.getProducto,
-  updateProducto:      modelos.updateProducto,
-  createProducto:      modelos.createProducto,
-  deleteProducto:      modelos.deleteProducto,
-  setProductoActivo:   modelos.setProductoActivo,
-  updateProductoPrecio: modelos.updateProductoPrecio,
 
   // clientes
   getCliente:          modelos.getCliente,

@@ -5,7 +5,7 @@
  */
 
 const { getPrecios, calcularPrecioItem, calcularSubtotal } = require("./precios");
-const { getConfig, getProductos } = require("../db");
+const { getConfig } = require("../db");
 const { calcularTarifaDomicilio } = require("../geo");
 
 // ── HELPERS DE CONFIG ─────────────────────────────────────────────────────────

@@ -3,9 +3,7 @@
 // El token se lee desde la config del tenant (pasarela_config) y APP_URL desde admin.db.
 
 const { MercadoPagoConfig, Preference, Payment } = require("mercadopago");
-const {
-  guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
-} = require("../db");
+const { getAppUrl, fechaExpiracion, registrarContextoPago, consumirContextoPago } = require('./contexto');
 
 function _getToken() {
   try {
@@ -16,18 +14,6 @@ function _getToken() {
   return process.env.MERCADOPAGO_ACCESS_TOKEN || null;
 }
 
-function _getAppUrl() {
-  try {
-    const { getConfig } = require('../db/config');
-    const tenantUrl = getConfig('public_url');
-    if (tenantUrl) return tenantUrl.replace(/\/$/, '');
-    const { getAppUrl } = require('../db/admin');
-    return getAppUrl() || process.env.APP_URL || '';
-  } catch (_) {
-    return process.env.APP_URL || '';
-  }
-}
-
 function getCliente() {
   const token = _getToken();
   if (!token) return null;
@@ -36,7 +22,7 @@ function getCliente() {
 
 function estaConfigurado() {
   const { getPasarelaActiva } = require('../db/config');
-  return getPasarelaActiva() === 'mercadopago' && !!_getToken() && !!_getAppUrl();
+  return getPasarelaActiva() === 'mercadopago' && !!_getToken() && !!getAppUrl();
 }
 
 async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resumen, nombre }) {
@@ -52,16 +38,14 @@ async function crearEnlacePago({ pedidoId, total, negocio, jid, telefono, resume
         unit_price: Math.round(total * 100) / 100,
         currency_id: "MXN",
       }],
-      notification_url:  `${_getAppUrl()}/webhook/mercadopago`,
+      notification_url:  `${getAppUrl()}/webhook/mercadopago`,
       external_reference: String(pedidoId),
       expires:            true,
-      expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expiration_date_to: fechaExpiracion().toISOString(),
     },
   });
 
-  // expiraEn en UTC ISO sin milisegundos — compatible con datetime('now') de SQLite
-  const expiraEn = new Date(Date.now() + 30 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  guardarPagoPendiente(String(pedidoId), { jid, telefono, resumen, nombre }, expiraEn);
+  registrarContextoPago(pedidoId, { jid, telefono, resumen, nombre });
   return resultado.init_point;
 }
 
@@ -74,12 +58,8 @@ async function procesarPago(paymentId) {
 
   if (pago.status !== "approved") return null;
 
-  limpiarPagosPendientesExpirados();
   const pedidoId = String(pago.external_reference);
-  const pendiente = obtenerPagoPendiente(pedidoId);
-  eliminarPagoPendiente(pedidoId);
-
-  return { pedidoId, aprobado: true, sinContexto: !pendiente, ...(pendiente || {}) };
+  return consumirContextoPago(pedidoId);
 }
 
 module.exports = { estaConfigurado, crearEnlacePago, procesarPago };

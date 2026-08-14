@@ -22,6 +22,7 @@ const {
 } = require("./utils");
 const { despacharConDelay } = require("../mandaditos");
 const trazabilidad = require('../../db/observabilidad');
+const { dividirNombreCompleto } = require('../../clientes/nombre');
 
 // ── HELPERS GIRO-AWARE ────────────────────────────────────────────────────────
 
@@ -355,12 +356,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     let pedidoMpId = null;
     try {
       const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
-      const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
-      const partes = nombreCompleto.split(/\s+/);
-      let nombre, apellido;
-      if (partes.length === 1)      { nombre = partes[0];                    apellido = null; }
-      else if (partes.length === 2) { nombre = partes[0];                    apellido = partes[1]; }
-      else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
+      const { nombre, apellido } = dividirNombreCompleto(infoPedido.nombre);
       const camposCliente = datosCampos.get(clienteNumero) || {};
       const cliente = upsertCliente({
         nombre, apellido, telefono: telefonoLimpio,
@@ -441,12 +437,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   let _coloniaTxt = '';
   try {
     const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
-    const nombreCompleto = (infoPedido.nombre || "Cliente").trim();
-    const partes = nombreCompleto.split(/\s+/);
-    let nombre, apellido;
-    if (partes.length === 1)      { nombre = partes[0];                   apellido = null; }
-    else if (partes.length === 2) { nombre = partes[0];                   apellido = partes[1]; }
-    else                          { nombre = partes.slice(0, 2).join(" "); apellido = partes.slice(2).join(" "); }
+    const { nombre, apellido } = dividirNombreCompleto(infoPedido.nombre);
     const camposCliente = datosCampos.get(clienteNumero) || {};
     _coloniaNoVerif = !!camposCliente._coloniaNoVerificada;
     _coloniaTxt     = camposCliente.colonia || '';

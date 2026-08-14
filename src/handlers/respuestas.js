@@ -2,7 +2,7 @@
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
-const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes, getMenuItems, getTipoServicio } = require("../db");
+const { getConfig, getMensaje, getHorarios, getBanco, getItemTypes, getMenuItems, getTipoServicio } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");

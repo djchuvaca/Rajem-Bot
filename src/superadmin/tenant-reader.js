@@ -324,7 +324,7 @@ function updateTenantSolicitudGeo(tenant, id, { estado, respuesta }) {
   try {
     db.prepare('UPDATE solicitudes_geo SET estado=?, respuesta=? WHERE id=?')
       .run(estado, respuesta || null, id);
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -357,7 +357,7 @@ function applyTenantGeoSolicitud(tenant, solicitud) {
         if (datos[clave] !== undefined) stmt.run(clave, String(datos[clave]));
       }
     }
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -378,7 +378,7 @@ function updateTenantRepartidor(tenant, id, { nombre, activo }) {
   try {
     if (nombre !== undefined) db.prepare('UPDATE repartidores SET nombre=? WHERE id=?').run(nombre, id);
     if (activo !== undefined) db.prepare('UPDATE repartidores SET activo=? WHERE id=?').run(activo ? 1 : 0, id);
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -389,7 +389,7 @@ function deleteTenantRepartidor(tenant, id) {
   if (!db) return false;
   try {
     db.prepare('DELETE FROM repartidores WHERE id=?').run(id);
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -413,7 +413,7 @@ function setTenantMandaditosConfig(tenant, config) {
     for (const clave of claves) {
       if (config[clave] !== undefined) stmt.run(clave, String(parseInt(config[clave], 10) || 0));
     }
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }

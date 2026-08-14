@@ -4,7 +4,7 @@
  * Fuente de verdad para NLU y pricing desde el rediseño multi-giro.
  */
 
-const { queryAll, queryOne, run } = require('./core');
+const { queryAll, queryOne } = require('./core');
 
 const _TTL = 60_000;
 
@@ -80,15 +80,6 @@ function getCortesBDObj() {
   } catch (_) { return []; }
 }
 
-/** Todos los cortes del giro (activos e inactivos). Para el panel. */
-function getAllCortesBD() {
-  try {
-    const giroId = _getGiroId();
-    if (!giroId) return [];
-    return queryAll('SELECT * FROM cortes WHERE giro_id = ? ORDER BY activo DESC, id', [giroId]) || [];
-  } catch (_) { return []; }
-}
-
 /**
  * Precio de un corte para un formato específico.
  * Cadena de fallback: precios_json[formato] → precio_base → config global.
@@ -122,30 +113,8 @@ function calcularPrecioMixto(cortesSlugs, formatoSlug) {
 
 function invalidarCacheCortesBD() { _invalidar(); }
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
-
-function createCorte(datos) {
-  const giroId = _getGiroId();
-  if (!giroId) throw new Error('giro no configurado');
-  const slug = datos.slug || datos.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-  run(
-    'INSERT OR IGNORE INTO cortes (giro_id, slug, nombre, aliases_json, descripcion, precio_base, precios_json, activo) VALUES (?,?,?,?,?,?,?,?)',
-    [giroId, slug, datos.nombre, JSON.stringify(datos.aliases || []), datos.descripcion || '', datos.precio_base || 30, JSON.stringify(datos.precios || {}), datos.activo ?? 1]
-  );
-  _invalidar();
-}
-
-function updateCorte(id, datos) {
-  run(
-    'UPDATE cortes SET nombre=?, aliases_json=?, descripcion=?, precio_base=?, precios_json=?, activo=? WHERE id=?',
-    [datos.nombre, JSON.stringify(datos.aliases || []), datos.descripcion || '', datos.precio_base || 30, JSON.stringify(datos.precios || {}), datos.activo ?? 1, id]
-  );
-  _invalidar();
-}
-
 module.exports = {
-  getCortesBD, getCortesBDObj, getAllCortesBD,
+  getCortesBD, getCortesBDObj,
   getPrecioCorteFormato, calcularPrecioMixto,
   invalidarCacheCortesBD,
-  createCorte, updateCorte,
 };

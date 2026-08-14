@@ -1,33 +1,10 @@
 const { queryAll, queryOne, run } = require("./core");
 
-// ─── PRODUCTOS ────────────────────────────────────────────────────────────────
-function getProductos() {
-  return queryAll("SELECT * FROM productos WHERE activo = 1");
-}
-
 // ─── MENU ITEMS (menú configurado por el tenant desde el panel) ───────────────
 function getMenuItems(categoria = null) {
   const where  = categoria ? "WHERE eliminado=0 AND activo=1 AND categoria=?" : "WHERE eliminado=0 AND activo=1";
   const params = categoria ? [categoria] : [];
   return queryAll(`SELECT * FROM menu_items ${where} ORDER BY categoria, producto_slug`, params) || [];
-}
-function getProducto(nombre) {
-  return queryOne("SELECT * FROM productos WHERE nombre = ? AND activo = 1", [nombre.toLowerCase()]);
-}
-function updateProducto(id, datos) {
-  run(
-    "UPDATE productos SET nombre=?, descripcion=?, precio_taco=?, precio_torta=?, precio_100g=?, activo=?, sinonimos=? WHERE id=?",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.activo, datos.sinonimos || '', id]
-  );
-}
-function createProducto(datos) {
-  run(
-    "INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, catalogo_slug) VALUES (?,?,?,?,?,?,?,?)",
-    [datos.nombre, datos.descripcion, datos.precio_taco, datos.precio_torta, datos.precio_100g, datos.sinonimos || '', datos.categoria || 'corte', datos.catalogo_slug || null]
-  );
-}
-function deleteProducto(id) {
-  run("UPDATE productos SET activo = 0 WHERE id = ?", [id]);
 }
 
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
@@ -121,17 +98,6 @@ function updatePedidoEstado(id, estado) {
 }
 function deletePedido(id) {
   run("DELETE FROM pedidos WHERE id = ?", [id]);
-}
-
-function setProductoActivo(nombre, activo) {
-  run("UPDATE productos SET activo = ? WHERE LOWER(nombre) = LOWER(?)", [activo ? 1 : 0, nombre]);
-}
-
-function updateProductoPrecio(nombre, precioTaco, precioTorta) {
-  run(
-    "UPDATE productos SET precio_taco = ?, precio_torta = ? WHERE LOWER(nombre) = LOWER(?)",
-    [precioTaco, precioTorta, nombre]
-  );
 }
 
 function getTopClientes(limit = 10) {
@@ -261,12 +227,11 @@ function getDespachosPendientes() {
 }
 
 module.exports = {
-  getProductos, getProducto, updateProducto, createProducto, deleteProducto,
   getMenuItems,
   getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
   registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha, getStatsReporte,
-  setProductoActivo, updateProductoPrecio, getTopClientes,
+  getTopClientes,
   guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,
   guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes,
 };

@@ -8,7 +8,7 @@ const {
   esperandoExtras, ordenPreResumen, datosCampos, limpiarTodo,
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
-const { getProductos, getConfig, getMenuItems, getCortesBDObj } = require("../../db");
+const { getConfig } = require("../../db");
 const { textoANumero, getCortes, buscarCorteFuzzy, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
 const trazabilidad = require('../../db/observabilidad');
 

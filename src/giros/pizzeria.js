@@ -58,31 +58,6 @@ module.exports = {
       descripcion: 'Champiñones, pimiento, cebolla, aceituna y elote.' },
   ],
 
-  // Productos-plantilla para provisioning
-  productos: [
-    { nombre: 'hawaiana',      categoria: 'corte', precio_taco: 120, precio_torta: 200, precio_100g: 0,
-      sinonimos: 'hawaii,piña y jamon,tropical',
-      descripcion: 'Piña fresca y jamón sobre salsa de tomate y queso fundido.' },
-    { nombre: 'pepperoni',     categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0,
-      sinonimos: 'peperoni,peperon',
-      descripcion: 'Rodajas generosas de pepperoni sobre queso mozzarella.' },
-    { nombre: 'mexicana',      categoria: 'corte', precio_taco: 130, precio_torta: 220, precio_100g: 0,
-      sinonimos: 'con jalapeños,picante,picosa',
-      descripcion: 'Jalapeños, chorizo y cebolla morada.' },
-    { nombre: 'margarita',     categoria: 'corte', precio_taco: 110, precio_torta: 190, precio_100g: 0,
-      sinonimos: 'margherita,marguerita',
-      descripcion: 'La clásica italiana: jitomate, mozzarella y albahaca.' },
-    { nombre: 'cuatro quesos', categoria: 'corte', precio_taco: 140, precio_torta: 240, precio_100g: 0,
-      sinonimos: '4 quesos,quatro quesos',
-      descripcion: 'Mezcla de cuatro quesos selectos.' },
-    { nombre: 'carnes',        categoria: 'corte', precio_taco: 150, precio_torta: 260, precio_100g: 0,
-      sinonimos: 'de carnes,carne mixta',
-      descripcion: 'Pepperoni, chorizo y jamón.' },
-    { nombre: 'vegetariana',   categoria: 'corte', precio_taco: 120, precio_torta: 210, precio_100g: 0,
-      sinonimos: 'veggie,sin carne,vegetal',
-      descripcion: 'Champiñones, pimiento, cebolla, aceituna y elote.' },
-  ],
-
   vocabulario: {
     corte:         'sabor',
     cortes:        'sabores',

@@ -55,25 +55,6 @@ module.exports = {
       descripcion: 'Carne de res, piña a la plancha, jamón y queso manchego.' },
   ],
 
-  // Productos-plantilla para provisioning
-  productos: [
-    { nombre: 'clásica',  categoria: 'corte', precio_taco: 90,  precio_torta: 130, precio_100g: 0,
-      sinonimos: 'clasica,original,normal,la clasica',
-      descripcion: 'Carne de res, queso americano, lechuga, jitomate y catsup.' },
-    { nombre: 'BBQ',      categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0,
-      sinonimos: 'bbq,barbecue,barbeque,a la parrilla',
-      descripcion: 'Carne de res, salsa BBQ casera, cebolla caramelizada y tocino.' },
-    { nombre: 'chipotle', categoria: 'corte', precio_taco: 100, precio_torta: 150, precio_100g: 0,
-      sinonimos: 'chipotl,chipot',
-      descripcion: 'Carne de res, salsa chipotle, jalapeños y queso manchego.' },
-    { nombre: 'crispy',   categoria: 'corte', precio_taco: 95,  precio_torta: 140, precio_100g: 0,
-      sinonimos: 'crujiente,crunchy,pollo crujiente,pollo crispy',
-      descripcion: 'Pechuga de pollo empanizada crujiente con mayonesa de ajo.' },
-    { nombre: 'especial', categoria: 'corte', precio_taco: 110, precio_torta: 160, precio_100g: 0,
-      sinonimos: 'la especial,la de la casa,de la casa,especial de la casa',
-      descripcion: 'Doble carne, tocino, queso derretido y salsa secreta.' },
-  ],
-
   vocabulario: {
     corte:         'variante',
     cortes:        'variantes',

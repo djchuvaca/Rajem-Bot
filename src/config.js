@@ -1,4 +1,4 @@
-﻿const { getConfig, getBanco, getMensaje, getProductos, getItemTypes, getMenuItems } = require("./db");
+﻿const { getConfig, getBanco, getMensaje, getItemTypes } = require("./db");
 const { getPrecios } = require("./pedido/precios");
 const { getRangoHorario } = require("./horario");
 const { getGiroActivo } = require("./giros");
