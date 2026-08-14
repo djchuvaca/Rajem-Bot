@@ -243,6 +243,7 @@ async function seedDB() {
     ["nombre_negocio",           process.env.NOMBRE_NEGOCIO || "Mi Negocio"],
     ["domicilio_costo",          "50"],
     ["geo_tarifa_aproximada",    "0"],
+    ["geo_radio_cobertura_km",   ""],
     ["moneda",                   "$"],
     ["grupo_id",                 process.env.GRUPO_ID || ""],
     ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],

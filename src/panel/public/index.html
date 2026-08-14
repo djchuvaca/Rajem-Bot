@@ -766,6 +766,18 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
         <div id="zonas-list"></div>
       </div>
       <div class="card">
+        <div class="card-title">📐 Radio de cobertura</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Define la distancia máxima de servicio desde tu negocio. Al aplicarla, las colonias fuera del radio se desactivarán solo para este negocio.</p>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+          <div class="form-group" style="margin:0;max-width:220px">
+            <label class="form-label">Distancia máxima (km)</label>
+            <input class="form-input" id="geo-radio-cobertura" type="number" min="0.1" max="100" step="0.1" placeholder="Ej: 8">
+          </div>
+          <button class="btn btn-primary" onclick="aplicarRadioCobertura()">Aplicar cobertura</button>
+          <span id="geo-radio-resumen" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
           <div class="card-title" style="margin:0">🏘️ Colonias registradas</div>
           <div style="display:flex;gap:8px;align-items:center">
@@ -2253,8 +2265,9 @@ async function loadEnvios() {
   const colonia    = get('negocio_colonia');
   const referencia = get('negocio_referencia');
   const costo      = get('domicilio_costo');
+  const radio      = get('geo_radio_cobertura_km');
 
-  _geoConfig = { negocio_lat: lat, negocio_lon: lon, negocio_calle: calle, negocio_colonia: colonia, negocio_referencia: referencia, domicilio_costo: costo };
+  _geoConfig = { negocio_lat: lat, negocio_lon: lon, negocio_calle: calle, negocio_colonia: colonia, negocio_referencia: referencia, domicilio_costo: costo, geo_radio_cobertura_km: radio };
 
   const _setText = (id, val, fallback = '—') => {
     const el = document.getElementById(id);
@@ -2266,6 +2279,9 @@ async function loadEnvios() {
   _setText('negocio-colonia',    colonia);
   _setText('negocio-referencia', referencia || 'Sin referencia');
   _setText('env-domicilio-costo', costo ? `$${costo}` : '—');
+  const radioInput = document.getElementById('geo-radio-cobertura');
+  if (radioInput) radioInput.value = radio || '';
+  _setText('geo-radio-resumen', radio ? `Cobertura actual: ${radio} km` : 'Sin límite configurado; todas las colonias están activas inicialmente');
 
   _zonasData    = await api('/api/tarifas-zonas');
   _coloniasData = await api('/api/colonias');
@@ -2273,6 +2289,21 @@ async function loadEnvios() {
   const siNombre = document.getElementById('si-nombre');
   if (siNombre) { siNombre.textContent = ' ▲'; siNombre.closest('th').classList.add('sort-active'); }
   filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
+}
+
+async function aplicarRadioCobertura() {
+  const input = document.getElementById('geo-radio-cobertura');
+  const radio = parseFloat(input?.value || '');
+  if (!Number.isFinite(radio) || radio <= 0 || radio > 100) return toast('Indica una distancia mayor a 0 y máxima de 100 km', false);
+  if (!_geoConfig.negocio_lat || !_geoConfig.negocio_lon) return toast('Primero solicita que se configuren las coordenadas del negocio', false);
+  if (!confirm(`Se activarán solo las colonias ubicadas hasta ${radio} km del negocio. ¿Continuar?`)) return;
+  const r = await api('/api/colonias/cobertura', 'PUT', { radio_km: radio });
+  if (!r.ok) return toast(r.error || 'No fue posible aplicar la cobertura', false);
+  _geoConfig.geo_radio_cobertura_km = String(r.radioKm);
+  document.getElementById('geo-radio-resumen').textContent = `${r.activas} colonias activas y ${r.inactivas} fuera de cobertura`;
+  _coloniasData = await api('/api/colonias');
+  filtrarColonias(document.getElementById('buscar-colonia')?.value || '');
+  toast(`Cobertura de ${r.radioKm} km aplicada`);
 }
 
 function renderZonas() {

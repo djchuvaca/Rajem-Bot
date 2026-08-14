@@ -694,6 +694,27 @@ app.get("/api/colonias", requireAuth, (req, res) => {
   res.json(colonias.map(c => ({ ...c, distancia: null, zona_actual: null })));
 });
 
+app.put("/api/colonias/cobertura", requireAuth, (req, res) => {
+  const tenantId = process.env.TENANT_ID || '';
+  let tenant = null;
+  try {
+    const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/tenants.json'), 'utf8'));
+    tenant = geoTepic.resolverTenant(registry.tenants || [], tenantId, getBsdb()?.name || '');
+  } catch (_) {}
+  if (!tenant || !geoTepic.esTenantTepic(tenant)) return res.status(403).json({ error: "GeoTepic solo está disponible para tenants de Tepic, Nayarit" });
+  try {
+    const resultado = geoTepic.aplicarRadioCobertura(
+      tenant,
+      parseFloat(getConfig('negocio_lat') || ''),
+      parseFloat(getConfig('negocio_lon') || ''),
+      req.body.radio_km
+    );
+    invalidarCacheColonias();
+    invalidarCacheConfig();
+    res.json({ ok: true, ...resultado });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // Las colonias se crean/editan/eliminan solo desde el super-admin.
 // El tenant solo puede activar o desactivar su entrega a cada colonia.
 app.put("/api/colonias/:id/activo", requireAuth, (req, res) => {
@@ -703,6 +724,16 @@ app.put("/api/colonias/:id/activo", requireAuth, (req, res) => {
   if (!local?.geo_tepic_id) return res.status(404).json({ error: "Colonia GeoTepic no encontrada" });
   if (activo && !geoTepic.listarColonias({ incluirInactivas: false }).some(c => c.id === local.geo_tepic_id)) {
     return res.status(403).json({ error: "La colonia está deshabilitada en GeoTepic" });
+  }
+  const radio = parseFloat(getConfig('geo_radio_cobertura_km') || '');
+  if (activo && Number.isFinite(radio) && radio > 0) {
+    const colonia = queryOne('SELECT lat,lon FROM colonias WHERE id=?', [parseInt(req.params.id)]);
+    const lat = parseFloat(getConfig('negocio_lat') || '');
+    const lon = parseFloat(getConfig('negocio_lon') || '');
+    const { haversine } = require('../geo');
+    if (colonia && Number.isFinite(lat) && Number.isFinite(lon) && haversine(lat, lon, colonia.lat, colonia.lon) > radio) {
+      return res.status(403).json({ error: `Esta colonia está fuera del radio de cobertura de ${radio} km` });
+    }
   }
   run("UPDATE colonias SET activo=? WHERE id=? AND geo_tepic_id IS NOT NULL", [activo ? 1 : 0, parseInt(req.params.id)]);
   invalidarCacheColonias();

@@ -213,11 +213,17 @@ function sincronizarTenant(tenant) {
     ]) { try { db.exec(sql); } catch (_) {} }
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_colonias_geo_tepic_id ON colonias(geo_tepic_id) WHERE geo_tepic_id IS NOT NULL');
     const master = _catalogo();
+    const configCobertura = Object.fromEntries(db.prepare("SELECT clave,valor FROM configuracion WHERE clave IN ('geo_radio_cobertura_km','negocio_lat','negocio_lon')").all().map(c => [c.clave, c.valor]));
+    const radioConfigurado = Number(configCobertura.geo_radio_cobertura_km);
+    const negocioLat = Number(configCobertura.negocio_lat);
+    const negocioLon = Number(configCobertura.negocio_lon);
+    const activoInicial = c => c.activo && (!(radioConfigurado > 0) || !Number.isFinite(negocioLat) || !Number.isFinite(negocioLon) || _haversine(negocioLat, negocioLon, c.lat, c.lon) <= radioConfigurado);
     const porSlug = db.prepare('SELECT id, activo FROM colonias WHERE slug=?');
     const porNombre = db.prepare('SELECT id, activo FROM colonias WHERE lower(nombre)=lower(?)');
     const link = db.prepare('UPDATE colonias SET geo_tepic_id=?,nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=?,codigo_postal=?,fuente_coordenadas=?,precision_coordenadas=?,confianza=?,verificada=?,grupo_ambiguedad=? WHERE id=?');
     const update = db.prepare('UPDATE colonias SET nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=?,codigo_postal=?,fuente_coordenadas=?,precision_coordenadas=?,confianza=?,verificada=?,grupo_ambiguedad=? WHERE geo_tepic_id=?');
-    const insert = db.prepare(`INSERT INTO colonias (nombre,slug,tipo,lat,lon,aliases,codigo_postal,fuente_coordenadas,precision_coordenadas,confianza,verificada,grupo_ambiguedad,activo,geo_tepic_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?)`);
+    const insert = db.prepare(`INSERT INTO colonias (nombre,slug,tipo,lat,lon,aliases,codigo_postal,fuente_coordenadas,precision_coordenadas,confianza,verificada,grupo_ambiguedad,activo,geo_tepic_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const activacionInicialPendiente = !db.prepare("SELECT 1 FROM configuracion WHERE clave='geo_colonias_inicializadas_v2'").get();
     db.transaction(() => {
       for (const c of master) {
         const existingLinked = db.prepare('SELECT id FROM colonias WHERE geo_tepic_id=?').get(c.id);
@@ -225,15 +231,59 @@ function sincronizarTenant(tenant) {
         else {
           const legacy = porSlug.get(c.slug) || porNombre.get(c.nombre);
           if (legacy) link.run(c.id, c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, legacy.id);
-          else insert.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, c.id);
+          else insert.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, activoInicial(c) ? 1 : 0, c.id);
         }
         if (!c.activo) db.prepare('UPDATE colonias SET activo=0 WHERE geo_tepic_id=?').run(c.id);
       }
       db.prepare(`UPDATE colonias SET activo=0 WHERE geo_tepic_id IS NOT NULL AND geo_tepic_id NOT IN (${master.map(() => '?').join(',') || 'NULL'})`)
         .run(...master.map(c => c.id));
+      if (activacionInicialPendiente) {
+        const idsActivos = master.filter(activoInicial).map(c => c.id);
+        db.prepare(`UPDATE colonias SET activo=1 WHERE geo_tepic_id IN (${idsActivos.map(() => '?').join(',') || 'NULL'})`).run(...idsActivos);
+        db.prepare("INSERT OR REPLACE INTO configuracion (clave,valor) VALUES ('geo_colonias_inicializadas_v2','1')").run();
+      }
     })();
     return master.length;
   } finally { db.close(); }
+}
+
+function aplicarRadioCobertura(tenant, negocioLat, negocioLon, radioKm) {
+  if (!esTenantTepic(tenant)) throw new Error('GeoTepic solo está disponible para tenants de Tepic, Nayarit');
+  const lat = Number(negocioLat);
+  const lon = Number(negocioLon);
+  const radio = Number(radioKm);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) throw new Error('Configura coordenadas válidas para el negocio antes de aplicar el radio');
+  if (!Number.isFinite(radio) || radio <= 0 || radio > 100) throw new Error('El radio debe ser mayor a 0 y máximo de 100 km');
+
+  sincronizarTenant(tenant);
+  const masterActivas = new Set(_catalogo().filter(c => c.activo).map(c => c.id));
+  const db = new Database(_tenantPath(tenant));
+  db.pragma('busy_timeout = 5000');
+  try {
+    const colonias = db.prepare('SELECT id,geo_tepic_id,lat,lon FROM colonias WHERE geo_tepic_id IS NOT NULL').all();
+    const actualizar = db.prepare('UPDATE colonias SET activo=? WHERE id=?');
+    let activas = 0;
+    let inactivas = 0;
+    db.transaction(() => {
+      for (const colonia of colonias) {
+        const distancia = _haversine(lat, lon, Number(colonia.lat), Number(colonia.lon));
+        const activo = masterActivas.has(colonia.geo_tepic_id) && distancia <= radio;
+        actualizar.run(activo ? 1 : 0, colonia.id);
+        if (activo) activas++; else inactivas++;
+      }
+      db.prepare("INSERT OR REPLACE INTO configuracion (clave,valor) VALUES ('geo_radio_cobertura_km',?)").run(String(radio));
+    })();
+    return { radioKm: radio, activas, inactivas, total: colonias.length };
+  } finally { db.close(); }
+}
+
+function _haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const rad = grados => grados * Math.PI / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLon = rad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function listarParaTenant(tenant) {
@@ -258,4 +308,4 @@ function activarEnTenant(tenant, geoTepicId, activo) {
   finally { db.close(); }
 }
 
-module.exports = { esTenantTepic, resolverTenant, inicializarDesdeTenants, sincronizarCatalogoMaestro, respaldarCatalogoMaestro, listarColonias, guardarColonia, eliminarColonia, restaurarColonia, listarAuditoria, sincronizarTenant, listarParaTenant, activarEnTenant };
+module.exports = { esTenantTepic, resolverTenant, inicializarDesdeTenants, sincronizarCatalogoMaestro, respaldarCatalogoMaestro, listarColonias, guardarColonia, eliminarColonia, restaurarColonia, listarAuditoria, sincronizarTenant, listarParaTenant, activarEnTenant, aplicarRadioCobertura };
