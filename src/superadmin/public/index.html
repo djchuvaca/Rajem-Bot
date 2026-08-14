@@ -742,7 +742,7 @@ async function loadDashboard() {
     const plan = `<span class="badge badge-blue">${t.plan}</span>`;
     return `<div class="card">
       <div class="card-header"><div class="card-title">${s.nombre_negocio||t.nombre}</div>${badge}</div>
-      <div style="display:flex;gap:6px;margin-bottom:10px">${plan}${ia}</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">${plan}</div>
       <div class="stat-row">Pedidos hoy <span>${s.pedidos_hoy||0}</span></div>
       <div class="stat-row">Confirmados hoy <span>${s.confirmados_hoy||0}</span></div>
       <div class="stat-row">Ventas hoy <span>$${s.ventas_hoy||0}</span></div>
@@ -801,10 +801,12 @@ async function editTenant(id) {
   document.getElementById('mt-nombre').value=t.nombre;
   document.getElementById('mt-ciudad').value=t.ciudad; document.getElementById('mt-estado').value=t.estado;
   document.getElementById('mt-grupo').value='';
-  document.getElementById('mt-plan').value=t.plan;
+  document.getElementById('mt-plan').value=t.plan||'basico';
   document.getElementById('mt-business-type').value = t.business_type || 'taqueria';
+  document.getElementById('mt-seccion-taqueria').value = t.seccion_taqueria || 'ambas';
   document.getElementById('mt-notas').value=t.notas||'';
   document.getElementById('mt-btn').textContent = 'Guardar cambios';
+  _mtToggleSeccion();
   openModal('modal-tenant');
 }
 async function saveTenant() {
@@ -818,9 +820,12 @@ async function saveTenant() {
     db_path:       `data/${id}.db`,
     panel_port:    0,
     desde:         new Date().toISOString().slice(0,10),
-    plan:          document.getElementById('mt-plan').value,
-    business_type: document.getElementById('mt-business-type').value,
-    notas:         document.getElementById('mt-notas').value.trim(),
+    plan:             document.getElementById('mt-plan').value,
+    business_type:    document.getElementById('mt-business-type').value,
+    seccion_taqueria: document.getElementById('mt-business-type').value === 'taqueria'
+                        ? document.getElementById('mt-seccion-taqueria').value
+                        : null,
+    notas:            document.getElementById('mt-notas').value.trim(),
   };
   const url    = _editingTenantId ? `/api/tenants/${_editingTenantId}` : '/api/tenants';
   const method = _editingTenantId ? 'PUT' : 'POST';
@@ -908,7 +913,11 @@ async function loadGeo() {
 }
 async function loadColonias() {
   if(!_geoTenant) return;
-  const r = await fetch(`/api/tenants/${_geoTenant}/colonias`); if(!r.ok) return;
+  const r = await fetch(`/api/tenants/${_geoTenant}/colonias`);
+  if(!r.ok) {
+    document.getElementById('colonias-tbody').innerHTML='<tr><td colspan="6" class="empty">Error al cargar colonias</td></tr>';
+    return;
+  }
   _colonias = await r.json();
   renderColonias();
 }
@@ -1386,8 +1395,10 @@ async function populateTenantSelects() {
   const r=await fetch('/api/tenants'); if(!r.ok) return;
   const data=await r.json();
   const opts=data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
-  document.getElementById('geo-tenant-select').innerHTML='<option value="">-- selecciona --</option>'+opts;
-  document.getElementById('tc-tenant-select').innerHTML='<option value="">-- selecciona --</option>'+opts;
+  const base='<option value="">-- selecciona --</option>'+opts;
+  document.getElementById('geo-tenant-select').innerHTML=base;
+  document.getElementById('tc-tenant-select').innerHTML=base;
+  document.getElementById('mand-tenant-select').innerHTML=base;
   loadTenants();
 }
 
@@ -1526,19 +1537,6 @@ async function loadHistorialReparto() {
     </tr>`).join('');
 }
 
-// Poblar select de mandaditos junto con los demás selects de tenant
-const _origPopulate = populateTenantSelects;
-document.addEventListener('DOMContentLoaded', () => {
-  const origFn = window.populateTenantSelects;
-});
-
-// Hook: cuando se abre la sección, poblar el select con la misma lista de tenants
-document.querySelector('[data-s="mandaditos"]').addEventListener('click', async () => {
-  const r = await fetch('/api/tenants'); if (!r.ok) return;
-  const data = await r.json();
-  const opts = data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
-  document.getElementById('mand-tenant-select').innerHTML = '<option value="">-- selecciona --</option>'+opts;
-});
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>

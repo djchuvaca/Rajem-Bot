@@ -96,9 +96,13 @@ app.get('/api/tenants', requireAuth, (req, res) => {
 });
 
 app.post('/api/tenants', requireAuth, (req, res) => {
-  const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas, business_type } = req.body;
+  const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas, business_type, seccion_taqueria } = req.body;
   if (!id || !nombre || !db_path) return res.status(400).json({ error: 'Faltan campos requeridos: id, nombre, db_path' });
-  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: plan || 'basico', desde: desde || new Date().toISOString().slice(0,10), notas: notas || '', business_type: business_type || 'taqueria' });
+  const planValido = ['basico', 'plus', 'pro'].includes(plan) ? plan : 'basico';
+  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: planValido, desde: desde || new Date().toISOString().slice(0,10), notas: notas || '', business_type: business_type || 'taqueria', seccion_taqueria: seccion_taqueria || null });
+  // Sincronizar plan a la BD del tenant si ya existe
+  const newTenant = getTenant(id);
+  if (newTenant) try { setTenantPlan(newTenant, planValido); } catch (_) {}
   res.json({ ok: true });
 });
 
