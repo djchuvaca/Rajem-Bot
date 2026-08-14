@@ -200,6 +200,7 @@ async function seedDB() {
       categoria     TEXT    NOT NULL DEFAULT 'corte',
       precio        REAL    DEFAULT 0,
       activo        INTEGER DEFAULT 1,
+      disponible    INTEGER DEFAULT 1,
       eliminado     INTEGER DEFAULT 0,
       precios_json  TEXT    DEFAULT '{}',
       created_at    TEXT    DEFAULT (datetime('now','localtime'))
@@ -216,6 +217,7 @@ async function seedDB() {
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_slug TEXT DEFAULT NULL"); } catch (_) {}
   try { db.run("ALTER TABLE item_types ADD COLUMN precio_base INTEGER DEFAULT 0"); } catch (_) {}
   try { db.run("ALTER TABLE cortes ADD COLUMN seccion TEXT DEFAULT 'carnitas'"); } catch (_) {}
+  try { db.run("ALTER TABLE menu_items ADD COLUMN disponible INTEGER DEFAULT 1"); } catch (_) {}
 
   // Migración: renombrar slug 'maciza' → 'carne' (v1.5 compat)
   try { db.run("UPDATE cortes SET slug='carne', nombre='Carne/Maciza', aliases_json='[\"carnitas\",\"carnita\",\"carne\",\"maciza\",\"masiza\",\"maciza de puerco\"]' WHERE slug='maciza'"); } catch (_) {}

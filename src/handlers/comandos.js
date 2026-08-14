@@ -170,7 +170,9 @@ async function handleComandos(msg, client) {
       `!reporte semana — últimos 7 días\n\n` +
       `*Menú y productos:*\n` +
       `!precios — ver precios del menú\n` +
-      `!precio [corte] [taco] [torta] — actualizar precio\n\n` +
+      `!precio [corte] [taco] [torta] — actualizar precio\n` +
+      `!agotado [corte] — ocultarlo temporalmente de WhatsApp\n` +
+      `!disponible [corte] — volver a mostrarlo en WhatsApp\n\n` +
       `*Negocio:*\n` +
       `!cerrar — cerrar el negocio manualmente hoy\n` +
       `!abrir — reabrir el negocio\n` +
@@ -944,6 +946,31 @@ async function handleComandos(msg, client) {
     }
     invalidarCacheCortes();
     await msg.reply(`✅ Precio de *${corte}* actualizado:\n🌮 Taco: $${precioTaco}  🥪 Torta: $${precioTorta}`);
+    return;
+  }
+
+  // Disponibilidad operativa. No altera la habilitación asignada por Superadmin.
+  if (/^!(agotado|disponible)\b/i.test(texto)) {
+    const disponible = /^!disponible\b/i.test(texto);
+    const corte = texto.split(/\s+/).slice(1).join(' ').toLowerCase().trim();
+    if (!corte) {
+      await msg.reply(`⚠️ Uso: *!${disponible ? 'disponible' : 'agotado'} [corte]*`);
+      return;
+    }
+    const def = catalogoTenant.getDefinicionProducto('corte', corte);
+    if (!def) {
+      await msg.reply(`⚠️ No encontré el corte *${corte}* en el Giro activo.`);
+      return;
+    }
+    const cambios = catalogoTenant.setMenuItemDisponibilidad(def.slug, 'corte', disponible);
+    if (!cambios) {
+      await msg.reply(`⚠️ *${def.nombre || corte}* no está habilitado por el Superadmin para este negocio.`);
+      return;
+    }
+    invalidarCacheCortes();
+    await msg.reply(disponible
+      ? `✅ *${def.nombre || corte}* está disponible y vuelve a mostrarse en WhatsApp.`
+      : `⛔ *${def.nombre || corte}* quedó agotado y se ocultó temporalmente de WhatsApp.`);
     return;
   }
 

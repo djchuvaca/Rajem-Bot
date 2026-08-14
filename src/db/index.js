@@ -77,7 +77,7 @@ module.exports = {
   // cortes (catálogo de cortes/ingredientes — nuevo modelo)
   getCortesBD:              cortesDB.getCortesBD,
 
-  // menu_items (menú activo configurado por el tenant)
+  // menu_items (habilitación del Superadmin + disponibilidad/precios del tenant)
   getMenuItems:        modelos.getMenuItems,
 
   // clientes

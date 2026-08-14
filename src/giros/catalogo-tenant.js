@@ -67,7 +67,7 @@ function esProductoValido(categoria, slug) {
 function esFormatoIdValido(id) { return getFormatosTenant({ todos: true }).some(x => x.id === id); }
 
 function getMenuItemsActivos(categoria = null) {
-  return getMenuItemsTenant(categoria).filter(i => i.activo);
+  return getMenuItemsTenant(categoria).filter(i => i.activo && i.disponible);
 }
 
 function getDefinicionProducto(categoria, slug) {
@@ -86,10 +86,20 @@ function getDefinicionProducto(categoria, slug) {
 
 function getPrecioMenu(productoSlug, formatoSlug = null, categoria = 'corte') {
   const fila = queryOne(
-    "SELECT precio FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=? AND activo=1 AND eliminado=0",
+    "SELECT precio FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=? AND activo=1 AND disponible=1 AND eliminado=0",
     [productoSlug, formatoSlug || '', categoria]
   );
   return fila ? Number(fila.precio || 0) : null;
+}
+
+function setMenuItemDisponibilidad(productoSlug, categoria, disponible) {
+  if (!esProductoValido(categoria, productoSlug)) return 0;
+  const { getBsdb } = require('../db/core');
+  const db = getBsdb();
+  if (!db) return 0;
+  return db.prepare(
+    "UPDATE menu_items SET disponible=? WHERE producto_slug=? AND categoria=? AND activo=1 AND eliminado=0"
+  ).run(disponible ? 1 : 0, productoSlug, categoria).changes;
 }
 
 function setPreciosCorte(productoSlug, precios = {}) {
@@ -108,5 +118,5 @@ function setPreciosCorte(productoSlug, precios = {}) {
 module.exports = {
   getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant,
   getMenuItemsTenant, getMenuItemsActivos, getDefinicionProducto, getPrecioMenu,
-  setPreciosCorte, esProductoValido, esFormatoIdValido,
+  setMenuItemDisponibilidad, setPreciosCorte, esProductoValido, esFormatoIdValido,
 };

@@ -910,11 +910,12 @@ app.post("/api/menu-items", requireAuth, (_req, res) => {
 // PUT /api/menu-items/:id — el tenant solo puede editar el precio
 app.put("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
-  const { precio, activo } = req.body;
+  const { precio, activo, disponible } = req.body;
   const item = queryOne("SELECT * FROM menu_items WHERE id=? AND eliminado=0", [id]);
   if (!item) return res.status(404).json({ error: "Item no encontrado" });
-  if (activo !== undefined) return res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
+  if (activo !== undefined) return res.status(403).json({ error: 'El Superadmin controla la habilitación de productos' });
   if (precio  !== undefined) run("UPDATE menu_items SET precio=? WHERE id=?",  [parseFloat(precio) || 0, id]);
+  if (disponible !== undefined) run("UPDATE menu_items SET disponible=? WHERE id=? AND activo=1", [disponible ? 1 : 0, id]);
   invalidarCacheCortes();
   res.json({ ok: true });
 });
@@ -924,9 +925,16 @@ app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
   res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
 });
 
-// Endpoint histórico bloqueado: la activación se trasladó al Superadmin.
+// Disponibilidad operativa: no cambia la habilitación asignada por Superadmin.
 app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
+  const { producto_slug, disponible } = req.body;
+  if (!producto_slug || !catalogoTenant.esProductoValido('corte', producto_slug)) {
+    return res.status(400).json({ error: 'Corte inválido para el giro activo' });
+  }
+  run("UPDATE menu_items SET disponible=? WHERE producto_slug=? AND categoria='corte' AND activo=1 AND eliminado=0",
+    [disponible ? 1 : 0, producto_slug]);
+  invalidarCacheCortes();
+  res.json({ ok: true });
 });
 
 // ── CATÁLOGO DEL GIRO (para selección en modales) ────────────────────────────

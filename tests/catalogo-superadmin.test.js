@@ -22,7 +22,7 @@ function crearTenantPrueba() {
     INSERT INTO business_types VALUES (1,'taqueria');
     CREATE TABLE item_types (id INTEGER PRIMARY KEY, business_type_id INTEGER, slug TEXT, nombre_plural TEXT, emoji TEXT, precio_base REAL, activo INTEGER DEFAULT 0);
     INSERT INTO item_types VALUES (1,1,'taco','tacos','🌮',30,0);
-    CREATE TABLE menu_items (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_slug TEXT NOT NULL, formato_slug TEXT, categoria TEXT, precio REAL DEFAULT 0, activo INTEGER DEFAULT 0, eliminado INTEGER DEFAULT 0);
+    CREATE TABLE menu_items (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_slug TEXT NOT NULL, formato_slug TEXT, categoria TEXT, precio REAL DEFAULT 0, activo INTEGER DEFAULT 0, disponible INTEGER DEFAULT 1, eliminado INTEGER DEFAULT 0);
     CREATE UNIQUE INDEX idx_menu_items_uq ON menu_items(producto_slug,COALESCE(formato_slug,''),categoria);
   `);
   db.close();
@@ -48,4 +48,3 @@ test('el Superadmin rechaza productos que no pertenecen al Giro', () => {
   const { tenant } = crearTenantPrueba();
   assert.equal(setTenantProductoActivo(tenant, 'corte', 'producto-inventado', true), false);
 });
-

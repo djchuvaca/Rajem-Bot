@@ -2,7 +2,7 @@ const { queryAll, queryOne, run } = require("./core");
 
 // ─── MENU ITEMS (habilitados por Superadmin; precios editables por tenant) ────
 function getMenuItems(categoria = null) {
-  const where  = categoria ? "WHERE eliminado=0 AND activo=1 AND categoria=?" : "WHERE eliminado=0 AND activo=1";
+  const where  = categoria ? "WHERE eliminado=0 AND activo=1 AND disponible=1 AND categoria=?" : "WHERE eliminado=0 AND activo=1 AND disponible=1";
   const params = categoria ? [categoria] : [];
   return queryAll(`SELECT * FROM menu_items ${where} ORDER BY categoria, producto_slug`, params) || [];
 }

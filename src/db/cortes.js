@@ -46,7 +46,7 @@ function getCortesBD() {
     const rows = queryAll(
       `SELECT DISTINCT c.* FROM cortes c
        INNER JOIN menu_items mi ON mi.producto_slug = c.slug
-         AND mi.activo = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
+         AND mi.activo = 1 AND mi.disponible = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
        WHERE c.giro_id = ? AND c.activo = 1 ORDER BY c.id`,
       [giroId]
     ) || [];

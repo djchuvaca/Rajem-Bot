@@ -1736,8 +1736,8 @@ function _renderMenuCortes(formatos) {
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = slugsVistos.map(slug => {
     const fmtMap = cortesMap[slug] || {};
-    const activo = formatos.some(f => fmtMap[f.slug]?.activo) ||
-                   (!formatos.length && Object.values(fmtMap).some(i => i.activo));
+    const disponible = formatos.some(f => fmtMap[f.slug]?.activo && fmtMap[f.slug]?.disponible) ||
+                       (!formatos.length && Object.values(fmtMap).some(i => i.activo && i.disponible));
     const info   = _descCortes?.[slug] || {};
     const nombre = info.nombre || _ucfirst(slug);
     const desc   = info.descripcion || '';
@@ -1755,7 +1755,7 @@ function _renderMenuCortes(formatos) {
       </td>`;
     }).join('');
 
-    return `<tr style="${activo ? '' : 'opacity:.45'}">
+    return `<tr style="${disponible ? '' : 'opacity:.55'}">
       <td>
         <div class="prod-cell">
           <div>
@@ -1766,7 +1766,10 @@ function _renderMenuCortes(formatos) {
       </td>
       ${celdas}
       <td>
-        <span class="badge badge-green" style="white-space:nowrap">✓ Habilitado</span>
+        <span class="badge ${disponible ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
+          onclick="toggleCorteDisponible('${_esc(slug)}',${disponible ? 0 : 1})">
+          ${disponible ? '✓ Disponible' : '○ Agotado'}
+        </span>
       </td>
     </tr>`;
   }).join('');
@@ -1794,7 +1797,7 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
     const info   = catMap?.[item.producto_slug] || {};
     const nombre = info.nombre || item.producto_slug;
     const desc   = info.descripcion || '';
-    return `<tr style="${item.activo ? '' : 'opacity:.45'}">
+    return `<tr style="${item.disponible ? '' : 'opacity:.55'}">
       <td>
         <div class="prod-cell">
           <div class="prod-avatar">${emoji}</div>
@@ -1813,7 +1816,10 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
         </div>
       </td>
       <td>
-        <span class="badge badge-green" style="white-space:nowrap">✓ Habilitado</span>
+        <span class="badge ${item.disponible ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
+          onclick="toggleMenuItemDisponible(${item.id},${item.disponible ? 0 : 1})">
+          ${item.disponible ? '✓ Disponible' : '○ Agotado'}
+        </span>
       </td>
     </tr>`;
   }).join('');
@@ -1821,6 +1827,20 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
 
 async function actualizarPrecioMenuItem(id, valor) {
   await api(`/api/menu-items/${id}`, 'PUT', { precio: parseFloat(valor) || 0 });
+}
+
+async function toggleMenuItemDisponible(id, disponible) {
+  const r = await api(`/api/menu-items/${id}`, 'PUT', { disponible });
+  if (r.ok) toast(disponible ? 'Producto disponible en WhatsApp' : 'Producto marcado como agotado');
+  else toast(r.error || 'No se pudo cambiar la disponibilidad', false);
+  loadProductos();
+}
+
+async function toggleCorteDisponible(slug, disponible) {
+  const r = await api('/api/menu-items/toggle-corte', 'POST', { producto_slug: slug, disponible });
+  if (r.ok) toast(disponible ? `${slug} disponible en WhatsApp` : `${slug} marcado como agotado`);
+  else toast(r.error || 'No se pudo cambiar la disponibilidad', false);
+  loadProductos();
 }
 
 // ── HORARIOS ──────────────────────────────────────────────────────────────────
