@@ -530,6 +530,8 @@ app.get('/api/tenants/:id/reporte-reparto', requireAuth, (req, res) => {
 function startSuperAdmin(port = 3001) {
   // Inicializar admin.db al arrancar
   getAdminDB();
+  const coloniasInicializadas = geoTepic.inicializarDesdeTenants(getTenants());
+  if (coloniasInicializadas) console.log(`[GeoTepic] Catálogo maestro inicializado con ${coloniasInicializadas} colonias`);
   app.listen(port, '0.0.0.0', () => {
     console.log(`\n🔐 Super-admin corriendo en http://0.0.0.0:${port}`);
   });
