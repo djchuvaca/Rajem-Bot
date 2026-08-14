@@ -2141,9 +2141,9 @@ const MSG_META = {
   cancelacion_enviada:   { icon:'❌', label:'Cancelación recibida',          trigger:'Al solicitar cancelar',                   hint:'Sé empático. Confirma que la solicitud fue recibida y que el equipo se comunicará.',                            vars:['{negocio}'] },
   comprobante_recibido:  { icon:'📸', label:'Comprobante recibido',          trigger:'Al enviar foto de transferencia',          hint:'Confirma que recibiste la foto del comprobante y que están verificando el pago.',                              vars:['{negocio}'] },
   fuera_horario_antes:   { icon:'🌅', label:'Antes de abrir',                trigger:'Escribe antes de la hora de apertura',    hint:'Informa a qué hora abren hoy y ofrece tomar un pedido en preventa.',                                          vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
-  fuera_horario_despues: { icon:'🌙', label:'Después de cerrar',             trigger:'Escribe después de la hora de cierre',    hint:'Informa cuándo abren mañana y ofrece la opción de hacer un pedido en preventa.',                               vars:['{negocio}','{hora_inicio}','{hora_fin}'] },
-  fuera_horario_lunes:   { icon:'😴', label:'Día de descanso',               trigger:'Escribe en el día de cierre semanal',     hint:'Explica que es el día de descanso y cuándo retoman el servicio. El día de cierre se configura en Horarios.',    vars:['{negocio}','{hora_inicio}'] },
-  menu_taco_nota:        { icon:'🌮', label:'Texto bajo tacos y tortas',     trigger:'Aparece en el menú',                      hint:'Ejemplo: "combinaciones al gusto" o "incluyen tortillas y salsas de la casa".',                                 vars:[] },
+  fuera_horario_despues: { icon:'🌙', label:'Después de cerrar',             trigger:'Escribe después de la hora de cierre',    hint:'Informa cuándo vuelve a abrir y ofrece la opción de hacer un pedido en preventa.',                              vars:['{negocio}','{hora_inicio}','{hora_fin}','{proximo_dia}'] },
+  fuera_horario_lunes:   { icon:'😴', label:'Día de descanso',               trigger:'Escribe en cualquier día marcado cerrado', hint:'Explica que es el día de descanso y cuándo retoman el servicio. Se configura desde Horarios.',                  vars:['{negocio}','{hora_inicio}','{proximo_dia}'] },
+  menu_taco_nota:        { icon:'🍽️', label:'Texto bajo presentaciones por pieza', trigger:'Solo si existen piezas activas',       hint:'Se muestra bajo tacos, tortas, quesadillas y cualquier otra presentación por unidad activa del Giro.',           vars:[] },
   menu_gramos_nota:      { icon:'⚖️', label:'Texto bajo venta por gramos',  trigger:'Aparece en el menú',                      hint:'Aparece cuando el negocio vende por peso. Ejemplo: "Incluye tortillas y salsas".',                               vars:[] },
   menu_salsas_nota:      { icon:'🌶️', label:'Nota en sección de salsas',   trigger:'Aparece en el menú',                      hint:'Aparece al inicio de la lista de salsas extra. Ejemplo: "Los tacos ya incluyen salsas gratis".',                 vars:[] },
   menu_pie_salsas:       { icon:'📝', label:'Nota al pie de salsas',        trigger:'Aparece en el menú',                      hint:'Opcional. Línea extra al final de la sección de salsas. Deja vacío para no mostrarla.',                         vars:[] },
@@ -2153,9 +2153,11 @@ const MSG_META = {
 };
 
 const GRUPOS_CONFIG = [
-  { id:'atencion', icon:'🤝', title:'Durante el pedido',   sub:'Mensajes que el bot envía mientras atiende un pedido',                    color:'var(--blue)',   colorBg:'rgba(59,130,246,0.1)',  claves:['saludo','confirmacion_pedido','cancelacion_enviada','comprobante_recibido'] },
-  { id:'horario',  icon:'🕐', title:'Fuera de horario',    sub:'Se activan cuando el cliente escribe fuera del horario de atención',       color:'var(--yellow)', colorBg:'rgba(245,158,11,0.1)', claves:['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'] },
-  { id:'menu',     icon:'📋', title:'Menú del negocio',    sub:'Textos que aparecen dentro del menú cuando el cliente lo solicita',        color:'var(--green)',  colorBg:'rgba(34,197,94,0.1)',  claves:['menu_taco_nota','menu_gramos_nota','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_por_cantidad','menu_domicilio_nota'] },
+  { id:'disponibilidad', icon:'🕐', title:'1. Disponibilidad',       sub:'Primera respuesta cuando el negocio todavía no abre, ya cerró o descansa', color:'var(--yellow)', colorBg:'rgba(245,158,11,0.1)', claves:['fuera_horario_antes','fuera_horario_despues','fuera_horario_lunes'] },
+  { id:'bienvenida',     icon:'👋', title:'2. Inicio de conversación', sub:'Saludo que inicia la toma del pedido dentro del horario de atención',         color:'var(--blue)',   colorBg:'rgba(59,130,246,0.1)',  claves:['saludo'] },
+  { id:'menu',           icon:'📋', title:'3. Menú y productos',     sub:'Notas insertadas alrededor del catálogo activo generado directamente por Giro', color:'var(--green)', colorBg:'rgba(34,197,94,0.1)', claves:['menu_taco_nota','menu_gramos_nota','menu_por_cantidad','menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_domicilio_nota'] },
+  { id:'cierre',         icon:'✅', title:'4. Registro y pago',      sub:'Mensajes posteriores a la captura de datos y confirmación de la orden',          color:'var(--blue)',   colorBg:'rgba(59,130,246,0.1)',  claves:['confirmacion_pedido','comprobante_recibido'] },
+  { id:'postventa',      icon:'❌', title:'5. Después del pedido',   sub:'Respuesta utilizada si el cliente solicita cancelar una orden registrada',       color:'var(--red)',    colorBg:'rgba(239,68,68,0.1)',   claves:['cancelacion_enviada'] },
 ];
 
 // Derivado para saveGrupoMensajes
@@ -2168,6 +2170,7 @@ function _waFormat(text) {
     .replace(/\{negocio\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">Tu Negocio</span>')
     .replace(/\{hora_inicio\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">8:00 a.m.</span>')
     .replace(/\{hora_fin\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">12:30 p.m.</span>')
+    .replace(/\{proximo_dia\}/g,'<span style="background:rgba(37,211,102,.15);color:#4ade80;border-radius:3px;padding:0 3px">martes</span>')
     .replace(/\*([^*\n]+)\*/g,'<b>$1</b>')
     .replace(/_([^_\n]+)_/g,'<i>$1</i>')
     .replace(/~([^~\n]+)~/g,'<s>$1</s>')
@@ -2200,8 +2203,9 @@ function insertarVariable(id, variable) {
   updateWaPreview(id.replace(/^msg-/, ''));
 }
 
-function _renderMsgCard(clave, valor, color, colorBg) {
+function _renderMsgCard(clave, valor, color, colorBg, contexto) {
   const meta  = MSG_META[clave] || { icon:'💬', label:clave, trigger:'', hint:'', vars:[] };
+  const aplica = contexto?.aplica?.[clave] !== false;
   const esc   = (valor||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const chips = meta.vars.map(v =>
     `<span class="msg-var-chip" onclick="insertarVariable('msg-${clave}','${v}')" title="Clic para insertar donde está el cursor">${v}</span>`
@@ -2212,6 +2216,7 @@ function _renderMsgCard(clave, valor, color, colorBg) {
       <div style="flex:1;min-width:0">
         <div class="msg-card-name">${meta.label}</div>
         ${meta.trigger ? `<div><span class="msg-trigger-pill" style="background:${colorBg};color:${color}">⚡ ${meta.trigger}</span></div>` : ''}
+        <div style="margin-top:6px"><span class="msg-trigger-pill" style="background:${aplica?'rgba(34,197,94,.12)':'rgba(148,163,184,.12)'};color:${aplica?'var(--green)':'var(--muted)'}">${aplica?'● Se muestra actualmente':'○ No aplica con el catálogo/configuración actual'}</span></div>
       </div>
     </div>
     <div class="msg-card-body">
@@ -2239,8 +2244,19 @@ function _renderMsgCard(clave, valor, color, colorBg) {
   </div>`;
 }
 
-function renderAllMensajes(map) {
-  document.getElementById('msgs-content').innerHTML = GRUPOS_CONFIG.map(g => `
+function renderAllMensajes(map, contexto) {
+  const c = contexto?.catalogo || {};
+  const resumenCatalogo = `<div class="msgs-group" style="border-color:rgba(34,197,94,.35)">
+    <div class="msgs-group-header">
+      <span class="msgs-group-icon">🔄</span>
+      <div>
+        <div class="msgs-group-title">Convergencia con WhatsApp y Giro</div>
+        <div class="msgs-group-sub">WhatsApp genera nombres, activación y precios desde Productos. Aquí únicamente editas los textos complementarios.</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">${Number(c.presentaciones)||0} presentaciones · ${Number(c.cortes)||0} cortes · ${Number(c.bebidas)||0} bebidas · ${Number(c.salsas)||0} salsas activas</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('msgs-content').innerHTML = resumenCatalogo + GRUPOS_CONFIG.map(g => `
     <div class="msgs-group">
       <div class="msgs-group-header">
         <span class="msgs-group-icon">${g.icon}</span>
@@ -2250,29 +2266,29 @@ function renderAllMensajes(map) {
         </div>
         <button class="btn btn-secondary btn-sm msgs-group-save" onclick="saveGrupoMensajes('${g.id}')">Guardar grupo</button>
       </div>
-      ${g.claves.map(c => _renderMsgCard(c, map[c]||'', g.color, g.colorBg)).join('')}
+      ${g.claves.map(clave => _renderMsgCard(clave, map[clave]||'', g.color, g.colorBg, contexto)).join('')}
     </div>
   `).join('');
   document.querySelectorAll('.msg-textarea').forEach(autoResizeMsg);
 }
 
 async function loadMensajes() {
-  const msgs = await api('/api/mensajes');
+  const [msgs, contexto] = await Promise.all([api('/api/mensajes'), api('/api/mensajes/contexto')]);
   const map  = Object.fromEntries(msgs.map(m => [m.clave, m.valor]));
-  renderAllMensajes(map);
+  renderAllMensajes(map, contexto);
 }
 
-async function saveGrupoMensajes(grupoId) {
+async function saveGrupoMensajes(grupoId, mostrarAviso = true) {
   const claves = GRUPOS_MENSAJES[grupoId] || [];
   for (const clave of claves) {
     const el = document.getElementById(`msg-${clave}`);
     if (el) await api('/api/mensajes', 'POST', { clave, valor: el.value });
   }
-  toast('Mensajes guardados ✅');
+  if (mostrarAviso) toast('Mensajes guardados ✅');
 }
 
 async function saveAllMensajes() {
-  for (const g of GRUPOS_CONFIG) await saveGrupoMensajes(g.id);
+  for (const g of GRUPOS_CONFIG) await saveGrupoMensajes(g.id, false);
   toast('Todos los mensajes guardados ✅');
 }
 

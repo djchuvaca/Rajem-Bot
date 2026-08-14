@@ -29,6 +29,7 @@ const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos");
 const { despacharConDelay } = require("../handlers/mandaditos");
 const catalogoTenant = require('../giros/catalogo-tenant');
+const { getGiroActivo } = require('../giros');
 const observabilidad = require('../db/observabilidad');
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
@@ -175,9 +176,50 @@ app.post("/api/banco", requireAuth, (req, res) => {
 });
 
 // ── MENSAJES BOT ──────────────────────────────────────────────────────────────
-app.get("/api/mensajes", requireAuth, (req, res) => res.json(getAllMensajes()));
+function _clavesMensajesGiro() {
+  return new Set(Object.keys(getGiroActivo()?.mensajesDefaults || {}));
+}
+
+app.get("/api/mensajes", requireAuth, (req, res) => {
+  const permitidas = _clavesMensajesGiro();
+  res.json(getAllMensajes().filter(m => permitidas.has(m.clave)));
+});
+
+app.get("/api/mensajes/contexto", requireAuth, (_req, res) => {
+  const items     = catalogoTenant.getMenuItemsActivos();
+  const formatos  = catalogoTenant.getFormatosTenant();
+  const cortes    = items.filter(i => i.categoria === 'corte');
+  const bebidas   = items.filter(i => i.categoria === 'refresco');
+  const salsas    = items.filter(i => i.categoria === 'salsa');
+  const tieneFormato = predicado => formatos.some(f => predicado(f) && cortes.some(i => i.formato_slug === f.slug));
+  const servicioDomicilio = getConfig('tipo_servicio') !== 'solo_mostrador';
+  res.json({
+    giro: getGiroActivo()?.nombre || getBusinessTypeSlug(),
+    catalogo: {
+      presentaciones: new Set(cortes.map(i => i.formato_slug).filter(Boolean)).size,
+      cortes:         new Set(cortes.map(i => i.producto_slug)).size,
+      bebidas:        bebidas.length,
+      salsas:         salsas.length,
+    },
+    aplica: {
+      menu_taco_nota:      tieneFormato(f => !f.soporta_gramos && !f.soporta_pesos),
+      menu_gramos_nota:    tieneFormato(f => Boolean(f.soporta_gramos)),
+      menu_por_cantidad:   tieneFormato(f => Boolean(f.soporta_pesos)),
+      menu_salsas_nota:    salsas.length > 0,
+      menu_pie_salsas:     salsas.length > 0,
+      menu_nota_precios:   items.length > 0,
+      menu_domicilio_nota: servicioDomicilio && items.length > 0,
+      comprobante_recibido: Boolean(getBanco()?.activo),
+    },
+  });
+});
+
 app.post("/api/mensajes", requireAuth, (req, res) => {
-  setMensaje(req.body.clave, req.body.valor);
+  const clave = String(req.body.clave || '');
+  const valor = typeof req.body.valor === 'string' ? req.body.valor : '';
+  if (!_clavesMensajesGiro().has(clave)) return res.status(400).json({ error: 'El mensaje no pertenece al Giro activo' });
+  if (valor.length > 4000) return res.status(400).json({ error: 'El mensaje excede 4000 caracteres' });
+  setMensaje(clave, valor);
   res.json({ ok: true });
 });
 

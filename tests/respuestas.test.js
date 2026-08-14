@@ -284,15 +284,14 @@ describe("respuestaPrecio filtrado y precios efectivos", () => {
 
   test("BUG: precio 0 en BD NO debe mostrarse como $0 en desglose", () => {
     // Simula que buche tiene precio 0 (usa global) y carne tiene precio diferente
-    run("UPDATE productos SET precio_taco = 0, precio_torta = 0, precio_100g = 0 WHERE lower(nombre) = 'buche'");
-    run("UPDATE productos SET precio_taco = 35, precio_torta = 45, precio_100g = 36 WHERE lower(nombre) = 'carne'");
+    run("UPDATE menu_items SET precio = 0 WHERE producto_slug = 'buche' AND categoria = 'corte'");
+    run("UPDATE menu_items SET precio = CASE formato_slug WHEN 'torta' THEN 45 WHEN 'gramos' THEN 36 ELSE 35 END WHERE producto_slug = 'carne' AND categoria = 'corte'");
     try {
       const r = respuestaPrecio();
       // Buche tiene precio 0 → debe usar global (30/40/32), NO mostrar $0
       assert.doesNotMatch(r, /\$0\b/);
     } finally {
-      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE lower(nombre) = 'buche'");
-      run("UPDATE productos SET precio_taco = 30, precio_torta = 40, precio_100g = 32 WHERE lower(nombre) = 'carne'");
+      run("UPDATE menu_items SET precio = CASE formato_slug WHEN 'torta' THEN 40 WHEN 'gramos' THEN 32 ELSE 30 END WHERE producto_slug IN ('buche','carne') AND categoria = 'corte'");
     }
   });
 
@@ -323,12 +322,12 @@ describe("respuestaMenu filtrado", () => {
   test("BUG: precio 0 en BD no activa modo 'desde $0'", () => {
     // Si todos los cortes tienen precio 0 en BD, debe usar el precio global ($30/$40/$32)
     // y mostrar precio fijo (no "desde $0")
-    run("UPDATE productos SET precio_taco = 0 WHERE categoria = 'corte' AND nombre != 'surtido especial'");
+    run("UPDATE menu_items SET precio = 0 WHERE categoria = 'corte'");
     try {
       const r = respuestaMenu();
       assert.doesNotMatch(r, /desde \$0/i);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE categoria = 'corte'");
+      run("UPDATE menu_items SET precio = CASE formato_slug WHEN 'torta' THEN 40 WHEN 'gramos' THEN 32 ELSE 30 END WHERE categoria = 'corte'");
     }
   });
 });
@@ -338,21 +337,20 @@ describe("respuestaMenu filtrado", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("menu_pie_salsas en respuestaMenu", () => {
   test("aparece en el menú cuando hay salsas y el mensaje está configurado", () => {
-    run("INSERT OR IGNORE INTO productos (nombre, categoria, activo, precio_taco, precio_torta, precio_100g) VALUES ('roja', 'salsa', 1, 0, 0, 0)");
+    run("UPDATE menu_items SET activo = 1 WHERE producto_slug = 'roja' AND categoria = 'salsa'");
     run("UPDATE mensajes_bot SET valor = '🟢 Salsas incluidas en tacos y tortas' WHERE clave = 'menu_pie_salsas'");
     invalidarCacheCortes();
     try {
       const r = respuestaMenu();
       assert.match(r, /🟢 Salsas incluidas en tacos y tortas/);
     } finally {
-      run("DELETE FROM productos WHERE nombre = 'roja'");
       run("UPDATE mensajes_bot SET valor = '🟢 Todos los tacos y tortas incluyen salsas' WHERE clave = 'menu_pie_salsas'");
       invalidarCacheCortes();
     }
   });
 
   test("NO aparece cuando el mensaje está vacío", () => {
-    run("INSERT OR IGNORE INTO productos (nombre, categoria, activo, precio_taco, precio_torta, precio_100g) VALUES ('verde', 'salsa', 1, 0, 0, 0)");
+    run("UPDATE menu_items SET activo = 1 WHERE producto_slug = 'roja' AND categoria = 'salsa'");
     run("UPDATE mensajes_bot SET valor = '' WHERE clave = 'menu_pie_salsas'");
     invalidarCacheCortes();
     try {
@@ -362,7 +360,6 @@ describe("menu_pie_salsas en respuestaMenu", () => {
       // Pero el pie no debe dejar una línea en blanco extra visible
       assert.doesNotMatch(r, /\n\n\n/);
     } finally {
-      run("DELETE FROM productos WHERE nombre = 'verde'");
       run("UPDATE mensajes_bot SET valor = '🟢 Todos los tacos y tortas incluyen salsas' WHERE clave = 'menu_pie_salsas'");
       invalidarCacheCortes();
     }
@@ -392,5 +389,57 @@ describe("menu_domicilio_nota en respuestaMenu", () => {
     } finally {
       run("UPDATE mensajes_bot SET valor = '🛵 Domicilio: _precio según distancia a tu colonia_ 📍' WHERE clave = 'menu_domicilio_nota'");
     }
+  });
+});
+
+describe("convergencia del menú WhatsApp con activación del tenant", () => {
+  test("oculta un corte desactivado en todas sus presentaciones", () => {
+    run("UPDATE menu_items SET activo=0 WHERE categoria='corte' AND producto_slug='buche'");
+    try {
+      assert.doesNotMatch(respuestaMenu(), /\bBuche\b/i);
+    } finally {
+      run("UPDATE menu_items SET activo=1 WHERE categoria='corte' AND producto_slug='buche'");
+    }
+  });
+
+  test("oculta una bebida desactivada y conserva las activas", () => {
+    run("UPDATE menu_items SET activo=0 WHERE categoria='refresco' AND producto_slug='coca cola'");
+    try {
+      const menu = respuestaMenu();
+      assert.doesNotMatch(menu, /Coca cola/i);
+      assert.match(menu, /Sprite/i);
+    } finally {
+      run("UPDATE menu_items SET activo=1 WHERE categoria='refresco' AND producto_slug='coca cola'");
+    }
+  });
+
+  test("oculta toda la sección y sus mensajes cuando no hay salsas activas", () => {
+    run("UPDATE menu_items SET activo=0 WHERE categoria='salsa'");
+    try {
+      const menu = respuestaMenu();
+      assert.doesNotMatch(menu, /SALSAS EXTRA/i);
+      assert.doesNotMatch(menu, /Todos los tacos y tortas incluyen salsas/i);
+    } finally {
+      run("UPDATE menu_items SET activo=1 WHERE categoria='salsa'");
+    }
+  });
+
+  test("oculta una presentación sin productos activos", () => {
+    run("UPDATE menu_items SET activo=0 WHERE categoria='corte' AND formato_slug='taco'");
+    try {
+      const menu = respuestaMenu();
+      assert.doesNotMatch(menu, /\*TACOS\*/i);
+      assert.match(menu, /\*TORTAS\*/i);
+    } finally {
+      run("UPDATE menu_items SET activo=1 WHERE categoria='corte' AND formato_slug='taco'");
+    }
+  });
+
+  test("muestra la nota final configurada y permite ocultarla con texto vacío", () => {
+    run("UPDATE mensajes_bot SET valor='CIERRE PERSONALIZADO' WHERE clave='menu_nota_precios'");
+    assert.match(respuestaMenu(), /CIERRE PERSONALIZADO/);
+    run("UPDATE mensajes_bot SET valor='' WHERE clave='menu_nota_precios'");
+    assert.doesNotMatch(respuestaMenu(), /Los precios incluyen tortillas y salsas/i);
+    run("UPDATE mensajes_bot SET valor='_Los precios incluyen tortillas y salsas_ 😊' WHERE clave='menu_nota_precios'");
   });
 });

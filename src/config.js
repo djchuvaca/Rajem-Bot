@@ -38,11 +38,15 @@ function getMenuFormato() {
     const precios     = getPrecios();
     const itemTypes   = getItemTypes();
 
-    const notaTaco     = getMensaje("menu_taco_nota")    || md.menu_taco_nota    || '';
-    const notaGramos   = getMensaje("menu_gramos_nota")  || md.menu_gramos_nota  || '';
-    const notaSalsas   = getMensaje("menu_salsas_nota")  || md.menu_salsas_nota  || '';
-    const pieSalsas    = getMensaje("menu_pie_salsas")   || md.menu_pie_salsas   || '';
-    const notaCantidad = getMensaje("menu_por_cantidad") || md.menu_por_cantidad || '';
+    // Una cadena vacía es una personalización válida: permite ocultar notas
+    // opcionales desde el panel sin que reaparezca el default del Giro.
+    const _mensajeMenu = clave => getMensaje(clave) ?? md[clave] ?? '';
+    const notaTaco     = _mensajeMenu("menu_taco_nota");
+    const notaGramos   = _mensajeMenu("menu_gramos_nota");
+    const notaSalsas   = _mensajeMenu("menu_salsas_nota");
+    const pieSalsas    = _mensajeMenu("menu_pie_salsas");
+    const notaCantidad = _mensajeMenu("menu_por_cantidad");
+    const notaPrecios  = _mensajeMenu("menu_nota_precios").replace(/{negocio}/g, negocio);
 
     // ── Leer el menú configurado por el tenant (menu_items) ───────────────────
     const miAll       = catalogoTenant.getMenuItemsActivos();
@@ -60,9 +64,12 @@ function getMenuFormato() {
 
     // ── Sección de precios por item_type ──────────────────────────────────────
     // Separar formatos por unidad (taco, torta…) de gramos/pesos que tienen sección propia
-    const itsPorUnidad = itemTypes.filter(it => !it.soporta_gramos && !it.soporta_pesos);
-    const itGramos     = itemTypes.find(t => t.soporta_gramos) || null;
-    const itPorPesos   = itemTypes.find(t => t.soporta_pesos)  || null;
+    // Un formato activo solo se anuncia si conserva al menos un producto
+    // activo. Así WhatsApp converge con cada activación del panel.
+    const formatoTieneProducto = slug => cortesItems.some(i => i.formato_slug === slug);
+    const itsPorUnidad = itemTypes.filter(it => !it.soporta_gramos && !it.soporta_pesos && formatoTieneProducto(it.slug));
+    const itGramos     = itemTypes.find(t => t.soporta_gramos && formatoTieneProducto(t.slug)) || null;
+    const itPorPesos   = itemTypes.find(t => t.soporta_pesos && formatoTieneProducto(t.slug))  || null;
 
     let seccionPrecios = "";
     for (const it of itsPorUnidad) {
@@ -102,7 +109,10 @@ function getMenuFormato() {
     // ── Bebidas ───────────────────────────────────────────────────────────────
     let refrescosSeccion = "";
     if (bebidasItems.length > 0) {
-      const refNombres  = bebidasItems.map(b => b.producto_slug.charAt(0).toUpperCase() + b.producto_slug.slice(1)).join(" · ");
+      const refNombres  = bebidasItems.map(b => {
+        const def = catalogoTenant.getDefinicionProducto('refresco', b.producto_slug);
+        return (def?.nombre || b.producto_slug).replace(/^./, c => c.toUpperCase());
+      }).join(" · ");
       const presBebidas = bebidasItems.map(b => b.precio || 0).filter(p => p > 0);
       const minB = presBebidas.length ? Math.min(...presBebidas) : 0;
       const maxB = presBebidas.length ? Math.max(...presBebidas) : 0;
@@ -113,7 +123,10 @@ function getMenuFormato() {
     // ── Salsas ────────────────────────────────────────────────────────────────
     let salsasSeccion = "";
     if (salsasItems.length > 0) {
-      const salNombres  = salsasItems.map(s => s.producto_slug.charAt(0).toUpperCase() + s.producto_slug.slice(1)).join(" · ");
+      const salNombres  = salsasItems.map(s => {
+        const def = catalogoTenant.getDefinicionProducto('salsa', s.producto_slug);
+        return (def?.nombre || s.producto_slug).replace(/^./, c => c.toUpperCase());
+      }).join(" · ");
       const presSalsas  = salsasItems.map(s => s.precio || 0);
       const todosCero   = presSalsas.every(p => p === 0);
       const todosIgual  = !todosCero && presSalsas.every(p => p === presSalsas[0]);
@@ -140,6 +153,7 @@ function getMenuFormato() {
       variedadesSeccion +
       refrescosSeccion +
       salsasSeccion +
+      (notaPrecios ? `${notaPrecios}\n\n` : '') +
       `━━━━━━━━━━━━━━━━━━\n` +
       domicilioSeccion +
       `*¿Qué te vamos a preparar?* 😊\n`

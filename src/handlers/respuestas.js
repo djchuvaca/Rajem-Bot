@@ -59,7 +59,7 @@ function respuestaPrecio(producto = null) {
     const precios     = getPrecios();
     const negocio     = getNegocio();
     const _giroR = (() => { try { const { getGiroActivo } = require('../giros'); return getGiroActivo(); } catch(_) { return null; } })();
-    const notaPrecios = (getMensaje("menu_nota_precios") || _giroR?.mensajesDefaults?.menu_nota_precios || '').replace(/{negocio}/g, negocio);
+    const notaPrecios = (getMensaje("menu_nota_precios") ?? _giroR?.mensajesDefaults?.menu_nota_precios ?? '').replace(/{negocio}/g, negocio);
 
     // Obtener item_types activos — separar formatos de precio por unidad de gramos/pesos
     let itemTypes = [];
@@ -93,11 +93,13 @@ function respuestaPrecio(producto = null) {
       if (miPrice !== undefined && miPrice > 0) return miPrice;
       // 2. Fallback: catálogo de cortes o precio global del item_type
       const pc = precios.porCorte[corteId] || precios;
-      if (pc.precios && pc.precios[formatoSlug] !== undefined) return pc.precios[formatoSlug];
-      if (it?.precio_campo === 'precio_torta') return pc.pTorta ?? precios.pTorta;
-      if (it?.precio_campo === 'precio_taco')  return pc.pTaco  ?? precios.pTaco;
-      if (it?.precio_base) return it.precio_base;
-      return pc.pTaco ?? precios.pTaco;
+      const precioCatalogo = Number(pc.precios?.[formatoSlug] || 0);
+      if (precioCatalogo > 0) return precioCatalogo;
+      const precioCorte = it?.precio_campo === 'precio_torta' ? Number(pc.pTorta || 0)
+        : it?.precio_campo === 'precio_taco' ? Number(pc.pTaco || 0) : 0;
+      if (precioCorte > 0) return precioCorte;
+      if (Number(it?.precio_base || 0) > 0) return Number(it.precio_base);
+      return it?.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
     };
 
     if (producto) {
