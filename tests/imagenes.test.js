@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const { initDB } = require('../src/db');
-const { handleImagen, descargarMediaConReintento } = require('../src/handlers/imagenes');
+const { handleImagen, descargarMediaConReintento, descargarMediaDirecto } = require('../src/handlers/imagenes');
 const { esperandoCaptura, pendientesConfirmacion, CARPETA_CAPTURAS, limpiarTodo } = require('../src/estado');
 
 test.before(async () => { await initDB(); });
@@ -62,4 +62,21 @@ test('reintenta la descarga recuperando el mensaje desde WhatsApp', async () => 
     },
   };
   assert.equal(await descargarMediaConReintento(msg, client), media);
+});
+
+test('usa el identificador nuevo $1 para la descarga directa', async () => {
+  const esperado = { mimetype: 'image/jpeg', data: 'AA==' };
+  const msg = { id: { $1: 'mensaje-nuevo' } };
+  const client = { pupPage: { evaluate: async (_fn, id) => {
+    assert.equal(id, 'mensaje-nuevo');
+    return esperado;
+  } } };
+  assert.equal(await descargarMediaDirecto(msg, client), esperado);
+});
+
+test('usa descarga directa si downloadMedia falla con el error r', async () => {
+  const esperado = { mimetype: 'image/png', data: 'AA==' };
+  const msg = { id: { $1: 'mensaje-nuevo' }, downloadMedia: async () => { throw new Error('r'); } };
+  const client = { pupPage: { evaluate: async () => esperado } };
+  assert.equal(await descargarMediaConReintento(msg, client), esperado);
 });

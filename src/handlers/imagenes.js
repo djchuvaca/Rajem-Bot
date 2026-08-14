@@ -15,15 +15,52 @@ const {
 const { ordenPendientePreventa, telefonosReales } = require("./flujos/utils");
 const { dividirNombreCompleto } = require('../clientes/nombre');
 
+async function descargarMediaDirecto(msg, client) {
+  const messageId = msg.id?._serialized || msg.id?.$1;
+  if (!messageId || !client?.pupPage) return null;
+  return client.pupPage.evaluate(async msgId => {
+    const coleccion = window.require('WAWebCollections').Msg;
+    const modelo = coleccion.get(msgId) || (await coleccion.getMessagesById([msgId]))?.messages?.[0];
+    if (!modelo) return null;
+    const mockQpl = { addAnnotations() { return this; }, addPoint() { return this; } };
+    const bytes = await window.require('WAWebDownloadManager').downloadManager.downloadAndMaybeDecrypt({
+      directPath: modelo.directPath,
+      encFilehash: modelo.encFilehash,
+      filehash: modelo.filehash,
+      mediaKey: modelo.mediaKey,
+      mediaKeyTimestamp: modelo.mediaKeyTimestamp,
+      type: modelo.type,
+      signal: new AbortController().signal,
+      downloadQpl: mockQpl,
+    });
+    return {
+      data: await window.WWebJS.arrayBufferToBase64Async(bytes),
+      mimetype: modelo.mimetype,
+      filename: modelo.filename,
+      filesize: modelo.size,
+    };
+  }, messageId);
+}
+
 async function descargarMediaConReintento(msg, client) {
   try {
     return await msg.downloadMedia();
   } catch (primerError) {
-    const messageId = msg.id?._serialized;
-    if (!messageId || typeof client?.getMessageById !== 'function') throw primerError;
-    const actualizado = await client.getMessageById(messageId);
-    if (!actualizado || typeof actualizado.downloadMedia !== 'function') throw primerError;
-    return actualizado.downloadMedia();
+    const messageId = msg.id?._serialized || msg.id?.$1;
+    if (messageId && typeof client?.getMessageById === 'function') {
+      try {
+        const actualizado = await client.getMessageById(messageId);
+        if (actualizado && typeof actualizado.downloadMedia === 'function') return await actualizado.downloadMedia();
+      } catch (_) {}
+    }
+    try {
+      const directo = await descargarMediaDirecto(msg, client);
+      if (directo?.data) return directo;
+    } catch (fallbackError) {
+      const detalle = fallbackError?.stack || fallbackError?.message || String(fallbackError);
+      console.error('❌ Falló también la descarga directa del comprobante:', detalle);
+    }
+    throw primerError;
   }
 }
 
@@ -123,4 +160,4 @@ async function handleImagen(msg, client) {
   return true;
 }
 
-module.exports = { handleImagen, descargarMediaConReintento };
+module.exports = { handleImagen, descargarMediaConReintento, descargarMediaDirecto };
