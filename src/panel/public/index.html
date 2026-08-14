@@ -2273,7 +2273,12 @@ function renderAllMensajes(map, contexto) {
 }
 
 async function loadMensajes() {
-  const [msgs, contexto] = await Promise.all([api('/api/mensajes'), api('/api/mensajes/contexto')]);
+  // El HTML puede renovarse antes que el proceso Node durante un despliegue.
+  // Los mensajes deben seguir visibles aunque el endpoint de contexto todavía
+  // no exista; el estado del catálogo aparecerá tras reiniciar el tenant.
+  const msgs = await api('/api/mensajes');
+  let contexto = {};
+  try { contexto = await api('/api/mensajes/contexto'); } catch (_) {}
   const map  = Object.fromEntries(msgs.map(m => [m.clave, m.valor]));
   renderAllMensajes(map, contexto);
 }
