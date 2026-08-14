@@ -662,7 +662,6 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 
 <script>
 const API = '';
-const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const GIRO_CATALOG = [
   { slug: 'taqueria',       label: '🌮 Taquería' },
   { slug: 'pizzeria',       label: '🍕 Pizzería' },
