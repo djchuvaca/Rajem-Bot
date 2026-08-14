@@ -164,6 +164,31 @@ function setTenantConfigBulk(tenant, config) {
   finally { db.close(); }
 }
 
+function getTenantPanelUsuario(tenant) {
+  const db = _getTenantDB(tenant);
+  if (!db) return null;
+  try {
+    const row = db.prepare('SELECT id,usuario FROM usuarios_panel ORDER BY id LIMIT 1').get();
+    return row ? { id: row.id, usuario: row.usuario } : null;
+  } catch (_) { return null; }
+}
+
+function updateTenantPanelCredentials(tenant, { usuario, passwordHash }) {
+  const db = _openWritable(tenant);
+  if (!db) return false;
+  try {
+    const actual = db.prepare('SELECT id FROM usuarios_panel ORDER BY id LIMIT 1').get();
+    if (!actual) return false;
+    const duplicado = db.prepare('SELECT id FROM usuarios_panel WHERE usuario=? AND id<>?').get(usuario, actual.id);
+    if (duplicado) throw new Error('El usuario ya existe');
+    if (passwordHash) db.prepare('UPDATE usuarios_panel SET usuario=?,password=? WHERE id=?').run(usuario, passwordHash, actual.id);
+    else db.prepare('UPDATE usuarios_panel SET usuario=? WHERE id=?').run(usuario, actual.id);
+    _invalidateTenant(tenant);
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
 function getTenantPedidos(tenant, { desde, hasta, limit = 50 } = {}) {
   const db = _getTenantDB(tenant);
   if (!db) return [];
@@ -419,6 +444,7 @@ function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantPanelUsuario, updateTenantPanelCredentials,
   getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,

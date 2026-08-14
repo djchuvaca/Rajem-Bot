@@ -18,6 +18,7 @@ const geoTepic = require('../geo/geotepic');
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantPanelUsuario, updateTenantPanelCredentials,
   getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
@@ -236,6 +237,32 @@ app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
   if (!config || typeof config !== 'object') return res.status(400).json({ error: 'Formato inválido' });
   if (!setTenantConfigBulk(tenant, config)) return res.status(500).json({ error: 'No se pudo guardar la configuración de forma atómica' });
   res.json({ ok: true });
+});
+
+app.get('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const credenciales = getTenantPanelUsuario(tenant);
+  if (!credenciales) return res.status(404).json({ error: 'Usuario del panel no encontrado' });
+  res.json({ usuario: credenciales.usuario, password_configurada: true });
+});
+
+app.put('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { usuario, password_nuevo, autorizado } = req.body;
+  if (autorizado !== true) return res.status(403).json({ error: 'Debes autorizar expresamente el cambio de credenciales' });
+  if (typeof usuario !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(usuario.trim())) {
+    return res.status(400).json({ error: 'El usuario debe tener entre 3 y 50 caracteres y usar solo letras, números, punto, guion o guion bajo' });
+  }
+  if (password_nuevo !== undefined && password_nuevo !== '' && (typeof password_nuevo !== 'string' || password_nuevo.length < 12)) {
+    return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 12 caracteres' });
+  }
+  const ok = updateTenantPanelCredentials(tenant, {
+    usuario: usuario.trim(),
+    passwordHash: password_nuevo ? bcrypt.hashSync(password_nuevo, 10) : null,
+  });
+  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'No se pudieron actualizar las credenciales del tenant' });
 });
 
 // ── GEOTEPIC — diccionario maestro administrado exclusivamente aquí ──────────

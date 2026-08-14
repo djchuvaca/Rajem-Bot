@@ -328,6 +328,22 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <div id="tc-pasarela-fields"></div>
         </div>
 
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><div class="card-title">🔐 Acceso al panel del tenant</div></div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:14px">El usuario actual es visible. Por seguridad, la contraseña existente está cifrada y no puede mostrarse; escribe una nueva únicamente si deseas reemplazarla.</p>
+          <div class="grid2">
+            <div class="form-group">
+              <label>Usuario del panel</label>
+              <input id="tc-panel-usuario" type="text" minlength="3" maxlength="50" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label>Nueva contraseña</label>
+              <input id="tc-panel-password" type="password" minlength="12" autocomplete="new-password" placeholder="Dejar vacío para conservarla">
+              <small style="color:var(--muted)">Mínimo 12 caracteres.</small>
+            </div>
+          </div>
+        </div>
+
         <div style="margin-top:16px;display:flex;gap:10px">
           <button class="btn btn-primary" onclick="saveTenantConfig()">Guardar cambios</button>
           <button class="btn btn-secondary" onclick="loadTenantConfig()">Revertir</button>
@@ -656,6 +672,23 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-eliminar-tenant')">Cancelar</button>
       <button class="btn btn-danger" id="elim-btn" disabled onclick="ejecutarEliminacion()">Eliminar todo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal autorizar cambio de credenciales del tenant -->
+<div class="modal-bg" id="modal-credenciales-tenant">
+  <div class="modal" style="max-width:480px">
+    <h2 style="color:var(--yellow)">Autorizar cambio de acceso</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Modificarás las credenciales con las que el negocio entra a su panel. Las sesiones ya abiertas pueden continuar activas, pero el siguiente inicio de sesión requerirá los datos nuevos.</p>
+    <div style="background:#2b2413;border:1px solid var(--yellow);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px" id="tc-cred-resumen"></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid var(--yellow);border-radius:6px;padding:10px 14px">
+      <input type="checkbox" id="tc-cred-confirmar" style="width:auto;accent-color:var(--yellow)" onchange="document.getElementById('tc-cred-btn').disabled=!this.checked">
+      <label for="tc-cred-confirmar" style="margin:0;font-size:13px;color:var(--yellow)">Confirmo que deseo cambiar el acceso al panel de este tenant</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cancelarCambioCredenciales()">Cancelar</button>
+      <button class="btn btn-primary" id="tc-cred-btn" disabled onclick="confirmarCambioCredenciales()">Autorizar y guardar</button>
     </div>
   </div>
 </div>
@@ -1071,6 +1104,8 @@ async function saveZonas() {
 // ── CONFIG TENANT ─────────────────────────────────────────────────────────────
 let _tcConfig = {};
 let _tcMap = null, _tcMarker = null;
+let _tcUsuarioOriginal = '';
+let _tcPendingSave = null;
 
 async function loadTenantConfig() {
   const id=document.getElementById('tc-tenant-select').value;
@@ -1079,6 +1114,11 @@ async function loadTenantConfig() {
   const r=await fetch(`/api/tenants/${id}/config`); if(!r.ok) return;
   _tcConfig=await r.json();
   document.getElementById('tc-content').style.display='block';
+  const credResp=await fetch(`/api/tenants/${id}/panel-credentials`);
+  const cred=credResp.ok ? await credResp.json() : {usuario:''};
+  _tcUsuarioOriginal=cred.usuario||'';
+  document.getElementById('tc-panel-usuario').value=_tcUsuarioOriginal;
+  document.getElementById('tc-panel-password').value='';
 
   // Modalidad y campos de notificación
   const modalidad = _tcConfig.notif_modalidad || 'grupo';
@@ -1186,8 +1226,58 @@ async function saveTenantConfig() {
     pasarela_config:   pasarelaConfig,
     public_url:        document.getElementById('tc-public-url').value.trim().replace(/\/$/,''),
   };
+  const usuario=document.getElementById('tc-panel-usuario').value.trim();
+  const passwordNuevo=document.getElementById('tc-panel-password').value;
+  if(!/^[a-zA-Z0-9._-]{3,50}$/.test(usuario)){toast('Usuario inválido: usa de 3 a 50 letras, números, punto, guion o guion bajo','err');return;}
+  if(passwordNuevo && passwordNuevo.length<12){toast('La contraseña nueva debe tener al menos 12 caracteres','err');return;}
+
+  const credencialesModificadas=usuario!==_tcUsuarioOriginal || passwordNuevo.length>0;
+  if(credencialesModificadas){
+    _tcPendingSave={config,usuario,passwordNuevo};
+    const cambios=[];
+    if(usuario!==_tcUsuarioOriginal) cambios.push(`Usuario: ${_tcUsuarioOriginal} → ${usuario}`);
+    if(passwordNuevo) cambios.push('Contraseña: será reemplazada por una nueva');
+    document.getElementById('tc-cred-resumen').textContent=cambios.join(' · ');
+    document.getElementById('tc-cred-confirmar').checked=false;
+    document.getElementById('tc-cred-btn').disabled=true;
+    openModal('modal-credenciales-tenant');
+    return;
+  }
+  await guardarConfigTenant(config);
+}
+
+async function guardarConfigTenant(config){
   const r=await fetch(`/api/tenants/${_tcTenant}/config/bulk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
-  r.ok ? toast('Configuración guardada') : toast('Error al guardar','err');
+  if(r.ok){toast('Configuración guardada');return true;}
+  const e=await r.json().catch(()=>({})); toast(e.error||'Error al guardar','err'); return false;
+}
+
+function cancelarCambioCredenciales(){
+  _tcPendingSave=null;
+  closeModal('modal-credenciales-tenant');
+}
+
+async function confirmarCambioCredenciales(){
+  if(!_tcPendingSave || !document.getElementById('tc-cred-confirmar').checked) return;
+  const pendiente=_tcPendingSave;
+  const btn=document.getElementById('tc-cred-btn');
+  btn.disabled=true;
+  const r=await fetch(`/api/tenants/${_tcTenant}/panel-credentials`,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({usuario:pendiente.usuario,password_nuevo:pendiente.passwordNuevo,autorizado:true})
+  });
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    toast(e.error||'No se pudieron cambiar las credenciales','err');
+    btn.disabled=false; return;
+  }
+  const configOk=await guardarConfigTenant(pendiente.config);
+  if(!configOk){btn.disabled=false;return;}
+  _tcUsuarioOriginal=pendiente.usuario;
+  document.getElementById('tc-panel-password').value='';
+  _tcPendingSave=null;
+  closeModal('modal-credenciales-tenant');
+  toast('Configuración y acceso del tenant actualizados');
 }
 
 // ── RESOLVER JID ──────────────────────────────────────────────────────────────
