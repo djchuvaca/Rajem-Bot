@@ -336,6 +336,65 @@ function applyTenantGeoSolicitud(tenant, solicitud) {
   finally { db.close(); }
 }
 
+// ── REPARTIDORES ──────────────────────────────────────────────────────────────
+function getTenantRepartidores(tenant) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    return db.prepare('SELECT * FROM repartidores ORDER BY activo DESC, en_ruta DESC, nombre').all();
+  } catch (_) { return []; }
+}
+
+function updateTenantRepartidor(tenant, id, { nombre, activo }) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
+  const db = new Database(dbPath);
+  try {
+    if (nombre !== undefined) db.prepare('UPDATE repartidores SET nombre=? WHERE id=?').run(nombre, id);
+    if (activo !== undefined) db.prepare('UPDATE repartidores SET activo=? WHERE id=?').run(activo ? 1 : 0, id);
+    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+function deleteTenantRepartidor(tenant, id) {
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
+  const db = new Database(dbPath);
+  try {
+    db.prepare('DELETE FROM repartidores WHERE id=?').run(id);
+    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+function getTenantMandaditosConfig(tenant) {
+  const cfg = getTenantConfig(tenant);
+  return {
+    mandaditos_silencio_min:     cfg.mandaditos_silencio_min     || '15',
+    mandaditos_recordatorio_min: cfg.mandaditos_recordatorio_min || '30',
+    mandaditos_timeout_post_min: cfg.mandaditos_timeout_post_min || '20',
+  };
+}
+
+function setTenantMandaditosConfig(tenant, config) {
+  const claves = ['mandaditos_silencio_min', 'mandaditos_recordatorio_min', 'mandaditos_timeout_post_min'];
+  const dbPath = path.isAbsolute(tenant.db_path)
+    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
+  const db = new Database(dbPath);
+  try {
+    const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
+    for (const clave of claves) {
+      if (config[clave] !== undefined) stmt.run(clave, String(parseInt(config[clave], 10) || 0));
+    }
+    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
@@ -343,4 +402,6 @@ module.exports = {
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
   getTenantPlan, setTenantPlan,
+  getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
+  getTenantMandaditosConfig, setTenantMandaditosConfig,
 };

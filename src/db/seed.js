@@ -423,6 +423,9 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_colonia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_referencia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupo_mandaditos_id', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_silencio_min', '15')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_recordatorio_min', '30')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_timeout_post_min', '20')");
 
   // Config: pasarela de pagos (administrada desde super-admin)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_activa', '')");
@@ -496,6 +499,22 @@ async function seedDB() {
     tarifa          INTEGER,
     hora_despacho   TEXT    NOT NULL,
     ejecutado       INTEGER NOT NULL DEFAULT 0
+  )`);
+
+  run(`CREATE TABLE IF NOT EXISTS repartidores (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    jid                   TEXT NOT NULL UNIQUE,
+    nombre                TEXT NOT NULL,
+    activo                INTEGER NOT NULL DEFAULT 1,
+    en_ruta               INTEGER NOT NULL DEFAULT 0,
+    pedido_actual_id      INTEGER,
+    tiempo_ruta_inicio    TEXT,
+    entregas_hoy          INTEGER NOT NULL DEFAULT 0,
+    entregas_total        INTEGER NOT NULL DEFAULT 0,
+    entregas_confirmadas  INTEGER NOT NULL DEFAULT 0,
+    promedio_entrega_min  REAL,
+    ultima_actividad      TEXT,
+    creado_en             TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
 
   // ── ENTORNO DE PRUEBAS: activar item_types y poblar productos ────────────────

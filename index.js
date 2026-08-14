@@ -26,7 +26,7 @@ const logger             = require("./src/logger");
 const { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes } = require("./src/handlers/comandos");
 const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
-const { handleMensajeMandaditos } = require("./src/handlers/mandaditos");
+const { handleMensajeMandaditos, handleMensajeRepartidor, esRepartidorActivo } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
 const { startPanel }     = require("./src/panel/server");
 const { setWhatsappClient, setWaEstado, setQR, clearQR } = require("./src/panel/whatsapp-bridge");
@@ -229,6 +229,12 @@ const mandaditosId = getGrupoMandaditosId();
       await handleComandos(msg, client);
       return;
     }
+  }
+
+  // Mensajes privados de repartidores con entrega activa — interceptar antes del bot normal
+  if (esRepartidorActivo(msg.from)) {
+    const atendido = await handleMensajeRepartidor(msg, client);
+    if (atendido) return;
   }
 
   if (msg.hasMedia) {

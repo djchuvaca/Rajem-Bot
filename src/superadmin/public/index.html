@@ -127,6 +127,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div class="nav-item" onclick="showSection('geo')" data-s="geo"><span class="icon">🗺️</span> Geo & Colonias</div>
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
+    <div class="nav-item" onclick="showSection('mandaditos')" data-s="mandaditos"><span class="icon">🛵</span> Mandaditos</div>
     <div class="nav-item" onclick="showSection('global')" data-s="global"><span class="icon">🌐</span> Config Global</div>
     <div class="sidebar-bottom">
       <div class="user-info" id="sa-user-label"></div>
@@ -335,6 +336,54 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
         <div class="card">
           <div class="card-header"><div class="card-title">OpenPay</div><span class="badge badge-gray">Próximamente</span></div>
           <p style="font-size:12px;color:var(--muted)">BBVA. Tarjetas y tiendas de conveniencia en México.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MANDADITOS ── -->
+    <div id="sec-mandaditos" class="section">
+      <h1>Mandaditos — Repartidores</h1>
+      <p class="subtitle">Gestión de repartidores y tiempos de confirmación por negocio</p>
+
+      <div class="form-group" style="max-width:300px">
+        <label>Selecciona negocio</label>
+        <select id="mand-tenant-select" onchange="loadMandaditos()"><option value="">-- selecciona --</option></select>
+      </div>
+
+      <div id="mand-content" style="display:none">
+        <!-- Config de tiempos -->
+        <div class="card" style="margin-bottom:20px;max-width:480px">
+          <div class="card-header"><div class="card-title">⏱️ Tiempos de confirmación</div></div>
+          <div class="grid2">
+            <div class="form-group">
+              <label>Silencio inicial (min)</label>
+              <input type="number" id="mand-silencio" min="1" max="60" placeholder="15">
+            </div>
+            <div class="form-group">
+              <label>Recordatorio (min)</label>
+              <input type="number" id="mand-recordatorio" min="5" max="120" placeholder="30">
+            </div>
+          </div>
+          <div class="form-group" style="max-width:200px">
+            <label>Timeout post-recordatorio (min)</label>
+            <input type="number" id="mand-timeout" min="5" max="60" placeholder="20">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveMandaditosConfig()">Guardar tiempos</button>
+        </div>
+
+        <!-- Tabla repartidores -->
+        <div class="toolbar">
+          <span style="font-size:13px;color:var(--muted)">Repartidores registrados</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadMandaditos()">🔄 Actualizar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Nombre</th><th>Estado</th><th>En ruta</th><th>Pedido</th>
+              <th>Tiempo en ruta</th><th>Hoy</th><th>Total</th><th>Prom. (min)</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="mand-tbody"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1286,6 +1335,99 @@ async function populateTenantSelects() {
 
 // Cargar tenants en la tabla cuando se abre esa sección
 document.querySelector('[data-s="tenants"]').addEventListener('click',()=>setTimeout(loadTenants,100));
+
+// ── MANDADITOS ────────────────────────────────────────────────────────────────
+let _mandTenantId = null;
+
+async function loadMandaditos() {
+  const tid = document.getElementById('mand-tenant-select').value;
+  if (!tid) { document.getElementById('mand-content').style.display='none'; return; }
+  _mandTenantId = tid;
+  document.getElementById('mand-content').style.display='';
+
+  // Config de tiempos
+  const rc = await fetch(`/api/tenants/${tid}/mandaditos-config`);
+  if (rc.ok) {
+    const cfg = await rc.json();
+    document.getElementById('mand-silencio').value     = cfg.mandaditos_silencio_min     || 15;
+    document.getElementById('mand-recordatorio').value = cfg.mandaditos_recordatorio_min || 30;
+    document.getElementById('mand-timeout').value      = cfg.mandaditos_timeout_post_min || 20;
+  }
+
+  // Repartidores
+  const rr = await fetch(`/api/tenants/${tid}/repartidores`);
+  const tbody = document.getElementById('mand-tbody');
+  if (!rr.ok) { tbody.innerHTML='<tr><td colspan="9" class="empty">Error al cargar</td></tr>'; return; }
+  const reps = await rr.json();
+  if (!reps.length) { tbody.innerHTML='<tr><td colspan="9" class="empty">Sin repartidores registrados aún</td></tr>'; return; }
+  tbody.innerHTML = reps.map(r => `
+    <tr>
+      <td><span id="mand-nombre-${r.id}">${esc(r.nombre)}</span></td>
+      <td>${r.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Pausado</span>'}</td>
+      <td>${r.en_ruta ? '<span class="badge badge-yellow">En ruta</span>' : '<span class="badge badge-gray">Libre</span>'}</td>
+      <td>${r.pedido_actual_id ? '#'+r.pedido_actual_id : '—'}</td>
+      <td>${r.minutos_en_ruta != null ? r.minutos_en_ruta+' min' : '—'}</td>
+      <td>${r.entregas_hoy}</td>
+      <td>${r.entregas_total}</td>
+      <td>${r.promedio_entrega_min != null ? r.promedio_entrega_min+' min' : '—'}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="editarRepartidor(${r.id},'${esc(r.nombre)}')">✏️</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleRepartidor(${r.id},${r.activo})">${r.activo ? 'Pausar' : 'Activar'}</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarRepartidor(${r.id})">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function saveMandaditosConfig() {
+  if (!_mandTenantId) return;
+  const config = {
+    mandaditos_silencio_min:     document.getElementById('mand-silencio').value,
+    mandaditos_recordatorio_min: document.getElementById('mand-recordatorio').value,
+    mandaditos_timeout_post_min: document.getElementById('mand-timeout').value,
+  };
+  const r = await fetch(`/api/tenants/${_mandTenantId}/mandaditos-config`, {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(config)
+  });
+  r.ok ? toast('Tiempos guardados') : toast('Error al guardar','err');
+}
+
+async function editarRepartidor(id, nombreActual) {
+  const nuevo = prompt('Nuevo nombre:', nombreActual);
+  if (!nuevo || nuevo === nombreActual) return;
+  const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nombre:nuevo})
+  });
+  r.ok ? (toast('Nombre actualizado'), loadMandaditos()) : toast('Error','err');
+}
+
+async function toggleRepartidor(id, activoActual) {
+  const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({activo: !activoActual})
+  });
+  r.ok ? (toast('Estado actualizado'), loadMandaditos()) : toast('Error','err');
+}
+
+async function eliminarRepartidor(id) {
+  if (!confirm('¿Eliminar este repartidor del registro?')) return;
+  const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, { method:'DELETE' });
+  r.ok ? (toast('Repartidor eliminado'), loadMandaditos()) : toast('Error','err');
+}
+
+// Poblar select de mandaditos junto con los demás selects de tenant
+const _origPopulate = populateTenantSelects;
+document.addEventListener('DOMContentLoaded', () => {
+  const origFn = window.populateTenantSelects;
+});
+
+// Hook: cuando se abre la sección, poblar el select con la misma lista de tenants
+document.querySelector('[data-s="mandaditos"]').addEventListener('click', async () => {
+  const r = await fetch('/api/tenants'); if (!r.ok) return;
+  const data = await r.json();
+  const opts = data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  document.getElementById('mand-tenant-select').innerHTML = '<option value="">-- selecciona --</option>'+opts;
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>

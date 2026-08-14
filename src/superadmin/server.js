@@ -21,6 +21,8 @@ const {
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
   getTenantPlan, setTenantPlan,
+  getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
+  getTenantMandaditosConfig, setTenantMandaditosConfig,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -447,6 +449,48 @@ function _inferTipo(nombre) {
   if (/^privada\s/.test(n))                         return 'privada';
   return 'colonia';
 }
+
+// ── MANDADITOS — REPARTIDORES ─────────────────────────────────────────────────
+app.get('/api/tenants/:id/repartidores', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const reps = getTenantRepartidores(tenant).map(r => ({
+    ...r,
+    // Calcular minutos en ruta si está activo (el panel lo pide al refrescar)
+    minutos_en_ruta: r.en_ruta && r.tiempo_ruta_inicio
+      ? Math.round((Date.now() - new Date(r.tiempo_ruta_inicio).getTime()) / 60000)
+      : null,
+  }));
+  res.json(reps);
+});
+
+app.put('/api/tenants/:id/repartidores/:repId', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { nombre, activo } = req.body;
+  const ok = updateTenantRepartidor(tenant, parseInt(req.params.repId), { nombre, activo });
+  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al actualizar' });
+});
+
+app.delete('/api/tenants/:id/repartidores/:repId', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const ok = deleteTenantRepartidor(tenant, parseInt(req.params.repId));
+  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al eliminar' });
+});
+
+app.get('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json(getTenantMandaditosConfig(tenant));
+});
+
+app.put('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const ok = setTenantMandaditosConfig(tenant, req.body);
+  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al guardar' });
+});
 
 function startSuperAdmin(port = 3001, waClient = null) {
   if (waClient) _waClient = waClient;
