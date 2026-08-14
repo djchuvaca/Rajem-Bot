@@ -1790,13 +1790,14 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
   if (emptyEl) emptyEl.style.display = 'none';
 
   const catMap = categoria === 'refresco' ? _descBebidas : _descSalsas;
-  const emoji  = categoria === 'refresco' ? '🥤' : '🌶️';
+  const emojiFallback = categoria === 'refresco' ? '🥤' : '🌶️';
 
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = items.map(item => {
     const info   = catMap?.[item.producto_slug] || {};
     const nombre = info.nombre || item.producto_slug;
     const desc   = info.descripcion || '';
+    const emoji  = info.emoji || emojiFallback;
     return `<tr style="${item.disponible ? '' : 'opacity:.55'}">
       <td>
         <div class="prod-cell">

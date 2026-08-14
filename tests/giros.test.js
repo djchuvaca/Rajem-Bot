@@ -14,6 +14,7 @@ test('taquería expone todo su catálogo desde el módulo de giro', () => {
   assert.equal(catalogo.cortes.length, getGiro('taqueria').cortes.length);
   assert.deepEqual(catalogo.bebidas.map(p => p.nombre), ['coca cola', 'fanta', 'sprite']);
   assert.deepEqual(catalogo.salsas.map(p => p.nombre), ['picada', 'suave', 'roja', 'cebolla', 'limones']);
+  assert.deepEqual(catalogo.salsas.map(p => p.emoji), ['🌶️', '🌿', '🔴', '🧅', '🍋']);
 });
 
 test('el giro no conserva una segunda plantilla productos[]', () => {

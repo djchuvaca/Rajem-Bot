@@ -127,15 +127,15 @@ module.exports = {
   ],
 
   salsas: [
-    { nombre: 'picada',  precio: 0, sinonimos: 'picante,salsa picada',
+    { nombre: 'picada',  emoji: '🌶️', precio: 0, sinonimos: 'picante,salsa picada',
       descripcion: 'Salsa picada de la casa 🌶️' },
-    { nombre: 'suave',   precio: 0, sinonimos: 'salsa suave,verde',
+    { nombre: 'suave',   emoji: '🌿', precio: 0, sinonimos: 'salsa suave,verde',
       descripcion: 'Salsa suave de tomatillo 🌿' },
-    { nombre: 'roja',    precio: 0, sinonimos: 'salsa roja',
+    { nombre: 'roja',    emoji: '🔴', precio: 0, sinonimos: 'salsa roja',
       descripcion: 'Salsa roja casera 🔴' },
-    { nombre: 'cebolla', precio: 0, sinonimos: 'cebollas,cebollita,cebollitas,cebolla rallada',
+    { nombre: 'cebolla', emoji: '🧅', precio: 0, sinonimos: 'cebollas,cebollita,cebollitas,cebolla rallada',
       descripcion: 'Cebolla fresca 🧅' },
-    { nombre: 'limones', precio: 0, sinonimos: 'limón,limon,limones,limoncito,limoncitos,limón extra,limon extra',
+    { nombre: 'limones', emoji: '🍋', precio: 0, sinonimos: 'limón,limon,limones,limoncito,limoncitos,limón extra,limon extra',
       descripcion: 'Limones frescos para acompañar 🍋' },
   ],
 

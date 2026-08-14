@@ -200,7 +200,7 @@ function getTenantCatalogoAdmin(tenant) {
       formatos: formatosDb.map(f => ({ id: f.id, slug: f.slug, nombre: f.nombre_plural, emoji: f.emoji, activo: !!f.activo })),
       cortes: (giro.cortes || []).map(p => ({ slug: p.slug, nombre: p.nombre, descripcion: p.descripcion || '', seccion: p.seccion || '', activo: estado('corte', p.slug) })),
       bebidas: (giro.refrescos || []).map(p => ({ slug: p.nombre, nombre: p.nombre, descripcion: p.descripcion || '', activo: estado('refresco', p.nombre) })),
-      salsas: (giro.salsas || []).map(p => ({ slug: p.nombre, nombre: p.nombre, descripcion: p.descripcion || '', activo: estado('salsa', p.nombre) })),
+      salsas: (giro.salsas || []).map(p => ({ slug: p.nombre, nombre: p.nombre, emoji: p.emoji || '🌶️', descripcion: p.descripcion || '', activo: estado('salsa', p.nombre) })),
     };
   } catch (_) { return null; }
 }
