@@ -12,7 +12,7 @@ const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
   detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
   detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
-  parsearDistribucionRefrescos, normalizar, buscarCorteFuzzy,
+  parsearDistribucionRefrescos, detectarComplementosNoDisponibles, normalizar, buscarCorteFuzzy,
   detectarTipoItemDesdeTexto, listaItemTypes,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
@@ -89,7 +89,8 @@ function _calcularPrecioSalsas(items, cantTotal, precios) {
   const salsasDB = getSalsas();
   const getPrecio = nombre => {
     const sal = salsasDB.find(s => s.nombre === nombre.toLowerCase());
-    return (sal && sal.precio_taco > 0) ? sal.precio_taco : precios.pSalsa;
+    // Cero es un precio explícito válido (complemento gratuito), no un dato faltante.
+    return sal && sal.precio_taco != null ? Number(sal.precio_taco) : precios.pSalsa;
   };
   if (items.length > 0 && typeof items[0] === "object") {
     return items.reduce((acc, s) => acc + (s.cantidad || 1) * getPrecio(s.nombre), 0);
@@ -884,6 +885,12 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
 
 // ── EXTRAS (Refresco / Salsa / más items) ────────────────────────────────────
 async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa) {
+  const noDisponibles = detectarComplementosNoDisponibles(textoOriginal);
+  if (noDisponibles.length) {
+    const nombres = noDisponibles.map(x => `*${x.nombre.charAt(0).toUpperCase()}${x.nombre.slice(1)}*`).join(', ');
+    await msg.reply(`${nombres} ${noDisponibles.length === 1 ? 'no está disponible' : 'no están disponibles'} en este momento. Puedes elegir otra salsa o refresco.`);
+    return true;
+  }
   if (!esperandoExtras.has(clienteNumero)) return false;
 
   const ctx = esperandoExtras.get(clienteNumero);
@@ -1289,6 +1296,12 @@ async function handleRepetirPedido(msg, textoOriginal, clienteNumero, historial)
 
 // ── PARSER LOCAL (pedido completo con corte) ──────────────────────────────────
 async function handlePedidoSimple(msg, textoOriginal, clienteNumero, historial) {
+  const noDisponibles = detectarComplementosNoDisponibles(textoOriginal);
+  if (noDisponibles.length) {
+    const nombres = noDisponibles.map(x => `*${x.nombre.charAt(0).toUpperCase()}${x.nombre.slice(1)}*`).join(', ');
+    await msg.reply(`${nombres} ${noDisponibles.length === 1 ? 'no está disponible' : 'no están disponibles'} en este momento. Puedes elegir otra opción del menú.`);
+    return true;
+  }
   const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
   const jsonSimple = parsearPedidoSimple(textoLimpio);
   if (!jsonSimple || jsonSimple.tipo !== "pedido") return false;

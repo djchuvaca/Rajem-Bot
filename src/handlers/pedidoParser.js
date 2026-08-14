@@ -70,6 +70,7 @@ module.exports = {
   getSalsas:                        _p('getSalsas'),
   detectarRefresco:                 _p('detectarRefresco'),
   detectarSalsa:                    _p('detectarSalsa'),
+  detectarComplementosNoDisponibles:_p('detectarComplementosNoDisponibles'),
   separarRefresco:                  _p('separarRefresco'),
   buscarCorteFuzzy:                 _p('buscarCorteFuzzy'),
   parsearDistribucionCortes:        _p('parsearDistribucionCortes'),

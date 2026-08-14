@@ -37,7 +37,7 @@ function _complementos(categoria) {
   const filas = queryAll("SELECT * FROM menu_items WHERE categoria=? AND COALESCE(formato_slug,'')='' AND eliminado=0", [categoria]) || [];
   return defs.map(def => {
     const fila = filas.find(f => f.producto_slug.toLowerCase() === def.nombre.toLowerCase());
-    return { ...def, id: fila?.id, activo: fila?.activo ?? 0,
+    return { ...def, id: fila?.id, activo: fila?.activo ?? 0, disponible: fila?.disponible ?? 1,
       precio: fila?.precio ?? def.precio ?? 0, precio_taco: fila?.precio ?? def.precio ?? 0 };
   });
 }

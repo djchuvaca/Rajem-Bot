@@ -113,7 +113,7 @@ function getRefrescos() {
   if (_refrescosCache && ahora - _refrescosCacheTs < _CORTES_TTL) return _refrescosCache;
   try {
     const { getBebidasTenant } = require('../catalogo-tenant');
-    _refrescosCache = getBebidasTenant().filter(x => x.activo);
+    _refrescosCache = getBebidasTenant().filter(x => x.activo && x.disponible);
     _refrescosCacheTs = Date.now();
     return _refrescosCache;
   } catch (_) { return []; }
@@ -124,7 +124,7 @@ function getSalsas() {
   if (_salsasCache && ahora - _salsasCacheTs < _CORTES_TTL) return _salsasCache;
   try {
     const { getSalsasTenant } = require('../catalogo-tenant');
-    _salsasCache = getSalsasTenant().filter(x => x.activo);
+    _salsasCache = getSalsasTenant().filter(x => x.activo && x.disponible);
     _salsasCacheTs = Date.now();
     return _salsasCache;
   } catch (_) { return []; }
@@ -215,6 +215,31 @@ function detectarRefresco(texto) {
     }
   }
   return null;
+}
+
+/**
+ * Reconoce complementos canónicos que existen en Giro pero no pueden venderse
+ * en WhatsApp por estar deshabilitados por Superadmin o agotados por el tenant.
+ * Las negaciones ("sin limón") se excluyen deliberadamente.
+ */
+function detectarComplementosNoDisponibles(texto) {
+  const { getBebidasTenant, getSalsasTenant } = require('../catalogo-tenant');
+  const t = normalizar(texto);
+  const encontrados = [];
+  for (const [categoria, items] of [['refresco', getBebidasTenant()], ['salsa', getSalsasTenant()]]) {
+    for (const item of items.filter(x => !x.activo || !x.disponible)) {
+      const variantes = [item.nombre, ...(item.sinonimos || '').split(',').map(x => x.trim()).filter(Boolean)];
+      for (const variante of variantes) {
+        const escaped = normalizar(variante).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+        const match = new RegExp(`\\b${escaped}\\b`, 'i').exec(t);
+        if (match && !_tieneNegacionAntes(t, match.index)) {
+          encontrados.push({ nombre: item.nombre, categoria, agotado: Boolean(item.activo && !item.disponible) });
+          break;
+        }
+      }
+    }
+  }
+  return encontrados;
 }
 
 // ── EXTRAER CORTE ─────────────────────────────────────────────────────────────
@@ -683,11 +708,13 @@ function separarRefresco(texto) {
       if (!variante) continue;
       const varNorm = normalizar(variante);
       const escaped = varNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-      if (!new RegExp(`\\b${escaped}s?\\b`).test(textoActual)) continue;
-      const mCant   = textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+${escaped}s?\\b`))
-                   || textoActual.match(new RegExp(`\\b([1-9]\\d?)\\s+salsas?\\s+(?:de\\s+)?${escaped}s?\\b`));
-      const cantidad = mCant ? parseInt(mCant[1]) : 1;
-      const reRemove = new RegExp(`(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:[1-9]\\d?|un[ao]?)?\\s*(?:salsas?\\s+(?:de\\s+)?)?${escaped}s?\\b`, 'g');
+      const matchVariante = new RegExp(`\\b${escaped}s?\\b`).exec(textoActual);
+      if (!matchVariante || _tieneNegacionAntes(textoActual, matchVariante.index)) continue;
+      const cantPat = '[1-9]\\d?|un[ao]?s?|dos|tres|cuatro';
+      const mCant   = textoActual.match(new RegExp(`\\b(${cantPat})\\s+${escaped}s?\\b`))
+                   || textoActual.match(new RegExp(`\\b(${cantPat})\\s+salsas?\\s+(?:de\\s+)?${escaped}s?\\b`));
+      const cantidad = mCant ? (/^\\d+$/.test(mCant[1]) ? parseInt(mCant[1]) : (NUMS_TEXTO[mCant[1]] || 1)) : 1;
+      const reRemove = new RegExp(`(?:\\s*(?:,|y|mas|tambien|con|\\+))?\\s*(?:${cantPat})?\\s*(?:salsas?\\s+(?:de\\s+)?)?${escaped}s?\\b`, 'g');
       textoActual = _limpiar(textoActual.replace(reRemove, ''));
       salsasEncontradas.push({ nombre: sal.nombre, cantidad });
       break;
@@ -804,6 +831,7 @@ module.exports = {
   detectarRefresco,
   getSalsas,
   detectarSalsa,
+  detectarComplementosNoDisponibles,
   invalidarCacheCortes,
   // Item types (delegados a core)
   detectarTipoItemDesdeTexto,

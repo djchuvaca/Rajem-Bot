@@ -122,7 +122,7 @@ module.exports = {
       descripcion: 'Refresco Coca-Cola bien frío 🥤' },
     { nombre: 'fanta',     precio: 20, sinonimos: 'fanta,naranja',
       descripcion: 'Refresco Fanta bien frío 🥤' },
-    { nombre: 'sprite',    precio: 20, sinonimos: 'sprite,limon,limón',
+    { nombre: 'sprite',    precio: 20, sinonimos: 'sprite',
       descripcion: 'Refresco Sprite bien frío 🥤' },
   ],
 
@@ -135,6 +135,8 @@ module.exports = {
       descripcion: 'Salsa roja casera 🔴' },
     { nombre: 'cebolla', precio: 0, sinonimos: 'cebollas,cebollita,cebollitas,cebolla rallada',
       descripcion: 'Cebolla fresca 🧅' },
+    { nombre: 'limones', precio: 0, sinonimos: 'limón,limon,limones,limoncito,limoncitos,limón extra,limon extra',
+      descripcion: 'Limones frescos para acompañar 🍋' },
   ],
 
   // Mapa alias→slug de emergencia para NLU sin BD
