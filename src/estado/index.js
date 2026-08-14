@@ -56,6 +56,8 @@ module.exports = {
   detectarEdicion:            campos.detectarEdicion,
   aplicarEdicion:             campos.aplicarEdicion,
   sanitizarColonia:           campos.sanitizarColonia,
+  getMetodosPago:             campos.getMetodosPago,
+  normalizarMetodoPago:       campos.normalizarMetodoPago,
   extraerTelefono:            campos.extraerTelefono,
   extraerTelefonoDeJID:       campos.extraerTelefonoDeJID,
 };

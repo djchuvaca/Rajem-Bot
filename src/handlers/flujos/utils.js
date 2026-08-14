@@ -252,28 +252,7 @@ function quitarItemDeOrden(ordenTexto, textoCliente) {
 }
 
 function validarHora(texto) {
-  texto = texto
-    .replace(/\bsiete\s+y\s+media\b/gi, "7:30")
-    .replace(/\bocho\s+y\s+media\b/gi,  "8:30")
-    .replace(/\bnueve\s+y\s+media\b/gi,  "9:30")
-    .replace(/\bdiez\s+y\s+media\b/gi,  "10:30")
-    .replace(/\bonce\s+y\s+media\b/gi,  "11:30")
-    .replace(/\bdoce\s+y\s+media\b/gi,  "12:30")
-    .replace(/\bsiete\b/gi,  "7").replace(/\bocho\b/gi,  "8")
-    .replace(/\bnueve\b/gi,  "9").replace(/\bdiez\b/gi,  "10")
-    .replace(/\bonce\b/gi,  "11").replace(/\bdoce\b/gi,  "12");
-  const m = texto.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/i);
-  if (!m) return null;
-  let h = parseInt(m[1]);
-  const min = parseInt(m[2] || "0");
-  const pm = /pm/i.test(texto);
-  const am = /am/i.test(texto); // eslint-disable-line no-unused-vars
-  if (pm && h < 12) h += 12;
-  const dec = h + min / 60;
-  if (dec < 7 || dec > 12.5) return null;
-  const sufijo = (pm || h >= 12) ? "p.m." : "a.m.";
-  const minStr = min > 0 ? `:${String(min).padStart(2, "0")}` : ":00";
-  return `${h > 12 ? h - 12 : h}${minStr} ${sufijo}`;
+  return require("../../horario").validarHoraPedido(texto);
 }
 
 function _listaCortesDesdeBD() {

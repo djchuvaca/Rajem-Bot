@@ -6,6 +6,7 @@ const {
   referenciaPreguntas, getHistorial, ordenPreResumen,
   mostrarFormularioProgresivo, siguienteCampoFaltante, camposATexto,
   persistirEstado, detectarEdicion, aplicarEdicion,
+  getMetodosPago, normalizarMetodoPago,
 } = require("../../estado");
 const { generarResumen } = require("../../pedido/resumen");
 const { MENU_FORMATO } = require("../../config");
@@ -33,16 +34,10 @@ async function handleEdicionPendiente(msg, textoOriginal, clienteNumero, histori
   }
 
   if (edicionPendiente.campo === "metodo") {
-    const vNorm = valorNuevo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    if (!/^(efectivo|tarjeta|transferencia)$/.test(vNorm)) {
-      const pregMetodo = esOrdenDomEdit
-        ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
-        : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
+    const vNorm = normalizarMetodoPago(valorNuevo, esOrdenDomEdit);
+    if (!vNorm) {
+      const pregMetodo = `*¿Cómo vas a pagar?* ${getMetodosPago(esOrdenDomEdit).texto}.`;
       await msg.reply("Opción no válida. " + pregMetodo);
-      return true;
-    }
-    if (esOrdenDomEdit && /tarjeta/i.test(valorNuevo)) {
-      await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
       return true;
     }
     valorNuevo = vNorm;
@@ -105,19 +100,19 @@ async function handleConfirmacionDatos(msg, textoOriginal, clienteNumero, histor
   const edicionForm = detectarEdicion(textoOriginal);
   if (edicionForm && !confirma && !niega) {
     if (edicionForm.campo === "metodo" && edicionForm.preguntar) {
-      const pregMetodo = esOrdenDom
-        ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
-        : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
+      const pregMetodo = `*¿Cómo vas a pagar?* ${getMetodosPago(esOrdenDom).texto}.`;
       esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "formulario" });
       await msg.reply(pregMetodo);
       return true;
     }
     if (edicionForm.campo === "metodo" && !edicionForm.preguntar) {
-      if (esOrdenDom && /tarjeta/i.test(edicionForm.valor)) {
-        await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
+      const metodoValido = normalizarMetodoPago(edicionForm.valor, esOrdenDom);
+      if (!metodoValido) {
+        await msg.reply(`Ese método no está habilitado. *¿Cuál prefieres?* ${getMetodosPago(esOrdenDom).texto}.`);
         esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "formulario" });
         return true;
       }
+      edicionForm.valor = metodoValido;
       aplicarEdicion(clienteNumero, edicionForm);
       const formAct = mostrarFormularioProgresivo(clienteNumero, esOrdenDom, esPreventa);
       await msg.reply("Perfecto! Datos actualizados:\n\n" + formAct + "\n\n*¿Son correctos los datos?*");

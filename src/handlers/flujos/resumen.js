@@ -5,6 +5,7 @@ const {
   horaEntregaPreventa, pedidoJSONActual, pendientesConfirmacion, clientesNuevos,
   pedidosConfirmados, ordenPreResumen, getHistorial, extraerDatosPedido, persistirEstado,
   detectarEdicion, aplicarEdicion, limpiarTodo, extraerTelefonoDeJID, esperandoPagoMP,
+  getMetodosPago, normalizarMetodoPago,
 } = require("../../estado");
 const { generarResumen, extraerOrdenDeResumen, jsonALineas } = require("../../pedido/resumen");
 const { parsearPedidoSimple, detectarSinCorte, detectarModificacion } = require("../pedidoParser");
@@ -101,20 +102,20 @@ async function handleEdicionResumen(msg, textoOriginal, clienteNumero, historial
   }
 
   if (edicion.campo === "metodo" && edicion.preguntar) {
-    const pregMetodo = esOrdenDomEdit
-      ? "*¿Cómo vas a pagar?* Efectivo o transferencia."
-      : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia.";
+    const pregMetodo = `*¿Cómo vas a pagar?* ${getMetodosPago(esOrdenDomEdit).texto}.`;
     esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "resumen", ordenTexto: ordenExtraida });
     await msg.reply(pregMetodo);
     return true;
   }
 
   if (edicion.campo === "metodo" && !edicion.preguntar) {
-    if (esOrdenDomEdit && /tarjeta/i.test(edicion.valor)) {
-      await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
+    const metodoValido = normalizarMetodoPago(edicion.valor, esOrdenDomEdit);
+    if (!metodoValido) {
+      await msg.reply(`Ese método no está habilitado. *¿Cuál prefieres?* ${getMetodosPago(esOrdenDomEdit).texto}.`);
       esperandoEdicion.set(clienteNumero, { campo: "metodo", contexto: "resumen", ordenTexto: ordenExtraida });
       return true;
     }
+    edicion.valor = metodoValido;
     aplicarEdicion(clienteNumero, edicion);
     const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, esOrdenDomEdit, esPreventa);
     resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
@@ -448,11 +449,9 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     const calle_numero  = camposCliente.calle || null;
     const colonia       = camposCliente.colonia || null;
     const referencia    = (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null;
-    const hora_entrega  = horaEntregaPreventa.get(clienteNumero) || null;
+    const hora_entrega  = camposCliente.hora || horaEntregaPreventa.get(clienteNumero) || null;
     const total         = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
-    const metodo_pago   = /transferencia/i.test(pendiente.texto) ? "transferencia"
-                        : /tarjeta/i.test(pendiente.texto)       ? "tarjeta"
-                        : "efectivo";
+    const metodo_pago   = camposCliente.metodo || "efectivo";
     const cliente = upsertCliente({ nombre, apellido, telefono: telefonoLimpio, calle_numero, colonia, referencia });
     pedidoId = registrarPedido({
       cliente_id: cliente ? cliente.id : null,

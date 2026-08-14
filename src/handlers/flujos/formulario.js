@@ -349,7 +349,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   const esConfirmacionDatos = /^(si|sí|ok|okey|va|dale|claro|correcto|listo|sip|sep|exacto|perfecto|todo\s+bien|está\s+bien|esta\s+bien|así\s+es|asi\s+es|afirmativo|bueno|bien)$/i.test(textoOriginal.trim());
   if (esConfirmacionDatos && camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
-    if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
+    if (camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
     datosRecibidos.add(clienteNumero);
     const ordenTexto = ordenPreResumen.get(clienteNumero);
     ordenPreResumen.delete(clienteNumero);
@@ -376,13 +376,13 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   const coloniaAntes = (datosCampos.get(clienteNumero) || {}).colonia;
   const campos = interpretarCampos(clienteNumero, textoOriginal, esOrdenDomicilio, esPreventa);
 
-  if (esPreventa && campos._horaFueraRango) {
+  if (campos._horaFueraRango) {
     const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
     const tipoPedido     = esOrdenDomicilio ? "recibirlo" : "pasar a recoger";
     const rango    = getRangoHorario();
     const msgHora  = campos._horaFueraRango === "antes"
-      ? `Aun no iniciamos labores a esa hora. Nuestro horario es de *${rango}*`
-      : `A esa hora ya estamos fuera de servicio. Nuestro horario es de *${rango}*`;
+      ? `Esa hora está fuera de nuestro horario de *${rango}*`
+      : `Esa hora está fuera de nuestro horario de *${rango}*`;
     await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre " + rango + ")");
     delete campos._horaFueraRango;
     datosCampos.set(clienteNumero, campos);
@@ -447,6 +447,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
       } else {
         // Encontrada — normalizar al nombre canónico
         caVal.colonia = encontrada.nombre;
+        delete caVal._coloniaNoVerificada;
         datosCampos.set(clienteNumero, caVal);
         _intentosColonia.delete(clienteNumero);
       }
@@ -455,7 +456,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
 
   if (camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
-    if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
+    if (camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
     datosRecibidos.add(clienteNumero);
     const ordenTexto = ordenPreResumen.get(clienteNumero);
     ordenPreResumen.delete(clienteNumero);

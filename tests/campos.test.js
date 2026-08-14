@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 
 const { initDB } = require("../src/db/core");
 const { seedDB } = require("../src/db/seed");
+const { setConfig } = require("../src/db");
 const {
   extraerTelefono,
   extraerTelefonoDeJID,
@@ -137,6 +138,7 @@ describe("interpretarCampos — mostrador", () => {
     interpretarCampos(NUM2, "Ana López", false, false);
     interpretarCampos(NUM2, "3319876543", false, false);
     interpretarCampos(NUM2, "efectivo", false, false);
+    interpretarCampos(NUM2, "paso a las 10:30", false, false);
     assert.ok(camposCompletos(NUM2, false, false));
     _mapa.delete(NUM2);
   });
@@ -184,8 +186,54 @@ describe("siguienteCampoFaltante", () => {
     interpretarCampos(NUM2, "Luis Mora", false, false);
     interpretarCampos(NUM2, "3315551234", false, false);
     interpretarCampos(NUM2, "efectivo", false, false);
+    interpretarCampos(NUM2, "a las 10:30", false, false);
     const f = siguienteCampoFaltante(NUM2, false, false);
     assert.equal(f, null);
     _mapa.delete(NUM2);
+  });
+});
+
+describe("interpretarCampos — conversación natural", () => {
+  test("limpia el prefijo 'me llamo' del nombre", () => {
+    const numero = "3310000010@c.us";
+    _mapa.delete(numero);
+    const campos = interpretarCampos(numero, "Me llamo Juan Pérez", false, false);
+    assert.equal(campos.nombre, "Juan Pérez");
+    _mapa.delete(numero);
+  });
+
+  test("captura hora para un pedido normal, no solo preventa", () => {
+    const numero = "3310000011@c.us";
+    _mapa.delete(numero);
+    const campos = interpretarCampos(numero, "paso a recoger a las nueve y media", false, false);
+    assert.equal(campos.hora, "9:30 a.m.");
+    _mapa.delete(numero);
+  });
+
+  test("captura datos completos progresivamente con lenguaje natural", () => {
+    const numero = "3310000012@c.us";
+    _mapa.delete(numero);
+    interpretarCampos(numero, "Mi nombre es Ana López", true, false);
+    interpretarCampos(numero, "311 234 5678", true, false);
+    interpretarCampos(numero, "Av. México 123, Col. Centro", true, false);
+    interpretarCampos(numero, "pago al recibir", true, false);
+    const campos = interpretarCampos(numero, "quiero la entrega a las 11 am", true, false);
+    assert.equal(campos.nombre, "Ana López");
+    assert.equal(campos.telefono, "3112345678");
+    assert.match(campos.calle, /México 123/i);
+    assert.match(campos.colonia, /Centro/i);
+    assert.equal(campos.metodo, "efectivo");
+    assert.equal(campos.hora, "11:00 a.m.");
+    _mapa.delete(numero);
+  });
+
+  test("respeta los métodos habilitados por el tenant", () => {
+    const numero = "3310000013@c.us";
+    setConfig("metodos_mostrador", "efectivo o transferencia");
+    _mapa.delete(numero);
+    assert.equal(interpretarCampos(numero, "pago con tarjeta", false, false).metodo, null);
+    assert.equal(interpretarCampos(numero, "pago con SPEI", false, false).metodo, "transferencia");
+    setConfig("metodos_mostrador", "efectivo, tarjeta o transferencia");
+    _mapa.delete(numero);
   });
 });

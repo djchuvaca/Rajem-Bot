@@ -15,10 +15,11 @@ const {
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
-const { getRangoHorario } = require("../horario");
+const { getRangoHorario, validarHoraPedido } = require("../horario");
+const { getConfig } = require("../db");
 
 // ── PALABRAS RESERVADAS ───────────────────────────────────────────────────────
-const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|spei|deposito|dep[oó]sito|cash|mostrador|domicilio|recoger|colonia|calle|correo|referencia|sin|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|priv|interior|entre|junto|frente|cerca|casa|fraccionamiento|fracc|unidad|lote)$/i;
+const PALABRAS_NO_NOMBRE = /^(efectivo|tarjeta|transferencia|spei|deposito|dep[oó]sito|cash|pago|pagar|mostrador|domicilio|entrega|recoger|recoleccion|recolección|colonia|calle|correo|referencia|telefono|teléfono|tel|numero|número|nombre|llamo|soy|quiero|deseo|paso|voy|llego|recibo|recibir|las|mi|me|es|la|el|al|para|con|sin|si|no|ok|va|dale|nada|listo|sale|andale|norte|sur|oriente|poniente|centro|reforma|avenida|boulevard|privada|priv|interior|entre|junto|frente|cerca|casa|fraccionamiento|fracc|unidad|lote)$/i;
 
 // ── EXTRACCIÓN DE TELÉFONO ────────────────────────────────────────────────────
 function extraerTelefono(texto) {
@@ -59,6 +60,24 @@ function sanitizarColonia(texto) {
   if (!texto) return null;
   const r = texto.replace(/[,;:.!?]+$/, '').replace(/\s{2,}/g, ' ').trim();
   return r.length >= 2 ? r : null;
+}
+
+function getMetodosPago(esDomicilio = false) {
+  const texto = String(getConfig(esDomicilio ? "metodos_domicilio" : "metodos_mostrador") ||
+    (esDomicilio ? "efectivo o transferencia" : "efectivo, tarjeta o transferencia"));
+  const valores = [];
+  if (/efectivo|cash/i.test(texto)) valores.push("efectivo");
+  if (/tarjeta|terminal/i.test(texto)) valores.push("tarjeta");
+  if (/transferencia|spei|dep[oó]sito/i.test(texto)) valores.push("transferencia");
+  return { texto, valores };
+}
+
+function normalizarMetodoPago(texto, esDomicilio = false) {
+  let metodo = null;
+  if (/transferencia|spei|dep[oó]sito|transfiero?/i.test(texto)) metodo = "transferencia";
+  else if (/tarjeta|terminal|con\s+tarjeta/i.test(texto)) metodo = "tarjeta";
+  else if (/efectivo|cash|pago\s+al\s+(?:recibir|llegar)/i.test(texto)) metodo = "efectivo";
+  return metodo && getMetodosPago(esDomicilio).valores.includes(metodo) ? metodo : null;
 }
 
 // ── FUNCIONES BASE ────────────────────────────────────────────────────────────
@@ -120,42 +139,15 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
   // ── Método de pago ────────────────────────────────────────────────────────
   if (!campos.metodo) {
-    if (/transferencia|spei|dep[oó]sito|transfiero?/i.test(textoCompleto))              campos.metodo = "transferencia";
-    else if (!esDomicilio && /tarjeta|con\s+tarjeta/i.test(textoCompleto))             campos.metodo = "tarjeta";
-    else if (/efectivo|en\s+efectivo|cash/i.test(textoCompleto))                       campos.metodo = "efectivo";
+    const detectado = normalizarMetodoPago(textoCompleto, esDomicilio);
+    if (detectado) campos.metodo = detectado;
   }
 
-  // ── Hora (preventa) ───────────────────────────────────────────────────────
-  if (esPreventa && !campos.hora) {
-    let horaExtraida = null;
-    const t = textoCompleto;
-
-    const m1 = t.match(/\ba\s+las?\s+(\d{1,2}(?::\d{2})?)\s*(?:am|pm|a\.m\.|p\.m\.)?/i);
-    if (m1) horaExtraida = m1[0].trim();
-
-    if (!horaExtraida) {
-      const m2 = t.match(/\b(?:paso|voy|llego|recojo|vengo)\s+a\s+las?\s+(\d{1,2}(?::\d{2})?)\s*(?:am|pm)?/i);
-      if (m2) horaExtraida = m2[0].trim();
-    }
-
-    if (!horaExtraida) {
-      const m3 = t.match(/\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm|a\.m\.|p\.m\.)/i);
-      if (m3) horaExtraida = m3[0].trim();
-    }
-
-    if (horaExtraida) {
-      const nm = horaExtraida.match(/(\d{1,2})(?::(\d{2}))?/);
-      if (nm) {
-        const h = parseInt(nm[1]);
-        const m = parseInt(nm[2] || "0");
-        const esPm = /pm/i.test(horaExtraida);
-        let horaDecimal = h + m / 60;
-        if (esPm && h < 12) horaDecimal += 12;
-        if (horaDecimal < 7)         campos._horaFueraRango = "antes";
-        else if (horaDecimal > 12.5) campos._horaFueraRango = "despues";
-        else { campos.hora = horaExtraida; delete campos._horaFueraRango; }
-      }
-    }
+  // ── Hora de entrega o recolección ────────────────────────────────────────
+  if (!campos.hora && /(?:a\s+las?|paso|voy|llego|recojo|recibir|entrega|\b(?:am|pm|a\.m\.|p\.m\.)\b)/i.test(textoCompleto)) {
+    const hora = validarHoraPedido(textoCompleto);
+    if (hora) { campos.hora = hora; delete campos._horaFueraRango; }
+    else campos._horaFueraRango = true;
   }
 
   // ── Dirección en una línea con col. ───────────────────────────────────────
@@ -192,7 +184,8 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
 
   // ── Nombre ────────────────────────────────────────────────────────────────
   if (!campos.nombre) {
-    const primeraLinea  = textoNuevo.split(/\n/)[0].trim();
+    const primeraLinea  = textoNuevo.split(/\n/)[0].trim()
+      .replace(/^(?:mi\s+nombre(?:\s+completo)?\s+es|me\s+llamo|soy)\s+/i, "");
     const primeraLimpia = primeraLinea
       .replace(/\b\d{10}\b/g, "")
       .replace(/efectivo|en\s+efectivo|cash|tarjeta|transferencia|spei|dep[oó]sito/gi, "")
@@ -277,8 +270,7 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
   }
 
   msg += `💳 *Método de pago:* ${lleno(campos.metodo)}`;
-  if (esPreventa)
-    msg += `\n🕖 *Hora de ${esDomicilio ? "entrega" : "recolección"}:* ${lleno(campos.hora)}`;
+  msg += `\n🕖 *Hora de ${esDomicilio ? "entrega" : "recolección"}:* ${lleno(campos.hora)}`;
   msg += `\n${SEP}`;
   return msg;
 }
@@ -304,8 +296,11 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
     }
   }
 
-  if (!campos.metodo) return { campo: "metodo", pregunta: esDomicilio ? "*¿Cómo vas a pagar?* Efectivo o transferencia." : "*¿Cómo vas a pagar?* Efectivo, tarjeta o transferencia." };
-  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre ${getRangoHorario()})` };
+  if (!campos.metodo) {
+    const metodos = getMetodosPago(esDomicilio).texto;
+    return { campo: "metodo", pregunta: `*¿Cómo vas a pagar?* ${metodos}.` };
+  }
+  if (!campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre ${getRangoHorario()})` };
 
   return null;
 }
@@ -324,7 +319,7 @@ function camposCompletos(numero, esDomicilio = false, esPreventa = false) {
   const campos = datosCampos.get(numero) || {};
   if (!campos.nombre || !campos.telefono || !campos.metodo) return false;
   if (esDomicilio && (!campos.calle || !campos.colonia))    return false;
-  if (esPreventa  && !campos.hora)                          return false;
+  if (!campos.hora)                                         return false;
   if (esDomicilio && !referenciaPreguntas.has(numero) && !campos.referencia) return false;
   return true;
 }
@@ -350,10 +345,8 @@ function datosCompletos(texto, esPreventa = false, esDomicilio = false) {
     || /\bpaso\s+a\s+las?\s+\d{1,2}/i.test(texto)
     || /\n\d{1,2}(:\d{2})?\s*$/.test(texto);
   const tieneDireccion = /calle\s+\w|col\.\s*\w|colonia\s+\w|av\.\s*\w|blvd\s*\w|#\s*\d|no\.\s*\d|\bn[uú]m\s*\d/i.test(texto);
-  if (esDomicilio && esPreventa) return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora && tieneDireccion;
-  if (esDomicilio)  return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneDireccion;
-  if (esPreventa)   return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora;
-  return tieneNumeroTelefono && tieneNombre && tieneMetodoPago;
+  if (esDomicilio) return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora && tieneDireccion;
+  return tieneNumeroTelefono && tieneNombre && tieneMetodoPago && tieneHora;
 }
 
 function pareceFragmentoDatos(texto) {
@@ -483,7 +476,13 @@ function aplicarEdicion(clienteNumero, edicion) {
       campos.calle = calleBase ? `${calleBase} #${edicion.valor}` : `#${edicion.valor}`;
       break;
     }
-    case "colonia":   campos.colonia   = edicion.valor; break;
+    case "colonia": {
+      const encontrada = require("../geo").buscarColonia(edicion.valor);
+      campos.colonia = encontrada?.nombre || sanitizarColonia(edicion.valor);
+      if (encontrada) delete campos._coloniaNoVerificada;
+      else campos._coloniaNoVerificada = true;
+      break;
+    }
     case "referencia": campos.referencia = edicion.valor; break;
   }
   datosCampos.set(clienteNumero, campos);
@@ -494,6 +493,7 @@ module.exports = {
   PALABRAS_NO_NOMBRE,
   getHistorial, limpiarTodo, acumularDatos,
   sanitizarColonia,
+  getMetodosPago, normalizarMetodoPago,
   interpretarCampos, mostrarFormularioProgresivo, siguienteCampoFaltante,
   manejarOpcional, camposCompletos, camposATexto,
   datosCompletos, pareceFragmentoDatos, extraerDatosPedido,
