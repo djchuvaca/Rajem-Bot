@@ -84,13 +84,6 @@ function respuestaPrecio(producto = null) {
       const porSlug  = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
       cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => c.slug !== 'surtido');
     } catch (_) {}
-    // Fallback si menu_items está vacío: usar cortes activos del catálogo
-    if (!cortes.length) {
-      try {
-        const { getCortesBDObj } = require("../db/cortes");
-        cortes = (getCortesBDObj() || []).filter(c => c.slug !== 'surtido');
-      } catch (_) {}
-    }
 
     // Precio para un corte en un formato específico
     const precioCorteFormato = (corteId, formatoSlug) => {
@@ -132,12 +125,7 @@ function respuestaPrecio(producto = null) {
     if (todosIguales || !cortes.length) {
       const nombres = cortes.length
         ? cortes.map(c => (c.nombre || c.slug).charAt(0).toUpperCase() + (c.nombre || c.slug).slice(1)).join(", ")
-        : (() => {
-            try {
-              const { getGiroActivo } = require('../giros');
-              return (getGiroActivo()?.cortes || []).map(c => c.nombre).join(', ');
-            } catch (_) { return ''; }
-          })();
+        : 'Ninguno activo';
       let lineasPrecios = "";
       for (const it of formatosPrecio) {
         const p = it.precio_base || (it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
@@ -305,9 +293,11 @@ function aplicarCambiarCorte(ordenTexto, de, por) {
 // ── RESPUESTA: DESCRIPCIÓN DE CORTE ──────────────────────────────────────────
 function respuestaDescripcionCorte(corte) {
   const negocio  = getNegocio();
-  const productos = getProductos();
-  const prod = productos.find(p => p.nombre.toLowerCase() === corte?.toLowerCase());
-  const desc = prod?.descripcion;
+  const catalogo = require('../giros/catalogo-tenant');
+  const activos = new Set(catalogo.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  const productos = catalogo.getCortesTenant().filter(c => activos.has(c.slug));
+  const prod = catalogo.getDefinicionProducto('corte', corte || '');
+  const desc = prod && activos.has(prod.slug) ? prod.descripcion : null;
   if (!desc) {
     const nombres = productos.length
       ? productos.map(p => p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1)).join(", ")

@@ -73,14 +73,12 @@ function _preguntaCorte(desc) {
 
 function _listaNombresRefrescos() {
   const refs = require("../pedidoParser").getRefrescos();
-  const fuente = refs.length > 0 ? refs : (getGiroActivo()?.refrescos || []);
-  return fuente.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ");
+  return refs.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ") || 'No hay refrescos activos';
 }
 
 function _listaNombresSalsas() {
   const sals = getSalsas();
-  const fuente = sals.length > 0 ? sals : (getGiroActivo()?.salsas || []);
-  return fuente.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ");
+  return sals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ") || 'No hay salsas activas';
 }
 
 

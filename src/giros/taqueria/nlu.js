@@ -14,7 +14,7 @@
  */
 
 const core = require('../../nlu/core');
-const { getConfig, getProductos } = require('../../db');
+const { getConfig } = require('../../db');
 
 const {
   normalizar,
@@ -97,63 +97,23 @@ function getCortes() {
     const { getCortesBD } = require('../../db');
     const cortesBD = getCortesBD();
     if (cortesBD && Object.keys(cortesBD).length > 0) {
-      let mapa = { ...cortesBD };
-      try {
-        const productos = getProductos();
-        for (const p of (productos || [])) {
-          if (p.categoria === 'refresco' || p.categoria === 'salsa') continue;
-          const nom = p.nombre.toLowerCase().trim();
-          if (!mapa[nom]) {
-            mapa[nom] = nom;
-            const plural = /[aeiouáéíóú]$/i.test(nom) ? nom + 's' : nom + 'es';
-            mapa[plural] = nom;
-            if (p.sinonimos) {
-              for (const s of p.sinonimos.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)) {
-                if (!mapa[s]) mapa[s] = nom;
-              }
-            }
-          }
-        }
-      } catch (_) {}
+      const mapa = { ...cortesBD };
       _cortesCache   = _filtrarPorSeccion(mapa);
       _cortesCacheTs = Date.now();
       return _cortesCache;
     }
   } catch (_) {}
-  // Fallback: tabla productos legada
-  try {
-    const productos = getProductos();
-    if (!productos || !productos.length) return _cortesDefault();
-    const mapa = {};
-    for (const p of productos) {
-      if (p.categoria === 'refresco' || p.categoria === 'salsa') continue;
-      const nombre = p.nombre.toLowerCase().trim();
-      mapa[nombre] = nombre;
-      const plural = /[aeiouáéíóú]$/i.test(nombre) ? nombre + 's' : nombre + 'es';
-      mapa[plural] = nombre;
-      if (p.sinonimos) {
-        for (const s of p.sinonimos.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)) {
-          mapa[s] = nombre;
-        }
-      }
-    }
-    _cortesCache   = _filtrarPorSeccion(mapa);
-    _cortesCacheTs = Date.now();
-    return _cortesCache;
-  } catch (_) { return _cortesDefault(); }
+  _cortesCache = {};
+  _cortesCacheTs = Date.now();
+  return _cortesCache;
 }
 
 function getRefrescos() {
   const ahora = Date.now();
   if (_refrescosCache && ahora - _refrescosCacheTs < _CORTES_TTL) return _refrescosCache;
   try {
-    const giro = getGiroActivo();
-    const estado = (getProductos() || []).filter(p => p.categoria === 'refresco');
-    _refrescosCache = (giro?.refrescos || []).flatMap(def => {
-      const row = estado.find(p => p.nombre.toLowerCase() === def.nombre.toLowerCase());
-      if (!row) return [];
-      return [{ ...row, nombre: def.nombre, descripcion: def.descripcion || '', sinonimos: def.sinonimos || '' }];
-    });
+    const { getBebidasTenant } = require('../catalogo-tenant');
+    _refrescosCache = getBebidasTenant().filter(x => x.activo);
     _refrescosCacheTs = Date.now();
     return _refrescosCache;
   } catch (_) { return []; }
@@ -163,13 +123,8 @@ function getSalsas() {
   const ahora = Date.now();
   if (_salsasCache && ahora - _salsasCacheTs < _CORTES_TTL) return _salsasCache;
   try {
-    const giro = getGiroActivo();
-    const estado = (getProductos() || []).filter(p => p.categoria === 'salsa');
-    _salsasCache = (giro?.salsas || []).flatMap(def => {
-      const row = estado.find(p => p.nombre.toLowerCase() === def.nombre.toLowerCase());
-      if (!row) return [];
-      return [{ ...row, nombre: def.nombre, descripcion: def.descripcion || '', sinonimos: def.sinonimos || '' }];
-    });
+    const { getSalsasTenant } = require('../catalogo-tenant');
+    _salsasCache = getSalsasTenant().filter(x => x.activo);
     _salsasCacheTs = Date.now();
     return _salsasCache;
   } catch (_) { return []; }
@@ -369,6 +324,12 @@ function parsearItem(fragmento) {
     const cantidad      = parseInt(matchPieza[1]);
     const tipoDetectado = detectarTipoItemDesdeTexto(matchPieza[2]);
     const presentacion  = tipoDetectado ? tipoDetectado.slug : matchPieza[2];
+    if (tipoDetectado?.soporta_gramos || presentacion === 'gramos') {
+      const medida = MEDIDAS.find(m => m.re.test(t));
+      const gramos = medida?.gramos ?? cantidad;
+      if (!corte) return { _sinCorte: true, presentacion: 'gramos', gramos };
+      return { presentacion: 'gramos', gramos, corte };
+    }
     if (!corte) return { _sinCorte: true, presentacion, cantidad };
     return { presentacion, cantidad, corte };
   }
@@ -532,6 +493,10 @@ function parsearPedidoSimple(texto) {
     const tipoDetect   = detectarTipoItemDesdeTexto(matchPieza[2]);
     const presentacion = tipoDetect ? tipoDetect.slug : 'taco';
     if (!corteRaw) return null;
+    if (tipoDetect?.soporta_gramos || presentacion === 'gramos') {
+      const medida = MEDIDAS.find(m => m.re.test(t));
+      return { tipo: 'pedido', items: [{ presentacion: 'gramos', gramos: medida?.gramos ?? cantidad, ...corteInfo }] };
+    }
     return { tipo: 'pedido', items: [{ presentacion, cantidad, ...corteInfo }] };
   }
 

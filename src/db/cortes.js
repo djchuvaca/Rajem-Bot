@@ -43,22 +43,13 @@ function getCortesBD() {
     if (!giroId) { _cache = {}; _cacheTs = ahora; return {}; }
     // Si menu_items tiene cortes activos, solo incluir los disponibles en el NLU.
     // Fallback al catálogo completo si menu_items aún no está configurado.
-    const miActivos = queryOne(
-      "SELECT COUNT(*) as n FROM menu_items WHERE categoria='corte' AND activo=1 AND eliminado=0",
-      []
-    );
-    const rows = (miActivos && miActivos.n > 0)
-      ? queryAll(
-          `SELECT DISTINCT c.* FROM cortes c
-           INNER JOIN menu_items mi ON mi.producto_slug = c.slug
-             AND mi.activo = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
-           WHERE c.giro_id = ? AND c.activo = 1 ORDER BY c.id`,
-          [giroId]
-        ) || []
-      : queryAll(
-          'SELECT * FROM cortes WHERE giro_id = ? AND activo = 1 ORDER BY id',
-          [giroId]
-        ) || [];
+    const rows = queryAll(
+      `SELECT DISTINCT c.* FROM cortes c
+       INNER JOIN menu_items mi ON mi.producto_slug = c.slug
+         AND mi.activo = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
+       WHERE c.giro_id = ? AND c.activo = 1 ORDER BY c.id`,
+      [giroId]
+    ) || [];
     const mapa = {};
     for (const c of rows) {
       const slug = c.slug;
@@ -103,15 +94,15 @@ function getAllCortesBD() {
  * Cadena de fallback: precios_json[formato] → precio_base → config global.
  */
 function getPrecioCorteFormato(corteSlug, formatoSlug) {
+  const { getPrecioMenu } = require('../giros/catalogo-tenant');
+  const precioMenu = getPrecioMenu(corteSlug, formatoSlug, 'corte');
+  if (precioMenu !== null) return precioMenu;
   const { getConfig } = require('./config');
   const defTaco  = parseInt(getConfig('precio_taco')  || '30');
   const defTorta = parseInt(getConfig('precio_torta') || '40');
-  const corte = getCortesBDObj().find(c => c.slug === corteSlug);
-  if (!corte) return formatoSlug === 'torta' ? defTorta : defTaco;
-  let precios = {};
-  try { precios = JSON.parse(corte.precios_json || '{}'); } catch (_) {}
-  if (precios[formatoSlug] !== undefined) return precios[formatoSlug];
-  if (corte.precio_base)                  return corte.precio_base;
+  const formato = queryOne(`SELECT it.precio_base FROM item_types it
+    JOIN business_types bt ON bt.id=it.business_type_id WHERE bt.slug=(SELECT valor FROM configuracion WHERE clave='business_type_slug') AND it.slug=?`, [formatoSlug]);
+  if (formato?.precio_base) return Number(formato.precio_base);
   return formatoSlug === 'torta' ? defTorta : defTaco;
 }
 

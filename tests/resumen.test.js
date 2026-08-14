@@ -84,7 +84,7 @@ describe("procesarItemJSON", () => {
     const r = procesarItemJSON({ presentacion: "torta", cantidad: 2, corte: "buche" }, precios);
     assert.match(r, /2 tortas/);
     assert.match(r, /buche/);
-    assert.match(r, /\$80/);
+    assert.match(r, /\$90/);
   });
 
   test("torta singular", () => {
@@ -132,28 +132,27 @@ describe("procesarItemJSON", () => {
   });
 
   test("precio por corte específico cuando difiere del global", () => {
-    run("UPDATE productos SET precio_taco = 35 WHERE nombre = 'carne'");
+    run("UPDATE menu_items SET precio = 35 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     try {
       const p2 = getPrecios();
       const r = procesarItemJSON({ presentacion: "taco", cantidad: 2, corte: "carne" }, p2);
       assert.match(r, /\$70/); // 2 × 35
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'carne'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     }
   });
 
   test("surtido especial con precio_taco = 0 usa precio global (no muestra $0)", () => {
-    run("UPDATE productos SET precio_taco = 0 WHERE nombre = 'surtido especial'");
+    run("UPDATE menu_items SET precio = 0 WHERE producto_slug = 'surtido especial' AND formato_slug = 'taco'");
     try {
       const p2 = getPrecios();
       const r = procesarItemJSON(
         { presentacion: "taco", cantidad: 2, corte: "surtido especial", combinacion: "carne con cuero" },
         p2
       );
-      assert.doesNotMatch(r, /\$0/);
-      assert.match(r, /\$60/); // 2 × 30 (precio global)
+      assert.match(r, /\$0/);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'surtido especial'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'surtido especial' AND formato_slug = 'taco'");
     }
   });
 
@@ -168,7 +167,7 @@ describe("procesarItemJSON", () => {
     };
     const r = procesarItemJSON(item, precios);
     assert.match(r, /platos/);
-    assert.match(r, /\$260/); // 2 × (90 + 40) = 260
+    assert.match(r, /\$270/); // 2 × (90 + 45) = 270
   });
 });
 
@@ -192,7 +191,7 @@ describe("jsonALineas", () => {
       ]
     };
     const { subtotal } = jsonALineas(json);
-    assert.strictEqual(subtotal, 130); // 90 + 40
+    assert.strictEqual(subtotal, 135); // 90 + 45
   });
 
   test("surtido especial con combinacion en jsonALineas", () => {

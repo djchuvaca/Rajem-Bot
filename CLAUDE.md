@@ -161,13 +161,13 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 ### Giros (módulos de negocio)
 - **`src/giros/taqueria.js`** — fuente única de verdad del giro taquería. Define `itemTypes[]`, `cortes[]`, `refrescos[]`, `salsas[]`, `configDefaults`, `vocabulario`, `mensajesDefaults` y `comportamiento`. El NLU toma nombre, alias y descripción de aquí; SQLite solo superpone activación y precio por tenant.
 - **`src/giros/index.js`** — `getGiroActivo()`, `getGiro(slug)`, `listGiros()`.
-- **`src/giros/catalogo-tenant.js`** — única fachada del catálogo visible para el tenant. Combina definiciones inmutables del giro con el overlay permitido de SQLite (`activo`, precios y selección de menú). Panel y APIs no deben leer catálogos directamente de tablas.
+- **`src/giros/catalogo-tenant.js`** — única fachada del catálogo operativo del tenant. Combina definiciones inmutables del Giro con el overlay permitido de SQLite: `menu_items` para cortes, bebidas y salsas; `item_types` para presentaciones. Panel, NLU, respuestas, comandos y cobro deben pasar por esta fachada.
 - **`src/giros/hamburgueseria.js`** y **`src/giros/hamburgueseria/nlu.js`** — implementación del giro hamburguesería: formatos, variantes, catálogo, mensajes y NLU. Está registrado en `src/giros/index.js`; debe validarse funcionalmente antes de ofrecerlo a producción.
 
 ### Base de datos
 - **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. Usa `journal_mode = DELETE` y `busy_timeout = 5000`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
-- **`src/db/seed.js`** — crea tablas, migraciones y proyecta el catálogo del módulo de giro en las tablas configurables del tenant. `cortes`, `item_types` y `productos` no son fuentes de plantilla: almacenan estado, precios y activación por tenant. La tabla legacy `business_type_products` dejó de crearse y consultarse.
-- **`src/db/cortes.js`** — catálogo de cortes. `getCortesBD()` → mapa `{alias→slug}` para NLU (TTL 60s). `getPrecioCorteFormato(corteSlug, formatoSlug)` con fallback a `precio_base` → config global.
+- **`src/db/seed.js`** — crea tablas, proyecta las definiciones del Giro y migra una sola vez los valores de `productos` antiguos hacia `menu_items`. `productos` queda únicamente como almacenamiento heredado de migración y no participa en panel, NLU, respuestas ni cobro.
+- **`src/db/cortes.js`** — proyecta los cortes definidos por el Giro y cruza obligatoriamente su disponibilidad con `menu_items`. Un menú vacío permanece vacío; nunca reactiva automáticamente el catálogo completo. Los precios efectivos se resuelven desde `menu_items`.
 - **`src/db/modelos.js`** — CRUD productos, clientes, pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhook MP).
 - **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
 - **`src/db/repartidores.js`** — CRUD repartidores + historial de entregas. `registrarEntregaConfirmada()` (actualiza promedio, escribe a `entregas_historial`), `registrarEntregaTimeout()` (escribe con `confirmado=0, minutos=NULL`), `getHistorialTenant()`, `getReporteDesempeno()`, `resetEntregasHoy()`.

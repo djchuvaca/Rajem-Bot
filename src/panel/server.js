@@ -166,62 +166,17 @@ app.get("/api/productos", requireAuth, (req, res) => res.json([
 
 // Tenant solo puede modificar precios y estado activo — el resto lo gestiona el super-admin
 app.put("/api/productos/:id", requireAuth, (req, res) => {
-  return res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
-  /* istanbul ignore next */
-  const id   = parseInt(req.params.id);
-  const prod = getProductos().find(p => p.id === id);
-  if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
-  const { precio_taco, precio_torta, precio_100g, activo } = req.body;
-  updateProducto(id, {
-    ...prod,
-    precio_taco:  precio_taco  !== undefined ? precio_taco  : prod.precio_taco,
-    precio_torta: precio_torta !== undefined ? precio_torta : prod.precio_torta,
-    precio_100g:  precio_100g  !== undefined ? precio_100g  : prod.precio_100g,
-    activo:       activo       !== undefined ? activo       : prod.activo,
-  });
-  invalidarCacheCortes();
-  res.json({ ok: true });
+  res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
 });
 
 // Desactivar producto (no eliminar físicamente — el catálogo lo define el super-admin)
 app.delete("/api/productos/:id", requireAuth, (req, res) => {
-  return res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
-  /* istanbul ignore next */
-  const id   = parseInt(req.params.id);
-  const prod = getProductos().find(p => p.id === id);
-  if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
-  updateProducto(id, { ...prod, activo: 0 });
-  invalidarCacheCortes();
-  res.json({ ok: true });
+  res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
 });
 
 // Adoptar un producto del catálogo al menú del tenant
 app.post("/api/productos/adoptar", requireAuth, (req, res) => {
-  return res.status(410).json({ error: 'Endpoint legacy retirado; el catálogo se adopta desde el menú del giro' });
-  /* istanbul ignore next */
-  const { catalogo_slug, precio_taco, precio_torta, precio_100g } = req.body;
-  if (!catalogo_slug) return res.status(400).json({ error: "catalogo_slug requerido" });
-  try {
-    const slug  = getBusinessTypeSlug();
-    const prods = getTemplateProducts(slug);
-    const tpl   = prods.find(p => p.sinonimos === catalogo_slug || p.nombre.toLowerCase().replace(/\s+/g,'_') === catalogo_slug);
-    if (!tpl) return res.status(404).json({ error: "Producto no encontrado en el catálogo" });
-    const existe = getProductos().find(p => p.nombre.toLowerCase() === tpl.nombre.toLowerCase());
-    if (existe) {
-      updateProducto(existe.id, { ...existe, activo: 1 });
-      invalidarCacheCortes();
-      return res.json({ ok: true, accion: 'reactivado', id: existe.id });
-    }
-    const precioData = {};
-    if (precio_taco  !== undefined) precioData.precio_taco  = parseFloat(precio_taco)  || tpl.precio_taco;
-    if (precio_torta !== undefined) precioData.precio_torta = parseFloat(precio_torta) || tpl.precio_torta;
-    if (precio_100g  !== undefined) precioData.precio_100g  = parseFloat(precio_100g)  || tpl.precio_100g;
-    createProducto({ ...tpl, ...precioData, catalogo_slug, activo: 1 });
-    invalidarCacheCortes();
-    res.json({ ok: true, accion: 'creado' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  res.status(410).json({ error: 'Endpoint legacy retirado; el catálogo se adopta desde el menú del giro' });
 });
 
 // Solicitud de nuevo producto (no disponible en el catálogo actual)
@@ -388,7 +343,9 @@ app.get("/api/stats", requireAuth, (req, res) => {
   const mostradores = confirmados.filter(p => p.tipo === "mostrador");
 
   const conteoCortes = {};
-  const CORTES_STAT  = getProductos().map(p => p.nombre.toLowerCase());
+  const cortesMenu = new Set(catalogoTenant.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  const CORTES_STAT = catalogoTenant.getCortesTenant()
+    .filter(c => cortesMenu.has(c.slug)).map(c => c.nombre.toLowerCase());
   for (const p of pedidosHoy) {
     const orden = (p.orden || "").toLowerCase();
     for (const c of CORTES_STAT) if (orden.includes(c)) conteoCortes[c] = (conteoCortes[c] || 0) + 1;
@@ -802,29 +759,23 @@ app.get("/api/item-types", requireAuth, (req, res) => {
 });
 
 app.post("/api/item-types", requireAuth, (req, res) => {
-  try {
-    const slug = getBusinessTypeSlug();
-    if (!getBusinessType(slug)) return res.status(404).json({ error: "business_type no encontrado" });
-    createItemType(slug, req.body);
-    invalidarCacheItemTypes(); invalidarCacheCortes();
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  res.status(403).json({ error: 'Las presentaciones se definen exclusivamente en el módulo Giro' });
 });
 
 app.put("/api/item-types/:id", requireAuth, (req, res) => {
   try {
-    updateItemType(parseInt(req.params.id), req.body);
+    const id = parseInt(req.params.id);
+    if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Presentación fuera del giro activo' });
+    const { precio_base, activo } = req.body;
+    if (precio_base !== undefined) run('UPDATE item_types SET precio_base=? WHERE id=?', [Number(precio_base), id]);
+    if (activo !== undefined) run('UPDATE item_types SET activo=? WHERE id=?', [activo ? 1 : 0, id]);
     invalidarCacheItemTypes(); invalidarCacheCortes();
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete("/api/item-types/:id", requireAuth, (req, res) => {
-  try {
-    deleteItemType(parseInt(req.params.id));
-    invalidarCacheItemTypes(); invalidarCacheCortes();
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  res.status(403).json({ error: 'Las presentaciones del Giro no se eliminan; únicamente se desactivan' });
 });
 
 // GET /api/business-types/:slug/productos — productos-plantilla de una plantilla específica
@@ -872,18 +823,11 @@ app.post("/api/menu-items", requireAuth, (req, res) => {
   if (!producto_slug || !categoria) return res.status(400).json({ error: "producto_slug y categoria requeridos" });
   if (!catalogoTenant.esProductoValido(categoria, producto_slug)) return res.status(400).json({ error: 'El producto no pertenece al giro activo' });
   const fmtSlug = formato_slug || null;
-  if (categoria === 'refresco' || categoria === 'salsa') {
-    const { getCatalogo } = require('../giros');
-    const catalogo = getCatalogo(getBusinessTypeSlug());
-    const defs = categoria === 'refresco' ? catalogo.bebidas : catalogo.salsas;
-    const def = defs.find(p => p.nombre.toLowerCase() === producto_slug.toLowerCase());
-    if (!def) return res.status(400).json({ error: 'El producto no pertenece al catálogo del giro activo' });
-    const precioTenant = parseFloat(precio) || def.precio || 0;
-    const row = queryOne("SELECT id FROM productos WHERE LOWER(nombre)=LOWER(?) AND categoria=?", [producto_slug, categoria]);
-    if (row) run("UPDATE productos SET activo=1, precio_taco=?, precio_torta=? WHERE id=?", [precioTenant, precioTenant, row.id]);
-    else run("INSERT INTO productos (nombre,descripcion,precio_taco,precio_torta,precio_100g,sinonimos,categoria,activo,catalogo_slug) VALUES (?,?,?,?,?,?,?,1,?)",
-      [def.nombre, def.descripcion || '', precioTenant, precioTenant, 0, def.sinonimos || '', categoria, def.slug || def.nombre]);
-    invalidarCacheCortes();
+  if (categoria === 'corte' && (!fmtSlug || !catalogoTenant.getFormatosTenant({ todos: true }).some(f => f.slug === fmtSlug))) {
+    return res.status(400).json({ error: 'La presentacion no pertenece al giro activo' });
+  }
+  if (categoria !== 'corte' && fmtSlug) {
+    return res.status(400).json({ error: 'Bebidas y salsas no admiten presentacion' });
   }
   // ¿Ya existe (incluso eliminado)?
   const existe = queryOne(
@@ -892,6 +836,7 @@ app.post("/api/menu-items", requireAuth, (req, res) => {
   );
   if (existe) {
     run("UPDATE menu_items SET eliminado=0, activo=1, precio=? WHERE id=?", [parseFloat(precio) || 0, existe.id]);
+    invalidarCacheCortes();
     return res.json({ ok: true, id: existe.id, accion: 'reactivado' });
   }
   run(
@@ -900,6 +845,7 @@ app.post("/api/menu-items", requireAuth, (req, res) => {
   );
   const nuevo = queryOne("SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
     [producto_slug, fmtSlug || '', categoria]);
+  invalidarCacheCortes();
   res.json({ ok: true, id: nuevo?.id, accion: 'creado' });
 });
 
@@ -907,10 +853,11 @@ app.post("/api/menu-items", requireAuth, (req, res) => {
 app.put("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const { precio, activo } = req.body;
-  const item = queryOne("SELECT id FROM menu_items WHERE id=? AND eliminado=0", [id]);
+  const item = queryOne("SELECT * FROM menu_items WHERE id=? AND eliminado=0", [id]);
   if (!item) return res.status(404).json({ error: "Item no encontrado" });
   if (precio  !== undefined) run("UPDATE menu_items SET precio=? WHERE id=?",  [parseFloat(precio) || 0, id]);
   if (activo  !== undefined) run("UPDATE menu_items SET activo=? WHERE id=?",  [activo ? 1 : 0, id]);
+  invalidarCacheCortes();
   res.json({ ok: true });
 });
 
@@ -919,11 +866,7 @@ app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const item = queryOne("SELECT producto_slug,categoria FROM menu_items WHERE id=?", [id]);
   run("UPDATE menu_items SET eliminado=1 WHERE id=?", [id]);
-  if (item && (item.categoria === 'refresco' || item.categoria === 'salsa')) {
-    const restantes = queryOne("SELECT COUNT(*) AS n FROM menu_items WHERE producto_slug=? AND categoria=? AND activo=1 AND eliminado=0", [item.producto_slug, item.categoria]);
-    if (!restantes?.n) run("UPDATE productos SET activo=0 WHERE LOWER(nombre)=LOWER(?) AND categoria=?", [item.producto_slug, item.categoria]);
-    invalidarCacheCortes();
-  }
+  invalidarCacheCortes();
   res.json({ ok: true });
 });
 
@@ -933,6 +876,7 @@ app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
   if (!producto_slug) return res.status(400).json({ error: "producto_slug requerido" });
   run("UPDATE menu_items SET activo=? WHERE producto_slug=? AND categoria='corte' AND eliminado=0",
     [activo ? 1 : 0, producto_slug]);
+  invalidarCacheCortes();
   res.json({ ok: true });
 });
 
@@ -982,10 +926,8 @@ app.put("/api/formatos/:id", requireAuth, (req, res) => {
     const { run } = require("../db/core");
     if (precio_base !== undefined) {
       run("UPDATE item_types SET precio_base = ? WHERE id = ?", [precio_base, id]);
-      if (cascade) {
-        const it = queryOne("SELECT slug FROM item_types WHERE id=?", [id]);
-        if (it) run("UPDATE menu_items SET precio=? WHERE formato_slug=? AND eliminado=0", [precio_base, it.slug]);
-      }
+      const it = queryOne("SELECT slug FROM item_types WHERE id=?", [id]);
+      if (it) run("UPDATE menu_items SET precio=? WHERE formato_slug=? AND eliminado=0", [precio_base, it.slug]);
     }
     if (activo !== undefined) run("UPDATE item_types SET activo = ? WHERE id = ?", [activo ? 1 : 0, id]);
     invalidarCacheItemTypes();

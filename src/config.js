@@ -2,6 +2,7 @@
 const { getPrecios } = require("./pedido/precios");
 const { getRangoHorario } = require("./horario");
 const { getGiroActivo } = require("./giros");
+const catalogoTenant = require('./giros/catalogo-tenant');
 
 // ── DATOS BANCO ───────────────────────────────────────────────────────────────
 function getDatosBanco() {
@@ -44,14 +45,14 @@ function getMenuFormato() {
     const notaCantidad = getMensaje("menu_por_cantidad") || md.menu_por_cantidad || '';
 
     // ── Leer el menú configurado por el tenant (menu_items) ───────────────────
-    const miAll       = getMenuItems();
+    const miAll       = catalogoTenant.getMenuItemsActivos();
     const cortesItems = miAll.filter(i => i.categoria === 'corte');
     const bebidasItems = miAll.filter(i => i.categoria === 'refresco');
     const salsasItems  = miAll.filter(i => i.categoria === 'salsa');
 
     // ── Cortes activos: nombres desde tabla cortes por slug ───────────────────
     const { getCortesBDObj } = require('./db/cortes');
-    const cortesDB      = getCortesBDObj();
+    const cortesDB      = catalogoTenant.getCortesTenant();
     const cortesPorSlug = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
     const corteSlugs    = [...new Set(cortesItems.map(i => i.producto_slug))];
     const cortesActivos = corteSlugs.map(s => cortesPorSlug[s]).filter(Boolean);

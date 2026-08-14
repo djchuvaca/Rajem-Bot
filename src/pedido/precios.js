@@ -5,7 +5,8 @@
  */
 
 function getPrecios() {
-  const { getConfig, getProductos } = require("../db");
+  const { getConfig } = require("../db");
+  const catalogoTenant = require("../giros/catalogo-tenant");
   const pTaco  = parseInt(getConfig("precio_taco")  || "30");
   const pTorta = parseInt(getConfig("precio_torta") || "40");
   const p100g  = parseInt(getConfig("precio_100g")  || "32");
@@ -13,45 +14,23 @@ function getPrecios() {
 
   const porCorte = {};
 
-  // Fuente primaria: tabla `productos` — precios configurados por el admin desde el panel
+  // Única fuente operativa: definiciones del Giro + overlay menu_items del tenant.
   try {
-    const productos = getProductos();
-    for (const p of (productos || [])) {
-      if (p.categoria === "refresco" || p.categoria === "salsa") continue;
-      const key = p.nombre.toLowerCase();
-      porCorte[key] = {
-        pTaco:   parseInt(p.precio_taco  || pTaco),
-        pTorta:  parseInt(p.precio_torta || pTorta),
-        p100g:   parseInt(p.precio_100g  || p100g),
-        // pTacoBD guarda el valor crudo de BD (0 = sin precio propio; >0 = precio explícito)
-        pTacoBD: p.precio_taco != null ? parseInt(p.precio_taco) : null,
-        precios: {},
-      };
-    }
-  } catch (_) {}
-
-  // Complementario: tabla `cortes` — agrega cortes nuevos (asada, tripa, pastor…)
-  // y enriquece con precios_json para formatos dinámicos
-  try {
-    const { getCortesBDObj } = require("../db/cortes");
-    for (const c of (getCortesBDObj() || [])) {
-      let precios = {};
-      try { precios = JSON.parse(c.precios_json || '{}'); } catch (_) {}
+    const items = catalogoTenant.getMenuItemsActivos('corte');
+    const defs = catalogoTenant.getCortesTenant();
+    for (const def of defs) {
+      const filas = items.filter(i => i.producto_slug === def.slug);
+      if (!filas.length) continue;
+      const precios = Object.fromEntries(filas.filter(i => i.formato_slug).map(i => [i.formato_slug, Number(i.precio || 0)]));
       const entry = {
-        pTaco:  precios.taco  ?? c.precio_base ?? pTaco,
-        pTorta: precios.torta ?? c.precio_base ?? pTorta,
-        p100g:  precios['100g'] ?? p100g,
+        pTaco: precios.taco ?? 0,
+        pTorta: precios.torta ?? 0,
+        p100g: precios.gramos ?? 0,
+        pTacoBD: precios.taco ?? null,
         precios,
       };
-      // Si ya existe en productos, solo enriquecer con precios_json para formatos dinámicos
-      if (porCorte[c.slug]) {
-        porCorte[c.slug].precios = precios;
-      } else {
-        porCorte[c.slug] = entry;
-      }
-      // Nombre del corte también como clave (compat con código que usa el nombre)
-      const nom = c.nombre.toLowerCase();
-      if (!porCorte[nom]) porCorte[nom] = porCorte[c.slug];
+      porCorte[def.slug] = entry;
+      porCorte[def.nombre.toLowerCase()] = entry;
     }
   } catch (_) {}
 
@@ -102,7 +81,7 @@ function calcularPrecioItem(item, precios) {
   if (item.corte === 'surtido especial' && item.combinacion) {
     // Si el producto 'surtido especial' tiene precio propio (> 0 en BD), usarlo directamente
     const pcSE = precios.porCorte && precios.porCorte['surtido especial'];
-    if (pcSE && pcSE.pTacoBD > 0) {
+    if (pcSE && pcSE.pTacoBD !== null) {
       return item.cantidad * pcSE.pTaco;
     }
     // Sin precio propio → calcular el precio máximo de los cortes componentes

@@ -10,7 +10,6 @@
  */
 
 const core = require('../../nlu/core');
-const { getProductos } = require('../../db');
 
 const {
   normalizar,
@@ -77,30 +76,17 @@ function getCortes() {
       return _variantesCache;
     }
   } catch (_) {}
-  try {
-    const productos = getProductos();
-    if (!productos || !productos.length) return _variantesDefault();
-    const mapa = {};
-    for (const p of productos) {
-      if (p.categoria === 'refresco' || p.categoria === 'salsa') continue;
-      const nombre = p.nombre.toLowerCase().trim();
-      mapa[nombre] = nombre;
-      const plural = /[aeiouáéíóú]$/i.test(nombre) ? nombre + 's' : nombre + 'es';
-      mapa[plural] = nombre;
-      if (p.sinonimos) {
-        for (const s of p.sinonimos.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)) {
-          mapa[s] = nombre;
-        }
-      }
-    }
-    _variantesCache   = mapa;
-    _variantesCacheTs = Date.now();
-    return _variantesCache;
-  } catch (_) { return _variantesDefault(); }
+  _variantesCache = {};
+  _variantesCacheTs = Date.now();
+  return _variantesCache;
 }
 
-function getRefrescos() { return []; }
-function getSalsas()    { return []; }
+function getRefrescos() {
+  return require('../catalogo-tenant').getBebidasTenant().filter(x => x.activo);
+}
+function getSalsas() {
+  return require('../catalogo-tenant').getSalsasTenant().filter(x => x.activo);
+}
 
 function getCortesRegex() {
   const ahora = Date.now();

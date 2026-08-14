@@ -3,7 +3,7 @@
 // Única fachada de catálogo para el panel del tenant. Las definiciones salen
 // del giro; SQLite aporta únicamente el estado mutable de este tenant.
 const { getGiroActivo, getCatalogo } = require('./index');
-const { queryAll } = require('../db/core');
+const { queryAll, queryOne, run } = require('../db/core');
 
 function _slug() { return getGiroActivo().slug; }
 
@@ -34,11 +34,11 @@ function getCortesTenant() {
 
 function _complementos(categoria) {
   const defs = categoria === 'refresco' ? getCatalogo(_slug()).bebidas : getCatalogo(_slug()).salsas;
-  const filas = queryAll('SELECT * FROM productos WHERE categoria=?', [categoria]) || [];
+  const filas = queryAll("SELECT * FROM menu_items WHERE categoria=? AND COALESCE(formato_slug,'')='' AND eliminado=0", [categoria]) || [];
   return defs.map(def => {
-    const fila = filas.find(f => f.nombre.toLowerCase() === def.nombre.toLowerCase());
+    const fila = filas.find(f => f.producto_slug.toLowerCase() === def.nombre.toLowerCase());
     return { ...def, id: fila?.id, activo: fila?.activo ?? 0,
-      precio: fila?.precio_taco ?? def.precio ?? 0, precio_taco: fila?.precio_taco ?? def.precio ?? 0 };
+      precio: fila?.precio ?? def.precio ?? 0, precio_taco: fila?.precio ?? def.precio ?? 0 };
   });
 }
 
@@ -66,4 +66,56 @@ function esProductoValido(categoria, slug) {
 
 function esFormatoIdValido(id) { return getFormatosTenant({ todos: true }).some(x => x.id === id); }
 
-module.exports = { getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant, getMenuItemsTenant, esProductoValido, esFormatoIdValido };
+function getMenuItemsActivos(categoria = null) {
+  return getMenuItemsTenant(categoria).filter(i => i.activo);
+}
+
+function getDefinicionProducto(categoria, slug) {
+  const giro = getGiroActivo();
+  const defs = categoria === 'corte' ? giro.cortes
+    : categoria === 'refresco' ? giro.refrescos
+      : categoria === 'salsa' ? giro.salsas : [];
+  const buscado = String(slug).toLowerCase().trim();
+  return (defs || []).find(x => {
+    const aliases = Array.isArray(x.aliases) ? x.aliases : String(x.sinonimos || '').split(',');
+    return (x.slug || x.nombre).toLowerCase() === buscado
+      || x.nombre.toLowerCase() === buscado
+      || aliases.some(a => String(a).toLowerCase().trim() === buscado);
+  }) || null;
+}
+
+function getPrecioMenu(productoSlug, formatoSlug = null, categoria = 'corte') {
+  const fila = queryOne(
+    "SELECT precio FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=? AND activo=1 AND eliminado=0",
+    [productoSlug, formatoSlug || '', categoria]
+  );
+  return fila ? Number(fila.precio || 0) : null;
+}
+
+function setMenuItemEstado(productoSlug, categoria, activo) {
+  if (!esProductoValido(categoria, productoSlug)) return 0;
+  const r = run(
+    "UPDATE menu_items SET activo=? WHERE producto_slug=? AND categoria=? AND eliminado=0",
+    [activo ? 1 : 0, productoSlug, categoria]
+  );
+  return r?.changes || 0;
+}
+
+function setPreciosCorte(productoSlug, precios = {}) {
+  if (!esProductoValido('corte', productoSlug)) return 0;
+  let cambios = 0;
+  for (const [formato, precio] of Object.entries(precios)) {
+    const r = run(
+      "UPDATE menu_items SET precio=? WHERE producto_slug=? AND formato_slug=? AND categoria='corte' AND eliminado=0",
+      [Number(precio), productoSlug, formato]
+    );
+    cambios += r?.changes || 0;
+  }
+  return cambios;
+}
+
+module.exports = {
+  getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant,
+  getMenuItemsTenant, getMenuItemsActivos, getDefinicionProducto, getPrecioMenu,
+  setMenuItemEstado, setPreciosCorte, esProductoValido, esFormatoIdValido,
+};

@@ -278,10 +278,10 @@ function validarHora(texto) {
 
 function _listaCortesDesdeBD() {
   try {
-    const menuItems = getMenuItems();
-    const cortesItems = menuItems.filter(i => i.categoria === 'corte');
+    const catalogo = require('../../giros/catalogo-tenant');
+    const cortesItems = catalogo.getMenuItemsActivos('corte');
     if (cortesItems.length > 0) {
-      const cortesDB   = getCortesBDObj();
+      const cortesDB   = catalogo.getCortesTenant();
       const porSlug    = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
       const slugsUnicos = [...new Set(cortesItems.map(i => i.producto_slug))].filter(s => s !== 'surtido especial');
       const nombres    = slugsUnicos.map(s => porSlug[s]?.nombre || s).filter(Boolean);
@@ -289,7 +289,7 @@ function _listaCortesDesdeBD() {
         return nombres.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ');
     }
   } catch (_) { /* caída segura */ }
-  // Fallback: leer de la tabla productos (legacy)
+  // El NLU ya está filtrado por Giro + menú activo.
   const cortes = getCortes();
   const unicos = [...new Set(Object.values(cortes))].filter(c => c !== 'surtido especial');
   if (unicos.length > 0) return unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');

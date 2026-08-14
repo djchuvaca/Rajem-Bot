@@ -187,7 +187,9 @@ function getStatsReporte(fechaInicio, fechaFin) {
   const ventas      = confirmados.reduce((s, p) => s + (p.total || 0), 0);
   const ticket      = confirmados.length ? Math.round(ventas / confirmados.length) : 0;
 
-  const productos = getProductos();
+  const catalogo = require('../giros/catalogo-tenant');
+  const activos = new Set(catalogo.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  const productos = catalogo.getCortesTenant().filter(c => activos.has(c.slug));
   const conteoCortes = {};
   for (const p of pedidos) {
     const orden = (p.orden || '').toLowerCase();

@@ -297,13 +297,13 @@ describe("respuestaPrecio filtrado y precios efectivos", () => {
   });
 
   test("desglose muestra precio correcto para corte con precio específico", () => {
-    run("UPDATE productos SET precio_taco = 38 WHERE lower(nombre) = 'lengua'");
+    run("UPDATE menu_items SET precio = 38 WHERE producto_slug = 'lengua' AND formato_slug = 'taco' AND categoria = 'corte'");
     try {
       const r = respuestaPrecio();
       // Lengua debe aparecer con $38
       assert.match(r, /\$38/);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE lower(nombre) = 'lengua'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'lengua' AND formato_slug = 'taco' AND categoria = 'corte'");
     }
   });
 });

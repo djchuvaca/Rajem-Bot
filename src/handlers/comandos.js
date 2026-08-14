@@ -8,11 +8,12 @@ const {
   actualizarEstadoPedido, actualizarEstadoConfirmado, actualizarEstadoPorId,
   getPedidosHoy, getPedidosPorCliente, getPedidosPorFecha,
   getCliente, getAllClientes, getTopClientes,
-  getProductos, getProducto, setProductoActivo, updateProductoPrecio,
+  getProductos,
   upsertCliente, getConfig, setConfig, getJIDReal, limpiarTodasLasSesionesDB,
   guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes,
 } = require("../db");
 const { invalidarCacheCortes } = require("./pedidoParser");
+const catalogoTenant = require('../giros/catalogo-tenant');
 const botPausado = require("../estado/bot-pausado");
 const { enviarDespachoMandaditos, despacharConDelay } = require("./mandaditos");
 const { calcularTarifaDomicilio } = require("../geo");
@@ -86,6 +87,11 @@ function descripcionEstado(jid) {
   if (datosCampos.has(jid))                 return "llenando formulario";
   if (clientesNuevos.has(jid))              return "inicio del flujo";
   return "activo";
+}
+
+function nombresCortesActivos() {
+  const slugs = new Set(catalogoTenant.getMenuItemsActivos('corte').map(i => i.producto_slug));
+  return catalogoTenant.getCortesTenant().filter(c => slugs.has(c.slug)).map(c => c.nombre.toLowerCase());
 }
 
 // ── HELPERS MANDADITOS ────────────────────────────────────────────────────────
@@ -629,7 +635,7 @@ async function handleComandos(msg, client) {
     const ticket      = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
     const negocio     = getConfig("nombre_negocio") || "Tacos Javier";
 
-    const CORTES    = getProductos().map(p => p.nombre.toLowerCase());
+    const CORTES    = nombresCortesActivos();
     const conteo    = {};
     for (const p of pedidos) {
       const orden = (p.orden || "").toLowerCase();
@@ -700,7 +706,7 @@ async function handleComandos(msg, client) {
     const totalVentas  = confirmados.reduce((s, p) => s + (p.total || 0), 0);
     const ticket       = confirmados.length ? Math.round(totalVentas / confirmados.length) : 0;
 
-    const CORTES = getProductos().map(p => p.nombre.toLowerCase());
+    const CORTES = nombresCortesActivos();
     const conteo = {};
     for (const p of pedidos) {
       const orden = (p.orden || "").toLowerCase();
@@ -895,19 +901,18 @@ async function handleComandos(msg, client) {
 
   // ── !precios — ver precios actuales del menú ──────────────────────────────
   if (/^!precios$/i.test(texto)) {
-    const productos = getProductos();
-    if (!productos.length) {
+    const items = catalogoTenant.getMenuItemsActivos();
+    if (!items.length) {
       await msg.reply("⚠️ No hay productos registrados.");
       return;
     }
     const negocio = getConfig("nombre_negocio") || "Tacos Javier";
     let out = `🥩 *Menú — ${negocio}*\n━━━━━━━━━━━━━━━━━━\n`;
-    for (const p of productos) {
-      const nombre = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
-      const taco   = p.precio_taco   ? `🌮 $${p.precio_taco}`   : "";
-      const torta  = p.precio_torta  ? `  🥪 $${p.precio_torta}` : "";
-      const estado = p.activo ? "" : "  _(agotado)_";
-      out += `• *${nombre}*${estado}\n  ${taco}${torta}\n`;
+    for (const p of items) {
+      const def = catalogoTenant.getDefinicionProducto(p.categoria, p.producto_slug);
+      const nombre = def?.nombre || p.producto_slug;
+      const formato = p.formato_slug ? ` · ${p.formato_slug}` : '';
+      out += `• *${nombre}${formato}* — $${Number(p.precio || 0)}\n`;
     }
     await msg.reply(out.trim());
     return;
@@ -929,13 +934,17 @@ async function handleComandos(msg, client) {
       return;
     }
 
-    const producto = getProducto(corte);
-    if (!producto) {
+    const def = catalogoTenant.getDefinicionProducto('corte', corte);
+    if (!def) {
       await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
       return;
     }
 
-    updateProductoPrecio(corte, precioTaco, precioTorta);
+    const cambios = catalogoTenant.setPreciosCorte(def.slug, { taco: precioTaco, torta: precioTorta });
+    if (!cambios) {
+      await msg.reply(`⚠️ El corte *${corte}* no está agregado al menú con taco o torta.`);
+      return;
+    }
     invalidarCacheCortes();
     await msg.reply(`✅ Precio de *${corte}* actualizado:\n🌮 Taco: $${precioTaco}  🥪 Torta: $${precioTorta}`);
     return;
@@ -951,13 +960,17 @@ async function handleComandos(msg, client) {
       return;
     }
 
-    const producto = getProducto(corte);
-    if (!producto) {
+    const def = catalogoTenant.getDefinicionProducto('corte', corte);
+    if (!def) {
       await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
       return;
     }
 
-    setProductoActivo(corte, false);
+    const cambios = catalogoTenant.setMenuItemEstado(def.slug, 'corte', false);
+    if (!cambios) {
+      await msg.reply(`⚠️ El corte *${corte}* no está agregado al menú.`);
+      return;
+    }
     invalidarCacheCortes();
     await msg.reply(`⛔ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como agotado. El bot ya no lo ofrecerá.`);
     return;
@@ -973,13 +986,17 @@ async function handleComandos(msg, client) {
       return;
     }
 
-    const producto = getProducto(corte);
-    if (!producto) {
+    const def = catalogoTenant.getDefinicionProducto('corte', corte);
+    if (!def) {
       await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
       return;
     }
 
-    setProductoActivo(corte, true);
+    const cambios = catalogoTenant.setMenuItemEstado(def.slug, 'corte', true);
+    if (!cambios) {
+      await msg.reply(`⚠️ El corte *${corte}* no está agregado al menú.`);
+      return;
+    }
     invalidarCacheCortes();
     await msg.reply(`✅ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como disponible. El bot vuelve a ofrecerlo.`);
     return;
@@ -1181,7 +1198,8 @@ async function handleComandos(msg, client) {
   // ── !cortes — desglose de pedidos por corte hoy ──────────────────────────
   if (/^!cortes$/i.test(texto)) {
     const pedidos    = getPedidosHoy();
-    const productos  = getProductos();
+    const productos  = catalogoTenant.getCortesTenant().filter(c =>
+      new Set(catalogoTenant.getMenuItemsActivos('corte').map(i => i.producto_slug)).has(c.slug));
     const negocio    = getConfig("nombre_negocio") || "Tacos Javier";
     const fecha      = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
 

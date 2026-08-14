@@ -62,23 +62,23 @@ describe("getPrecios", () => {
     }
   });
 
-  test("cuando precio_taco = 0 en BD, usa precio global como fallback", () => {
-    run("UPDATE productos SET precio_taco = 0 WHERE nombre = 'buche'");
+  test("menu_items conserva un precio explícito de cero", () => {
+    run("UPDATE menu_items SET precio = 0 WHERE producto_slug = 'buche' AND formato_slug = 'taco'");
     try {
       const p = getPrecios();
-      assert.strictEqual(p.porCorte["buche"].pTaco, 30);
+      assert.strictEqual(p.porCorte["buche"].pTaco, 0);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'buche'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'buche' AND formato_slug = 'taco'");
     }
   });
 
   test("cuando precio diferente del global, porCorte lo refleja correctamente", () => {
-    run("UPDATE productos SET precio_taco = 35 WHERE nombre = 'carne'");
+    run("UPDATE menu_items SET precio = 35 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     try {
       const p = getPrecios();
       assert.strictEqual(p.porCorte["carne"].pTaco, 35);
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'carne'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     }
   });
 });
@@ -102,7 +102,7 @@ describe("calcularPrecioItem", () => {
 
   test("torta — N tortas × pTorta", () => {
     const item = { presentacion: "torta", cantidad: 2, corte: "buche" };
-    assert.strictEqual(calcularPrecioItem(item, precios), 80);
+    assert.strictEqual(calcularPrecioItem(item, precios), 90);
   });
 
   test("gramos — redondeado a entero", () => {
@@ -141,24 +141,24 @@ describe("calcularPrecioItem", () => {
   });
 
   test("precio por corte específico cuando difiere del global", () => {
-    run("UPDATE productos SET precio_taco = 35 WHERE nombre = 'carne'");
+    run("UPDATE menu_items SET precio = 35 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     try {
       const p2 = getPrecios();
       const item = { presentacion: "taco", cantidad: 2, corte: "carne" };
       assert.strictEqual(calcularPrecioItem(item, p2), 70); // 2 × 35
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'carne'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'carne' AND formato_slug = 'taco'");
     }
   });
 
   test("surtido especial con precio propio", () => {
-    run("UPDATE productos SET precio_taco = 33 WHERE nombre = 'surtido especial'");
+    run("UPDATE menu_items SET precio = 33 WHERE producto_slug = 'surtido especial' AND formato_slug = 'taco'");
     try {
       const p2 = getPrecios();
       const item = { presentacion: "taco", cantidad: 3, corte: "surtido especial", combinacion: "carne con buche" };
       assert.strictEqual(calcularPrecioItem(item, p2), 99); // 3 × 33
     } finally {
-      run("UPDATE productos SET precio_taco = 30 WHERE nombre = 'surtido especial'");
+      run("UPDATE menu_items SET precio = 30 WHERE producto_slug = 'surtido especial' AND formato_slug = 'taco'");
     }
   });
 
@@ -171,8 +171,8 @@ describe("calcularPrecioItem", () => {
         { presentacion: "torta", cantidad: 1, corte: "carne"   }
       ]
     };
-    // 2 × (3×30 + 1×40) = 2 × 130 = 260
-    assert.strictEqual(calcularPrecioItem(item, precios), 260);
+    // 2 × (3×30 + 1×45) = 270
+    assert.strictEqual(calcularPrecioItem(item, precios), 270);
   });
 
   test("plato_separado — suma sus ítems", () => {
@@ -184,8 +184,8 @@ describe("calcularPrecioItem", () => {
         { presentacion: "torta", cantidad: 1, corte: "carne"   }
       ]
     };
-    // 2×30 + 1×40 = 100
-    assert.strictEqual(calcularPrecioItem(item, precios), 100);
+    // 2×30 + 1×45 = 105
+    assert.strictEqual(calcularPrecioItem(item, precios), 105);
   });
 });
 

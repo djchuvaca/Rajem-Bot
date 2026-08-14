@@ -224,73 +224,10 @@ async function seedDB() {
     // Instalación nueva — tabla productos vacía intencionalmente.
     // El tenant construye su catálogo desde el panel: Productos → Agregar.
     console.log(`ℹ️  Catálogo vacío (${_btSlug}) — el tenant define su menú desde el panel`);
-  } else if (_btSlug === 'taqueria') {
-    // 1. Limpiar duplicados por capitalización (conservar el activo con precios reales)
-    const _dupes = [
-      ['costilla',         'Costilla'],       // 'costilla' era seed legacy; 'Costilla' tiene precios del tenant
-      ['Surtido especial', 'surtido especial'], // 'Surtido especial' inactivo; 'surtido especial' activo
-      ['cebolla',          'Cebolla'],
-      ['picada',           'Picada'],
-      ['roja',             'Roja'],
-      ['suave',            'Suave'],
-    ];
-    for (const [eliminar, conservar] of _dupes) {
-      const rowElim = queryOne("SELECT id FROM productos WHERE nombre = ?", [eliminar]);
-      const rowCons = queryOne("SELECT id FROM productos WHERE nombre = ?", [conservar]);
-      if (rowElim && rowCons) {
-        run("DELETE FROM productos WHERE nombre = ?", [eliminar]);
-        console.log(`🧹 Duplicado eliminado: "${eliminar}" (conservado: "${conservar}")`);
-      }
-    }
-    // limones: producto de relleno sin precio real; borrar si no fue personalizado
-    run("DELETE FROM productos WHERE nombre = 'limones' AND precio_taco = 0 AND precio_torta = 0");
-
-    // 2. Insertar productos de la plantilla que no existan (cortes nuevos, ej. asada/pastor)
-    for (const p of (_giro?.productos || [])) {
-      const cap = p.nombre.charAt(0).toUpperCase() + p.nombre.slice(1);
-      const ya  = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [p.nombre, cap]);
-      if (!ya) {
-        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-          [p.nombre, p.descripcion || '', p.precio_taco || 0, p.precio_torta || 0, p.precio_100g || 0, p.sinonimos || '', p.categoria || 'corte']);
-        console.log(`✅ Producto nuevo: ${p.nombre} (inactivo — activar desde el panel)`);
-      }
-    }
-
-    // 3. Sincronizar campos textuales donde estén vacíos; no tocar precios del tenant
-    db.run("UPDATE productos SET nombre = 'carne' WHERE nombre = 'carner'");
-    db.run("UPDATE productos SET categoria = 'corte' WHERE categoria IS NULL");
-    for (const p of (_giro?.productos || [])) {
-      if (p.descripcion) run("UPDATE productos SET descripcion = ? WHERE nombre = ? AND (descripcion IS NULL OR descripcion = '')", [p.descripcion, p.nombre]);
-      if (p.sinonimos)   run("UPDATE productos SET sinonimos = ? WHERE nombre = ? AND (sinonimos IS NULL OR sinonimos = '')", [p.sinonimos, p.nombre]);
-    }
   }
 
-  // ── PROYECCIÓN DEL CATÁLOGO DEL GIRO ────────────────────────────────────────
-  // `productos` conserva estado/precios del tenant para bebidas y salsas.
-  // Las definiciones canónicas siempre provienen del módulo de giro.
-  try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
-  {
-    for (const r of (_giro?.refrescos || [])) {
-      const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
-      const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
-      if (!ya) {
-        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-          [r.nombre, r.descripcion || '', r.precio || 0, r.precio || 0, 0, r.sinonimos || '', 'refresco']);
-      }
-    }
-    for (const s of (_giro?.salsas || [])) {
-      const cap = s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1);
-      const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [s.nombre, cap]);
-      if (!ya) {
-        run("INSERT INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,0)",
-          [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']);
-      } else {
-        run("UPDATE productos SET categoria = 'salsa' WHERE (nombre = ? OR nombre = ?) AND (categoria IS NULL OR categoria = '')", [s.nombre, cap]);
-      }
-    }
-  }
-  // Rename legacy "cebolla rallada" si aún existe
-  run("UPDATE productos SET nombre = 'cebolla', sinonimos = 'cebollas,cebollita,cebollitas,cebolla rallada' WHERE nombre = 'cebolla rallada'");
+  // `productos` se conserva temporalmente solo como entrada de migración para
+  // bases antiguas. Los tenants nuevos no proyectan ningún catálogo en ella.
 
   // ── SEED CONFIGURACIÓN ─────────────────────────────────────────────────────
   const countConf = db.exec("SELECT COUNT(*) as c FROM configuracion")[0]?.values[0][0] || 0;
@@ -486,6 +423,7 @@ async function seedDB() {
   for (const _giro of _listGirosSeed()) {
     _seedCortesGiro(db, _giro);
   }
+  _migrarCatalogoLegacyAMenu(db, _giro);
 
   // ── DESPACHOS PROGRAMADOS (preventa a domicilio) ───────────────────────────
   run(`CREATE TABLE IF NOT EXISTS despachos_programados (
@@ -534,31 +472,8 @@ async function seedDB() {
   // En tests (BOT_TEST_MODE=1), se activan automáticamente para que el NLU funcione.
   if (process.env.BOT_TEST_MODE) {
     run("UPDATE item_types SET activo = 1");
-    for (const p of (_giro?.productos || [])) {
-      try {
-        run(
-          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
-          [p.nombre, p.descripcion || '', p.precio_taco || 30, p.precio_torta || 40, p.precio_100g || 32, p.sinonimos || '', p.categoria || 'corte']
-        );
-      } catch (_) {}
-    }
-    for (const r of (_giro?.refrescos || [])) {
-      try {
-        run(
-          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
-          [r.nombre, r.descripcion || '', r.precio || 20, r.precio || 20, 0, r.sinonimos || '', 'refresco']
-        );
-      } catch (_) {}
-    }
-    for (const s of (_giro?.salsas || [])) {
-      try {
-        run(
-          "INSERT OR IGNORE INTO productos (nombre, descripcion, precio_taco, precio_torta, precio_100g, sinonimos, categoria, activo) VALUES (?,?,?,?,?,?,?,1)",
-          [s.nombre, s.descripcion || '', s.precio || 0, s.precio || 0, 0, s.sinonimos || '', 'salsa']
-        );
-      } catch (_) {}
-    }
-    console.log("🧪 Modo test: item_types activados y productos seeded en memoria");
+    _seedMenuPruebas(db, _giro);
+    console.log("🧪 Modo test: catálogo del Giro proyectado en menu_items");
   }
 
   guardarDB();
@@ -661,6 +576,47 @@ function _seedBusinessTypes(db) {
   }
 
   console.log("✅ Giros y formatos sincronizados desde src/giros");
+}
+
+// Migración única: `productos` deja de ser fuente operativa. Sus valores se
+// copian a menu_items únicamente para preservar la configuración de tenants
+// anteriores. Después de esta marca nunca vuelve a repoblar un menú eliminado.
+function _migrarCatalogoLegacyAMenu(db, giro) {
+  if (!giro) return;
+  const hecho = db.prepare("SELECT valor FROM configuracion WHERE clave='catalogo_giro_migrado_v2'").get()?.valor === '1';
+  if (hecho) return;
+  const legacy = db.prepare('SELECT * FROM productos WHERE activo=1').all();
+  const formatos = db.prepare(`SELECT it.slug FROM item_types it JOIN business_types bt ON bt.id=it.business_type_id
+    WHERE bt.slug=?`).all(giro.slug);
+  const ins = db.prepare("INSERT OR IGNORE INTO menu_items(producto_slug,formato_slug,categoria,precio,activo,eliminado) VALUES (?,?,?,?,1,0)");
+  for (const p of legacy) {
+    const nombre = String(p.nombre || '').toLowerCase();
+    const corte = (giro.cortes || []).find(c => c.slug === nombre || c.nombre.toLowerCase() === nombre);
+    if (corte) {
+      for (const f of formatos) {
+        const precio = f.slug === 'torta' ? p.precio_torta
+          : f.slug === 'gramos' ? p.precio_100g : p.precio_taco;
+        ins.run(corte.slug, f.slug, 'corte', Number(precio || 0));
+      }
+      continue;
+    }
+    const categoria = p.categoria === 'refresco' ? 'refresco' : p.categoria === 'salsa' ? 'salsa' : null;
+    const def = categoria === 'refresco'
+      ? (giro.refrescos || []).find(x => x.nombre.toLowerCase() === nombre)
+      : categoria === 'salsa' ? (giro.salsas || []).find(x => x.nombre.toLowerCase() === nombre) : null;
+    if (def) ins.run(def.nombre, null, categoria, Number(p.precio_taco || def.precio || 0));
+  }
+  db.prepare("INSERT OR REPLACE INTO configuracion(clave,valor) VALUES('catalogo_giro_migrado_v2','1')").run();
+}
+
+function _seedMenuPruebas(db, giro) {
+  if (!giro) return;
+  const formatos = db.prepare(`SELECT it.slug,it.precio_base FROM item_types it JOIN business_types bt ON bt.id=it.business_type_id
+    WHERE bt.slug=? AND it.activo=1`).all(giro.slug);
+  const ins = db.prepare("INSERT OR IGNORE INTO menu_items(producto_slug,formato_slug,categoria,precio,activo,eliminado) VALUES (?,?,?,?,1,0)");
+  for (const c of giro.cortes || []) for (const f of formatos) ins.run(c.slug, f.slug, 'corte', Number(f.precio_base || c.precio_base || 0));
+  for (const r of giro.refrescos || []) ins.run(r.nombre, null, 'refresco', Number(r.precio || 0));
+  for (const s of giro.salsas || []) ins.run(s.nombre, null, 'salsa', Number(s.precio || 0));
 }
 
 module.exports = { seedDB };
