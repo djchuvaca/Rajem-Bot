@@ -35,9 +35,13 @@ function upsertCliente(datos) {
   }
   return getCliente(datos.telefono);
 }
-function deleteCliente(id) {
-  run("UPDATE pedidos SET cliente_id = NULL WHERE cliente_id = ?", [id]);
-  run("DELETE FROM clientes WHERE id = ?", [id]);
+function updateClientePanel(id, datos) {
+  run(
+    `UPDATE clientes SET nombre=?, apellido=?, telefono=?, calle_numero=?, colonia=?, referencia=?
+     WHERE id=?`,
+    [datos.nombre, datos.apellido, datos.telefono, datos.calle_numero, datos.colonia, datos.referencia, id]
+  );
+  return queryOne("SELECT * FROM clientes WHERE id=?", [id]);
 }
 function guardarUltimoPedido(telefono, jsonObj) {
   try { run("UPDATE clientes SET ultimo_pedido_json = ? WHERE telefono = ?", [JSON.stringify(jsonObj), telefono]); } catch (_) {}
@@ -96,10 +100,6 @@ function getAllPedidos() {
 function updatePedidoEstado(id, estado) {
   run("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, id]);
 }
-function deletePedido(id) {
-  run("DELETE FROM pedidos WHERE id = ?", [id]);
-}
-
 function getTopClientes(limit = 10) {
   return queryAll(
     `SELECT c.*,
@@ -228,8 +228,8 @@ function getDespachosPendientes() {
 
 module.exports = {
   getMenuItems,
-  getCliente, getAllClientes, upsertCliente, deleteCliente, guardarUltimoPedido, getUltimoPedido,
-  registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado, deletePedido,
+  getCliente, getAllClientes, upsertCliente, updateClientePanel, guardarUltimoPedido, getUltimoPedido,
+  registrarPedido, actualizarEstadoPedido, actualizarEstadoPorId, getPedidosHoy, getAllPedidos, updatePedidoEstado,
   getPedidosPorCliente, actualizarEstadoConfirmado, getPedidosPorFecha, getStatsReporte,
   getTopClientes,
   guardarPagoPendiente, obtenerPagoPendiente, eliminarPagoPendiente, limpiarPagosPendientesExpirados,

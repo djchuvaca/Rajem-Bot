@@ -9,8 +9,8 @@ const {
   getHorarios, updateHorario,
   getBanco, updateBanco,
   getAllMensajes, setMensaje,
-  getAllClientes, getCliente, upsertCliente, deleteCliente,
-  getAllPedidos, getPedidosHoy, updatePedidoEstado, deletePedido,
+  getAllClientes, getCliente, updateClientePanel,
+  getAllPedidos, getPedidosHoy, updatePedidoEstado,
   getConfig, guardarTelefonoReal, getJIDReal, getGrupoId, getNotifDestinoJID,
   getPedidosPorFecha, getStatsReporte, getTopClientes,
   getBusinessType, getBusinessTypeSlug,
@@ -316,29 +316,30 @@ app.get("/api/clientes/:telefono", requireAuth, (req, res) => {
   res.json(cliente);
 });
 
-app.post("/api/clientes", requireAuth, (req, res) => {
+app.put("/api/clientes/:id", requireAuth, (req, res) => {
   try {
-    const cliente = upsertCliente(req.body);
-    // Si tiene teléfono de whatsapp, guardar relación para cliente frecuente
-    if (req.body.whatsapp && req.body.telefono)
-      guardarTelefonoReal(req.body.whatsapp, req.body.telefono);
+    const id = parseInt(req.params.id);
+    const actual = queryOne("SELECT * FROM clientes WHERE id=?", [id]);
+    if (!actual) return res.status(404).json({ error: 'Cliente no encontrado' });
+    const telefono = String(req.body.telefono || '').replace(/\D/g, '');
+    if (!/^[2-9]\d{9}$/.test(telefono)) return res.status(400).json({ error: 'El teléfono debe contener 10 dígitos válidos' });
+    const repetido = queryOne("SELECT id FROM clientes WHERE telefono=? AND id<>?", [telefono, id]);
+    if (repetido) return res.status(409).json({ error: 'Ese teléfono ya pertenece a otro cliente' });
+    const limpio = valor => String(valor ?? '').trim().slice(0, 200) || null;
+    const cliente = updateClientePanel(id, {
+      nombre: limpio(req.body.nombre),
+      apellido: limpio(req.body.apellido),
+      telefono,
+      calle_numero: limpio(req.body.calle_numero),
+      colonia: limpio(req.body.colonia),
+      referencia: limpio(req.body.referencia),
+    });
     res.json({ ok: true, cliente });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-app.put("/api/clientes/:id", requireAuth, (req, res) => {
-  try {
-    upsertCliente(req.body);
-    if (req.body.whatsapp && req.body.telefono)
-      guardarTelefonoReal(req.body.whatsapp, req.body.telefono);
-    res.json({ ok: true });
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.delete("/api/clientes/:id", requireAuth, (req, res) => {
-  deleteCliente(parseInt(req.params.id));
-  res.json({ ok: true });
-});
+app.post("/api/clientes", requireAuth, (_req, res) => res.status(403).json({ error: 'Los clientes se registran desde la conversación de WhatsApp' }));
+app.delete("/api/clientes/:id", requireAuth, (_req, res) => res.status(403).json({ error: 'Los clientes no pueden eliminarse' }));
 
 // ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
 app.get("/api/negocio/estado", requireAuth, (req, res) => {
@@ -392,9 +393,8 @@ app.put("/api/pedidos/:id/estado", requireAuth, (req, res) => {
     }
   }
 });
-app.delete("/api/pedidos/:id", requireAuth, (req, res) => {
-  deletePedido(parseInt(req.params.id));
-  res.json({ ok: true });
+app.delete("/api/pedidos/:id", requireAuth, (_req, res) => {
+  res.status(403).json({ error: 'Las ventas son registros históricos y no pueden eliminarse' });
 });
 
 // ── TRAZABILIDAD Y ATENCIÓN OPERATIVA ────────────────────────────────────────

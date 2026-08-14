@@ -462,7 +462,10 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
     <div class="section" id="s-pedidos">
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
-          <div class="card-title" style="margin:0">Todos los pedidos</div>
+          <div>
+            <div class="card-title" style="margin:0">Todos los pedidos</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Las ventas forman parte del historial y no se pueden eliminar.</div>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input class="form-input" id="buscar-pedido" placeholder="Buscar nombre o teléfono…" style="width:200px" oninput="filtrarPedidosTabla(this.value)">
             <select class="form-select" style="width:150px" id="filtro-estado" onchange="loadPedidos()">
@@ -518,11 +521,10 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input class="form-input" id="buscar-cliente" placeholder="Buscar por nombre o teléfono…" style="width:240px" oninput="filtrarClientes(this.value)">
             <button class="btn btn-secondary btn-sm" onclick="exportarClientesCSV()">⬇ CSV</button>
-            <button class="btn btn-primary btn-sm" onclick="openModalCliente()">+ Agregar cliente</button>
           </div>
         </div>
         <div class="table-wrap"><table id="clientes-table">
-          <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Pedidos</th><th>Registro</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Pedidos</th><th>Registro</th><th>Editar</th></tr></thead>
           <tbody></tbody>
         </table></div>
         <div id="clientes-count" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
@@ -636,6 +638,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
     <!-- REPORTES -->
     <div class="section" id="s-reportes">
       <div class="card">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Los reportes son de consulta y exportación; sus registros no se pueden modificar ni eliminar.</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
           <div class="card-title" style="margin:0">Rango de fechas</div>
           <input type="date" class="form-input" id="rep-desde" style="width:160px">
@@ -845,7 +848,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
 <!-- MODAL CLIENTE -->
 <div class="modal-overlay" id="modal-cliente">
   <div class="modal">
-    <div class="modal-title" id="modal-cli-title">Nuevo cliente</div>
+    <div class="modal-title" id="modal-cli-title">Editar cliente</div>
     <input type="hidden" id="cli-id">
     <div class="form-row">
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="cli-nombre" type="text" placeholder="Javier"></div>
@@ -862,11 +865,6 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
     <div class="form-row">
       <div class="form-group"><label class="form-label">Colonia</label><input class="form-input" id="cli-colonia" type="text" placeholder="Infonavit El Mirador"></div>
       <div class="form-group"><label class="form-label">Referencia</label><input class="form-input" id="cli-referencia" type="text" placeholder="Casa azul"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Número WhatsApp <span style="color:var(--muted)">(opcional — para reconocimiento automático)</span></label>
-      <input class="form-input" id="cli-whatsapp" type="text" placeholder="521XXXXXXXXXX@c.us o @lid">
-      <div class="hint">Si lo ingresas, el bot reconocerá a este cliente aunque sea la primera vez que escriba.</div>
     </div>
     <div id="cli-historial-section" style="display:none;margin-top:12px">
       <div style="font-size:12px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Historial de pedidos</div>
@@ -1282,7 +1280,7 @@ function _accionesPedido(p) {
     case 'listo':
       return `<button class="btn-accion btn-accion-blue" onclick="accionPedido(${p.id},'en_camino')">🛵 En camino</button>`;
     default:
-      return `<button class="btn-accion btn-accion-red" onclick="deletePedido(${p.id})" title="Eliminar">🗑</button>`;
+      return '<span style="color:var(--muted);font-size:12px">Solo lectura</span>';
   }
 }
 
@@ -1449,18 +1447,6 @@ async function enviarMsgDesdePedido() {
   const r = await api(`/api/pedidos/${_modalPedidoActual.id}/notificar`, 'POST', { mensaje: msg });
   if (r.ok) { toast('Mensaje enviado ✅'); document.getElementById('mp-msg').value = ''; }
   else toast(r.error || 'Error al enviar', false);
-}
-
-// ── CAMBIO 2: nueva función deletePedido ──────────────────────────────────────
-async function deletePedido(id) {
-  if (!confirm(`¿Eliminar el pedido #${id}? Esta acción no se puede deshacer.`)) return;
-  const r = await api(`/api/pedidos/${id}`, 'DELETE');
-  if (r.ok) {
-    toast('Pedido eliminado ✅');
-    loadPedidos();
-  } else {
-    toast('Error al eliminar el pedido', false);
-  }
 }
 
 // ── REPORTES ──────────────────────────────────────────────────────────────────
@@ -1655,9 +1641,8 @@ function renderClientes(lista) {
       <td style="font-size:12px;color:var(--muted2)">${[c.calle_numero, c.colonia?'Col. '+c.colonia:''].filter(Boolean).join(', ')||'—'}</td>
       <td style="text-align:center">${c.total_pedidos||0}</td>
       <td style="color:var(--muted);font-size:12px">${(c.fecha_registro||'').substring(0,10)}</td>
-      <td style="display:flex;gap:6px">
+      <td>
         <button class="btn btn-secondary btn-sm" onclick='openModalCliente(${JSON.stringify(c)})'>✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCliente(${c.id})">🗑</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay clientes registrados</td></tr>';
   if (count) count.textContent = lista.length !== _clientesData.length
@@ -1684,8 +1669,9 @@ function exportarClientesCSV() {
   window.open('/api/clientes/export', '_blank');
 }
 
-async function openModalCliente(c=null) {
-  document.getElementById('modal-cli-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+async function openModalCliente(c) {
+  if (!c?.id) return;
+  document.getElementById('modal-cli-title').textContent = 'Editar cliente';
   document.getElementById('cli-id').value         = c?.id          || '';
   document.getElementById('cli-nombre').value     = c?.nombre      || '';
   document.getElementById('cli-apellido').value   = c?.apellido    || '';
@@ -1693,7 +1679,6 @@ async function openModalCliente(c=null) {
   document.getElementById('cli-calle').value      = c?.calle_numero|| '';
   document.getElementById('cli-colonia').value    = c?.colonia     || '';
   document.getElementById('cli-referencia').value = c?.referencia  || '';
-  document.getElementById('cli-whatsapp').value   = '';
 
   // Historial de pedidos
   const histSection = document.getElementById('cli-historial-section');
@@ -1715,7 +1700,6 @@ async function openModalCliente(c=null) {
   } else {
     histSection.style.display = 'none';
   }
-
   document.getElementById('modal-cliente').classList.add('show');
 }
 
@@ -1730,10 +1714,10 @@ async function saveCliente() {
     calle_numero: document.getElementById('cli-calle').value.trim() || null,
     colonia:      document.getElementById('cli-colonia').value.trim() || null,
     referencia:   document.getElementById('cli-referencia').value.trim() || null,
-    whatsapp:     document.getElementById('cli-whatsapp').value.trim() || null,
   };
 
-  const r = await api('/api/clientes', 'POST', datos);
+  const id = Number(document.getElementById('cli-id').value);
+  const r = await api(`/api/clientes/${id}`, 'PUT', datos);
   if (r.ok) {
     closeModal('modal-cliente');
     toast('Cliente guardado ✅');
@@ -1741,13 +1725,6 @@ async function saveCliente() {
   } else {
     toast(r.error || 'Error al guardar', false);
   }
-}
-
-async function deleteCliente(id) {
-  if (!confirm('¿Eliminar este cliente? También se perderá su historial de reconocimiento.')) return;
-  await api(`/api/clientes/${id}`, 'DELETE');
-  toast('Cliente eliminado');
-  loadClientes();
 }
 
 // ── PRODUCTOS (menú del tenant) ───────────────────────────────────────────────

@@ -85,7 +85,7 @@ module.exports = {
   getAllClientes:       modelos.getAllClientes,
   getTopClientes:      modelos.getTopClientes,
   upsertCliente:       modelos.upsertCliente,
-  deleteCliente:       modelos.deleteCliente,
+  updateClientePanel:  modelos.updateClientePanel,
   guardarUltimoPedido: modelos.guardarUltimoPedido,
   getUltimoPedido:     modelos.getUltimoPedido,
 
@@ -100,7 +100,6 @@ module.exports = {
   getPedidosPorFecha:         modelos.getPedidosPorFecha,
   getStatsReporte:            modelos.getStatsReporte,
   updatePedidoEstado:         modelos.updatePedidoEstado,
-  deletePedido:               modelos.deletePedido,
 
   // pagos pendientes MP
   guardarPagoPendiente:             modelos.guardarPagoPendiente,
