@@ -23,7 +23,7 @@ function _bustCache() {
 }
 
 // Sin fallback hardcodeado — si no hay item_types activos en BD, devuelve vacío.
-// El tenant activa los tipos desde el panel; el menú refleja solo lo configurado.
+// El Superadmin activa los tipos; el menú refleja solo lo habilitado para el tenant.
 function _defaultItemTypes() { return []; }
 
 // ── BUSINESS TYPES ────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 const { queryAll, queryOne, run } = require("./core");
 
-// ─── MENU ITEMS (menú configurado por el tenant desde el panel) ───────────────
+// ─── MENU ITEMS (habilitados por Superadmin; precios editables por tenant) ────
 function getMenuItems(categoria = null) {
   const where  = categoria ? "WHERE eliminado=0 AND activo=1 AND categoria=?" : "WHERE eliminado=0 AND activo=1";
   const params = categoria ? [categoria] : [];

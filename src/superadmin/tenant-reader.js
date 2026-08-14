@@ -6,6 +6,7 @@ const path     = require('path');
 const fs       = require('fs');
 const Database = require('better-sqlite3');
 const { encrypt, decrypt } = require('../security/secrets');
+const { getGiro } = require('../giros');
 
 const TENANTS_PATH = path.join(__dirname, '../../data/tenants.json');
 const ROOT_PATH    = path.join(__dirname, '../../');
@@ -176,6 +177,78 @@ function setTenantConfigBulk(tenant, config) {
     const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
     db.transaction(() => {
       for (const [clave, valor] of Object.entries(config)) stmt.run(clave, _encodeTenantConfig(tenant, clave, valor));
+    })();
+    _invalidateTenant(tenant);
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+// ── Catálogo y formatos administrados exclusivamente por Superadmin ─────────
+function getTenantCatalogoAdmin(tenant) {
+  const db = _getTenantDB(tenant);
+  if (!db) return null;
+  try {
+    const cfg = Object.fromEntries(db.prepare('SELECT clave,valor FROM configuracion').all().map(r => [r.clave, r.valor]));
+    const giro = getGiro(cfg.business_type_slug || tenant.business_type || 'taqueria');
+    const formatosDb = db.prepare(`SELECT it.* FROM item_types it
+      JOIN business_types bt ON bt.id=it.business_type_id WHERE bt.slug=? ORDER BY it.id`).all(giro.slug);
+    const menu = db.prepare('SELECT * FROM menu_items WHERE eliminado=0').all();
+    const estado = (categoria, slug) => menu.some(i => i.categoria === categoria && i.producto_slug === slug && i.activo === 1);
+    return {
+      giro: { slug: giro.slug, nombre: giro.nombre, emoji: giro.emoji },
+      formatos: formatosDb.map(f => ({ id: f.id, slug: f.slug, nombre: f.nombre_plural, emoji: f.emoji, activo: !!f.activo })),
+      cortes: (giro.cortes || []).map(p => ({ slug: p.slug, nombre: p.nombre, descripcion: p.descripcion || '', seccion: p.seccion || '', activo: estado('corte', p.slug) })),
+      bebidas: (giro.refrescos || []).map(p => ({ slug: p.nombre, nombre: p.nombre, descripcion: p.descripcion || '', activo: estado('refresco', p.nombre) })),
+      salsas: (giro.salsas || []).map(p => ({ slug: p.nombre, nombre: p.nombre, descripcion: p.descripcion || '', activo: estado('salsa', p.nombre) })),
+    };
+  } catch (_) { return null; }
+}
+
+function setTenantFormatoActivo(tenant, formatoId, activo) {
+  const db = _openWritable(tenant);
+  if (!db) return false;
+  try {
+    const cfg = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get();
+    const giro = getGiro(cfg?.valor || tenant.business_type || 'taqueria');
+    const formato = db.prepare(`SELECT it.id FROM item_types it JOIN business_types bt ON bt.id=it.business_type_id
+      WHERE it.id=? AND bt.slug=?`).get(formatoId, giro.slug);
+    if (!formato) return false;
+    db.prepare('UPDATE item_types SET activo=? WHERE id=?').run(activo ? 1 : 0, formatoId);
+    _invalidateTenant(tenant);
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+function setTenantProductoActivo(tenant, categoria, productoSlug, activo) {
+  if (!['corte', 'refresco', 'salsa'].includes(categoria)) return false;
+  const db = _openWritable(tenant);
+  if (!db) return false;
+  try {
+    const cfg = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get();
+    const giro = getGiro(cfg?.valor || tenant.business_type || 'taqueria');
+    const definiciones = categoria === 'corte' ? (giro.cortes || [])
+      : categoria === 'refresco' ? (giro.refrescos || []) : (giro.salsas || []);
+    const definicion = definiciones.find(p => (p.slug || p.nombre) === productoSlug);
+    if (!definicion) return false;
+    const buscar = db.prepare("SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?");
+    const insertar = db.prepare(`INSERT INTO menu_items(producto_slug,formato_slug,categoria,precio,activo,eliminado)
+      VALUES(?,?,?,?,?,0)`);
+    const actualizar = db.prepare('UPDATE menu_items SET activo=?,eliminado=0 WHERE id=?');
+    const guardar = (slug, formato, cat, precio, habilitado) => {
+      const existente = buscar.get(slug, formato || '', cat);
+      if (existente) actualizar.run(habilitado, existente.id);
+      else insertar.run(slug, formato, cat, precio, habilitado);
+    };
+    db.transaction(() => {
+      if (categoria === 'corte') {
+        const formatos = db.prepare(`SELECT it.slug,it.precio_base FROM item_types it
+          JOIN business_types bt ON bt.id=it.business_type_id WHERE bt.slug=?`).all(giro.slug);
+        for (const formato of formatos) guardar(productoSlug, formato.slug, categoria, Number(formato.precio_base || definicion.precio_base || 0), activo ? 1 : 0);
+      } else {
+        guardar(productoSlug, null, categoria, Number(definicion.precio || 0), activo ? 1 : 0);
+      }
     })();
     _invalidateTenant(tenant);
     return true;
@@ -463,6 +536,7 @@ function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantCatalogoAdmin, setTenantFormatoActivo, setTenantProductoActivo,
   getTenantPanelUsuario, updateTenantPanelCredentials,
   getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,

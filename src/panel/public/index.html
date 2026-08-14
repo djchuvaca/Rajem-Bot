@@ -159,12 +159,6 @@ tr:hover td{background:var(--surface2)}
 .price-pill input{background:transparent;border:none;outline:none;width:44px;text-align:right;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:0;min-width:0}
 .price-pill input:focus{color:var(--accent)}
 td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
-.fmt-tab-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);white-space:nowrap}
-.fmt-tab-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-.fmt-seccion-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;padding:6px 12px;background:var(--surface2);border-radius:6px;display:inline-block}
-.fmt-fila{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;margin-bottom:4px;transition:background .12s,border-color .12s;background:var(--surface2)}
-.fmt-fila.activo{background:var(--accent-dim);border-color:rgba(255,107,43,.22)}
-.fmt-fila:hover{border-color:var(--border2)}
 @media(max-width:900px){#pedidos-table th:nth-child(5),#pedidos-table td:nth-child(5),#pedidos-table th:nth-child(7),#pedidos-table td:nth-child(7),#pedidos-table th:nth-child(9),#pedidos-table td:nth-child(9){display:none}}
 @keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -550,26 +544,13 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
         </p>
       </div>
 
-      <!-- Formatos de venta -->
-      <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-          <div>
-            <div class="card-title" style="margin:0">🍽️ Formatos de venta</div>
-            <p style="font-size:13px;color:var(--muted);margin-top:4px">Ajusta el precio base de cada formato y activa o desactiva los que no ofreces.</p>
-          </div>
-        </div>
-        <div id="item-types-list"></div>
-        <button class="btn btn-primary" style="margin-top:14px" onclick="saveFormatos()">Guardar precios de formato</button>
-      </div>
-
       <!-- Mis Cortes (formatos integrados en header) -->
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px">
           <div>
             <div class="card-title" style="margin:0">🥩 Mis Cortes</div>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">Selecciona un formato para agregar cortes y ajustar sus precios.</p>
+            <p style="font-size:12px;color:var(--muted);margin-top:4px">Productos habilitados por el Superadmin. Aquí puedes ajustar sus precios.</p>
           </div>
-          <div id="formatos-btns" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
         <div class="table-wrap">
           <table id="menu-cortes-table" style="display:none">
@@ -581,7 +562,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <div class="empty-state">
             <div class="empty-state-icon">🥩</div>
             <div class="empty-state-title">Sin cortes en el menú</div>
-            <div class="empty-state-sub">Usa los botones de formato para agregar cortes al menú.</div>
+            <div class="empty-state-sub">Solicita al Superadmin que habilite los productos para este negocio.</div>
           </div>
         </div>
       </div>
@@ -593,11 +574,10 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
             <div class="card-title" style="margin:0">🥤 Bebidas</div>
             <p style="font-size:12px;color:var(--muted);margin-top:4px">Refrescos y bebidas disponibles en el menú.</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openModalAgregarBebida()">+ Agregar bebida</button>
         </div>
         <div class="table-wrap">
           <table id="menu-bebidas-table" style="display:none">
-            <thead><tr><th>Bebida</th><th class="num">Precio</th><th>Estado</th><th style="width:44px"></th></tr></thead>
+            <thead><tr><th>Bebida</th><th class="num">Precio</th><th>Estado</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -605,7 +585,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <div class="empty-state" style="padding:28px 24px">
             <div class="empty-state-icon">🥤</div>
             <div class="empty-state-title">Sin bebidas en el menú</div>
-            <div class="empty-state-sub">Agrega bebidas usando el botón de arriba.</div>
+            <div class="empty-state-sub">Solicita al Superadmin que habilite las bebidas.</div>
           </div>
         </div>
       </div>
@@ -617,11 +597,10 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
             <div class="card-title" style="margin:0">🌶️ Salsas</div>
             <p style="font-size:12px;color:var(--muted);margin-top:4px">Salsas y acompañamientos con su precio extra.</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openModalAgregarSalsa()">+ Agregar salsa</button>
         </div>
         <div class="table-wrap">
           <table id="menu-salsas-table" style="display:none">
-            <thead><tr><th>Salsa</th><th class="num">Precio extra</th><th>Estado</th><th style="width:44px"></th></tr></thead>
+            <thead><tr><th>Salsa</th><th class="num">Precio extra</th><th>Estado</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -629,7 +608,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <div class="empty-state" style="padding:28px 24px">
             <div class="empty-state-icon">🌶️</div>
             <div class="empty-state-title">Sin salsas en el menú</div>
-            <div class="empty-state-sub">Agrega salsas usando el botón de arriba.</div>
+            <div class="empty-state-sub">Solicita al Superadmin que habilite las salsas.</div>
           </div>
         </div>
       </div>
@@ -926,44 +905,6 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
     </div>
     <div class="modal-footer" style="margin-top:16px">
       <button class="btn btn-secondary" onclick="closeModal('modal-pedido')">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── MODAL: CONFIGURAR FORMATO ─────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-formato">
-  <div class="modal" style="width:560px;max-height:88vh;overflow-y:auto">
-    <div class="modal-title" id="modal-formato-title">Configurar formato</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Activa los cortes disponibles y ajusta el precio por corte para este formato. Haz clic en la fila para activar/desactivar.</p>
-    <div class="fmt-seccion-label">🥩 Tacos de Asada</div>
-    <div id="fmt-cortes-asada" style="margin-bottom:20px"></div>
-    <div class="fmt-seccion-label">🐷 Carnitas</div>
-    <div id="fmt-cortes-carnitas" style="margin-bottom:8px"></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-formato')">Cancelar</button>
-      <button class="btn btn-primary" id="btn-save-formato" onclick="saveFormato()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── MODAL: AGREGAR BEBIDA ──────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-bebida">
-  <div class="modal" style="width:420px;max-height:75vh;overflow-y:auto">
-    <div class="modal-title">🥤 Agregar bebida</div>
-    <div id="bebidas-catalogo-list"></div>
-    <div class="modal-footer" style="margin-top:12px">
-      <button class="btn btn-secondary" onclick="closeModal('modal-bebida')">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── MODAL: AGREGAR SALSA ───────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-salsa">
-  <div class="modal" style="width:420px;max-height:75vh;overflow-y:auto">
-    <div class="modal-title">🌶️ Agregar salsa</div>
-    <div id="salsas-catalogo-list"></div>
-    <div class="modal-footer" style="margin-top:12px">
-      <button class="btn btn-secondary" onclick="closeModal('modal-salsa')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1729,7 +1670,6 @@ async function saveCliente() {
 
 // ── PRODUCTOS (menú del tenant) ───────────────────────────────────────────────
 let _menuItems   = [];
-let _formatoSlug = null;
 let _descBebidas = {};
 let _descSalsas  = {};
 let _descCortes  = {};
@@ -1757,22 +1697,13 @@ async function loadProductos() {
   const formatosCorte   = formatosActivos.filter(f => !f.soporta_pesos);
 
   // Pills de formato en el header de "Mis Cortes"
-  const btnsEl = document.getElementById('formatos-btns');
-  if (btnsEl) {
-    btnsEl.innerHTML = formatosCorte.map(f =>
-      `<button class="fmt-tab-btn" onclick="openModalFormato('${_esc(f.slug)}','${_esc(f.nombre_plural)}')">
-        ${f.emoji || ''} ${_ucfirst(f.nombre_plural)}
-      </button>`
-    ).join('');
-  }
-
   _renderMenuCortes(formatosCorte);
   _renderMenuSimples('refresco', 'menu-bebidas-table', 'menu-bebidas-empty', 'Precio');
   _renderMenuSimples('salsa',    'menu-salsas-table',  'menu-salsas-empty',  'Precio extra');
 }
 
 function _renderMenuCortes(formatos) {
-  const corteItems  = _menuItems.filter(i => i.categoria === 'corte');
+  const corteItems  = _menuItems.filter(i => i.categoria === 'corte' && i.activo);
   const slugsVistos = [...new Set(corteItems.map(i => i.producto_slug))];
 
   const table   = document.getElementById('menu-cortes-table');
@@ -1793,7 +1724,6 @@ function _renderMenuCortes(formatos) {
       <th style="min-width:200px">Corte</th>
       ${formatos.map(f => `<th class="num" style="white-space:nowrap">${f.emoji||''} ${_ucfirst(f.nombre_plural)}</th>`).join('')}
       <th style="min-width:95px">Estado</th>
-      <th style="width:44px"></th>
     </tr>`;
   }
 
@@ -1836,21 +1766,14 @@ function _renderMenuCortes(formatos) {
       </td>
       ${celdas}
       <td>
-        <span class="badge ${activo ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
-          onclick="toggleCorteMenu('${_esc(slug)}',${activo ? 0 : 1})">
-          ${activo ? '✓ Activo' : '✗ Inactivo'}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="eliminarCorteMenu('${_esc(slug)}')"
-          title="Quitar del menú" style="padding:4px 8px">🗑</button>
+        <span class="badge badge-green" style="white-space:nowrap">✓ Habilitado</span>
       </td>
     </tr>`;
   }).join('');
 }
 
 function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
-  const items   = _menuItems.filter(i => i.categoria === categoria);
+  const items   = _menuItems.filter(i => i.categoria === categoria && i.activo);
   const table   = document.getElementById(tableId);
   const emptyEl = document.getElementById(emptyId);
   if (!table) return;
@@ -1890,14 +1813,7 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
         </div>
       </td>
       <td>
-        <span class="badge ${item.activo ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
-          onclick="toggleMenuItemActivo(${item.id},${item.activo ? 0 : 1})">
-          ${item.activo ? '✓ Activo' : '✗ Inactivo'}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="eliminarMenuItem(${item.id})"
-          title="Quitar" style="padding:4px 8px">🗑</button>
+        <span class="badge badge-green" style="white-space:nowrap">✓ Habilitado</span>
       </td>
     </tr>`;
   }).join('');
@@ -1905,165 +1821,6 @@ function _renderMenuSimples(categoria, tableId, emptyId, precioLabel) {
 
 async function actualizarPrecioMenuItem(id, valor) {
   await api(`/api/menu-items/${id}`, 'PUT', { precio: parseFloat(valor) || 0 });
-}
-
-async function toggleMenuItemActivo(id, activo) {
-  await api(`/api/menu-items/${id}`, 'PUT', { activo });
-  loadProductos();
-}
-
-async function toggleCorteMenu(slug, activo) {
-  await api('/api/menu-items/toggle-corte', 'POST', { producto_slug: slug, activo });
-  toast(activo ? `✓ ${slug} activado` : `✗ ${slug} desactivado`);
-  loadProductos();
-}
-
-async function eliminarMenuItem(id) {
-  if (!confirm('¿Quitar del menú?')) return;
-  await api(`/api/menu-items/${id}`, 'DELETE');
-  toast('Eliminado del menú');
-  loadProductos();
-}
-
-async function eliminarCorteMenu(slug) {
-  if (!confirm(`¿Quitar "${slug}" del menú?`)) return;
-  const items = _menuItems.filter(i => i.producto_slug === slug && i.categoria === 'corte');
-  await Promise.all(items.map(i => api(`/api/menu-items/${i.id}`, 'DELETE')));
-  toast(`${slug} eliminado del menú`);
-  loadProductos();
-}
-
-// ── MODAL FORMATO ─────────────────────────────────────────────────────────────
-async function openModalFormato(slug, nombrePlural) {
-  _formatoSlug = slug;
-  document.getElementById('modal-formato-title').textContent = `Configurar: ${nombrePlural}`;
-
-  const { asada = [], carnitas = [] } = await api('/api/catalogo/cortes');
-
-  const existentes = {};
-  for (const item of _menuItems) {
-    if (item.categoria === 'corte' && item.formato_slug === slug) {
-      existentes[item.producto_slug] = item;
-    }
-  }
-
-  const renderFila = c => {
-    const item    = existentes[c.slug];
-    const activo  = !!(item?.activo);  // item existe con activo=1 → checked; activo=0 → unchecked
-    const precio  = item ? (item.precio || 0) : (c.precio_base || 0);
-    return `<div id="fmt-row-${_esc(c.slug)}"
-        class="fmt-fila${activo ? ' activo' : ''}"
-        onclick="_onFmtRowClick('${_esc(c.slug)}')">
-      <input type="checkbox" id="fmt-chk-${_esc(c.slug)}" value="${_esc(c.slug)}" ${activo ? 'checked' : ''}
-        style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;pointer-events:none">
-      <div style="flex:1;min-width:0">
-        <div class="prod-name">${_esc(c.nombre)}</div>
-        ${c.descripcion ? `<div class="prod-desc">${_esc(c.descripcion)}</div>` : ''}
-      </div>
-      <div class="price-pill" id="fmt-pill-${_esc(c.slug)}"
-        style="${activo ? '' : 'opacity:.3;pointer-events:none'}"
-        onclick="event.stopPropagation()">
-        <span class="sym">$</span>
-        <input type="number" id="fmt-price-${_esc(c.slug)}" min="0" step="1" value="${precio}"
-          onkeydown="if(event.key==='Enter')this.blur()">
-      </div>
-    </div>`;
-  };
-
-  document.getElementById('fmt-cortes-asada').innerHTML    = asada.map(renderFila).join('') || '<p style="color:var(--muted);font-size:13px">Sin cortes de asada</p>';
-  document.getElementById('fmt-cortes-carnitas').innerHTML = carnitas.map(renderFila).join('') || '<p style="color:var(--muted);font-size:13px">Sin cortes de carnitas</p>';
-
-  document.getElementById('modal-formato').classList.add('show');
-}
-
-function _onFmtRowClick(slug) {
-  const cb = document.getElementById(`fmt-chk-${slug}`);
-  if (cb) { cb.checked = !cb.checked; _onFmtCorteToggle(cb, slug); }
-}
-
-function _onFmtCorteToggle(cb, slug) {
-  const pill = document.getElementById(`fmt-pill-${slug}`);
-  const row  = document.getElementById(`fmt-row-${slug}`);
-  const on   = cb.checked;
-  if (pill) { pill.style.opacity = on ? '1' : '.3'; pill.style.pointerEvents = on ? '' : 'none'; }
-  if (row)  {
-    row.classList.toggle('activo', on);
-  }
-}
-
-async function saveFormato() {
-  const btn = document.getElementById('btn-save-formato');
-  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
-  try {
-    const checks = document.querySelectorAll('#fmt-cortes-asada input[type="checkbox"], #fmt-cortes-carnitas input[type="checkbox"]');
-    const ops = [];
-    for (const cb of checks) {
-      const cSlug   = cb.value;
-      const price   = parseFloat(document.getElementById(`fmt-price-${cSlug}`)?.value) || 0;
-      const existente = _menuItems.find(i => i.categoria === 'corte' && i.formato_slug === _formatoSlug && i.producto_slug === cSlug);
-      if (cb.checked) {
-        if (existente) {
-          ops.push(api(`/api/menu-items/${existente.id}`, 'PUT', { precio: price, activo: 1 }));
-        } else {
-          ops.push(api('/api/menu-items', 'POST', { producto_slug: cSlug, formato_slug: _formatoSlug, categoria: 'corte', precio: price }));
-        }
-      } else if (existente) {
-        ops.push(api(`/api/menu-items/${existente.id}`, 'DELETE'));
-      }
-    }
-    await Promise.all(ops);
-    closeModal('modal-formato');
-    toast('✅ Menú guardado');
-    loadProductos();
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
-  }
-}
-
-// ── MODAL BEBIDA ──────────────────────────────────────────────────────────────
-async function openModalAgregarBebida() {
-  const catalogo   = await api('/api/catalogo/bebidas');
-  const enMenu     = new Set(_menuItems.filter(i => i.categoria === 'refresco').map(i => i.producto_slug));
-  const disponibles = (catalogo || []).filter(c => !enMenu.has(c.nombre));
-  const listEl = document.getElementById('bebidas-catalogo-list');
-  listEl.innerHTML = disponibles.length
-    ? disponibles.map(b => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:13px">${_esc(b.nombre)}</div>
-          <div style="font-size:11px;color:var(--muted)">${_esc(b.descripcion||'')}</div>
-        </div>
-        <span style="color:var(--muted);font-size:13px">$${b.precio||0}</span>
-        <button class="btn btn-primary btn-sm" onclick="agregarItemCatalogo('${_esc(b.nombre)}','refresco',${b.precio||0})">+ Agregar</button>
-      </div>`).join('')
-    : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:12px">${(catalogo || []).length ? 'Todas las bebidas ya están en el menú.' : 'El giro activo no define bebidas.'}</p>`;
-  document.getElementById('modal-bebida').classList.add('show');
-}
-
-// ── MODAL SALSA ───────────────────────────────────────────────────────────────
-async function openModalAgregarSalsa() {
-  const catalogo    = await api('/api/catalogo/salsas');
-  const enMenu      = new Set(_menuItems.filter(i => i.categoria === 'salsa').map(i => i.producto_slug));
-  const disponibles = (catalogo || []).filter(c => !enMenu.has(c.nombre));
-  const listEl = document.getElementById('salsas-catalogo-list');
-  listEl.innerHTML = disponibles.length
-    ? disponibles.map(s => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:13px">${_esc(s.nombre)}</div>
-          <div style="font-size:11px;color:var(--muted)">${_esc(s.descripcion||'')}</div>
-        </div>
-        <span style="color:var(--muted);font-size:13px">$${s.precio||0}</span>
-        <button class="btn btn-primary btn-sm" onclick="agregarItemCatalogo('${_esc(s.nombre)}','salsa',${s.precio||0})">+ Agregar</button>
-      </div>`).join('')
-    : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:12px">${(catalogo || []).length ? 'Todas las salsas ya están en el menú.' : 'El giro activo no define salsas.'}</p>`;
-  document.getElementById('modal-salsa').classList.add('show');
-}
-
-async function agregarItemCatalogo(nombre, categoria, precio) {
-  await api('/api/menu-items', 'POST', { producto_slug: nombre, formato_slug: null, categoria, precio });
-  toast(`✅ ${nombre} agregado al menú`);
-  closeModal('modal-bebida');
-  closeModal('modal-salsa');
-  loadProductos();
 }
 
 // ── HORARIOS ──────────────────────────────────────────────────────────────────
@@ -2862,7 +2619,7 @@ async function _wzInitPrecios() {
   }
   const el = document.getElementById('wz-precios-rows');
   if (!_wzItemTypes.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px">Activa tipos de item desde <em>Tipo de Negocio</em> para configurar precios base.</p>';
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">El Superadmin debe habilitar primero los formatos de venta de este negocio.</p>';
     return;
   }
   const camposVistos = new Set();
@@ -2956,14 +2713,9 @@ function wizardSkip() {
 }
 
 // ── TIPO DE NEGOCIO ───────────────────────────────────────────────────────────
-let _formatosTodos = [];   // todos los formatos del giro (incl. inactivos)
 
 async function loadTipoDeNegocio() {
-  const [actual, formatos] = await Promise.all([
-    api('/api/business-types/actual'),
-    api('/api/formatos?todos=1'),
-  ]);
-  _formatosTodos = formatos;
+  const actual = await api('/api/business-types/actual');
 
   // Giro info
   const emoji  = document.getElementById('bt-giro-emoji');
@@ -2974,62 +2726,6 @@ async function loadTipoDeNegocio() {
   if (nombre) nombre.textContent = giro.nombre || actual.slug || '—';
   if (desc)   desc.textContent   = giro.descripcion || '';
 
-  renderItemTypesEditable(formatos);
-}
-
-function renderItemTypesEditable(its) {
-  const el = document.getElementById('item-types-list');
-  if (!its.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No hay formatos configurados para este giro.</p>';
-    return;
-  }
-  el.innerHTML = its.map(it => {
-    let aliases = [];
-    try { aliases = JSON.parse(it.aliases_json || '[]'); } catch(_) {}
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-      <div style="font-size:26px;width:34px;text-align:center;flex-shrink:0">${it.emoji}</div>
-      <div style="flex:1;min-width:120px">
-        <div style="font-weight:600;font-size:14px">${it.nombre_plural}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">
-          ${aliases.length ? 'También: ' + aliases.slice(0,4).join(', ') : ''}
-          ${it.soporta_gramos ? '· ⚖️ gramos' : ''}
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <label style="font-size:12px;color:var(--muted2);white-space:nowrap">Precio base $</label>
-        <input class="form-input" id="fmt-base-${it.id}" type="number" min="0" step="1"
-          value="${it.precio_base || 0}"
-          style="width:80px;text-align:right;font-family:'DM Mono',monospace"
-          title="Precio base cuando el corte no tiene precio específico para este formato">
-      </div>
-      <label class="toggle" title="${it.activo ? 'Activo — clic para desactivar' : 'Inactivo — clic para activar'}">
-        <input type="checkbox" id="fmt-activo-${it.id}" ${it.activo ? 'checked' : ''}
-          onchange="toggleFormato(${it.id}, this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </div>`;
-  }).join('');
-}
-
-async function toggleFormato(id, activo) {
-  const r = await api(`/api/formatos/${id}`, 'PUT', { activo: activo ? 1 : 0 });
-  if (!r.ok) toast('Error al actualizar formato', false);
-}
-
-async function saveFormatos() {
-  const inputs = document.querySelectorAll('[id^="fmt-base-"]');
-  if (!inputs.length) return toast('No hay formatos para guardar', false);
-  let errores = 0;
-  const reqs = Array.from(inputs).map(el => {
-    const id = parseInt(el.id.replace('fmt-base-', ''));
-    const precio_base = parseInt(el.value) || 0;
-    return api(`/api/formatos/${id}`, 'PUT', { precio_base })
-      .then(r => { if (!r.ok) errores++; })
-      .catch(() => errores++);
-  });
-  await Promise.all(reqs);
-  if (errores) toast(`${errores} error(es) al guardar`, false);
-  else toast('✅ Precios de formato guardados');
 }
 
 function _ucfirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }

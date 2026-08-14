@@ -92,15 +92,6 @@ function getPrecioMenu(productoSlug, formatoSlug = null, categoria = 'corte') {
   return fila ? Number(fila.precio || 0) : null;
 }
 
-function setMenuItemEstado(productoSlug, categoria, activo) {
-  if (!esProductoValido(categoria, productoSlug)) return 0;
-  const r = run(
-    "UPDATE menu_items SET activo=? WHERE producto_slug=? AND categoria=? AND eliminado=0",
-    [activo ? 1 : 0, productoSlug, categoria]
-  );
-  return r?.changes || 0;
-}
-
 function setPreciosCorte(productoSlug, precios = {}) {
   if (!esProductoValido('corte', productoSlug)) return 0;
   let cambios = 0;
@@ -117,5 +108,5 @@ function setPreciosCorte(productoSlug, precios = {}) {
 module.exports = {
   getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant,
   getMenuItemsTenant, getMenuItemsActivos, getDefinicionProducto, getPrecioMenu,
-  setMenuItemEstado, setPreciosCorte, esProductoValido, esFormatoIdValido,
+  setPreciosCorte, esProductoValido, esFormatoIdValido,
 };

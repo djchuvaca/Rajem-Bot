@@ -871,8 +871,8 @@ app.put("/api/item-types/:id", requireAuth, (req, res) => {
     const id = parseInt(req.params.id);
     if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Presentación fuera del giro activo' });
     const { precio_base, activo } = req.body;
+    if (activo !== undefined) return res.status(403).json({ error: 'El Superadmin habilita los formatos de venta' });
     if (precio_base !== undefined) run('UPDATE item_types SET precio_base=? WHERE id=?', [Number(precio_base), id]);
-    if (activo !== undefined) run('UPDATE item_types SET activo=? WHERE id=?', [activo ? 1 : 0, id]);
     invalidarCacheItemTypes(); invalidarCacheCortes();
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -902,66 +902,31 @@ app.get("/api/menu-items", requireAuth, (req, res) => {
   res.json(catalogoTenant.getMenuItemsTenant(categoria || null));
 });
 
-// POST /api/menu-items — crea o reactiva un ítem del menú
-app.post("/api/menu-items", requireAuth, (req, res) => {
-  const { producto_slug, formato_slug, categoria, precio } = req.body;
-  if (!producto_slug || !categoria) return res.status(400).json({ error: "producto_slug y categoria requeridos" });
-  if (!catalogoTenant.esProductoValido(categoria, producto_slug)) return res.status(400).json({ error: 'El producto no pertenece al giro activo' });
-  const fmtSlug = formato_slug || null;
-  if (categoria === 'corte' && (!fmtSlug || !catalogoTenant.getFormatosTenant({ todos: true }).some(f => f.slug === fmtSlug))) {
-    return res.status(400).json({ error: 'La presentacion no pertenece al giro activo' });
-  }
-  if (categoria !== 'corte' && fmtSlug) {
-    return res.status(400).json({ error: 'Bebidas y salsas no admiten presentacion' });
-  }
-  // ¿Ya existe (incluso eliminado)?
-  const existe = queryOne(
-    "SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
-    [producto_slug, fmtSlug || '', categoria]
-  );
-  if (existe) {
-    run("UPDATE menu_items SET eliminado=0, activo=1, precio=? WHERE id=?", [parseFloat(precio) || 0, existe.id]);
-    invalidarCacheCortes();
-    return res.json({ ok: true, id: existe.id, accion: 'reactivado' });
-  }
-  run(
-    "INSERT INTO menu_items (producto_slug, formato_slug, categoria, precio, activo, eliminado) VALUES (?,?,?,?,1,0)",
-    [producto_slug, fmtSlug, categoria, parseFloat(precio) || 0]
-  );
-  const nuevo = queryOne("SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
-    [producto_slug, fmtSlug || '', categoria]);
-  invalidarCacheCortes();
-  res.json({ ok: true, id: nuevo?.id, accion: 'creado' });
+// Altas y habilitación pertenecen exclusivamente al Superadmin.
+app.post("/api/menu-items", requireAuth, (_req, res) => {
+  res.status(403).json({ error: 'El Superadmin habilita los productos del tenant' });
 });
 
-// PUT /api/menu-items/:id — editar precio y/o activo
+// PUT /api/menu-items/:id — el tenant solo puede editar el precio
 app.put("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const { precio, activo } = req.body;
   const item = queryOne("SELECT * FROM menu_items WHERE id=? AND eliminado=0", [id]);
   if (!item) return res.status(404).json({ error: "Item no encontrado" });
+  if (activo !== undefined) return res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
   if (precio  !== undefined) run("UPDATE menu_items SET precio=? WHERE id=?",  [parseFloat(precio) || 0, id]);
-  if (activo  !== undefined) run("UPDATE menu_items SET activo=? WHERE id=?",  [activo ? 1 : 0, id]);
   invalidarCacheCortes();
   res.json({ ok: true });
 });
 
 // DELETE /api/menu-items/:id — soft delete
 app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  run("UPDATE menu_items SET eliminado=1 WHERE id=?", [id]);
-  invalidarCacheCortes();
-  res.json({ ok: true });
+  res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
 });
 
-// POST /api/menu-items/toggle-corte — activa/desactiva todos los items de un corte
+// Endpoint histórico bloqueado: la activación se trasladó al Superadmin.
 app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
-  const { producto_slug, activo } = req.body;
-  if (!producto_slug) return res.status(400).json({ error: "producto_slug requerido" });
-  run("UPDATE menu_items SET activo=? WHERE producto_slug=? AND categoria='corte' AND eliminado=0",
-    [activo ? 1 : 0, producto_slug]);
-  invalidarCacheCortes();
-  res.json({ ok: true });
+  res.status(403).json({ error: 'El Superadmin controla la disponibilidad de productos' });
 });
 
 // ── CATÁLOGO DEL GIRO (para selección en modales) ────────────────────────────
@@ -1000,12 +965,13 @@ app.get("/api/formatos", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PUT /api/formatos/:id — editar precio_base de un formato
+// PUT /api/formatos/:id — el tenant solo puede editar precio_base
 // cascade:true propaga el precio a todos los menu_items del formato (útil desde el wizard)
 app.put("/api/formatos/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Formato no definido por el giro activo' });
   const { precio_base, activo } = req.body;
+  if (activo !== undefined) return res.status(403).json({ error: 'El Superadmin habilita los formatos de venta' });
   try {
     const { run } = require("../db/core");
     if (precio_base !== undefined) {
@@ -1013,7 +979,6 @@ app.put("/api/formatos/:id", requireAuth, (req, res) => {
       const it = queryOne("SELECT slug FROM item_types WHERE id=?", [id]);
       if (it) run("UPDATE menu_items SET precio=? WHERE formato_slug=? AND eliminado=0", [precio_base, it.slug]);
     }
-    if (activo !== undefined) run("UPDATE item_types SET activo = ? WHERE id = ?", [activo ? 1 : 0, id]);
     invalidarCacheItemTypes();
     invalidarCacheCortes();
     res.json({ ok: true });

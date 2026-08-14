@@ -170,9 +170,7 @@ async function handleComandos(msg, client) {
       `!reporte semana — últimos 7 días\n\n` +
       `*Menú y productos:*\n` +
       `!precios — ver precios del menú\n` +
-      `!precio [corte] [taco] [torta] — actualizar precio\n` +
-      `!agotado [corte] — marcar corte como agotado\n` +
-      `!disponible [corte] — marcar corte disponible\n\n` +
+      `!precio [corte] [taco] [torta] — actualizar precio\n\n` +
       `*Negocio:*\n` +
       `!cerrar — cerrar el negocio manualmente hoy\n` +
       `!abrir — reabrir el negocio\n` +
@@ -946,58 +944,6 @@ async function handleComandos(msg, client) {
     }
     invalidarCacheCortes();
     await msg.reply(`✅ Precio de *${corte}* actualizado:\n🌮 Taco: $${precioTaco}  🥪 Torta: $${precioTorta}`);
-    return;
-  }
-
-  // ── !agotado [corte] — marcar un corte como no disponible ────────────────
-  if (/^!agotado/i.test(texto)) {
-    const partes = texto.split(/\s+/);
-    const corte  = partes.slice(1).join(" ").toLowerCase().trim();
-
-    if (!corte) {
-      await msg.reply("⚠️ Uso: *!agotado [corte]*\nEjemplo: !agotado buche");
-      return;
-    }
-
-    const def = catalogoTenant.getDefinicionProducto('corte', corte);
-    if (!def) {
-      await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
-      return;
-    }
-
-    const cambios = catalogoTenant.setMenuItemEstado(def.slug, 'corte', false);
-    if (!cambios) {
-      await msg.reply(`⚠️ El corte *${corte}* no está agregado al menú.`);
-      return;
-    }
-    invalidarCacheCortes();
-    await msg.reply(`⛔ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como agotado. El bot ya no lo ofrecerá.`);
-    return;
-  }
-
-  // ── !disponible [corte] — marcar un corte como disponible ────────────────
-  if (/^!disponible/i.test(texto)) {
-    const partes = texto.split(/\s+/);
-    const corte  = partes.slice(1).join(" ").toLowerCase().trim();
-
-    if (!corte) {
-      await msg.reply("⚠️ Uso: *!disponible [corte]*\nEjemplo: !disponible buche");
-      return;
-    }
-
-    const def = catalogoTenant.getDefinicionProducto('corte', corte);
-    if (!def) {
-      await msg.reply(`⚠️ No encontré el corte *${corte}*. Usa *!precios* para ver los disponibles.`);
-      return;
-    }
-
-    const cambios = catalogoTenant.setMenuItemEstado(def.slug, 'corte', true);
-    if (!cambios) {
-      await msg.reply(`⚠️ El corte *${corte}* no está agregado al menú.`);
-      return;
-    }
-    invalidarCacheCortes();
-    await msg.reply(`✅ *${corte.charAt(0).toUpperCase() + corte.slice(1)}* marcado como disponible. El bot vuelve a ofrecerlo.`);
     return;
   }
 

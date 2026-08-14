@@ -19,6 +19,7 @@ const geoTepic = require('../geo/geotepic');
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantCatalogoAdmin, setTenantFormatoActivo, setTenantProductoActivo,
   getTenantPanelUsuario, updateTenantPanelCredentials,
   getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
@@ -262,6 +263,36 @@ app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
     } catch (_) { return res.status(400).json({ error: 'Configuración de pasarela inválida' }); }
   }
   if (!setTenantConfigBulk(tenant, config)) return res.status(500).json({ error: 'No se pudo guardar la configuración de forma atómica. Verifica el PANEL_SECRET del tenant.' });
+  res.json({ ok: true });
+});
+
+app.get('/api/tenants/:id/catalogo', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const catalogo = getTenantCatalogoAdmin(tenant);
+  catalogo ? res.json(catalogo) : res.status(500).json({ error: 'No se pudo leer el catálogo del tenant' });
+});
+
+app.put('/api/tenants/:id/catalogo/formatos/:formatoId', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const activo = req.body.activo === true || req.body.activo === 1;
+  if (!setTenantFormatoActivo(tenant, parseInt(req.params.formatoId), activo)) {
+    return res.status(400).json({ error: 'Formato inválido o base del tenant no disponible' });
+  }
+  registrarAuditoria({ usuario: req.session?.usuario || 'superadmin', accion: 'catalogo.formato', entidad: 'tenant', entidadId: tenant.id, detalles: { formato_id: parseInt(req.params.formatoId), activo }, ip: req.ip });
+  res.json({ ok: true });
+});
+
+app.put('/api/tenants/:id/catalogo/productos', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { categoria, producto_slug } = req.body;
+  const activo = req.body.activo === true || req.body.activo === 1;
+  if (!producto_slug || !setTenantProductoActivo(tenant, categoria, producto_slug, activo)) {
+    return res.status(400).json({ error: 'Producto inválido para el giro del tenant' });
+  }
+  registrarAuditoria({ usuario: req.session?.usuario || 'superadmin', accion: 'catalogo.producto', entidad: 'tenant', entidadId: tenant.id, detalles: { categoria, producto_slug, activo }, ip: req.ip });
   res.json({ ok: true });
 });
 

@@ -191,7 +191,7 @@ async function seedDB() {
     )
   `);
 
-  // ── TABLA MENU_ITEMS (menú configurado por el tenant desde el panel) ─────────
+  // ── TABLA MENU_ITEMS (habilitación Superadmin + precios del tenant) ──────────
   db.run(`
     CREATE TABLE IF NOT EXISTS menu_items (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -272,8 +272,8 @@ async function seedDB() {
   const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
   if (countProd === 0) {
     // Instalación nueva — tabla productos vacía intencionalmente.
-    // El tenant construye su catálogo desde el panel: Productos → Agregar.
-    console.log(`ℹ️  Catálogo vacío (${_btSlug}) — el tenant define su menú desde el panel`);
+    // El Superadmin habilita el catálogo desde Config Tenant.
+    console.log(`ℹ️  Catálogo vacío (${_btSlug}) — pendiente de habilitación por Superadmin`);
   }
 
   // `productos` se conserva temporalmente solo como entrada de migración para
@@ -521,7 +521,7 @@ async function seedDB() {
   )`);
 
   // ── ENTORNO DE PRUEBAS: activar item_types y poblar productos ────────────────
-  // En producción, el tenant activa item_types y agrega productos desde el panel.
+  // En producción, el Superadmin habilita formatos y productos desde Config Tenant.
   // En tests (BOT_TEST_MODE=1), se activan automáticamente para que el NLU funcione.
   if (process.env.BOT_TEST_MODE) {
     run("UPDATE item_types SET activo = 1");
@@ -603,29 +603,6 @@ function _seedBusinessTypes(db) {
       );
     }
 
-  }
-
-  // Auto-activar item_types del giro configurado — solo si ninguno está activo aún.
-  // Así el tenant arranca con sus items listos sin pasar por el panel primero.
-  // Si el tenant desactiva alguno después, el reinicio del bot no los vuelve a activar.
-  let businessType = process.env.BUSINESS_TYPE || null;
-  if (!businessType) {
-    try { businessType = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get()?.valor || null; } catch (_) {}
-  }
-  if (businessType && !process.env.BOT_TEST_MODE) {
-    const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(businessType);
-    if (btRow) {
-      const yaActivos = db.prepare(
-        "SELECT COUNT(*) as n FROM item_types WHERE business_type_id = ? AND activo = 1"
-      ).get(btRow.id)?.n || 0;
-      const menuConfigurado = db.prepare("SELECT COUNT(*) as n FROM menu_items WHERE eliminado=0").get()?.n || 0;
-      const inicializado = db.prepare("SELECT valor FROM configuracion WHERE clave='item_types_inicializados'").get()?.valor === '1';
-      if (yaActivos === 0 && menuConfigurado === 0 && !inicializado) {
-        db.prepare("UPDATE item_types SET activo = 1 WHERE business_type_id = ?").run(btRow.id);
-        console.log(`✅ Item types de '${businessType}' activados (primera configuración)`);
-      }
-      db.prepare("INSERT OR REPLACE INTO configuracion (clave,valor) VALUES ('item_types_inicializados','1')").run();
-    }
   }
 
   db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)").run('2026-08-14-giro-geotepic-security');
