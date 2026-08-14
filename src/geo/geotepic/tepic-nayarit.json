@@ -1,0 +1,1450 @@
+[
+  {
+    "nombre": "12 de Diciembre",
+    "slug": "12-de-diciembre",
+    "tipo": "colonia",
+    "lat": 21.489774911653697,
+    "lon": -104.87658950490167,
+    "aliases": []
+  },
+  {
+    "nombre": "15 de Mayo",
+    "slug": "15-de-mayo",
+    "tipo": "colonia",
+    "lat": 21.47828556679425,
+    "lon": -104.89005078290481,
+    "aliases": []
+  },
+  {
+    "nombre": "18 de Agosto",
+    "slug": "18-de-agosto",
+    "tipo": "colonia",
+    "lat": 21.502739921116525,
+    "lon": -104.87804988964112,
+    "aliases": []
+  },
+  {
+    "nombre": "2 de Agosto",
+    "slug": "2-de-agosto",
+    "tipo": "colonia",
+    "lat": 21.48077906026589,
+    "lon": -104.87111848445387,
+    "aliases": []
+  },
+  {
+    "nombre": "20 de Noviembre",
+    "slug": "20-de-noviembre",
+    "tipo": "colonia",
+    "lat": 21.51618455937892,
+    "lon": -104.91094930753725,
+    "aliases": []
+  },
+  {
+    "nombre": "26 de Septiembre",
+    "slug": "26-de-septiembre",
+    "tipo": "colonia",
+    "lat": 21.4720236423838,
+    "lon": -104.88212671858568,
+    "aliases": []
+  },
+  {
+    "nombre": "4 Milpas",
+    "slug": "4-milpas",
+    "tipo": "colonia",
+    "lat": 21.491692448537023,
+    "lon": -104.87536510832986,
+    "aliases": []
+  },
+  {
+    "nombre": "5 de Febrero",
+    "slug": "5-de-febrero",
+    "tipo": "colonia",
+    "lat": 21.468095194296012,
+    "lon": -104.87073957710953,
+    "aliases": []
+  },
+  {
+    "nombre": "Acayapan",
+    "slug": "acayapan",
+    "tipo": "colonia",
+    "lat": 21.519660215786132,
+    "lon": -104.89514252134343,
+    "aliases": []
+  },
+  {
+    "nombre": "Adolfo López Mateos",
+    "slug": "adolfo-lopez-mateos",
+    "tipo": "colonia",
+    "lat": 21.526478841562863,
+    "lon": -104.90680942548025,
+    "aliases": []
+  },
+  {
+    "nombre": "Alaska",
+    "slug": "alaska",
+    "tipo": "colonia",
+    "lat": 21.52351717743389,
+    "lon": -104.9238464115534,
+    "aliases": []
+  },
+  {
+    "nombre": "Amado Nervo",
+    "slug": "amado-nervo",
+    "tipo": "colonia",
+    "lat": 21.51936056311773,
+    "lon": -104.89257898448878,
+    "aliases": []
+  },
+  {
+    "nombre": "Ampliación El Paraíso",
+    "slug": "ampliacion-el-paraiso",
+    "tipo": "colonia",
+    "lat": 21.536738782046857,
+    "lon": -104.86930496486958,
+    "aliases": []
+  },
+  {
+    "nombre": "Ampliación Santa Teresita",
+    "slug": "ampliacion-santa-teresita",
+    "tipo": "colonia",
+    "lat": 21.522678812881992,
+    "lon": -104.8951016835117,
+    "aliases": []
+  },
+  {
+    "nombre": "Ampliación Tierra y Libertad",
+    "slug": "ampliacion-tierra-y-libertad",
+    "tipo": "colonia",
+    "lat": 21.504496354562985,
+    "lon": -104.87676722921434,
+    "aliases": []
+  },
+  {
+    "nombre": "América Manríquez",
+    "slug": "america-manriquez",
+    "tipo": "colonia",
+    "lat": 21.525020767867538,
+    "lon": -104.91368148534733,
+    "aliases": []
+  },
+  {
+    "nombre": "Aramara",
+    "slug": "aramara",
+    "tipo": "colonia",
+    "lat": 21.496444356137797,
+    "lon": -104.82132676024855,
+    "aliases": []
+  },
+  {
+    "nombre": "Arboledas",
+    "slug": "arboledas",
+    "tipo": "colonia",
+    "lat": 21.53389340896135,
+    "lon": -104.8773722339332,
+    "aliases": []
+  },
+  {
+    "nombre": "Aves del Paraíso",
+    "slug": "aves-del-paraiso",
+    "tipo": "colonia",
+    "lat": 21.505807739784622,
+    "lon": -104.91514143963101,
+    "aliases": []
+  },
+  {
+    "nombre": "Aviación",
+    "slug": "aviacion",
+    "tipo": "colonia",
+    "lat": 21.47413757848202,
+    "lon": -104.88132119320032,
+    "aliases": []
+  },
+  {
+    "nombre": "Aztlán Solidaridad",
+    "slug": "aztlan-solidaridad",
+    "tipo": "colonia",
+    "lat": 21.52490942794132,
+    "lon": -104.93272647904094,
+    "aliases": []
+  },
+  {
+    "nombre": "Benito Juárez",
+    "slug": "benito-juarez",
+    "tipo": "colonia",
+    "lat": 21.497670005950738,
+    "lon": -104.90767969479212,
+    "aliases": []
+  },
+  {
+    "nombre": "Bethel",
+    "slug": "bethel",
+    "tipo": "colonia",
+    "lat": 21.479062097156625,
+    "lon": -104.91058346162717,
+    "aliases": []
+  },
+  {
+    "nombre": "Bonaterra",
+    "slug": "bonaterra",
+    "tipo": "colonia",
+    "lat": 21.46569420132228,
+    "lon": -104.8432806525549,
+    "aliases": []
+  },
+  {
+    "nombre": "Brisas de San Juan",
+    "slug": "brisas-de-san-juan",
+    "tipo": "colonia",
+    "lat": 21.51450580432022,
+    "lon": -104.92733851802282,
+    "aliases": []
+  },
+  {
+    "nombre": "Buenos Aires",
+    "slug": "buenos-aires",
+    "tipo": "colonia",
+    "lat": 21.534018176355428,
+    "lon": -104.90519307245624,
+    "aliases": []
+  },
+  {
+    "nombre": "Bugambilias",
+    "slug": "bugambilias",
+    "tipo": "colonia",
+    "lat": 21.478510784867755,
+    "lon": -104.87853340722658,
+    "aliases": []
+  },
+  {
+    "nombre": "Burócrata Estatal",
+    "slug": "burocrata-estatal",
+    "tipo": "colonia",
+    "lat": 21.484128317138907,
+    "lon": -104.87921544746395,
+    "aliases": []
+  },
+  {
+    "nombre": "Caja de Agua",
+    "slug": "caja-de-agua",
+    "tipo": "colonia",
+    "lat": 21.495949200989884,
+    "lon": -104.89585865244058,
+    "aliases": []
+  },
+  {
+    "nombre": "Caminera",
+    "slug": "caminera",
+    "tipo": "colonia",
+    "lat": 21.471971363956047,
+    "lon": -104.8858414209668,
+    "aliases": []
+  },
+  {
+    "nombre": "Camino Real",
+    "slug": "camino-real",
+    "tipo": "colonia",
+    "lat": 21.517528054553456,
+    "lon": -104.87192403107173,
+    "aliases": []
+  },
+  {
+    "nombre": "Castilla",
+    "slug": "castilla",
+    "tipo": "colonia",
+    "lat": 21.468256961829848,
+    "lon": -104.88202074688095,
+    "aliases": []
+  },
+  {
+    "nombre": "Chapultepec",
+    "slug": "chapultepec",
+    "tipo": "colonia",
+    "lat": 21.520190389255607,
+    "lon": -104.8808542119398,
+    "aliases": []
+  },
+  {
+    "nombre": "Ciudad del Valle",
+    "slug": "ciudad-del-valle",
+    "tipo": "colonia",
+    "lat": 21.490458810678255,
+    "lon": -104.885434748645,
+    "aliases": []
+  },
+  {
+    "nombre": "Ciudad Industrial",
+    "slug": "ciudad-industrial",
+    "tipo": "colonia",
+    "lat": 21.478814997339605,
+    "lon": -104.84633817145053,
+    "aliases": []
+  },
+  {
+    "nombre": "Colinas del Rey",
+    "slug": "colinas-del-rey",
+    "tipo": "colonia",
+    "lat": 21.487657925437848,
+    "lon": -104.90781622968203,
+    "aliases": []
+  },
+  {
+    "nombre": "Colinas del Valle",
+    "slug": "colinas-del-valle",
+    "tipo": "colonia",
+    "lat": 21.489457617246448,
+    "lon": -104.84706027164303,
+    "aliases": []
+  },
+  {
+    "nombre": "Colonial",
+    "slug": "colonial",
+    "tipo": "colonia",
+    "lat": 21.478069539619206,
+    "lon": -104.87215605967286,
+    "aliases": []
+  },
+  {
+    "nombre": "Cora",
+    "slug": "cora",
+    "tipo": "colonia",
+    "lat": 21.502930926796214,
+    "lon": -104.91816096953514,
+    "aliases": []
+  },
+  {
+    "nombre": "Cuauhtémoc",
+    "slug": "cuauhtemoc",
+    "tipo": "colonia",
+    "lat": 21.484881758689603,
+    "lon": -104.90657273246448,
+    "aliases": []
+  },
+  {
+    "nombre": "Del Bosque",
+    "slug": "del-bosque",
+    "tipo": "colonia",
+    "lat": 21.49263427787895,
+    "lon": -104.90427121377225,
+    "aliases": []
+  },
+  {
+    "nombre": "Del Sol",
+    "slug": "del-sol",
+    "tipo": "colonia",
+    "lat": 21.504652937409507,
+    "lon": -104.8697349314376,
+    "aliases": []
+  },
+  {
+    "nombre": "Ejidal",
+    "slug": "ejidal",
+    "tipo": "colonia",
+    "lat": 21.49027232793564,
+    "lon": -104.83062864492258,
+    "aliases": []
+  },
+  {
+    "nombre": "El Aguacate",
+    "slug": "el-aguacate",
+    "tipo": "colonia",
+    "lat": 21.506926591948574,
+    "lon": -104.92067132216697,
+    "aliases": []
+  },
+  {
+    "nombre": "El Armadillo",
+    "slug": "el-armadillo",
+    "tipo": "colonia",
+    "lat": 21.46139821045422,
+    "lon": -104.84960763857204,
+    "aliases": []
+  },
+  {
+    "nombre": "El Faisán",
+    "slug": "el-faisan",
+    "tipo": "colonia",
+    "lat": 21.529957827689223,
+    "lon": -104.89109084562004,
+    "aliases": []
+  },
+  {
+    "nombre": "El Paraíso",
+    "slug": "el-paraiso",
+    "tipo": "colonia",
+    "lat": 21.538068726599995,
+    "lon": -104.87261176099412,
+    "aliases": []
+  },
+  {
+    "nombre": "El Pedregal",
+    "slug": "el-pedregal",
+    "tipo": "colonia",
+    "lat": 21.498480285198234,
+    "lon": -104.91785190029789,
+    "aliases": []
+  },
+  {
+    "nombre": "El Puerto",
+    "slug": "el-puerto",
+    "tipo": "colonia",
+    "lat": 21.471117347830653,
+    "lon": -104.85272875256689,
+    "aliases": []
+  },
+  {
+    "nombre": "El Punto",
+    "slug": "el-punto",
+    "tipo": "colonia",
+    "lat": 21.536483253020485,
+    "lon": -104.89430827951031,
+    "aliases": []
+  },
+  {
+    "nombre": "El Rodeo",
+    "slug": "el-rodeo",
+    "tipo": "colonia",
+    "lat": 21.521543057110872,
+    "lon": -104.91816524280651,
+    "aliases": []
+  },
+  {
+    "nombre": "El Rubí",
+    "slug": "el-rubi",
+    "tipo": "colonia",
+    "lat": 21.4866034977113,
+    "lon": -104.84112073143119,
+    "aliases": []
+  },
+  {
+    "nombre": "El Tecolote",
+    "slug": "el-tecolote",
+    "tipo": "colonia",
+    "lat": 21.500543186971093,
+    "lon": -104.9086679926038,
+    "aliases": []
+  },
+  {
+    "nombre": "Electricistas",
+    "slug": "electricistas",
+    "tipo": "colonia",
+    "lat": 21.50011198210533,
+    "lon": -104.90274198607756,
+    "aliases": []
+  },
+  {
+    "nombre": "Emiliano Zapata",
+    "slug": "emiliano-zapata",
+    "tipo": "colonia",
+    "lat": 21.516935786873848,
+    "lon": -104.90649156973524,
+    "aliases": []
+  },
+  {
+    "nombre": "Emilio M. Gonzales",
+    "slug": "emilio-m-gonzales",
+    "tipo": "colonia",
+    "lat": 21.536842695445127,
+    "lon": -104.87850246817327,
+    "aliases": []
+  },
+  {
+    "nombre": "Estadios",
+    "slug": "estadios",
+    "tipo": "colonia",
+    "lat": 21.512570414857464,
+    "lon": -104.90456223210765,
+    "aliases": []
+  },
+  {
+    "nombre": "Esteban Baca Calderón",
+    "slug": "esteban-baca-calderon",
+    "tipo": "colonia",
+    "lat": 21.502248334736198,
+    "lon": -104.88655489433012,
+    "aliases": []
+  },
+  {
+    "nombre": "Flamingos",
+    "slug": "flamingos",
+    "tipo": "colonia",
+    "lat": 21.49527270266536,
+    "lon": -104.87381542160864,
+    "aliases": []
+  },
+  {
+    "nombre": "Florencia",
+    "slug": "florencia",
+    "tipo": "colonia",
+    "lat": 21.4897795,
+    "lon": -104.8854245,
+    "aliases": []
+  },
+  {
+    "nombre": "Flores Magón",
+    "slug": "flores-magon",
+    "tipo": "colonia",
+    "lat": 21.501473551762814,
+    "lon": -104.87225358484572,
+    "aliases": []
+  },
+  {
+    "nombre": "FOVISSSTE 1a Etapa",
+    "slug": "fovissste-1a-etapa",
+    "tipo": "colonia",
+    "lat": 21.515917846191225,
+    "lon": -104.91723960791154,
+    "aliases": []
+  },
+  {
+    "nombre": "FOVISSSTE 2a Etapa",
+    "slug": "fovissste-2a-etapa",
+    "tipo": "colonia",
+    "lat": 21.51742995799435,
+    "lon": -104.92700214472366,
+    "aliases": []
+  },
+  {
+    "nombre": "Francisco Villa",
+    "slug": "francisco-villa",
+    "tipo": "colonia",
+    "lat": 21.52864454531759,
+    "lon": -104.88729985591642,
+    "aliases": []
+  },
+  {
+    "nombre": "Félix Peña",
+    "slug": "felix-pena",
+    "tipo": "colonia",
+    "lat": 21.478903743713452,
+    "lon": -104.89789289429088,
+    "aliases": []
+  },
+  {
+    "nombre": "Gardenias",
+    "slug": "gardenias",
+    "tipo": "colonia",
+    "lat": 21.471779488580182,
+    "lon": -104.89101344135196,
+    "aliases": []
+  },
+  {
+    "nombre": "Genaro Vázquez",
+    "slug": "genaro-vazquez",
+    "tipo": "colonia",
+    "lat": 21.50649438290829,
+    "lon": -104.86973250155556,
+    "aliases": []
+  },
+  {
+    "nombre": "Gilberto Flores Muñoz",
+    "slug": "gilberto-flores-munoz",
+    "tipo": "colonia",
+    "lat": 21.50616296255626,
+    "lon": -104.8838192458357,
+    "aliases": []
+  },
+  {
+    "nombre": "Gobernadores",
+    "slug": "gobernadores",
+    "tipo": "colonia",
+    "lat": 21.4865662155212,
+    "lon": -104.87239249389923,
+    "aliases": []
+  },
+  {
+    "nombre": "Guadalupe",
+    "slug": "guadalupe",
+    "tipo": "colonia",
+    "lat": 21.526336157133283,
+    "lon": -104.93058414778532,
+    "aliases": []
+  },
+  {
+    "nombre": "Gustavo Díaz Ordaz",
+    "slug": "gustavo-diaz-ordaz",
+    "tipo": "colonia",
+    "lat": 21.48173098102303,
+    "lon": -104.87500208039948,
+    "aliases": []
+  },
+  {
+    "nombre": "Heriberto Casas",
+    "slug": "heriberto-casas",
+    "tipo": "colonia",
+    "lat": 21.516108317841304,
+    "lon": -104.90194863611411,
+    "aliases": []
+  },
+  {
+    "nombre": "Heriberto Jara",
+    "slug": "heriberto-jara",
+    "tipo": "colonia",
+    "lat": 21.50264123327722,
+    "lon": -104.8756983710847,
+    "aliases": []
+  },
+  {
+    "nombre": "Hermosa Provincia",
+    "slug": "hermosa-provincia",
+    "tipo": "colonia",
+    "lat": 21.48006955148632,
+    "lon": -104.88003215096278,
+    "aliases": []
+  },
+  {
+    "nombre": "IMSS",
+    "slug": "imss",
+    "tipo": "colonia",
+    "lat": 21.514667231722164,
+    "lon": -104.91170875743342,
+    "aliases": []
+  },
+  {
+    "nombre": "INDECO",
+    "slug": "indeco",
+    "tipo": "colonia",
+    "lat": 21.528328635354143,
+    "lon": -104.90347815416159,
+    "aliases": []
+  },
+  {
+    "nombre": "Independencia",
+    "slug": "independencia",
+    "tipo": "colonia",
+    "lat": 21.50316430133397,
+    "lon": -104.90759736086106,
+    "aliases": []
+  },
+  {
+    "nombre": "INFONAVIT EL Mirador",
+    "slug": "infonavit-el-mirador",
+    "tipo": "colonia",
+    "lat": 21.525959585935215,
+    "lon": -104.88545416071835,
+    "aliases": []
+  },
+  {
+    "nombre": "INFONAVIT El Tecolote",
+    "slug": "infonavit-el-tecolote",
+    "tipo": "colonia",
+    "lat": 21.500936353125407,
+    "lon": -104.90522416619409,
+    "aliases": []
+  },
+  {
+    "nombre": "INFONAVIT los Fresnos",
+    "slug": "infonavit-los-fresnos",
+    "tipo": "colonia",
+    "lat": 21.479388177900063,
+    "lon": -104.87674506908562,
+    "aliases": []
+  },
+  {
+    "nombre": "INFONAVIT Los Sauces",
+    "slug": "infonavit-los-sauces",
+    "tipo": "colonia",
+    "lat": 21.470912418896997,
+    "lon": -104.87539987489824,
+    "aliases": []
+  },
+  {
+    "nombre": "Insurgentes",
+    "slug": "insurgentes",
+    "tipo": "colonia",
+    "lat": 21.47287306251885,
+    "lon": -104.89473016846294,
+    "aliases": []
+  },
+  {
+    "nombre": "Jacarandas",
+    "slug": "jacarandas",
+    "tipo": "colonia",
+    "lat": 21.482243238511575,
+    "lon": -104.85428227362954,
+    "aliases": []
+  },
+  {
+    "nombre": "Jardines de La Cruz",
+    "slug": "jardines-de-la-cruz",
+    "tipo": "colonia",
+    "lat": 21.496057244211197,
+    "lon": -104.89813056068235,
+    "aliases": []
+  },
+  {
+    "nombre": "Jazmines",
+    "slug": "jazmines",
+    "tipo": "colonia",
+    "lat": 21.485993822045177,
+    "lon": -104.83277960337708,
+    "aliases": []
+  },
+  {
+    "nombre": "Jesús García",
+    "slug": "jesus-garcia",
+    "tipo": "colonia",
+    "lat": 21.485210426425226,
+    "lon": -104.83883313389097,
+    "aliases": []
+  },
+  {
+    "nombre": "Juan Escutia",
+    "slug": "juan-escutia",
+    "tipo": "colonia",
+    "lat": 21.472753177142096,
+    "lon": -104.8886648905005,
+    "aliases": []
+  },
+  {
+    "nombre": "Juventud",
+    "slug": "juventud",
+    "tipo": "colonia",
+    "lat": 21.49364226145953,
+    "lon": -104.87721246597144,
+    "aliases": []
+  },
+  {
+    "nombre": "La Esperanza",
+    "slug": "la-esperanza",
+    "tipo": "colonia",
+    "lat": 21.506765479765726,
+    "lon": -104.8713409974782,
+    "aliases": []
+  },
+  {
+    "nombre": "La Huerta",
+    "slug": "la-huerta",
+    "tipo": "colonia",
+    "lat": 21.518938879017657,
+    "lon": -104.91299997918517,
+    "aliases": []
+  },
+  {
+    "nombre": "La Joya",
+    "slug": "la-joya",
+    "tipo": "colonia",
+    "lat": 21.475709407126473,
+    "lon": -104.8707959375292,
+    "aliases": []
+  },
+  {
+    "nombre": "La Loma",
+    "slug": "la-loma",
+    "tipo": "colonia",
+    "lat": 21.50384179053414,
+    "lon": -104.90466886370884,
+    "aliases": []
+  },
+  {
+    "nombre": "La Lomita",
+    "slug": "la-lomita",
+    "tipo": "colonia",
+    "lat": 21.523433201656655,
+    "lon": -104.87458188706125,
+    "aliases": []
+  },
+  {
+    "nombre": "Lagos del Country",
+    "slug": "lagos-del-country",
+    "tipo": "colonia",
+    "lat": 21.48014033210326,
+    "lon": -104.86231219214804,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Aves",
+    "slug": "las-aves",
+    "tipo": "colonia",
+    "lat": 21.494926571082814,
+    "lon": -104.88068432498017,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Brisas",
+    "slug": "las-brisas",
+    "tipo": "colonia",
+    "lat": 21.516862082687737,
+    "lon": -104.92250278932708,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Conchas",
+    "slug": "las-conchas",
+    "tipo": "colonia",
+    "lat": 21.541193136753844,
+    "lon": -104.87433908232202,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Flores",
+    "slug": "las-flores",
+    "tipo": "colonia",
+    "lat": 21.526056424691784,
+    "lon": -104.918796799223,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Islas",
+    "slug": "las-islas",
+    "tipo": "colonia",
+    "lat": 21.472369428508806,
+    "lon": -104.86417268608027,
+    "aliases": []
+  },
+  {
+    "nombre": "Las Palomas",
+    "slug": "las-palomas",
+    "tipo": "colonia",
+    "lat": 21.459335964388917,
+    "lon": -104.85567723478,
+    "aliases": []
+  },
+  {
+    "nombre": "Leyva Medina",
+    "slug": "leyva-medina",
+    "tipo": "colonia",
+    "lat": 21.476870675373984,
+    "lon": -104.89264541171104,
+    "aliases": []
+  },
+  {
+    "nombre": "Lindavista",
+    "slug": "lindavista",
+    "tipo": "colonia",
+    "lat": 21.51058948784751,
+    "lon": -104.92002638029078,
+    "aliases": []
+  },
+  {
+    "nombre": "Lirios",
+    "slug": "lirios",
+    "tipo": "colonia",
+    "lat": 21.504988400896895,
+    "lon": -104.87906558696561,
+    "aliases": []
+  },
+  {
+    "nombre": "Loma Hermosa",
+    "slug": "loma-hermosa",
+    "tipo": "colonia",
+    "lat": 21.534611655521097,
+    "lon": -104.89052591670048,
+    "aliases": []
+  },
+  {
+    "nombre": "Lomas Altas",
+    "slug": "lomas-altas",
+    "tipo": "colonia",
+    "lat": 21.522946082659658,
+    "lon": -104.91115941669347,
+    "aliases": []
+  },
+  {
+    "nombre": "Lomas Bonitas",
+    "slug": "lomas-bonitas",
+    "tipo": "colonia",
+    "lat": 21.526794488676327,
+    "lon": -104.92410319527124,
+    "aliases": []
+  },
+  {
+    "nombre": "Lomas de La Cruz",
+    "slug": "lomas-de-la-cruz",
+    "tipo": "colonia",
+    "lat": 21.52332974266508,
+    "lon": -104.88300616946546,
+    "aliases": []
+  },
+  {
+    "nombre": "Lomas de San Juan",
+    "slug": "lomas-de-san-juan",
+    "tipo": "colonia",
+    "lat": 21.50244901907581,
+    "lon": -104.9213109410473,
+    "aliases": []
+  },
+  {
+    "nombre": "Lomas del Valle",
+    "slug": "lomas-del-valle",
+    "tipo": "colonia",
+    "lat": 21.528843571935614,
+    "lon": -104.9225386143343,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Arcos",
+    "slug": "los-arcos",
+    "tipo": "colonia",
+    "lat": 21.527896369657533,
+    "lon": -104.87591854219889,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Colomos",
+    "slug": "los-colomos",
+    "tipo": "colonia",
+    "lat": 21.500368028154323,
+    "lon": -104.87968093776288,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Fresnos",
+    "slug": "los-fresnos",
+    "tipo": "colonia",
+    "lat": 21.485025353505407,
+    "lon": -104.89148305964078,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Fresnos Poniente",
+    "slug": "los-fresnos-poniente",
+    "tipo": "colonia",
+    "lat": 21.48162238833021,
+    "lon": -104.8959670727624,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Llanitos",
+    "slug": "los-llanitos",
+    "tipo": "colonia",
+    "lat": 21.492085494726453,
+    "lon": -104.87884997755795,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Pinos",
+    "slug": "los-pinos",
+    "tipo": "colonia",
+    "lat": 21.530801943133746,
+    "lon": -104.89318164591468,
+    "aliases": []
+  },
+  {
+    "nombre": "Los Sauces",
+    "slug": "los-sauces",
+    "tipo": "colonia",
+    "lat": 21.470041096034024,
+    "lon": -104.87683008278944,
+    "aliases": []
+  },
+  {
+    "nombre": "Luis Donaldo Colosio",
+    "slug": "luis-donaldo-colosio",
+    "tipo": "colonia",
+    "lat": 21.50977023270726,
+    "lon": -104.88147903638739,
+    "aliases": []
+  },
+  {
+    "nombre": "Luis Donaldo Colosio Murrieta",
+    "slug": "luis-donaldo-colosio-murrieta",
+    "tipo": "colonia",
+    "lat": 21.48693383678135,
+    "lon": -104.86080169951099,
+    "aliases": []
+  },
+  {
+    "nombre": "Lázaro Cárdenas",
+    "slug": "lazaro-cardenas",
+    "tipo": "colonia",
+    "lat": 21.479417501346305,
+    "lon": -104.88704285277828,
+    "aliases": []
+  },
+  {
+    "nombre": "Miguel Hidalgo",
+    "slug": "miguel-hidalgo",
+    "tipo": "colonia",
+    "lat": 21.471574025693833,
+    "lon": -104.86100264678299,
+    "aliases": []
+  },
+  {
+    "nombre": "Miravalles",
+    "slug": "miravalles",
+    "tipo": "colonia",
+    "lat": 21.47452702735179,
+    "lon": -104.89150957393237,
+    "aliases": []
+  },
+  {
+    "nombre": "Moctezuma",
+    "slug": "moctezuma",
+    "tipo": "colonia",
+    "lat": 21.48721919230847,
+    "lon": -104.89727081193003,
+    "aliases": []
+  },
+  {
+    "nombre": "Molinos del Rey",
+    "slug": "molinos-del-rey",
+    "tipo": "colonia",
+    "lat": 21.49087145714268,
+    "lon": -104.84816891077922,
+    "aliases": []
+  },
+  {
+    "nombre": "Mololoa",
+    "slug": "mololoa",
+    "tipo": "colonia",
+    "lat": 21.51709947837223,
+    "lon": -104.88724134751007,
+    "aliases": []
+  },
+  {
+    "nombre": "Morelos",
+    "slug": "morelos",
+    "tipo": "colonia",
+    "lat": 21.49623046148686,
+    "lon": -104.90240662865816,
+    "aliases": []
+  },
+  {
+    "nombre": "México",
+    "slug": "mexico",
+    "tipo": "colonia",
+    "lat": 21.49103618106805,
+    "lon": -104.87434886108339,
+    "aliases": []
+  },
+  {
+    "nombre": "Niños Héroes",
+    "slug": "ninos-heroes",
+    "tipo": "colonia",
+    "lat": 21.468599477347947,
+    "lon": -104.87235641273283,
+    "aliases": []
+  },
+  {
+    "nombre": "Nueva Alemania",
+    "slug": "nueva-alemania",
+    "tipo": "colonia",
+    "lat": 21.49770651437621,
+    "lon": -104.91063593045368,
+    "aliases": []
+  },
+  {
+    "nombre": "Nuevas Delicias",
+    "slug": "nuevas-delicias",
+    "tipo": "colonia",
+    "lat": 21.523012691647654,
+    "lon": -104.9382125066764,
+    "aliases": []
+  },
+  {
+    "nombre": "Nuevas Palomas",
+    "slug": "nuevas-palomas",
+    "tipo": "colonia",
+    "lat": 21.468124924824476,
+    "lon": -104.8577526677122,
+    "aliases": []
+  },
+  {
+    "nombre": "Nuevo Progreso",
+    "slug": "nuevo-progreso",
+    "tipo": "colonia",
+    "lat": 21.5429173,
+    "lon": -104.8638528,
+    "aliases": []
+  },
+  {
+    "nombre": "Ojo de Agua",
+    "slug": "ojo-de-agua",
+    "tipo": "colonia",
+    "lat": 21.53176726503445,
+    "lon": -104.90183024193759,
+    "aliases": []
+  },
+  {
+    "nombre": "Olimpo",
+    "slug": "olimpo",
+    "tipo": "colonia",
+    "lat": 21.5115309,
+    "lon": -104.920337,
+    "aliases": []
+  },
+  {
+    "nombre": "Oriental",
+    "slug": "oriental",
+    "tipo": "colonia",
+    "lat": 21.488530557835222,
+    "lon": -104.87007958251759,
+    "aliases": []
+  },
+  {
+    "nombre": "Parque Ecológico",
+    "slug": "parque-ecologico",
+    "tipo": "colonia",
+    "lat": 21.481833032801358,
+    "lon": -104.85798647816473,
+    "aliases": []
+  },
+  {
+    "nombre": "Paseo del Valle Real",
+    "slug": "paseo-del-valle-real",
+    "tipo": "colonia",
+    "lat": 21.462716155168742,
+    "lon": -104.86232075868647,
+    "aliases": []
+  },
+  {
+    "nombre": "Plan de Ayala",
+    "slug": "plan-de-ayala",
+    "tipo": "colonia",
+    "lat": 21.466375688898914,
+    "lon": -104.87693721400674,
+    "aliases": []
+  },
+  {
+    "nombre": "Privada Cielo 30",
+    "slug": "privada-cielo-30",
+    "tipo": "colonia",
+    "lat": 21.540995278353442,
+    "lon": -104.86410218108182,
+    "aliases": []
+  },
+  {
+    "nombre": "Puente de San Cayetano",
+    "slug": "puente-de-san-cayetano",
+    "tipo": "colonia",
+    "lat": 21.46989961820942,
+    "lon": -104.8543539811257,
+    "aliases": []
+  },
+  {
+    "nombre": "Puente Quebrado",
+    "slug": "puente-quebrado",
+    "tipo": "colonia",
+    "lat": 21.4940877243818,
+    "lon": -104.8601844537208,
+    "aliases": []
+  },
+  {
+    "nombre": "Puerta Encanto",
+    "slug": "puerta-encanto",
+    "tipo": "colonia",
+    "lat": 21.48656650726913,
+    "lon": -104.8441383901154,
+    "aliases": []
+  },
+  {
+    "nombre": "Reforma",
+    "slug": "reforma",
+    "tipo": "colonia",
+    "lat": 21.531995896994154,
+    "lon": -104.87867279986888,
+    "aliases": []
+  },
+  {
+    "nombre": "Residencial La Loma",
+    "slug": "residencial-la-loma",
+    "tipo": "colonia",
+    "lat": 21.503963713790064,
+    "lon": -104.90462010833275,
+    "aliases": []
+  },
+  {
+    "nombre": "Residencial Las Fincas",
+    "slug": "residencial-las-fincas",
+    "tipo": "colonia",
+    "lat": 21.49679523335256,
+    "lon": -104.85947971174882,
+    "aliases": []
+  },
+  {
+    "nombre": "Residencial los Olivos",
+    "slug": "residencial-los-olivos",
+    "tipo": "colonia",
+    "lat": 21.4951731,
+    "lon": -104.8161051,
+    "aliases": []
+  },
+  {
+    "nombre": "Residencial Neriqa",
+    "slug": "residencial-neriqa",
+    "tipo": "colonia",
+    "lat": 21.49470114879761,
+    "lon": -104.8580020269688,
+    "aliases": []
+  },
+  {
+    "nombre": "Revolución",
+    "slug": "revolucion",
+    "tipo": "colonia",
+    "lat": 21.488538838704798,
+    "lon": -104.82193820823036,
+    "aliases": []
+  },
+  {
+    "nombre": "Rey Nayar",
+    "slug": "rey-nayar",
+    "tipo": "colonia",
+    "lat": 21.505530949063772,
+    "lon": -104.9194874481267,
+    "aliases": []
+  },
+  {
+    "nombre": "Rinconada Residencial",
+    "slug": "rinconada-residencial",
+    "tipo": "colonia",
+    "lat": 21.523403790875054,
+    "lon": -104.91497536976699,
+    "aliases": []
+  },
+  {
+    "nombre": "Rincón de San Juan",
+    "slug": "rincon-de-san-juan",
+    "tipo": "colonia",
+    "lat": 21.502218389058914,
+    "lon": -104.91336655954443,
+    "aliases": []
+  },
+  {
+    "nombre": "Rivas Allende",
+    "slug": "rivas-allende",
+    "tipo": "colonia",
+    "lat": 21.512532296968768,
+    "lon": -104.88313080280402,
+    "aliases": []
+  },
+  {
+    "nombre": "Rodeo de La Punta",
+    "slug": "rodeo-de-la-punta",
+    "tipo": "colonia",
+    "lat": 21.519558968051314,
+    "lon": -104.9251612493746,
+    "aliases": []
+  },
+  {
+    "nombre": "San Antonio",
+    "slug": "san-antonio",
+    "tipo": "colonia",
+    "lat": 21.501317751012532,
+    "lon": -104.89381632478442,
+    "aliases": []
+  },
+  {
+    "nombre": "San José",
+    "slug": "san-jose",
+    "tipo": "colonia",
+    "lat": 21.52161373755133,
+    "lon": -104.88787311216846,
+    "aliases": []
+  },
+  {
+    "nombre": "San Juan",
+    "slug": "san-juan",
+    "tipo": "colonia",
+    "lat": 21.50954780675665,
+    "lon": -104.90763138487331,
+    "aliases": []
+  },
+  {
+    "nombre": "San Juanito",
+    "slug": "san-juanito",
+    "tipo": "colonia",
+    "lat": 21.51342106187347,
+    "lon": -104.86856037550825,
+    "aliases": []
+  },
+  {
+    "nombre": "Sandino",
+    "slug": "sandino",
+    "tipo": "colonia",
+    "lat": 21.510502504707397,
+    "lon": -104.88367643576079,
+    "aliases": []
+  },
+  {
+    "nombre": "Santa Cecilia",
+    "slug": "santa-cecilia",
+    "tipo": "colonia",
+    "lat": 21.530023994117872,
+    "lon": -104.89650120122444,
+    "aliases": []
+  },
+  {
+    "nombre": "Santa Teresita",
+    "slug": "santa-teresita",
+    "tipo": "colonia",
+    "lat": 21.523723878522574,
+    "lon": -104.89981046369124,
+    "aliases": []
+  },
+  {
+    "nombre": "Tepic Centro",
+    "slug": "tepic-centro",
+    "tipo": "colonia",
+    "lat": 21.51043411892842,
+    "lon": -104.89224137779881,
+    "aliases": []
+  },
+  {
+    "nombre": "Tierra y Libertad",
+    "slug": "tierra-y-libertad",
+    "tipo": "colonia",
+    "lat": 21.506718358666085,
+    "lon": -104.88054217053076,
+    "aliases": []
+  },
+  {
+    "nombre": "Tulipanes",
+    "slug": "tulipanes",
+    "tipo": "colonia",
+    "lat": 21.5294835,
+    "lon": -104.8713718,
+    "aliases": []
+  },
+  {
+    "nombre": "Universidad Autónoma de Nayarit",
+    "slug": "universidad-autonoma-de-nayarit",
+    "tipo": "colonia",
+    "lat": 21.4919338,
+    "lon": -104.8923585,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle de La Cruz",
+    "slug": "valle-de-la-cruz",
+    "tipo": "colonia",
+    "lat": 21.533072107058725,
+    "lon": -104.86742047625856,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle de Matatipac",
+    "slug": "valle-de-matatipac",
+    "tipo": "colonia",
+    "lat": 21.473727653753553,
+    "lon": -104.86832550673317,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle de Nayarit",
+    "slug": "valle-de-nayarit",
+    "tipo": "colonia",
+    "lat": 21.47854072239635,
+    "lon": -104.90863666114467,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle de Zaragoza",
+    "slug": "valle-de-zaragoza",
+    "tipo": "colonia",
+    "lat": 21.53431806820959,
+    "lon": -104.86802377593462,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle del Country",
+    "slug": "valle-del-country",
+    "tipo": "colonia",
+    "lat": 21.48417806346254,
+    "lon": -104.86358131304719,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle Dorado",
+    "slug": "valle-dorado",
+    "tipo": "colonia",
+    "lat": 21.48469049998398,
+    "lon": -104.90350032338661,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle Magno",
+    "slug": "valle-magno",
+    "tipo": "colonia",
+    "lat": 21.4629947,
+    "lon": -104.8513475,
+    "aliases": []
+  },
+  {
+    "nombre": "Valle Verde",
+    "slug": "valle-verde",
+    "tipo": "colonia",
+    "lat": 21.525695176614278,
+    "lon": -104.87599871949843,
+    "aliases": []
+  },
+  {
+    "nombre": "Venceremos",
+    "slug": "venceremos",
+    "tipo": "colonia",
+    "lat": 21.508542139714702,
+    "lon": -104.8739979768291,
+    "aliases": []
+  },
+  {
+    "nombre": "Versalles",
+    "slug": "versalles",
+    "tipo": "colonia",
+    "lat": 21.5076273194318,
+    "lon": -104.90442040523749,
+    "aliases": []
+  },
+  {
+    "nombre": "Versalles Sur",
+    "slug": "versalles-sur",
+    "tipo": "colonia",
+    "lat": 21.504983609737376,
+    "lon": -104.91062186466269,
+    "aliases": []
+  },
+  {
+    "nombre": "Villas de La Cantera",
+    "slug": "villas-de-la-cantera",
+    "tipo": "colonia",
+    "lat": 21.489341837128023,
+    "lon": -104.84047709752696,
+    "aliases": []
+  },
+  {
+    "nombre": "Villas de La Paz",
+    "slug": "villas-de-la-paz",
+    "tipo": "colonia",
+    "lat": 21.48169176835435,
+    "lon": -104.8904018305404,
+    "aliases": []
+  },
+  {
+    "nombre": "Villas de San Juan",
+    "slug": "villas-de-san-juan",
+    "tipo": "colonia",
+    "lat": 21.50301555798608,
+    "lon": -104.91894276364866,
+    "aliases": []
+  },
+  {
+    "nombre": "Villas del Molino",
+    "slug": "villas-del-molino",
+    "tipo": "colonia",
+    "lat": 21.488578339027256,
+    "lon": -104.84518549649354,
+    "aliases": []
+  },
+  {
+    "nombre": "Villas del Parque",
+    "slug": "villas-del-parque",
+    "tipo": "colonia",
+    "lat": 21.4911759003916,
+    "lon": -104.85532862707649,
+    "aliases": []
+  },
+  {
+    "nombre": "Vistas de La Cantera",
+    "slug": "vistas-de-la-cantera",
+    "tipo": "colonia",
+    "lat": 21.49149344976705,
+    "lon": -104.82998260825234,
+    "aliases": []
+  },
+  {
+    "nombre": "Zitacua",
+    "slug": "zitacua",
+    "tipo": "colonia",
+    "lat": 21.50523744811259,
+    "lon": -104.8698264860915,
+    "aliases": []
+  }
+]

@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { getAdminDB } = require('../../db/admin');
+const CATALOGO_INICIAL = require('./tepic-nayarit.json');
 
 const ROOT_PATH = path.join(__dirname, '../../..');
 
@@ -44,6 +45,14 @@ function _catalogo() {
 function inicializarDesdeTenants(tenants = []) {
   const admin = getAdminDB();
   if (admin.prepare('SELECT COUNT(*) n FROM geo_tepic_colonias').get().n > 0) return 0;
+  if (CATALOGO_INICIAL.length) {
+    const insert = admin.prepare(`INSERT OR IGNORE INTO geo_tepic_colonias
+      (nombre, slug, tipo, lat, lon, aliases, activo) VALUES (?,?,?,?,?,?,1)`);
+    admin.transaction(() => {
+      for (const c of CATALOGO_INICIAL) insert.run(c.nombre, c.slug || slugify(c.nombre), c.tipo || 'colonia', c.lat, c.lon, _normalizarAliases(c.aliases));
+    })();
+    return CATALOGO_INICIAL.length;
+  }
   const origen = tenants.find(t => esTenantTepic(t) && t.db_path && fs.existsSync(_tenantPath(t)));
   if (!origen) return 0;
   const db = new Database(_tenantPath(origen), { readonly: true });

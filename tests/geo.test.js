@@ -15,6 +15,7 @@ const {
   invalidarCacheConfig,
 } = require('../src/geo');
 const { esTenantTepic, resolverTenant } = require('../src/geo/geotepic');
+const catalogoTepic = require('../src/geo/geotepic/tepic-nayarit.json');
 
 describe('GeoTepic — alcance territorial', () => {
   const tenants = [
@@ -30,6 +31,12 @@ describe('GeoTepic — alcance territorial', () => {
   test('resuelve el tenant por id o por nombre de su base', () => {
     assert.strictEqual(resolverTenant(tenants, 'tepic')?.id, 'tepic');
     assert.strictEqual(resolverTenant(tenants, 'xalisco')?.id, 'xalisco');
+  });
+
+  test('incluye el catálogo canónico completo para instalaciones nuevas', () => {
+    assert.strictEqual(catalogoTepic.length, 181);
+    assert.strictEqual(new Set(catalogoTepic.map(c => c.slug)).size, 181);
+    assert.ok(catalogoTepic.every(c => c.nombre && Number.isFinite(c.lat) && Number.isFinite(c.lon)));
   });
 });
 
