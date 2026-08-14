@@ -75,7 +75,7 @@ textarea{resize:vertical;min-height:80px}
 .toggle{position:relative;width:40px;height:22px;cursor:pointer}
 .toggle input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:var(--surface2);border-radius:22px;transition:.3s}
-.toggle input:checked+.slider{background:var(--accent)}
+.toggle input:checked~.toggle-slider{background:var(--green);box-shadow:0 0 0 3px rgba(34,197,94,.14),0 0 14px rgba(34,197,94,.28)}
 .toggle-slider:before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
 input:checked~.toggle-slider:before{transform:translateX(18px)}
 /* TABS */
@@ -97,9 +97,11 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 .catalog-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:var(--surface2);border-bottom:1px solid var(--border)}
 .catalog-section-title{font-weight:700;font-size:13px}.catalog-section-meta{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:3px 8px;white-space:nowrap}
 .catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:0 14px;padding:4px 13px 8px}
-.catalog-item{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid rgba(46,50,80,.7);min-height:58px}.catalog-item:nth-last-child(-n+2){border-bottom-color:transparent}
+.catalog-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid transparent;border-bottom-color:rgba(46,50,80,.7);border-radius:8px;min-height:62px;transition:background .2s,border-color .2s,opacity .2s}.catalog-item:nth-last-child(-n+2){border-bottom-color:transparent}
+.catalog-item.is-on{background:linear-gradient(90deg,rgba(34,197,94,.13),rgba(34,197,94,.035));border-color:rgba(34,197,94,.32);box-shadow:inset 3px 0 0 var(--green)}
+.catalog-item.is-off{background:rgba(15,17,23,.25);opacity:.62;filter:saturate(.55)}
 .catalog-item-copy{flex:1;min-width:0}.catalog-item-name{font-weight:600;font-size:13px}.catalog-item-desc{font-size:10px;line-height:1.35;color:var(--muted);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.catalog-item-state{font-size:9px;text-transform:uppercase;letter-spacing:.45px;font-weight:700;margin-top:4px}.catalog-item-state.on{color:var(--green)}.catalog-item-state.off{color:var(--muted)}
+.catalog-item-state{display:inline-flex;align-items:center;font-size:9px;text-transform:uppercase;letter-spacing:.45px;font-weight:800;margin-top:5px;padding:3px 7px;border-radius:20px}.catalog-item-state.on{color:#86efac;background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.35)}.catalog-item-state.off{color:var(--muted);background:var(--surface2);border:1px solid var(--border)}
 @media(max-width:760px){.catalog-grid{grid-template-columns:1fr}.catalog-item:nth-last-child(-n+2){border-bottom-color:rgba(46,50,80,.7)}.catalog-item:last-child{border-bottom-color:transparent}.catalog-hero{align-items:flex-start;flex-direction:column}}
 #toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
@@ -1245,7 +1247,7 @@ async function loadTenantCatalogo(){
     <div class="catalog-hero-main"><div class="catalog-hero-icon">${c.giro?.emoji||'🏪'}</div><div><div class="catalog-hero-name">${esc(c.giro?.nombre||c.giro?.slug||'Giro')}</div><div class="catalog-hero-sub">Catálogo maestro asignado a este tenant</div></div></div>
     <span class="badge badge-green">${habilitados} de ${todos.length} habilitados</span>
   </div>`;
-  const fila=(tipo,item)=>`<div class="catalog-item">
+  const fila=(tipo,item)=>`<div class="catalog-item ${item.activo?'is-on':'is-off'}">
     <div class="catalog-item-copy"><div class="catalog-item-name">${item.emoji||''} ${esc(item.nombre||item.slug)}</div>${item.descripcion?`<div class="catalog-item-desc">${esc(item.descripcion)}</div>`:''}<div class="catalog-item-state ${item.activo?'on':'off'}">${item.activo?'● Habilitado':'○ Deshabilitado'}</div></div>
     <label class="toggle" title="${item.activo?'Deshabilitar':'Habilitar'}"><input type="checkbox" ${item.activo?'checked':''}
       onchange="toggleTenantCatalogo('${tipo}','${encodeURIComponent(item.slug)}',${item.id||0},this)"><span class="toggle-slider"></span></label>
