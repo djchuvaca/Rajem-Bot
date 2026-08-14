@@ -427,6 +427,7 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_silencio_min', '15')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_recordatorio_min', '30')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_timeout_post_min', '20')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_delay_min', '15')");
 
   // Config: pasarela de pagos (administrada desde super-admin)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('pasarela_activa', '')");

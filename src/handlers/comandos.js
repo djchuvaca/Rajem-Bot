@@ -14,7 +14,7 @@ const {
 } = require("../db");
 const { invalidarCacheCortes } = require("./pedidoParser");
 const botPausado = require("../estado/bot-pausado");
-const { enviarDespachoMandaditos } = require("./mandaditos");
+const { enviarDespachoMandaditos, despacharConDelay } = require("./mandaditos");
 const { calcularTarifaDomicilio } = require("../geo");
 const { ordenPendientePreventa } = require("./flujos/utils");
 
@@ -439,9 +439,9 @@ async function handleComandos(msg, client) {
                   .catch(e => console.error("[Mandaditos] Error al despachar:", e.message));
               }
             } else {
-              // Pedido normal (no preventa): despacho inmediato
-              enviarDespachoMandaditos(client, despachoData)
-                .catch(e => console.error("[Mandaditos] Error al despachar:", e.message));
+              // Pedido normal (no preventa): despacho con delay configurable
+              despacharConDelay(client, despachoData)
+                .catch(e => console.error("[Mandaditos] Error al programar despacho:", e.message));
             }
           }
         } catch (e) { console.error("[Mandaditos] Error preparando despacho:", e.message); }

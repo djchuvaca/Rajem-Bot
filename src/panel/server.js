@@ -26,6 +26,7 @@ const { getWhatsappClient, getStatusInfo, getQR } = require("./whatsapp-bridge")
 const botPausado = require("../estado/bot-pausado");
 const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos");
+const { despacharConDelay } = require("../handlers/mandaditos");
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
@@ -464,6 +465,30 @@ async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
         `✅ *PAGO CONFIRMADO — ${proveedor}*\n\n👤 ${nombre}\n📦 Pedido #${resultado.pedidoId}\n\n${resultado.resumen}`
       );
     } catch (_) {}
+  }
+  // Despacho a mandaditos si es pedido a domicilio
+  if (resultado.pedidoId) {
+    try {
+      const row = queryOne(
+        `SELECT p.tipo, p.total, c.calle_numero, c.colonia, c.referencia
+         FROM pedidos p LEFT JOIN clientes c ON p.cliente_id = c.id
+         WHERE p.id = ?`,
+        [resultado.pedidoId]
+      );
+      if (row && row.tipo === 'domicilio') {
+        const tarifa = parseInt(getConfig('domicilio_costo') || '50', 10);
+        despacharConDelay(waClient, {
+          pedidoId:          resultado.pedidoId,
+          clienteNombre:     resultado.nombre      || 'Cliente',
+          clienteTelefono:   resultado.telefono    || null,
+          clienteCalle:      row.calle_numero      || null,
+          clienteColonia:    row.colonia           || null,
+          clienteReferencia: row.referencia        || null,
+          totalOrden:        `$${row.total         || 0}`,
+          tarifaDomicilio:   tarifa,
+        }).catch(e => console.error('[Mandaditos] Error al programar despacho pago:', e.message));
+      }
+    } catch (e) { console.error('[Mandaditos] Error consultando pedido para despacho:', e.message); }
   }
 }
 

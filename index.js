@@ -28,6 +28,7 @@ const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
 const { handleMensajeMandaditos, handleMensajeRepartidor, esRepartidorActivo } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
+const { resetEntregasHoy } = require("./src/db/repartidores");
 const { startPanel }     = require("./src/panel/server");
 const { setWhatsappClient, setWaEstado, setQR, clearQR } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
@@ -251,6 +252,24 @@ const mandaditosId = getGrupoMandaditosId();
   await _esta;
 });
 
+// ── Reset entregas_hoy a medianoche ──────────────────────────────────────────
+function _programarResetMedianoche() {
+  const ahora     = new Date();
+  const manana    = new Date(ahora);
+  manana.setDate(manana.getDate() + 1);
+  manana.setHours(0, 0, 0, 0);
+  const msHastaMedianoche = manana.getTime() - ahora.getTime();
+
+  setTimeout(() => {
+    try { resetEntregasHoy(); logger.info("[Repartidores] entregas_hoy reiniciado a 0"); } catch (e) { logger.error(`[Repartidores] Error en reset medianoche: ${e.message}`); }
+    setInterval(() => {
+      try { resetEntregasHoy(); logger.info("[Repartidores] entregas_hoy reiniciado a 0"); } catch (e) { logger.error(`[Repartidores] Error en reset medianoche: ${e.message}`); }
+    }, 24 * 60 * 60 * 1000);
+  }, msHastaMedianoche);
+
+  logger.info(`[Repartidores] Reset entregas_hoy programado en ${Math.round(msHastaMedianoche / 60000)} min`);
+}
+
 // ── Backup automático cada 6 horas ───────────────────────────────────────────
 function _runBackup() {
   const hijo = fork(path.join(__dirname, "scripts/backup-db.js"), [], { silent: true });
@@ -297,6 +316,9 @@ initDB().then(() => {
   // Primer backup al arrancar, luego cada 6 horas
   _runBackup();
   setInterval(_runBackup, 6 * 60 * 60 * 1000);
+
+  // Reset de entregas_hoy a medianoche
+  _programarResetMedianoche();
 }).catch(err => {
   logger.error(`Error al inicializar la base de datos: ${err.message}`);
   process.exit(1);

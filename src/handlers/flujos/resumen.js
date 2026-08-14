@@ -19,6 +19,7 @@ const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
 } = require("./utils");
+const { despacharConDelay } = require("../mandaditos");
 
 // ── HELPERS GIRO-AWARE ────────────────────────────────────────────────────────
 
@@ -475,7 +476,23 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     return true;
   }
 
-  // ── 2. Notificar al destino configurado y confirmar al cliente ───────────────
+  // ── 2. Despacho mandaditos (solo domicilio, efectivo/tarjeta) ────────────────
+  if (pedidoId && infoPedido.tipo === 'domicilio') {
+    const camposMand  = datosCampos.get(clienteNumero) || {};
+    const tarifaMand  = parseInt(getConfig('domicilio_costo') || '50', 10);
+    despacharConDelay(client, {
+      pedidoId,
+      clienteNombre:     infoPedido.nombre     || 'Cliente',
+      clienteTelefono:   infoPedido.telefono   || null,
+      clienteCalle:      camposMand.calle      || null,
+      clienteColonia:    camposMand.colonia    || null,
+      clienteReferencia: camposMand.referencia || null,
+      totalOrden:        infoPedido.total      || '$0',
+      tarifaDomicilio:   tarifaMand,
+    }).catch(e => console.error('[Mandaditos] Error al programar despacho:', e.message));
+  }
+
+  // ── 3. Notificar al destino administrativo y confirmar al cliente ────────────
   const notifJID = getNotifDestinoJID();
   if (notifJID) {
     try {

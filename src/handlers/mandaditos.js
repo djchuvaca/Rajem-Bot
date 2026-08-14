@@ -227,8 +227,23 @@ function esRepartidorActivo(jid) {
   return _timers.has(jid);
 }
 
+// ── Despacho con delay configurable ──────────────────────────────────────────
+async function despacharConDelay(client, datos) {
+  const delay = parseInt(getConfig('mandaditos_delay_min') || '15', 10);
+  if (delay <= 0) {
+    await enviarDespachoMandaditos(client, datos);
+  } else {
+    setTimeout(() => {
+      enviarDespachoMandaditos(client, datos)
+        .catch(e => logger.error(`[Mandaditos] Error en despacho demorado #${datos.pedidoId}: ${e.message}`));
+    }, delay * 60 * 1000);
+    logger.info(`[Mandaditos] Despacho #${datos.pedidoId} programado en ${delay} min`);
+  }
+}
+
 module.exports = {
   enviarDespachoMandaditos,
+  despacharConDelay,
   handleMensajeMandaditos,
   handleMensajeRepartidor,
   esRepartidorActivo,
