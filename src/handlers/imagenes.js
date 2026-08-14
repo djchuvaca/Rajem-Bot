@@ -15,6 +15,18 @@ const {
 const { ordenPendientePreventa, telefonosReales } = require("./flujos/utils");
 const { dividirNombreCompleto } = require('../clientes/nombre');
 
+async function descargarMediaConReintento(msg, client) {
+  try {
+    return await msg.downloadMedia();
+  } catch (primerError) {
+    const messageId = msg.id?._serialized;
+    if (!messageId || typeof client?.getMessageById !== 'function') throw primerError;
+    const actualizado = await client.getMessageById(messageId);
+    if (!actualizado || typeof actualizado.downloadMedia !== 'function') throw primerError;
+    return actualizado.downloadMedia();
+  }
+}
+
 async function handleImagen(msg, client) {
   if (!msg.hasMedia) return false;
   if (!esperandoCaptura.has(msg.from)) return false;
@@ -24,7 +36,7 @@ async function handleImagen(msg, client) {
   const horaVenta     = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 
   try {
-    const media = await msg.downloadMedia();
+    const media = await descargarMediaConReintento(msg, client);
     if (!media?.data) throw new Error("WhatsApp no entregó el contenido del archivo");
     const mimetype = String(media.mimetype || "").toLowerCase().split(";")[0].trim();
     const esImagen = mimetype.startsWith("image/");
@@ -104,11 +116,11 @@ async function handleImagen(msg, client) {
       || "¡Gracias! Recibimos tu comprobante 📸\nTu pedido fue solicitado exitosamente y solo queda la confirmación de nuestro equipo de trabajo.\nEn breve te avisamos 🙏").replace(/{negocio}/g, _negocio);
     await msg.reply(msgComprobante);
   } catch (e) {
-    console.error("❌ Error al procesar captura:", e.message);
+    console.error("❌ Error al procesar captura:", e?.stack || e?.message || String(e));
     await msg.reply("Disculpa, tuve un problema al recibir tu comprobante. ¿Puedes mandarlo de nuevo? 🙏");
   }
 
   return true;
 }
 
-module.exports = { handleImagen };
+module.exports = { handleImagen, descargarMediaConReintento };

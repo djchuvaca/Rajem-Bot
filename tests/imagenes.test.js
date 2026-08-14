@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const { initDB } = require('../src/db');
-const { handleImagen } = require('../src/handlers/imagenes');
+const { handleImagen, descargarMediaConReintento } = require('../src/handlers/imagenes');
 const { esperandoCaptura, pendientesConfirmacion, CARPETA_CAPTURAS, limpiarTodo } = require('../src/estado');
 
 test.before(async () => { await initDB(); });
@@ -50,4 +50,16 @@ test('rechaza medios que no son imagen o PDF y conserva la espera', async () => 
   assert.equal(await handleImagen(msg, { sendMessage: async () => {} }), true);
   assert.equal(esperandoCaptura.has(jid), true);
   assert.match(respuestas[0], /imagen o PDF/i);
+});
+
+test('reintenta la descarga recuperando el mensaje desde WhatsApp', async () => {
+  const media = { mimetype: 'image/png', data: 'AA==' };
+  const msg = { id: { _serialized: 'mensaje-1' }, downloadMedia: async () => { throw new Error('r'); } };
+  const client = {
+    getMessageById: async id => {
+      assert.equal(id, 'mensaje-1');
+      return { downloadMedia: async () => media };
+    },
+  };
+  assert.equal(await descargarMediaConReintento(msg, client), media);
 });
