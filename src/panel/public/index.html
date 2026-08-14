@@ -2078,6 +2078,10 @@ const configLabels = {
   alerta_pedido_min:'Alerta pedido sin confirmar (min)',
   mandaditos_delay_min:'Delay para lanzar mandadito tras confirmar pedido (min)',
 };
+const configRangos = {
+  tiempo_cancelacion:[0,120], timeout_recordatorio_min:[1,240],
+  timeout_sesion_min:[2,480], alerta_pedido_min:[1,240], mandaditos_delay_min:[0,240],
+};
 
 async function loadConfig() {
   const conf = await api('/api/config');
@@ -2086,7 +2090,7 @@ async function loadConfig() {
     const readonly = c.clave === 'nombre_negocio';
     return `<div class="form-group">
       <label class="form-label">${configLabels[c.clave] || c.clave}${readonly ? ' <small style="color:var(--muted)">(solo lectura)</small>' : ''}</label>
-      <input class="form-input" id="cfg-${c.clave}" type="text" value="${c.valor}"${readonly ? ' readonly disabled style="opacity:0.5;cursor:not-allowed"' : ''}>
+      <input class="form-input" id="cfg-${c.clave}" type="${configRangos[c.clave]?'number':'text'}"${configRangos[c.clave]?` min="${configRangos[c.clave][0]}" max="${configRangos[c.clave][1]}" step="1"`:''} value="${_esc(c.valor)}"${readonly ? ' readonly disabled style="opacity:0.5;cursor:not-allowed"' : ''}>
     </div>`;
   }).join('');
   // Cargar estrategia mixto por separado
@@ -2105,11 +2109,31 @@ async function saveEstrategiaMixto() {
 async function saveConfig() {
   const READONLY_KEYS = ['nombre_negocio'];
   const conf = await api('/api/config');
-  for (const c of conf) {
+  const recEl = document.getElementById('cfg-timeout_recordatorio_min');
+  const sesEl = document.getElementById('cfg-timeout_sesion_min');
+  if (recEl && sesEl && Number(sesEl.value) <= Number(recEl.value)) {
+    toast('Limpiar sesión debe ser mayor que el recordatorio de inactividad', false); return;
+  }
+  const oldSesion = Number(conf.find(c => c.clave === 'timeout_sesion_min')?.valor || 35);
+  // Mantener válida la pareja durante el guardado: al aumentar ambos se guarda
+  // primero el cierre; al reducirlos, primero el recordatorio.
+  const ordenados = [...conf].sort((a,b) => {
+    const orden = Number(recEl?.value) >= oldSesion
+      ? ['timeout_sesion_min','timeout_recordatorio_min']
+      : ['timeout_recordatorio_min','timeout_sesion_min'];
+    return (orden.indexOf(a.clave) < 0 ? 99 : orden.indexOf(a.clave)) - (orden.indexOf(b.clave) < 0 ? 99 : orden.indexOf(b.clave));
+  });
+  const errores = [];
+  for (const c of ordenados) {
     if (READONLY_KEYS.includes(c.clave)) continue;
     const el = document.getElementById(`cfg-${c.clave}`);
-    if (el) await api('/api/config', 'POST', { clave: c.clave, valor: el.value });
+    if (el) {
+      if (!el.checkValidity()) { errores.push(`${configLabels[c.clave]}: valor fuera del rango permitido`); continue; }
+      const r = await api('/api/config', 'POST', { clave: c.clave, valor: el.value });
+      if (!r?.ok) errores.push(`${configLabels[c.clave]}: ${r?.error || 'no se pudo guardar'}`);
+    }
   }
+  if (errores.length) { toast(errores.join('\n'), false); return; }
   toast('Configuración guardada');
   loadDashboard();
 }

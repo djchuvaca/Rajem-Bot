@@ -150,13 +150,17 @@ const _CLAVES_GEO = new Set([
   'negocio_calle', 'negocio_colonia', 'negocio_referencia',
   'domicilio_costo',
 ]);
+const { validarConfiguracion } = require('../config/validacion');
 
 app.get("/api/config", requireAuth, (req, res) => res.json(getAllConfig()));
 app.post("/api/config", requireAuth, (req, res) => {
   if (_CLAVES_GEO.has(req.body.clave)) {
     return res.status(403).json({ error: "Esta configuración es administrada por el equipo de soporte. Usa el formulario de solicitud de cambio en la sección Zonas de Envío." });
   }
-  setConfig(req.body.clave, req.body.valor);
+  if (typeof req.body.clave !== 'string' || !req.body.clave.trim()) return res.status(400).json({ error: 'Clave de configuración inválida' });
+  const validacion = validarConfiguracion(req.body.clave, req.body.valor, getConfig);
+  if (!validacion.ok) return res.status(400).json({ error: validacion.error });
+  setConfig(req.body.clave, validacion.valor);
   res.json({ ok: true });
 });
 
@@ -744,7 +748,7 @@ setInterval(async () => {
     try {
       await waClient.sendMessage(notifJID,
         `⚠️ *Pedido sin confirmar*\n\n` +
-        `El pedido *#${p.id}* de *${nombre}* lleva más de 10 minutos esperando.\n` +
+        `El pedido *#${p.id}* de *${nombre}* lleva más de ${alertaMin} minutos esperando.\n` +
         `Total: $${Math.round(p.total || 0)}\n\n` +
         `Usa *!confirmar ${p.telefono || nombre}* o revisa el panel.`
       );
@@ -758,7 +762,7 @@ setInterval(async () => {
   for (const id of _pedidosAlertados) {
     if (!idsActuales.has(id)) _pedidosAlertados.delete(id);
   }
-}, 5 * 60 * 1000).unref();
+}, 60 * 1000).unref();
 
 // ── COLONIAS Y TARIFAS DE ENVÍO ───────────────────────────────────────────────
 app.get("/api/colonias", requireAuth, (req, res) => {

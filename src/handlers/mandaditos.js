@@ -7,6 +7,7 @@ const {
   registrarEntregaTimeout,
 } = require('../db/repartidores');
 const logger = require('../logger');
+const { guardarDespachoProgramado, marcarDespachoEjecutado, getDespachosPendientes } = require('../db/modelos');
 
 // ── Estado en memoria ─────────────────────────────────────────────────────────
 const despachosPendientes = new Map(); // messageId → datos del despacho
@@ -106,6 +107,7 @@ async function enviarDespachoMandaditos(client, datos) {
     if (msgId) despachosPendientes.set(msgId, { ...datos, negocioColonia });
   } catch (e) {
     logger.error(`[Mandaditos] Error al enviar despacho #${datos.pedidoId}: ${e.message}`);
+    throw e;
   }
 }
 
@@ -234,12 +236,19 @@ async function despacharConDelay(client, datos) {
   const delay = parseInt(getConfig('mandaditos_delay_min') || '15', 10);
   if (delay <= 0) {
     await enviarDespachoMandaditos(client, datos);
+    return { inmediato: true, delay: 0 };
   } else {
-    setTimeout(() => {
+    const horaDespacho = new Date(Date.now() + delay * 60 * 1000);
+    const existente = getDespachosPendientes().find(d => Number(d.pedido_id) === Number(datos.pedidoId));
+    const despachoId = existente?.id || guardarDespachoProgramado({ ...datos, horaDespacho: horaDespacho.toISOString() });
+    const timer = setTimeout(() => {
       enviarDespachoMandaditos(client, datos)
+        .then(() => marcarDespachoEjecutado(despachoId))
         .catch(e => logger.error(`[Mandaditos] Error en despacho demorado #${datos.pedidoId}: ${e.message}`));
     }, delay * 60 * 1000);
-    logger.info(`[Mandaditos] Despacho #${datos.pedidoId} programado en ${delay} min`);
+    timer.unref?.();
+    logger.info(`[Mandaditos] Despacho #${datos.pedidoId} (db #${despachoId}) programado en ${delay} min`);
+    return { inmediato: false, delay, despachoId, horaDespacho };
   }
 }
 
