@@ -118,30 +118,16 @@ async function main() {
     console.error("⚠️  npm install falló. Hazlo manualmente dentro de la carpeta del tenant.");
   }
 
-  // ── Seed inicial + poblar productos desde plantilla ───────────────────────
-  console.log("\n🗄️  Inicializando base de datos y cargando plantilla de productos...");
+  // ── Seed inicial: el catálogo se proyecta exclusivamente desde src/giros ───
+  console.log("\n🗄️  Inicializando base de datos y catálogo del giro...");
   try {
     const seedScript = `
       (async () => {
         require('dotenv').config();
-        const { initDB, run, queryOne } = require('./src/db/core');
+        const { initDB }                = require('./src/db/core');
         const { seedDB }                = require('./src/db/seed');
-        const { getTemplateProducts, getBusinessTypeSlug } = require('./src/db');
         await initDB();
         await seedDB();
-        // Poblar productos desde la plantilla del business_type activo (si la tabla está vacía)
-        const cnt = queryOne('SELECT COUNT(*) as c FROM productos')?.c || 0;
-        if (cnt > 0) { console.log('Productos ya existen — omitiendo seed de plantilla.'); return; }
-        const slug  = getBusinessTypeSlug();
-        const prods = getTemplateProducts(slug);
-        if (!prods.length) { console.log('Sin productos en plantilla ' + slug); return; }
-        for (const p of prods) {
-          try {
-            run('INSERT OR IGNORE INTO productos (nombre, descripcion, categoria, precio_taco, precio_torta, precio_100g, sinonimos) VALUES (?,?,?,?,?,?,?)',
-              [p.nombre, p.descripcion, p.categoria, p.precio_taco, p.precio_torta, p.precio_100g, p.sinonimos || '']);
-          } catch(_) {}
-        }
-        console.log('✅ ' + prods.length + ' productos cargados desde la plantilla ' + slug);
       })().catch(e => { console.error('❌ Error en seed:', e.message); process.exit(1); });
     `;
     const tmpScript = path.join(destino, '_seed_init.js');

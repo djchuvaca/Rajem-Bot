@@ -143,17 +143,31 @@ function invalidarCacheItemTypes() { _bustCache(); }
 // ── TEMPLATE PRODUCTS ─────────────────────────────────────────────────────────
 
 /**
- * Devuelve los productos-plantilla de un business_type.
- * El script de provisioning de nuevos tenants los copia a la tabla `productos`.
+ * Compatibilidad de API: deriva el catálogo directamente del módulo de giro.
+ * No existe una segunda fuente de plantillas en SQLite.
  */
 function getTemplateProducts(businessTypeSlug) {
   try {
-    const bt = getBusinessType(businessTypeSlug);
-    if (!bt) return [];
-    return queryAll(
-      'SELECT * FROM business_type_products WHERE business_type_id = ? ORDER BY id',
-      [bt.id]
-    ) || [];
+    const { getCatalogo } = require('../giros');
+    const catalogo = getCatalogo(businessTypeSlug);
+    return [
+      ...catalogo.cortes.map(c => ({
+        nombre: c.nombre, descripcion: c.descripcion || '', categoria: 'corte',
+        precio_taco: c.precio_base || 0, precio_torta: c.precio_base || 0,
+        precio_100g: c.precio_base || 0, sinonimos: (c.aliases || []).join(','),
+        catalogo_slug: c.slug,
+      })),
+      ...catalogo.bebidas.map(p => ({
+        nombre: p.nombre, descripcion: p.descripcion || '', categoria: 'refresco',
+        precio_taco: p.precio || 0, precio_torta: p.precio || 0, precio_100g: 0,
+        sinonimos: p.sinonimos || '', catalogo_slug: p.slug || p.nombre,
+      })),
+      ...catalogo.salsas.map(p => ({
+        nombre: p.nombre, descripcion: p.descripcion || '', categoria: 'salsa',
+        precio_taco: p.precio || 0, precio_torta: p.precio || 0, precio_100g: 0,
+        sinonimos: p.sinonimos || '', catalogo_slug: p.slug || p.nombre,
+      })),
+    ];
   } catch (_) { return []; }
 }
 

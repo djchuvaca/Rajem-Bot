@@ -73,16 +73,14 @@ function _preguntaCorte(desc) {
 
 function _listaNombresRefrescos() {
   const refs = require("../pedidoParser").getRefrescos();
-  return refs.length > 0
-    ? refs.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ")
-    : "Coca Cola · Fanta · Sprite";
+  const fuente = refs.length > 0 ? refs : (getGiroActivo()?.refrescos || []);
+  return fuente.map(r => r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)).join(" · ");
 }
 
 function _listaNombresSalsas() {
   const sals = getSalsas();
-  return sals.length > 0
-    ? sals.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ")
-    : "picada · cebolla · suave · roja · limones";
+  const fuente = sals.length > 0 ? sals : (getGiroActivo()?.salsas || []);
+  return fuente.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(" · ");
 }
 
 

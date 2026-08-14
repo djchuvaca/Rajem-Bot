@@ -44,6 +44,7 @@ async function initDB() {
   _bsdb = new Database(_getDbPath());
   // DELETE es más simple para el backup (sin archivos -wal/-shm)
   _bsdb.pragma("journal_mode = DELETE");
+  _bsdb.pragma("busy_timeout = 5000");
   db = _makeCompatDB(_bsdb);
   return _bsdb;
 }

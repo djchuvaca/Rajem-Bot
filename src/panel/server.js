@@ -2,6 +2,7 @@ const express      = require("express");
 const session      = require("express-session");
 const bcrypt       = require("bcryptjs");
 const path         = require("path");
+const fs           = require("fs");
 const {
   getUsuarioPanel, updatePasswordPanel,
   getAllConfig, setConfig,
@@ -21,12 +22,14 @@ const { queryOne, queryAll, run, getBsdb } = require("../db/core");
 const SqliteSessionStore = require("../db/session-store");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
 const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
+const geoTepic = require('../geo/geotepic');
 
 const { getWhatsappClient, getStatusInfo, getQR } = require("./whatsapp-bridge");
 const botPausado = require("../estado/bot-pausado");
 const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos");
 const { despacharConDelay } = require("../handlers/mandaditos");
+const catalogoTenant = require('../giros/catalogo-tenant');
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
@@ -40,6 +43,9 @@ app.use(express.json({
   },
 }));
 app.use(express.urlencoded({ extended: true }));
+if (process.env.NODE_ENV === 'production' && (!process.env.PANEL_SECRET || process.env.PANEL_SECRET.length < 32)) {
+  throw new Error('PANEL_SECRET es obligatorio en producción y debe tener al menos 32 caracteres');
+}
 if (!process.env.PANEL_SECRET) {
   console.warn("[SEGURIDAD] PANEL_SECRET no está definido en .env — usando secreto por defecto (INSEGURO en producción)");
 }
@@ -49,7 +55,7 @@ app.use(session({
   resave:            false,
   saveUninitialized: false,
   store:             new SqliteSessionStore(() => getBsdb()),
-  cookie:            { maxAge: 8 * 60 * 60 * 1000 },
+  cookie:            { maxAge: 8 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE === '1' },
 }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -154,10 +160,14 @@ app.post("/api/mensajes", requireAuth, (req, res) => {
 });
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
-app.get("/api/productos", requireAuth, (req, res) => res.json(getProductos()));
+app.get("/api/productos", requireAuth, (req, res) => res.json([
+  ...catalogoTenant.getBebidasTenant(), ...catalogoTenant.getSalsasTenant(),
+]));
 
 // Tenant solo puede modificar precios y estado activo — el resto lo gestiona el super-admin
 app.put("/api/productos/:id", requireAuth, (req, res) => {
+  return res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
+  /* istanbul ignore next */
   const id   = parseInt(req.params.id);
   const prod = getProductos().find(p => p.id === id);
   if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
@@ -175,6 +185,8 @@ app.put("/api/productos/:id", requireAuth, (req, res) => {
 
 // Desactivar producto (no eliminar físicamente — el catálogo lo define el super-admin)
 app.delete("/api/productos/:id", requireAuth, (req, res) => {
+  return res.status(410).json({ error: 'Endpoint legacy retirado; usa la configuración de menú del giro' });
+  /* istanbul ignore next */
   const id   = parseInt(req.params.id);
   const prod = getProductos().find(p => p.id === id);
   if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
@@ -185,6 +197,8 @@ app.delete("/api/productos/:id", requireAuth, (req, res) => {
 
 // Adoptar un producto del catálogo al menú del tenant
 app.post("/api/productos/adoptar", requireAuth, (req, res) => {
+  return res.status(410).json({ error: 'Endpoint legacy retirado; el catálogo se adopta desde el menú del giro' });
+  /* istanbul ignore next */
   const { catalogo_slug, precio_taco, precio_torta, precio_100g } = req.body;
   if (!catalogo_slug) return res.status(400).json({ error: "catalogo_slug requerido" });
   try {
@@ -692,7 +706,18 @@ setInterval(async () => {
 
 // ── COLONIAS Y TARIFAS DE ENVÍO ───────────────────────────────────────────────
 app.get("/api/colonias", requireAuth, (req, res) => {
-  const colonias  = queryAll("SELECT * FROM colonias ORDER BY nombre");
+  const tenantId = process.env.TENANT_ID || '';
+  let tenant = null;
+  try {
+    const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/tenants.json'), 'utf8'));
+    tenant = geoTepic.resolverTenant(registry.tenants || [], tenantId, getBsdb()?.name || '');
+  } catch (_) {}
+  if (!tenant || !geoTepic.esTenantTepic(tenant)) return res.status(403).json({ error: "GeoTepic solo está disponible para tenants de Tepic, Nayarit" });
+  let colonias;
+  try {
+    geoTepic.inicializarDesdeTenants([tenant]);
+    colonias = geoTepic.listarParaTenant(tenant);
+  } catch (e) { return res.status(500).json({ error: e.message }); }
   const negLat    = parseFloat(getConfig("negocio_lat") || "0");
   const negLon    = parseFloat(getConfig("negocio_lon") || "0");
 
@@ -717,7 +742,12 @@ app.get("/api/colonias", requireAuth, (req, res) => {
 app.put("/api/colonias/:id/activo", requireAuth, (req, res) => {
   const { activo } = req.body;
   if (activo === undefined) return res.status(400).json({ error: "Falta campo activo" });
-  run("UPDATE colonias SET activo=? WHERE id=?", [activo ? 1 : 0, parseInt(req.params.id)]);
+  const local = queryOne("SELECT geo_tepic_id FROM colonias WHERE id=?", [parseInt(req.params.id)]);
+  if (!local?.geo_tepic_id) return res.status(404).json({ error: "Colonia GeoTepic no encontrada" });
+  if (activo && !geoTepic.listarColonias({ incluirInactivas: false }).some(c => c.id === local.geo_tepic_id)) {
+    return res.status(403).json({ error: "La colonia está deshabilitada en GeoTepic" });
+  }
+  run("UPDATE colonias SET activo=? WHERE id=? AND geo_tepic_id IS NOT NULL", [activo ? 1 : 0, parseInt(req.params.id)]);
   invalidarCacheColonias();
   res.json({ ok: true });
 });
@@ -811,33 +841,21 @@ app.get("/api/business-types/products", requireAuth, (req, res) => {
 });
 
 // ── CORTES ────────────────────────────────────────────────────────────────────
-const { getAllCortesBD, createCorte, updateCorte, invalidarCacheCortesBD } = require("../db/cortes");
+const { invalidarCacheCortesBD } = require("../db/cortes");
 
 // GET /api/cortes — todos los cortes del giro (incluye inactivos)
 app.get("/api/cortes", requireAuth, (req, res) => {
-  try { res.json(getAllCortesBD()); } catch (e) { res.status(500).json({ error: e.message }); }
+  try { res.json(catalogoTenant.getCortesTenant()); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/cortes — crear nuevo corte
 app.post("/api/cortes", requireAuth, (req, res) => {
-  const { nombre, aliases, descripcion, precio_base, precios, activo } = req.body;
-  if (!nombre) return res.status(400).json({ error: "nombre requerido" });
-  try {
-    createCorte({ nombre, aliases, descripcion, precio_base, precios, activo });
-    invalidarCacheCortes();
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  res.status(403).json({ error: 'Los cortes se definen exclusivamente en el módulo de giro' });
 });
 
 // PUT /api/cortes/:id — editar corte (precio, aliases, activo)
 app.put("/api/cortes/:id", requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  const { nombre, aliases, descripcion, precio_base, precios, activo } = req.body;
-  try {
-    updateCorte(id, { nombre, aliases, descripcion, precio_base, precios, activo });
-    invalidarCacheCortes();
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  res.status(403).json({ error: 'La definición pertenece al giro; precios y activación se configuran en el menú' });
 });
 
 // ── MENÚ DEL TENANT (menu_items) ─────────────────────────────────────────────
@@ -845,18 +863,28 @@ app.put("/api/cortes/:id", requireAuth, (req, res) => {
 // GET /api/menu-items?categoria=corte|refresco|salsa
 app.get("/api/menu-items", requireAuth, (req, res) => {
   const { categoria } = req.query;
-  const where = categoria
-    ? "WHERE eliminado=0 AND categoria=?"
-    : "WHERE eliminado=0";
-  const params = categoria ? [categoria] : [];
-  res.json(queryAll(`SELECT * FROM menu_items ${where} ORDER BY categoria, producto_slug`, params));
+  res.json(catalogoTenant.getMenuItemsTenant(categoria || null));
 });
 
 // POST /api/menu-items — crea o reactiva un ítem del menú
 app.post("/api/menu-items", requireAuth, (req, res) => {
   const { producto_slug, formato_slug, categoria, precio } = req.body;
   if (!producto_slug || !categoria) return res.status(400).json({ error: "producto_slug y categoria requeridos" });
+  if (!catalogoTenant.esProductoValido(categoria, producto_slug)) return res.status(400).json({ error: 'El producto no pertenece al giro activo' });
   const fmtSlug = formato_slug || null;
+  if (categoria === 'refresco' || categoria === 'salsa') {
+    const { getCatalogo } = require('../giros');
+    const catalogo = getCatalogo(getBusinessTypeSlug());
+    const defs = categoria === 'refresco' ? catalogo.bebidas : catalogo.salsas;
+    const def = defs.find(p => p.nombre.toLowerCase() === producto_slug.toLowerCase());
+    if (!def) return res.status(400).json({ error: 'El producto no pertenece al catálogo del giro activo' });
+    const precioTenant = parseFloat(precio) || def.precio || 0;
+    const row = queryOne("SELECT id FROM productos WHERE LOWER(nombre)=LOWER(?) AND categoria=?", [producto_slug, categoria]);
+    if (row) run("UPDATE productos SET activo=1, precio_taco=?, precio_torta=? WHERE id=?", [precioTenant, precioTenant, row.id]);
+    else run("INSERT INTO productos (nombre,descripcion,precio_taco,precio_torta,precio_100g,sinonimos,categoria,activo,catalogo_slug) VALUES (?,?,?,?,?,?,?,1,?)",
+      [def.nombre, def.descripcion || '', precioTenant, precioTenant, 0, def.sinonimos || '', categoria, def.slug || def.nombre]);
+    invalidarCacheCortes();
+  }
   // ¿Ya existe (incluso eliminado)?
   const existe = queryOne(
     "SELECT id FROM menu_items WHERE producto_slug=? AND COALESCE(formato_slug,'')=? AND categoria=?",
@@ -889,7 +917,13 @@ app.put("/api/menu-items/:id", requireAuth, (req, res) => {
 // DELETE /api/menu-items/:id — soft delete
 app.delete("/api/menu-items/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
+  const item = queryOne("SELECT producto_slug,categoria FROM menu_items WHERE id=?", [id]);
   run("UPDATE menu_items SET eliminado=1 WHERE id=?", [id]);
+  if (item && (item.categoria === 'refresco' || item.categoria === 'salsa')) {
+    const restantes = queryOne("SELECT COUNT(*) AS n FROM menu_items WHERE producto_slug=? AND categoria=? AND activo=1 AND eliminado=0", [item.producto_slug, item.categoria]);
+    if (!restantes?.n) run("UPDATE productos SET activo=0 WHERE LOWER(nombre)=LOWER(?) AND categoria=?", [item.producto_slug, item.categoria]);
+    invalidarCacheCortes();
+  }
   res.json({ ok: true });
 });
 
@@ -907,13 +941,7 @@ app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
 // GET /api/catalogo/cortes — cortes del giro agrupados por sección, filtrados por seccion_taqueria
 app.get("/api/catalogo/cortes", requireAuth, (req, res) => {
   try {
-    const slug = getBusinessTypeSlug() || 'taqueria';
-    const bt   = queryOne("SELECT id FROM business_types WHERE slug=?", [slug]);
-    if (!bt) return res.json({ asada: [], carnitas: [] });
-    const cortes = queryAll(
-      "SELECT slug, nombre, precio_base, seccion, descripcion FROM cortes WHERE giro_id=? ORDER BY id",
-      [bt.id]
-    );
+    const cortes = catalogoTenant.getCortesTenant();
     const seccion = getConfig('seccion_taqueria') || 'ambas';
     const asada    = seccion !== 'carnitas' ? cortes.filter(c => c.seccion === 'asada')  : [];
     const carnitas = seccion !== 'asada'    ? cortes.filter(c => c.seccion !== 'asada') : [];
@@ -923,12 +951,12 @@ app.get("/api/catalogo/cortes", requireAuth, (req, res) => {
 
 // GET /api/catalogo/bebidas
 app.get("/api/catalogo/bebidas", requireAuth, (req, res) => {
-  res.json(queryAll("SELECT id, nombre, descripcion, precio_taco as precio FROM productos WHERE categoria='refresco' ORDER BY nombre"));
+  res.json(catalogoTenant.getBebidasTenant());
 });
 
 // GET /api/catalogo/salsas
 app.get("/api/catalogo/salsas", requireAuth, (req, res) => {
-  res.json(queryAll("SELECT id, nombre, descripcion, precio_taco as precio FROM productos WHERE categoria='salsa' ORDER BY nombre"));
+  res.json(catalogoTenant.getSalsasTenant());
 });
 
 // ── FORMATOS (item_types del giro activo) ─────────────────────────────────────
@@ -938,13 +966,9 @@ app.get("/api/catalogo/salsas", requireAuth, (req, res) => {
 app.get("/api/formatos", requireAuth, (req, res) => {
   try {
     if (req.query.todos === "1") {
-      const { queryOne, queryAll } = require("../db/core");
-      const slug = getBusinessTypeSlug() || "taqueria";
-      const bt   = queryOne("SELECT id FROM business_types WHERE slug = ?", [slug]);
-      if (!bt) return res.json([]);
-      return res.json(queryAll("SELECT * FROM item_types WHERE business_type_id = ? ORDER BY id", [bt.id]) || []);
+      return res.json(catalogoTenant.getFormatosTenant({ todos: true }));
     }
-    res.json(getItemTypes());
+    res.json(catalogoTenant.getFormatosTenant());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -952,6 +976,7 @@ app.get("/api/formatos", requireAuth, (req, res) => {
 // cascade:true propaga el precio a todos los menu_items del formato (útil desde el wizard)
 app.put("/api/formatos/:id", requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
+  if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Formato no definido por el giro activo' });
   const { precio_base, activo, cascade } = req.body;
   try {
     const { run } = require("../db/core");

@@ -13,11 +13,12 @@ const {
   getAppUrl, getGrupoMandaditosGlobal,
 } = require('../db/admin');
 const SqliteSessionStore = require('../db/session-store');
+const geoTepic = require('../geo/geotepic');
 
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
-  getTenantStats, getTenantConfig, setTenantConfig,
-  getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
+  getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
   getTenantPlan, setTenantPlan,
@@ -28,22 +29,48 @@ const {
 
 const _loginAttempts = new Map();
 
+const _superadminSecret = process.env.SUPERADMIN_SECRET;
+if (process.env.NODE_ENV === 'production' && (!_superadminSecret || _superadminSecret.length < 32)) {
+  throw new Error('SUPERADMIN_SECRET es obligatorio en producción y debe tener al menos 32 caracteres');
+}
 const app = express();
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
   name:              'rajem.superadmin.sid',
-  secret:            process.env.SUPERADMIN_SECRET || 'rajem-superadmin-secret-2024',
+  secret:            _superadminSecret || 'rajem-superadmin-secret-local-dev',
   resave:            false,
   saveUninitialized: false,
   store:             new SqliteSessionStore(() => getAdminDB()),
-  cookie:            { maxAge: 8 * 60 * 60 * 1000 },
+  cookie:            { maxAge: 8 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE === '1' },
 }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  if (!origin) return next();
+  try {
+    if (new URL(origin).host !== req.get('host')) return res.status(403).json({ error: 'Origen no permitido' });
+  } catch (_) { return res.status(403).json({ error: 'Origen inválido' }); }
+  next();
+});
 
 function requireAuth(req, res, next) {
   if (req.session?.usuario) return next();
   res.status(401).json({ error: 'No autorizado' });
+}
+
+function fechaLocalISO() {
+  const ahora = new Date();
+  return new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -74,6 +101,7 @@ app.post('/api/cambiar-password', requireAuth, (req, res) => {
   const user = getSuperadminUsuario(req.session.usuario);
   if (!bcrypt.compareSync(password_actual, user.password))
     return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+  if (typeof password_nuevo !== 'string' || password_nuevo.length < 12) return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 12 caracteres' });
   updateSuperadminPassword(req.session.usuario, bcrypt.hashSync(password_nuevo, 10));
   res.json({ ok: true });
 });
@@ -98,8 +126,10 @@ app.get('/api/tenants', requireAuth, (req, res) => {
 app.post('/api/tenants', requireAuth, (req, res) => {
   const { id, nombre, ciudad, estado, db_path, logs_path, panel_port, plan, desde, notas, business_type, seccion_taqueria } = req.body;
   if (!id || !nombre || !db_path) return res.status(400).json({ error: 'Faltan campos requeridos: id, nombre, db_path' });
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) return res.status(400).json({ error: 'ID de tenant inválido' });
+  if (getTenant(id)) return res.status(409).json({ error: 'El tenant ya existe' });
   const planValido = ['basico', 'plus', 'pro'].includes(plan) ? plan : 'basico';
-  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: planValido, desde: desde || new Date().toISOString().slice(0,10), notas: notas || '', business_type: business_type || 'taqueria', seccion_taqueria: seccion_taqueria || null });
+  upsertTenant({ id, nombre, ciudad: ciudad || '', estado: estado || '', db_path, logs_path: logs_path || 'logs/', panel_port: parseInt(panel_port) || 3000, activo: true, plan: planValido, desde: desde || fechaLocalISO(), notas: notas || '', business_type: business_type || 'taqueria', seccion_taqueria: seccion_taqueria || null });
   // Sincronizar plan a la BD del tenant si ya existe
   const newTenant = getTenant(id);
   if (newTenant) try { setTenantPlan(newTenant, planValido); } catch (_) {}
@@ -109,13 +139,22 @@ app.post('/api/tenants', requireAuth, (req, res) => {
 app.put('/api/tenants/:id', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  upsertTenant({ ...tenant, ...req.body, id: req.params.id });
+  const allowed = ['nombre','ciudad','estado','plan','notas','business_type','seccion_taqueria','activo'];
+  const cambios = Object.fromEntries(allowed.filter(k => req.body[k] !== undefined).map(k => [k, req.body[k]]));
+  if (cambios.plan && !['basico','plus','pro'].includes(cambios.plan)) return res.status(400).json({ error: 'Plan inválido' });
+  if (cambios.business_type && !['taqueria','pizzeria','hamburgueseria'].includes(cambios.business_type)) return res.status(400).json({ error: 'Giro inválido' });
+  const actualizado = { ...tenant, ...cambios, id: req.params.id };
+  if (cambios.plan && !setTenantConfig(tenant, 'plan_activo', cambios.plan)) return res.status(409).json({ error: 'No se pudo sincronizar el plan en la base del tenant' });
+  const cfg = {};
+  if (cambios.business_type) cfg.business_type_slug = cambios.business_type;
+  if (cambios.seccion_taqueria !== undefined) cfg.seccion_taqueria = cambios.seccion_taqueria || '';
+  if (Object.keys(cfg).length && !setTenantConfigBulk(tenant, cfg)) return res.status(409).json({ error: 'No se pudo sincronizar el giro en la base del tenant' });
+  upsertTenant(actualizado);
   res.json({ ok: true });
 });
 
 app.delete('/api/tenants/:id', requireAuth, (req, res) => {
-  deleteTenant(req.params.id);
-  res.json({ ok: true });
+  res.status(410).json({ error: 'Usa la eliminación completa para evitar recursos huérfanos' });
 });
 
 // Eliminacion completa: baja contenedor, limpia compose y env (streaming)
@@ -143,9 +182,11 @@ app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
 
   const http = require('http');
   const proxyReq = http.request(options, proxyRes => {
-    proxyRes.on('data', chunk => res.write(chunk));
+    let salida = '';
+    proxyRes.on('data', chunk => { salida += chunk.toString(); res.write(chunk); });
     proxyRes.on('end', () => {
-      deleteTenant(req.params.id);
+      if (proxyRes.statusCode >= 200 && proxyRes.statusCode < 300 && /\[DONE:0\]/.test(salida)) deleteTenant(req.params.id);
+      else res.write('\nEl registro se conserva porque la eliminación no terminó correctamente.\n');
       res.end();
     });
   });
@@ -184,7 +225,7 @@ app.post('/api/tenants/:id/config', requireAuth, (req, res) => {
   const { clave, valor } = req.body;
   if (!clave) return res.status(400).json({ error: 'Falta clave' });
   const ok = setTenantConfig(tenant, clave, valor);
-  res.json({ ok });
+  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'No se pudo escribir en la base del tenant' });
 });
 
 // Guardar múltiples claves de config a la vez
@@ -193,49 +234,42 @@ app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { config } = req.body;
   if (!config || typeof config !== 'object') return res.status(400).json({ error: 'Formato inválido' });
-  const fallidas = [];
-  for (const [clave, valor] of Object.entries(config)) {
-    const ok = setTenantConfig(tenant, clave, valor);
-    if (!ok) fallidas.push(clave);
-  }
-  if (fallidas.length) {
-    console.error(`[superadmin] setTenantConfig falló para tenant=${tenant.id} claves=${fallidas.join(',')} db_path=${tenant.db_path}`);
-    return res.status(500).json({ error: `BD no accesible. Verifica que el tenant esté corriendo. Claves fallidas: ${fallidas.join(', ')}` });
-  }
+  if (!setTenantConfigBulk(tenant, config)) return res.status(500).json({ error: 'No se pudo guardar la configuración de forma atómica' });
   res.json({ ok: true });
 });
 
-// ── COLONIAS POR TENANT ───────────────────────────────────────────────────────
+// ── GEOTEPIC — diccionario maestro administrado exclusivamente aquí ──────────
+app.get('/api/geo/tepic/colonias', requireAuth, (_req, res) => {
+  try {
+    geoTepic.inicializarDesdeTenants(getTenants());
+    res.json(geoTepic.listarColonias());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/geo/tepic/colonias', requireAuth, (req, res) => {
+  try { res.json({ ok: true, id: geoTepic.guardarColonia(req.body) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
+  try { res.json({ ok: true, id: geoTepic.guardarColonia({ ...req.body, id: req.params.colId }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
+  try { res.json({ ok: geoTepic.eliminarColonia(req.params.colId) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Vista de soporte: definición maestra + activación particular del tenant Tepic.
 app.get('/api/tenants/:id/colonias', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  res.json(getTenantColonias(tenant));
-});
-
-app.post('/api/tenants/:id/colonias', requireAuth, (req, res) => {
-  const tenant = getTenant(req.params.id);
-  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const { nombre, lat, lon, tipo, aliases } = req.body;
-  if (!nombre || lat == null || lon == null) return res.status(400).json({ error: 'Faltan campos' });
-  const slug = _toSlug(nombre);
-  const ok = setTenantColonia(tenant, { nombre, lat: parseFloat(lat), lon: parseFloat(lon), tipo: tipo || _inferTipo(nombre), slug, aliases: aliases || [] });
-  res.json({ ok });
-});
-
-app.put('/api/tenants/:id/colonias/:colId', requireAuth, (req, res) => {
-  const tenant = getTenant(req.params.id);
-  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const { nombre, lat, lon, activo, tipo, aliases } = req.body;
-  const slug = _toSlug(nombre);
-  const ok = setTenantColonia(tenant, { id: parseInt(req.params.colId), nombre, lat: parseFloat(lat), lon: parseFloat(lon), activo: activo ?? 1, tipo: tipo || _inferTipo(nombre), slug, aliases: aliases || [] });
-  res.json({ ok });
-});
-
-app.delete('/api/tenants/:id/colonias/:colId', requireAuth, (req, res) => {
-  const tenant = getTenant(req.params.id);
-  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  deleteTenantColonia(tenant, parseInt(req.params.colId));
-  res.json({ ok: true });
+  if (!geoTepic.esTenantTepic(tenant)) return res.status(403).json({ error: 'GeoTepic solo aplica a Tepic, Nayarit' });
+  try {
+    geoTepic.inicializarDesdeTenants(getTenants());
+    res.json(geoTepic.listarParaTenant(tenant));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── ZONAS DE TARIFA POR TENANT ────────────────────────────────────────────────
@@ -250,7 +284,8 @@ app.put('/api/tenants/:id/zonas', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { zonas } = req.body;
   if (!Array.isArray(zonas)) return res.status(400).json({ error: 'Formato inválido' });
-  setTenantZonas(tenant, zonas);
+  if (zonas.some(z => !z.nombre_zona || !Number.isFinite(Number(z.distancia_max)) || !Number.isFinite(Number(z.tarifa)))) return res.status(400).json({ error: 'Hay zonas inválidas' });
+  if (!setTenantZonas(tenant, zonas)) return res.status(500).json({ error: 'No se pudieron guardar las zonas' });
   res.json({ ok: true });
 });
 
@@ -266,7 +301,8 @@ app.put('/api/tenants/:id/plan', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { plan } = req.body;
   const ok = setTenantPlan(tenant, plan);
-  if (!ok) return res.status(400).json({ error: 'Plan inválido. Valores permitidos: basico, plus, pro' });
+  if (!['basico','plus','pro'].includes(plan)) return res.status(400).json({ error: 'Plan inválido. Valores permitidos: basico, plus, pro' });
+  if (!ok) return res.status(500).json({ error: 'No se pudo sincronizar el plan en la base del tenant' });
   res.json({ ok: true, plan });
 });
 
@@ -291,7 +327,7 @@ app.post('/api/tenants/:id/solicitudes-geo/:solId/aprobar', requireAuth, (req, r
   const aplicado = applyTenantGeoSolicitud(tenant, solicitud);
   if (!aplicado) return res.status(500).json({ error: 'No se pudo aplicar la configuración. Verifica que la BD del tenant esté accesible.' });
 
-  updateTenantSolicitudGeo(tenant, solId, { estado: 'aprobada', respuesta: respuesta || '' });
+  if (!updateTenantSolicitudGeo(tenant, solId, { estado: 'aprobada', respuesta: respuesta || '' })) return res.status(500).json({ error: 'La configuración se aplicó, pero no se pudo cerrar la solicitud' });
   res.json({ ok: true });
 });
 
@@ -306,7 +342,7 @@ app.post('/api/tenants/:id/solicitudes-geo/:solId/rechazar', requireAuth, (req, 
   if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
   if (solicitud.estado !== 'pendiente') return res.status(409).json({ error: `La solicitud ya fue ${solicitud.estado}` });
 
-  updateTenantSolicitudGeo(tenant, solId, { estado: 'rechazada', respuesta: respuesta || '' });
+  if (!updateTenantSolicitudGeo(tenant, solId, { estado: 'rechazada', respuesta: respuesta || '' })) return res.status(500).json({ error: 'No se pudo actualizar la solicitud' });
   res.json({ ok: true });
 });
 
@@ -327,37 +363,13 @@ app.post('/api/global-config/bulk', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── RESOLUCIÓN DE JIDs (usa el cliente WA del bot) ───────────────────────────
-let _waClient = null;
-function setWaClient(client) { _waClient = client; }
-
-app.post('/api/resolver-jid', requireAuth, async (req, res) => {
-  if (!_waClient) return res.status(503).json({ error: 'Bot de WhatsApp no conectado' });
+// El superadmin no comparte memoria con los bots: solo normaliza el JID.
+app.post('/api/resolver-jid', requireAuth, (req, res) => {
   const { telefono } = req.body;
   if (!telefono) return res.status(400).json({ error: 'Falta telefono' });
-  try {
-    const numero = telefono.replace(/\D/g, '');
-    const jid = `521${numero.slice(-10)}@c.us`;
-    // Verificar que existe en WhatsApp
-    const existe = await _waClient.isRegisteredUser(jid);
-    res.json({ jid: existe ? jid : null, existe, telefono: numero.slice(-10) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/grupos-wa', requireAuth, async (req, res) => {
-  if (!_waClient) return res.status(503).json({ error: 'Bot de WhatsApp no conectado' });
-  try {
-    const chats = await _waClient.getChats();
-    const grupos = chats
-      .filter(c => c.isGroup)
-      .map(c => ({ id: c.id._serialized, nombre: c.name, participantes: c.participants?.length || 0 }))
-      .slice(0, 50);
-    res.json(grupos);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  const numero = String(telefono).replace(/\D/g, '').slice(-10);
+  if (!/^[2-9]\d{9}$/.test(numero)) return res.status(400).json({ error: 'Número mexicano inválido' });
+  res.json({ jid: `521${numero}@c.us`, verificado: false, telefono: numero });
 });
 
 // ── PROVISIONAMIENTO DE NUEVO TENANT ─────────────────────────────────────────
@@ -515,8 +527,7 @@ app.get('/api/tenants/:id/reporte-reparto', requireAuth, (req, res) => {
   res.json(getTenantReporteReparto(tenant, { desde: desde || null, hasta: hasta || null }));
 });
 
-function startSuperAdmin(port = 3001, waClient = null) {
-  if (waClient) _waClient = waClient;
+function startSuperAdmin(port = 3001) {
   // Inicializar admin.db al arrancar
   getAdminDB();
   app.listen(port, '0.0.0.0', () => {
@@ -524,4 +535,4 @@ function startSuperAdmin(port = 3001, waClient = null) {
   });
 }
 
-module.exports = { startSuperAdmin, setWaClient };
+module.exports = { startSuperAdmin };

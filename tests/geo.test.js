@@ -14,6 +14,24 @@ const {
   invalidarCacheColonias,
   invalidarCacheConfig,
 } = require('../src/geo');
+const { esTenantTepic, resolverTenant } = require('../src/geo/geotepic');
+
+describe('GeoTepic — alcance territorial', () => {
+  const tenants = [
+    { id: 'tepic', ciudad: 'Tepic', estado: 'Nayarit', db_path: 'data/tepic.db' },
+    { id: 'xalisco', ciudad: 'Xalisco', estado: 'Nayarit', db_path: 'data/xalisco.db' },
+  ];
+
+  test('solo reconoce tenants de Tepic, Nayarit', () => {
+    assert.strictEqual(esTenantTepic(tenants[0]), true);
+    assert.strictEqual(esTenantTepic(tenants[1]), false);
+  });
+
+  test('resuelve el tenant por id o por nombre de su base', () => {
+    assert.strictEqual(resolverTenant(tenants, 'tepic')?.id, 'tepic');
+    assert.strictEqual(resolverTenant(tenants, 'xalisco')?.id, 'xalisco');
+  });
+});
 
 // Colonias de prueba — coordenadas ficticias pero coherentes
 const _COLONIAS = [

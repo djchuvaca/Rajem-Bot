@@ -147,8 +147,13 @@ function getRefrescos() {
   const ahora = Date.now();
   if (_refrescosCache && ahora - _refrescosCacheTs < _CORTES_TTL) return _refrescosCache;
   try {
-    const productos = getProductos();
-    _refrescosCache   = (productos || []).filter(p => p.categoria === 'refresco' && p.activo !== 0);
+    const giro = getGiroActivo();
+    const estado = (getProductos() || []).filter(p => p.categoria === 'refresco');
+    _refrescosCache = (giro?.refrescos || []).flatMap(def => {
+      const row = estado.find(p => p.nombre.toLowerCase() === def.nombre.toLowerCase());
+      if (!row) return [];
+      return [{ ...row, nombre: def.nombre, descripcion: def.descripcion || '', sinonimos: def.sinonimos || '' }];
+    });
     _refrescosCacheTs = Date.now();
     return _refrescosCache;
   } catch (_) { return []; }
@@ -158,8 +163,13 @@ function getSalsas() {
   const ahora = Date.now();
   if (_salsasCache && ahora - _salsasCacheTs < _CORTES_TTL) return _salsasCache;
   try {
-    const productos = getProductos();
-    _salsasCache   = (productos || []).filter(p => p.categoria === 'salsa' && p.activo !== 0);
+    const giro = getGiroActivo();
+    const estado = (getProductos() || []).filter(p => p.categoria === 'salsa');
+    _salsasCache = (giro?.salsas || []).flatMap(def => {
+      const row = estado.find(p => p.nombre.toLowerCase() === def.nombre.toLowerCase());
+      if (!row) return [];
+      return [{ ...row, nombre: def.nombre, descripcion: def.descripcion || '', sinonimos: def.sinonimos || '' }];
+    });
     _salsasCacheTs = Date.now();
     return _salsasCache;
   } catch (_) { return []; }

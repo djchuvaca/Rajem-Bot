@@ -132,6 +132,7 @@ async function handleProvisionar(req, res) {
     ...(data.seccion_taqueria ? { PROV_SECCION_TAQUERIA: data.seccion_taqueria } : {}),
     PROV_GRUPO_ID:        data.grupo_id     || '',
     PROV_PANEL_SECRET:    data.panel_secret || '',
+    PROV_PANEL_INITIAL_PASSWORD: data.panel_initial_password || '',
     PROV_PLAN:            data.plan         || 'basico',
     PROV_NOTAS:           data.notas        || '',
   };

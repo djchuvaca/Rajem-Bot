@@ -100,6 +100,13 @@ if [[ -z "$PANEL_SECRET" ]]; then
   ok "PANEL_SECRET generado automáticamente."
 fi
 
+PANEL_INITIAL_PASSWORD=$(get_val "PROV_PANEL_INITIAL_PASSWORD" "Contraseña inicial del panel (vacío = generar automático)" "")
+if [[ -z "$PANEL_INITIAL_PASSWORD" ]]; then
+  PANEL_INITIAL_PASSWORD=$(openssl rand -base64 24 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 20 || true)
+  [[ ${#PANEL_INITIAL_PASSWORD} -lt 12 ]] && PANEL_INITIAL_PASSWORD="Cambiar-${PANEL_SECRET:0:12}"
+  ok "Contraseña inicial del panel generada automáticamente."
+fi
+
 # ── 2. Crear envs/{TENANT_ID}.env ─────────────────────────────────────────────
 mkdir -p "$ENVS_DIR"
 cat > "$ENVS_DIR/${TENANT_ID}.env" <<EOF
@@ -111,6 +118,8 @@ PANEL_PORT=${PANEL_PORT}
 PANEL_SECRET=${PANEL_SECRET}
 BUSINESS_TYPE=${BUSINESS_TYPE}
 SECCION_TAQUERIA_INICIAL=${SECCION_TAQUERIA}
+PLAN_ACTIVO=${PLAN}
+PANEL_INITIAL_PASSWORD=${PANEL_INITIAL_PASSWORD}
 EOF
 [[ -n "$GROQ_API_KEY" ]] && echo "GROQ_API_KEY=${GROQ_API_KEY}" >> "$ENVS_DIR/${TENANT_ID}.env"
 ok "envs/${TENANT_ID}.env creado."
@@ -164,6 +173,11 @@ env = {
     "TENANT_ID": "${TENANT_ID}",
     "PANEL_PORT": "${PANEL_PORT}",
     "PANEL_SECRET": "${PANEL_SECRET}",
+    "PANEL_INITIAL_PASSWORD": "${PANEL_INITIAL_PASSWORD}",
+    "NOMBRE_NEGOCIO": "${NOMBRE}",
+    "BUSINESS_TYPE": "${BUSINESS_TYPE}",
+    "SECCION_TAQUERIA_INICIAL": "${SECCION_TAQUERIA}",
+    "PLAN_ACTIVO": "${PLAN}",
 }
 if "${GRUPO_ID}":     env["GRUPO_ID"]     = "${GRUPO_ID}"
 if "${GROQ_API_KEY}": env["GROQ_API_KEY"] = "${GROQ_API_KEY}"
@@ -225,6 +239,8 @@ ok "Tenant \"${NOMBRE}\" (${TENANT_ID}) provisionado."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo -e "  Panel tenant : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
+echo -e "  Usuario panel: ${CYAN}admin${NC}"
+echo -e "  Contraseña   : ${CYAN}${PANEL_INITIAL_PASSWORD}${NC}  (cambiar en el primer ingreso)"
 echo -e "  Proceso PM2  : ${CYAN}pm2 logs ${TENANT_ID}${NC}"
 echo -e "  BD           : ${CYAN}data/${TENANT_ID}.db${NC}"
 echo ""

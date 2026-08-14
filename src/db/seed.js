@@ -5,7 +5,7 @@ async function seedDB() {
 
   // ── CREAR TABLAS ───────────────────────────────────────────────────────────
   // ── TABLAS DEL CATÁLOGO MULTI-TENANT ──────────────────────────────────────────
-  // Plantillas de tipo de negocio (taquería, pizzería, hamburguesería…)
+  // Registro de tipos de negocio (los catálogos viven exclusivamente en src/giros)
   db.run(`
     CREATE TABLE IF NOT EXISTS business_types (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,21 +33,6 @@ async function seedDB() {
       UNIQUE(business_type_id, slug)
     )
   `);
-  // Productos-plantilla por business_type (para provisioning de nuevos tenants)
-  db.run(`
-    CREATE TABLE IF NOT EXISTS business_type_products (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      business_type_id INTEGER NOT NULL REFERENCES business_types(id),
-      nombre           TEXT    NOT NULL,
-      descripcion      TEXT,
-      categoria        TEXT    DEFAULT 'corte',
-      precio_taco      REAL    DEFAULT 30,
-      precio_torta     REAL    DEFAULT 40,
-      precio_100g      REAL    DEFAULT 32,
-      sinonimos        TEXT    DEFAULT ''
-    )
-  `);
-
   db.run(`
     CREATE TABLE IF NOT EXISTS productos (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -204,6 +189,8 @@ async function seedDB() {
   try { db.run("ALTER TABLE colonias ADD COLUMN slug    TEXT DEFAULT ''"); } catch (_) {}
   try { db.run("ALTER TABLE colonias ADD COLUMN tipo    TEXT DEFAULT 'colonia'"); } catch (_) {}
   try { db.run("ALTER TABLE colonias ADD COLUMN aliases TEXT DEFAULT '[]'"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN geo_tepic_id INTEGER DEFAULT NULL"); } catch (_) {}
+  try { db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_colonias_geo_tepic_id ON colonias(geo_tepic_id) WHERE geo_tepic_id IS NOT NULL"); } catch (_) {}
 
   // Poblar slug en registros existentes que no lo tengan
   try {
@@ -278,12 +265,11 @@ async function seedDB() {
     }
   }
 
-  // ── SINCRONIZACIÓN REFRESCOS/SALSAS (solo en instancias existentes) ──────────
-  // En instalaciones nuevas (countProd === 0) no se toca nada — catálogo vacío.
-  // En instancias existentes solo se corrigen categorías y se agregan productos
-  // que hayan aparecido en el módulo de giro pero aún no estén en la BD.
+  // ── PROYECCIÓN DEL CATÁLOGO DEL GIRO ────────────────────────────────────────
+  // `productos` conserva estado/precios del tenant para bebidas y salsas.
+  // Las definiciones canónicas siempre provienen del módulo de giro.
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
-  if (countProd > 0) {
+  {
     for (const r of (_giro?.refrescos || [])) {
       const cap = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
       const ya = queryOne("SELECT id FROM productos WHERE nombre = ? OR nombre = ?", [r.nombre, cap]);
@@ -320,7 +306,7 @@ async function seedDB() {
     ["tiempo_cancelacion",       "15"],
     ["timeout_recordatorio_min", "20"],
     ["timeout_sesion_min",       "35"],
-    ["plan_activo",              "basico"],
+    ["plan_activo",              process.env.PLAN_ACTIVO || "basico"],
   ];
 
   // Config del giro activo — reutiliza _btSlug y _giro resueltos en la sección de productos
@@ -406,13 +392,26 @@ async function seedDB() {
   const countUser = db.exec("SELECT COUNT(*) as c FROM usuarios_panel")[0]?.values[0][0] || 0;
   if (countUser === 0) {
     const bcrypt = require("bcryptjs");
-    const hash   = bcrypt.hashSync("admin123", 10);
+    const initialPassword = process.env.PANEL_INITIAL_PASSWORD || "admin123";
+    const hash   = bcrypt.hashSync(initialPassword, 10);
     db.run("INSERT INTO usuarios_panel (usuario, password) VALUES (?,?)", ["admin", hash]);
-    console.log("✅ Usuario panel creado: admin / admin123");
+    console.log(`✅ Usuario panel creado: admin${process.env.PANEL_INITIAL_PASSWORD ? ' / contraseña segura configurada por provisioning' : ' / admin123 (solo desarrollo)'}`);
   }
 
-  // Las colonias y tarifas de envío son específicas de cada ciudad.
-  // Se configuran desde el super-admin por tenant — no hay seed genérico.
+  // GeoTepic sincroniza definiciones maestras; la BD local conserva el estado activo.
+  if (!process.env.BOT_TEST_MODE) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const geoTepic = require('../geo/geotepic');
+      const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/tenants.json'), 'utf8'));
+      const tenant = geoTepic.resolverTenant(registry.tenants || [], process.env.TENANT_ID || '', require('./core').getBsdb()?.name || '');
+      if (tenant && geoTepic.esTenantTepic(tenant)) {
+        geoTepic.inicializarDesdeTenants(registry.tenants || []);
+        geoTepic.sincronizarTenant(tenant);
+      }
+    } catch (e) { console.warn(`[GeoTepic] No se pudo sincronizar al iniciar: ${e.message}`); }
+  }
 
   // Config: coordenadas del negocio (solo si no existen)
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_lat', '')");
@@ -606,11 +605,6 @@ function _seedBusinessTypes(db) {
        (business_type_id, slug, nombre, nombre_plural, emoji, aliases_json, soporta_gramos, soporta_pesos, precio_campo, precio_base, activo)
      VALUES (?,?,?,?,?,?,?,?,?,?,0)`
   );
-  const stmtPT = db.prepare(
-    `INSERT OR IGNORE INTO business_type_products
-       (business_type_id, nombre, descripcion, categoria, precio_taco, precio_torta, precio_100g, sinonimos)
-     VALUES (?,?,?,?,?,?,?,?)`
-  );
 
   for (const giro of listGiros()) {
     stmtBT.run(giro.slug, giro.nombre, giro.descripcion, giro.emoji);
@@ -641,37 +635,32 @@ function _seedBusinessTypes(db) {
       );
     }
 
-    for (const prod of (giro.productos || [])) {
-      const yaExiste = db.prepare(
-        "SELECT id FROM business_type_products WHERE business_type_id = ? AND nombre = ?"
-      ).get(btRow.id, prod.nombre);
-      if (!yaExiste) {
-        stmtPT.run(
-          btRow.id, prod.nombre, prod.descripcion, prod.categoria,
-          prod.precio_taco, prod.precio_torta, prod.precio_100g, prod.sinonimos
-        );
-      }
-    }
   }
 
   // Auto-activar item_types del giro configurado — solo si ninguno está activo aún.
   // Así el tenant arranca con sus items listos sin pasar por el panel primero.
   // Si el tenant desactiva alguno después, el reinicio del bot no los vuelve a activar.
-  const businessType = process.env.BUSINESS_TYPE || null;
+  let businessType = process.env.BUSINESS_TYPE || null;
+  if (!businessType) {
+    try { businessType = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get()?.valor || null; } catch (_) {}
+  }
   if (businessType && !process.env.BOT_TEST_MODE) {
     const btRow = db.prepare("SELECT id FROM business_types WHERE slug = ?").get(businessType);
     if (btRow) {
       const yaActivos = db.prepare(
         "SELECT COUNT(*) as n FROM item_types WHERE business_type_id = ? AND activo = 1"
       ).get(btRow.id)?.n || 0;
-      if (yaActivos === 0) {
+      const menuConfigurado = db.prepare("SELECT COUNT(*) as n FROM menu_items WHERE eliminado=0").get()?.n || 0;
+      const inicializado = db.prepare("SELECT valor FROM configuracion WHERE clave='item_types_inicializados'").get()?.valor === '1';
+      if (yaActivos === 0 && menuConfigurado === 0 && !inicializado) {
         db.prepare("UPDATE item_types SET activo = 1 WHERE business_type_id = ?").run(btRow.id);
         console.log(`✅ Item types de '${businessType}' activados (primera configuración)`);
       }
+      db.prepare("INSERT OR REPLACE INTO configuracion (clave,valor) VALUES ('item_types_inicializados','1')").run();
     }
   }
 
-  console.log("✅ Business types y plantillas de productos registradas");
+  console.log("✅ Giros y formatos sincronizados desde src/giros");
 }
 
 module.exports = { seedDB };

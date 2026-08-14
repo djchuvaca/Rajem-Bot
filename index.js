@@ -12,8 +12,10 @@ if (process.env.SENTRY_DSN) {
   if (!process.env.GROQ_API_KEY) {
     console.warn("⚠️  GROQ_API_KEY no está en .env. Configúrala desde el super-admin si este tenant tiene IA activa.");
   }
-  if (!process.env.PANEL_SECRET) {
-    console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto por defecto (inseguro en producción).");
+  if (process.env.NODE_ENV === "production" && (!process.env.PANEL_SECRET || process.env.PANEL_SECRET.length < 32)) {
+    throw new Error("PANEL_SECRET es obligatorio en producción y debe tener al menos 32 caracteres.");
+  } else if (!process.env.PANEL_SECRET) {
+    console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto local de desarrollo.");
   }
 })();
 
@@ -311,6 +313,9 @@ initDB().then(() => {
 
   restaurarTodasLasSesiones();
   startPanel(process.env.PANEL_PORT || 3000);
+  const heartbeat = () => { try { setConfig('bot_heartbeat', new Date().toISOString()); } catch (_) {} };
+  heartbeat();
+  setInterval(heartbeat, 30_000).unref();
   client.initialize();
 
   // Primer backup al arrancar, luego cada 6 horas

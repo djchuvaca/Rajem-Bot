@@ -20,7 +20,9 @@ function getTenants() {
 }
 
 function saveTenants(tenants) {
-  fs.writeFileSync(TENANTS_PATH, JSON.stringify({ tenants }, null, 2), 'utf8');
+  const tmp = `${TENANTS_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify({ tenants }, null, 2), 'utf8');
+  fs.renameSync(tmp, TENANTS_PATH);
 }
 
 function getTenant(id) {
@@ -45,13 +47,31 @@ function deleteTenant(id) {
 // ── Conexiones a BDs de tenants (solo lectura para monitoreo) ─────────────────
 const _dbCache = new Map();
 
+function _dbPath(tenant) {
+  return path.isAbsolute(tenant.db_path) ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
+}
+
+function _openWritable(tenant) {
+  const dbPath = _dbPath(tenant);
+  if (!fs.existsSync(dbPath)) return null;
+  const db = new Database(dbPath, { fileMustExist: true });
+  db.pragma('busy_timeout = 5000');
+  return db;
+}
+
+function _invalidateTenant(tenant) {
+  if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+}
+
 function _getTenantDB(tenant) {
   if (_dbCache.has(tenant.id)) return _dbCache.get(tenant.id);
   const dbPath = path.isAbsolute(tenant.db_path)
     ? tenant.db_path
     : path.join(ROOT_PATH, tenant.db_path);
   if (!fs.existsSync(dbPath)) return null;
-  const db = new Database(dbPath, { readonly: true });
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  db.pragma('busy_timeout = 5000');
+  db.pragma('query_only = ON');
   _dbCache.set(tenant.id, db);
   return db;
 }
@@ -62,19 +82,17 @@ function getTenantStats(tenant) {
   if (!db) return { error: 'BD no encontrada', pedidos_hoy: 0, clientes: 0, sesiones_activas: 0 };
 
   try {
-    const hoy = new Date().toISOString().slice(0, 10);
-
     const pedidosHoy = db.prepare(
-      `SELECT COUNT(*) as n FROM pedidos WHERE date(fecha, 'localtime') = ?`
-    ).get(hoy)?.n || 0;
+      `SELECT COUNT(*) as n FROM pedidos WHERE date(fecha, 'localtime') = date('now','localtime')`
+    ).get()?.n || 0;
 
     const confirmadosHoy = db.prepare(
-      `SELECT COUNT(*) as n FROM pedidos WHERE date(fecha,'localtime')=? AND estado IN ('confirmado','listo','en_camino')`
-    ).get(hoy)?.n || 0;
+      `SELECT COUNT(*) as n FROM pedidos WHERE date(fecha,'localtime')=date('now','localtime') AND estado IN ('confirmado','listo','en_camino')`
+    ).get()?.n || 0;
 
     const ventasHoy = db.prepare(
-      `SELECT ROUND(SUM(total),2) as v FROM pedidos WHERE date(fecha,'localtime')=? AND estado IN ('confirmado','listo','en_camino')`
-    ).get(hoy)?.v || 0;
+      `SELECT ROUND(SUM(total),2) as v FROM pedidos WHERE date(fecha,'localtime')=date('now','localtime') AND estado IN ('confirmado','listo','en_camino')`
+    ).get()?.v || 0;
 
     const pendientes = db.prepare(
       `SELECT COUNT(*) as n FROM pedidos WHERE estado='pendiente'`
@@ -121,21 +139,26 @@ function getTenantConfig(tenant) {
 }
 
 function setTenantConfig(tenant, clave, valor) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  if (!fs.existsSync(dbPath)) {
-    console.error(`[tenant-reader] DB no encontrada: ${dbPath} (tenant=${tenant.id}, db_path=${tenant.db_path})`);
-    return false;
-  }
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)').run(clave, String(valor ?? ''));
     // Invalidar caché de readonly para que próxima lectura vea el cambio
-    if (_dbCache.has(tenant.id)) {
-      _dbCache.get(tenant.id).close();
-      _dbCache.delete(tenant.id);
-    }
+    _invalidateTenant(tenant);
+    return true;
+  } catch (_) { return false; }
+  finally { db.close(); }
+}
+
+function setTenantConfigBulk(tenant, config) {
+  const db = _openWritable(tenant);
+  if (!db) return false;
+  try {
+    const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
+    db.transaction(() => {
+      for (const [clave, valor] of Object.entries(config)) stmt.run(clave, String(valor ?? ''));
+    })();
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -159,46 +182,6 @@ function getTenantPedidos(tenant, { desde, hasta, limit = 50 } = {}) {
   } catch (_) { return []; }
 }
 
-function getTenantColonias(tenant) {
-  const db = _getTenantDB(tenant);
-  if (!db) return [];
-  try {
-    return db.prepare('SELECT * FROM colonias ORDER BY nombre').all();
-  } catch (_) { return []; }
-}
-
-function setTenantColonia(tenant, { id, nombre, lat, lon, activo, slug, tipo, aliases }) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
-  try {
-    if (id) {
-      db.prepare(`UPDATE colonias SET nombre=?,lat=?,lon=?,activo=?,slug=?,tipo=?,aliases=? WHERE id=?`)
-        .run(nombre, lat, lon, activo ?? 1, slug || '', tipo || 'colonia', JSON.stringify(aliases || []), id);
-    } else {
-      db.prepare(`INSERT INTO colonias (nombre,lat,lon,activo,slug,tipo,aliases) VALUES (?,?,?,?,?,?,?)`)
-        .run(nombre, lat, lon, 1, slug || '', tipo || 'colonia', JSON.stringify(aliases || []));
-    }
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
-    return true;
-  } catch (_) { return false; }
-  finally { db.close(); }
-}
-
-function deleteTenantColonia(tenant, id) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
-  try {
-    db.prepare('DELETE FROM colonias WHERE id=?').run(id);
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
-    return true;
-  } catch (_) { return false; }
-  finally { db.close(); }
-}
-
 function getTenantZonas(tenant) {
   const db = _getTenantDB(tenant);
   if (!db) return [];
@@ -208,15 +191,16 @@ function getTenantZonas(tenant) {
 }
 
 function setTenantZonas(tenant, zonas) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
-    db.prepare('DELETE FROM tarifas_zonas').run();
-    const stmt = db.prepare('INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)');
-    for (const z of zonas) stmt.run(z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa));
-    if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM tarifas_zonas').run();
+      const stmt = db.prepare('INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)');
+      for (const z of zonas) stmt.run(z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa));
+    });
+    tx();
+    _invalidateTenant(tenant);
     return true;
   } catch (_) { return false; }
   finally { db.close(); }
@@ -224,6 +208,7 @@ function setTenantZonas(tenant, zonas) {
 
 // Lee bot_pausado de configuracion con conexion fresca — activo | pausado | inactivo
 function getTenantBotEstado(tenant) {
+  if (tenant.activo === false) return 'inactivo';
   const dbPath = path.isAbsolute(tenant.db_path)
     ? tenant.db_path
     : path.join(ROOT_PATH, tenant.db_path);
@@ -231,8 +216,10 @@ function getTenantBotEstado(tenant) {
   let db;
   try {
     db = new Database(dbPath, { readonly: true });
-    const row = db.prepare('SELECT valor FROM configuracion WHERE clave=?').get('bot_pausado');
-    return row?.valor === '1' ? 'pausado' : 'activo';
+    const rows = db.prepare("SELECT clave,valor FROM configuracion WHERE clave IN ('bot_pausado','bot_heartbeat')").all();
+    const cfg = Object.fromEntries(rows.map(r => [r.clave, r.valor]));
+    if (!cfg.bot_heartbeat || Date.now() - Date.parse(cfg.bot_heartbeat) > 120000) return 'inactivo';
+    return cfg.bot_pausado === '1' ? 'pausado' : 'activo';
   } catch { return 'inactivo'; }
   finally { try { db?.close(); } catch {} }
 }
@@ -288,10 +275,8 @@ function getTenantSolicitudesGeo(tenant) {
 }
 
 function updateTenantSolicitudGeo(tenant, id, { estado, respuesta }) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     db.prepare('UPDATE solicitudes_geo SET estado=?, respuesta=? WHERE id=?')
       .run(estado, respuesta || null, id);
@@ -302,10 +287,8 @@ function updateTenantSolicitudGeo(tenant, id, { estado, respuesta }) {
 }
 
 function applyTenantGeoSolicitud(tenant, solicitud) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path
-    : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     const datos = typeof solicitud.datos_propuestos === 'string'
       ? JSON.parse(solicitud.datos_propuestos)
@@ -313,11 +296,11 @@ function applyTenantGeoSolicitud(tenant, solicitud) {
 
     if (solicitud.tipo === 'tarifas') {
       const zonas = Array.isArray(datos.zonas) ? datos.zonas : [];
-      db.prepare('DELETE FROM tarifas_zonas').run();
-      const stmt = db.prepare('INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)');
-      for (const z of zonas) {
-        stmt.run(z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa));
-      }
+      db.transaction(() => {
+        db.prepare('DELETE FROM tarifas_zonas').run();
+        const stmt = db.prepare('INSERT INTO tarifas_zonas (nombre_zona, distancia_max, tarifa) VALUES (?,?,?)');
+        for (const z of zonas) stmt.run(z.nombre_zona, parseFloat(z.distancia_max), parseFloat(z.tarifa));
+      })();
     } else {
       const clavesPorTipo = {
         ubicacion:      ['negocio_lat', 'negocio_lon'],
@@ -346,9 +329,8 @@ function getTenantRepartidores(tenant) {
 }
 
 function updateTenantRepartidor(tenant, id, { nombre, activo }) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     if (nombre !== undefined) db.prepare('UPDATE repartidores SET nombre=? WHERE id=?').run(nombre, id);
     if (activo !== undefined) db.prepare('UPDATE repartidores SET activo=? WHERE id=?').run(activo ? 1 : 0, id);
@@ -359,9 +341,8 @@ function updateTenantRepartidor(tenant, id, { nombre, activo }) {
 }
 
 function deleteTenantRepartidor(tenant, id) {
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     db.prepare('DELETE FROM repartidores WHERE id=?').run(id);
     if (_dbCache.has(tenant.id)) { _dbCache.get(tenant.id).close(); _dbCache.delete(tenant.id); }
@@ -381,9 +362,8 @@ function getTenantMandaditosConfig(tenant) {
 
 function setTenantMandaditosConfig(tenant, config) {
   const claves = ['mandaditos_silencio_min', 'mandaditos_recordatorio_min', 'mandaditos_timeout_post_min'];
-  const dbPath = path.isAbsolute(tenant.db_path)
-    ? tenant.db_path : path.join(ROOT_PATH, tenant.db_path);
-  const db = new Database(dbPath);
+  const db = _openWritable(tenant);
+  if (!db) return false;
   try {
     const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
     for (const clave of claves) {
@@ -438,8 +418,8 @@ function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
 
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
-  getTenantStats, getTenantConfig, setTenantConfig,
-  getTenantPedidos, getTenantColonias, setTenantColonia, deleteTenantColonia,
+  getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
+  getTenantPedidos,
   getTenantZonas, setTenantZonas, getTenantQR, getTenantBotEstado,
   getTenantSolicitudesGeo, updateTenantSolicitudGeo, applyTenantGeoSolicitud,
   getTenantPlan, setTenantPlan,

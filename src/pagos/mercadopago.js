@@ -18,6 +18,9 @@ function _getToken() {
 
 function _getAppUrl() {
   try {
+    const { getConfig } = require('../db/config');
+    const tenantUrl = getConfig('public_url');
+    if (tenantUrl) return tenantUrl.replace(/\/$/, '');
     const { getAppUrl } = require('../db/admin');
     return getAppUrl() || process.env.APP_URL || '';
   } catch (_) {

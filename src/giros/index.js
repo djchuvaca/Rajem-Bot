@@ -54,4 +54,17 @@ function getSlugs() {
   return [..._registry.keys()];
 }
 
-module.exports = { getGiro, getGiroActivo, listGiros, getSlugs };
+/**
+ * Catálogo canónico del giro. Las tablas SQLite son únicamente una proyección
+ * configurable por tenant; ninguna otra plantilla debe definir productos.
+ */
+function getCatalogo(slug) {
+  const giro = getGiro(slug);
+  return {
+    cortes: (giro.cortes || []).map(c => ({ ...c, categoria: 'corte' })),
+    bebidas: (giro.refrescos || []).map(p => ({ ...p, categoria: 'refresco' })),
+    salsas: (giro.salsas || []).map(p => ({ ...p, categoria: 'salsa' })),
+  };
+}
+
+module.exports = { getGiro, getGiroActivo, listGiros, getSlugs, getCatalogo };

@@ -1,4 +1,6 @@
-# Rajem's Technology — Bot SaaS de WhatsApp para Taquerías
+# Rajem's Technology — Bot SaaS de WhatsApp para negocios de comida
+
+> Estado de referencia: 2026-08-13. Este documento describe el código actual; los pendientes se identifican explícitamente.
 
 ## Descripción del sistema
 
@@ -50,9 +52,9 @@ VPS
 ```bash
 npm start        # producción directa
 npm run dev      # nodemon — reinicia al guardar (15-30s para reconectar WA)
-npm test         # 4 archivos de tests con el runner nativo de Node
+npm test         # 5 archivos de tests con el runner nativo de Node
 ```
-Panel tenant en `http://localhost:3000` (usuario: `admin`, contraseña: `admin123`)
+Panel tenant en `http://localhost:3000`. En desarrollo, si no se define `PANEL_INITIAL_PASSWORD`, la credencial inicial es `admin` / `admin123`. No usarla en producción.
 
 ### Producción en VPS (primera vez)
 ```bash
@@ -64,13 +66,14 @@ cat > .env <<EOF
 WEBHOOK_PORT=4000
 WEBHOOK_SECRET=<openssl rand -hex 32>
 SUPERADMIN_SECRET=<openssl rand -hex 32>
+SUPERADMIN_INITIAL_PASSWORD=<contraseña-larga-única>
 EOF
 
 pm2 start ecosystem.config.js --only superadmin,webhook-deploy
 pm2 save
 pm2 startup   # ejecutar el comando que imprima
 ```
-Superadmin en `http://IP-VPS:3001` (usuario: `admin`, contraseña: `admin123`)
+El superadmin debe publicarse detrás de un proxy inverso HTTPS. No se deben exponer directamente a Internet los puertos 3001 ni 4000. El usuario inicial por defecto es `rajem`; la contraseña se toma de `SUPERADMIN_INITIAL_PASSWORD` al crear `admin.db` por primera vez.
 
 ### Comandos PM2 útiles
 ```bash
@@ -99,10 +102,10 @@ pm2 delete carnitas-bot           # eliminar un tenant de PM2
 
 ### Variables que `provisionar-tenant.sh` pasa al JSON de PM2
 ```
-TENANT_ID, NOMBRE_NEGOCIO, GRUPO_ID, PANEL_PORT, PANEL_SECRET,
+TENANT_ID, NOMBRE_NEGOCIO, GRUPO_ID, PANEL_PORT, PANEL_SECRET, PANEL_INITIAL_PASSWORD,
 GROQ_API_KEY (opcional), BUSINESS_TYPE, SECCION_TAQUERIA_INICIAL, PLAN_ACTIVO
 ```
-**CRÍTICO:** Si alguna de estas vars no llega al proceso de PM2, `seed.js` usará su default hardcodeado. Ver sección de Bugs conocidos.
+El script escribe estas variables en `envs/{TENANT_ID}.env` y también las inyecta en el bloque `env` de PM2. `PANEL_SECRET` y `PANEL_INITIAL_PASSWORD` se generan automáticamente si no se proporcionan.
 
 ### Eliminar un tenant
 El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-deploy:4000/eliminar` → ejecuta `scripts/eliminar-tenant.sh` que:
@@ -156,13 +159,14 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/estado/index.js`** — re-exporta todo.
 
 ### Giros (módulos de negocio)
-- **`src/giros/taqueria.js`** — fuente de verdad del giro taquería. Define `itemTypes[]` (taco, torta, quesadilla, vampiro, burrito, gramos, por_pesos), `cortes[]` (16 cortes con slug, aliases, seccion asada|carnitas), `configDefaults`, `vocabulario`, `mensajesDefaults`, `comportamiento`. Consumido por `seed.js` en cada arranque.
+- **`src/giros/taqueria.js`** — fuente única de verdad del giro taquería. Define `itemTypes[]`, `cortes[]`, `refrescos[]`, `salsas[]`, `configDefaults`, `vocabulario`, `mensajesDefaults` y `comportamiento`. El NLU toma nombre, alias y descripción de aquí; SQLite solo superpone activación y precio por tenant.
 - **`src/giros/index.js`** — `getGiroActivo()`, `getGiro(slug)`, `listGiros()`.
-- **`src/giros/hamburgueseria/nlu.js`** — stubs NLU para hamburguesería (no implementado aún).
+- **`src/giros/catalogo-tenant.js`** — única fachada del catálogo visible para el tenant. Combina definiciones inmutables del giro con el overlay permitido de SQLite (`activo`, precios y selección de menú). Panel y APIs no deben leer catálogos directamente de tablas.
+- **`src/giros/hamburgueseria.js`** y **`src/giros/hamburgueseria/nlu.js`** — implementación del giro hamburguesería: formatos, variantes, catálogo, mensajes y NLU. Está registrado en `src/giros/index.js`; debe validarse funcionalmente antes de ofrecerlo a producción.
 
 ### Base de datos
-- **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. `journal_mode = DELETE` (sin WAL). `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
-- **`src/db/seed.js`** — crea todas las tablas + migraciones inline + datos iniciales. Lee env vars del proceso: `BUSINESS_TYPE`, `NOMBRE_NEGOCIO`, `GRUPO_ID`, `SECCION_TAQUERIA_INICIAL`, `PLAN_ACTIVO`. `_seedBusinessTypes()` sincroniza `item_types` desde los módulos giro. `BOT_TEST_MODE=1` activa todos los item_types y seedea productos de prueba.
+- **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. Usa `journal_mode = DELETE` y `busy_timeout = 5000`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
+- **`src/db/seed.js`** — crea tablas, migraciones y proyecta el catálogo del módulo de giro en las tablas configurables del tenant. `cortes`, `item_types` y `productos` no son fuentes de plantilla: almacenan estado, precios y activación por tenant. La tabla legacy `business_type_products` dejó de crearse y consultarse.
 - **`src/db/cortes.js`** — catálogo de cortes. `getCortesBD()` → mapa `{alias→slug}` para NLU (TTL 60s). `getPrecioCorteFormato(corteSlug, formatoSlug)` con fallback a `precio_base` → config global.
 - **`src/db/modelos.js`** — CRUD productos, clientes, pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhook MP).
 - **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
@@ -239,10 +243,13 @@ El promedio de tiempo se calcula **solo** de entregas con `confirmado=1`.
 ```
 SUPERADMIN_PORT=3001       # Puerto del superadmin (default 3001)
 SUPERADMIN_SECRET=...      # Secret de sesión del superadmin
+SUPERADMIN_INITIAL_USER=rajem # Usuario usado solo al crear admin.db por primera vez
+SUPERADMIN_INITIAL_PASSWORD=... # Obligatoria para una instalación nueva de producción
 WEBHOOK_PORT=4000          # Puerto del webhook-deploy (default 4000)
 WEBHOOK_SECRET=...         # Secreto HMAC compartido con GitHub
 WEBHOOK_HOST=localhost     # Host del webhook-deploy (default localhost; Docker: host.docker.internal)
 SENTRY_DSN=                # Opcional — activa Sentry si se define
+COOKIE_SECURE=1            # Usar detrás de HTTPS; marca cookies como Secure
 ```
 
 ### Variables que `provisionar-tenant.sh` inyecta en el JSON PM2 de cada tenant
@@ -252,6 +259,7 @@ NOMBRE_NEGOCIO=Tacos Javier         # Seeded en configuracion.nombre_negocio
 GRUPO_ID=521XXXXXXXXXX@g.us         # JID del grupo admin de WhatsApp
 PANEL_PORT=3002                     # Puerto del panel del tenant
 PANEL_SECRET=...                    # Secret de sesión del panel del tenant
+PANEL_INITIAL_PASSWORD=...          # Contraseña usada al crear el usuario admin por primera vez
 GROQ_API_KEY=gsk_...               # Opcional — puede configurarse desde superadmin (admin.db)
 BUSINESS_TYPE=taqueria              # Giro del negocio — determina NLU y productos
 SECCION_TAQUERIA_INICIAL=ambas      # ambas | carnitas | asada
@@ -296,35 +304,24 @@ BOT_TEST_MODE=1                     # Solo scripts — activa todos los item_typ
 
 ---
 
-## Bugs conocidos y pendientes
+## Incidencias conocidas y pendientes
 
-### BUG 1 — `provisionar-tenant.sh`: env vars no llegan al proceso PM2
-**Síntomas:** Al provisionar un tenant nuevo, la BD se seedea con defaults incorrectos:
-- `nombre_negocio = "Mi Negocio"` en lugar del nombre real
-- `seccion_taqueria = "ambas"` aunque se seleccionó "carnitas" o "asada"
-- `plan_activo = "basico"` aunque se asignó "plus" o "pro"
+### RESUELTO — Variables de provisionamiento en PM2
+`provisionar-tenant.sh` persiste e inyecta `NOMBRE_NEGOCIO`, `BUSINESS_TYPE`, `SECCION_TAQUERIA_INICIAL` y `PLAN_ACTIVO`. `seed.js` usa `PLAN_ACTIVO` al crear la configuración. La corrección aplica a tenants nuevos; los tenants ya creados deben revisarse y corregirse desde el superadmin.
 
-**Causa:** `provisionar-tenant.sh` escribe las vars en `envs/{TENANT_ID}.env` pero el JSON de PM2 que genera no incluye `NOMBRE_NEGOCIO`, `SECCION_TAQUERIA_INICIAL` ni `PLAN_ACTIVO` en el bloque `env`. El proceso PM2 arranca sin esas vars y `seed.js` usa sus defaults.
-
-**Fix pendiente:**
-1. En `provisionar-tenant.sh`, agregar al dict de env de Python: `NOMBRE_NEGOCIO`, `SECCION_TAQUERIA_INICIAL`, `BUSINESS_TYPE`, `PLAN_ACTIVO`
-2. En `seed.js` línea 323, cambiar `"basico"` por `process.env.PLAN_ACTIVO || "basico"`
-
-### BUG 2 — Colonias vacías en superadmin inmediatamente tras provisionar
+### RESUELTO — Estado vacío de colonias en el superadmin
 **Síntoma:** La sección Geo del superadmin muestra tabla vacía para el tenant recién creado.
 
 **Causa:** `seed.js` no seedea colonias (por diseño — son específicas de cada ciudad). La BD recién creada tiene la tabla `colonias` vacía. El superadmin la lee correctamente — simplemente no hay datos.
 
 **Comportamiento esperado:** El superadmin debe agregar las colonias manualmente en Geo → Colonias. La UI debe mostrar un mensaje claro de "Sin colonias configuradas" en lugar de tabla vacía sin contexto.
 
-**Fix pendiente:** Mejorar el mensaje vacío en la UI del superadmin (`index.html`, sección de colonias).
+La UI muestra “Sin colonias configuradas” e indica que deben agregarse desde esa sección.
 
-### BUG 3 — Plan en tenants.json no se sincroniza a BD del tenant existente
-**Síntoma:** Si se cambia el plan de un tenant en el superadmin cuando el bot ya está corriendo, el plan en `tenants.json` se actualiza pero la BD del tenant puede quedar desincronizada.
+### Limitación — Cambio de plan antes del primer arranque
+Si se intenta cambiar el plan cuando la BD todavía no existe, `setTenantPlan()` no puede escribirlo. El provisionamiento normal evita esta ventana porque inyecta `PLAN_ACTIVO` en PM2 antes del primer arranque. Para altas manuales, crear/arrancar la BD antes de cambiar el plan desde el superadmin.
 
-**Causa:** `POST /api/tenants` y `PUT /api/tenants/:id/plan` llaman `setTenantPlan()` que intenta escribir a la BD del tenant. Si la BD no existe aún (bot nunca arrancó), falla silenciosamente.
-
-**Fix:** El superadmin ya llama `setTenantPlan()` correctamente — el problema solo ocurre si el bot nunca ha corrido. Una vez el bot arranca y crea la BD, el plan se puede setear normalmente.
+Una vez creada la BD, los cambios se sincronizan a `configuracion.plan_activo` y `tenants.json`.
 
 ---
 
@@ -399,12 +396,12 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 | 2 | Extraer `nlu/core.js` con utilidades genéricas puras | ✅ incluido en Fase 1 |
 | 3 | Servicio geo — solicitudes geo tenant→superadmin, seed ciudad-agnóstico, aliases en `buscarColonia()` | ✅ completa |
 | 4 | Feature flags por plan — `src/features/index.js`, `requireFeature()`, gates UI, endpoints superadmin plan | ✅ completa |
-| 5 | ~~Hamburguesería como segundo giro~~ | ❌ descartada |
+| 5 | Hamburguesería como segundo giro | Implementada; validación funcional pendiente |
 | 6 | Drivers Stripe + Conekta, webhooks, `_notificarPagoConfirmado()` helper compartido | ✅ completa |
 | 7 | Mandaditos/reparto — despacho con delay configurable, historial de entregas, reporte de desempeño | ✅ completa |
 | 8 | Mejoras al diccionario de colonias — aliases ampliados para reducir fallos de matching | Pendiente |
 | 9 | Tarifas de reparto por distancia — el superadmin fija tarifas fijas por zona (NO dinámica) | Pendiente |
-| 10 | Corrección de 3 bugs de provisionamiento (ver sección Bugs conocidos) | Pendiente |
+| 10 | Corrección de variables de provisionamiento | ✅ completa |
 
 ---
 
@@ -413,3 +410,11 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 - **GitHub:** `djchuvaca/Rajem-Bot` — rama `main`
 - **Webhook GitHub → VPS:** configurar `POST https://IP:4000/deploy` con secret = `WEBHOOK_SECRET`
 - En cada push a `main`: `git pull` + `npm install` si cambió `package.json` + `pm2 restart` de todos los procesos excepto `webhook-deploy` (se reinicia solo al final con delay de 3s)
+
+## Seguridad de producción
+
+- `SUPERADMIN_SECRET` y `PANEL_SECRET` deben tener al menos 32 caracteres. Con `NODE_ENV=production`, el proceso falla al arrancar si faltan o son demasiado cortos.
+- Definir `SUPERADMIN_INITIAL_PASSWORD` antes de crear `data/admin.db`. Cada tenant recibe una contraseña inicial aleatoria durante el provisionamiento y debe cambiarla en el primer ingreso.
+- Publicar los paneles únicamente mediante un proxy inverso con HTTPS y configurar `COOKIE_SECURE=1`.
+- Restringir los puertos 3001 y 4000 a localhost o mediante firewall. El webhook debe validar su firma con `WEBHOOK_SECRET`.
+- `journal_mode=DELETE` simplifica backups, pero serializa escrituras. `busy_timeout=5000` absorbe contención breve; si aparecen bloqueos sostenidos, revisar transacciones y concurrencia antes de migrar a WAL.

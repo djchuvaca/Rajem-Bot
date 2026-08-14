@@ -14,6 +14,7 @@ function getAdminDB() {
   if (_db) return _db;
   _db = new Database(ADMIN_DB_PATH);
   _db.pragma('journal_mode = DELETE');
+  _db.pragma('busy_timeout = 5000');
   _init();
   return _db;
 }
@@ -29,6 +30,18 @@ function _init() {
       usuario  TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS geo_tepic_colonias (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre     TEXT NOT NULL,
+      slug       TEXT UNIQUE NOT NULL,
+      tipo       TEXT NOT NULL DEFAULT 'colonia',
+      lat        REAL NOT NULL,
+      lon        REAL NOT NULL,
+      aliases    TEXT NOT NULL DEFAULT '[]',
+      activo     INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
   `);
 
   // Defaults de global_config — solo inserta si no existe
@@ -43,9 +56,14 @@ function _init() {
   // Usuario super-admin por defecto (solo si no existe ninguno)
   const existe = _db.prepare('SELECT id FROM superadmin_usuarios LIMIT 1').get();
   if (!existe) {
-    const hash = bcrypt.hashSync('rajem2024', 10);
-    _db.prepare('INSERT INTO superadmin_usuarios (usuario, password) VALUES (?,?)').run('rajem', hash);
-    console.log('✅ Super-admin creado — usuario: rajem / contraseña: rajem2024 (cámbiala desde el panel)');
+    if (process.env.NODE_ENV === 'production' && !process.env.SUPERADMIN_INITIAL_PASSWORD) {
+      throw new Error('SUPERADMIN_INITIAL_PASSWORD es obligatoria al crear admin.db en producción');
+    }
+    const usuario = process.env.SUPERADMIN_INITIAL_USER || 'rajem';
+    const password = process.env.SUPERADMIN_INITIAL_PASSWORD || 'rajem2024';
+    const hash = bcrypt.hashSync(password, 10);
+    _db.prepare('INSERT INTO superadmin_usuarios (usuario, password) VALUES (?,?)').run(usuario, hash);
+    console.log(`✅ Super-admin creado — usuario: ${usuario}${process.env.SUPERADMIN_INITIAL_PASSWORD ? ' / contraseña segura configurada' : ' / contraseña de desarrollo (cámbiala de inmediato)'}`);
   }
 }
 
