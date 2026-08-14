@@ -433,16 +433,20 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <div class="grid2">
             <div class="form-group">
               <label>Silencio inicial (min)</label>
-              <input type="number" id="mand-silencio" min="1" max="60" placeholder="15">
+              <input type="number" id="mand-silencio" min="0" max="60" placeholder="15">
             </div>
             <div class="form-group">
               <label>Recordatorio (min)</label>
-              <input type="number" id="mand-recordatorio" min="5" max="120" placeholder="30">
+              <input type="number" id="mand-recordatorio" min="1" max="240" placeholder="30">
             </div>
           </div>
           <div class="form-group" style="max-width:200px">
             <label>Timeout post-recordatorio (min)</label>
-            <input type="number" id="mand-timeout" min="5" max="60" placeholder="20">
+            <input type="number" id="mand-timeout" min="1" max="240" placeholder="20">
+          </div>
+          <div class="form-group" style="max-width:240px">
+            <label>Espera tras confirmar pedido (min)</label>
+            <input type="number" id="mand-delay" min="0" max="240" placeholder="15">
           </div>
           <button class="btn btn-primary btn-sm" onclick="saveMandaditosConfig()">Guardar tiempos</button>
         </div>
@@ -1672,6 +1676,7 @@ async function loadMandaditos() {
     document.getElementById('mand-silencio').value     = cfg.mandaditos_silencio_min     || 15;
     document.getElementById('mand-recordatorio').value = cfg.mandaditos_recordatorio_min || 30;
     document.getElementById('mand-timeout').value      = cfg.mandaditos_timeout_post_min || 20;
+    document.getElementById('mand-delay').value        = cfg.mandaditos_delay_min        || 15;
   }
 
   // Repartidores
@@ -1698,7 +1703,7 @@ async function loadMandaditos() {
       <td>${r.entregas_total}</td>
       <td>${r.promedio_entrega_min != null ? r.promedio_entrega_min+' min' : '—'}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="editarRepartidor(${r.id},'${esc(r.nombre)}')">✏️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editarRepartidor(${r.id},'${encodeURIComponent(r.nombre)}')">✏️</button>
         <button class="btn btn-secondary btn-sm" onclick="toggleRepartidor(${r.id},${r.activo})">${r.activo ? 'Pausar' : 'Activar'}</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarRepartidor(${r.id})">🗑️</button>
       </td>
@@ -1711,33 +1716,39 @@ async function saveMandaditosConfig() {
     mandaditos_silencio_min:     document.getElementById('mand-silencio').value,
     mandaditos_recordatorio_min: document.getElementById('mand-recordatorio').value,
     mandaditos_timeout_post_min: document.getElementById('mand-timeout').value,
+    mandaditos_delay_min:        document.getElementById('mand-delay').value,
   };
   const r = await fetch(`/api/tenants/${_mandTenantId}/mandaditos-config`, {
     method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(config)
   });
-  r.ok ? toast('Tiempos guardados') : toast('Error al guardar','err');
+  const data = await r.json().catch(()=>({}));
+  r.ok ? toast('Tiempos guardados') : toast(data.error || 'Error al guardar','err');
 }
 
 async function editarRepartidor(id, nombreActual) {
+  nombreActual = decodeURIComponent(nombreActual);
   const nuevo = prompt('Nuevo nombre:', nombreActual);
   if (!nuevo || nuevo === nombreActual) return;
   const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, {
     method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nombre:nuevo})
   });
-  r.ok ? (toast('Nombre actualizado'), loadMandaditos()) : toast('Error','err');
+  const data = await r.json().catch(()=>({}));
+  r.ok ? (toast('Nombre actualizado'), loadMandaditos()) : toast(data.error || 'Error al actualizar','err');
 }
 
 async function toggleRepartidor(id, activoActual) {
   const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, {
     method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({activo: !activoActual})
   });
-  r.ok ? (toast('Estado actualizado'), loadMandaditos()) : toast('Error','err');
+  const data = await r.json().catch(()=>({}));
+  r.ok ? (toast('Estado actualizado'), loadMandaditos()) : toast(data.error || 'Error al actualizar','err');
 }
 
 async function eliminarRepartidor(id) {
-  if (!confirm('¿Eliminar este repartidor del registro?')) return;
+  if (!confirm('¿Eliminar este repartidor? Si tiene historial se pausará para conservar sus métricas.')) return;
   const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, { method:'DELETE' });
-  r.ok ? (toast('Repartidor eliminado'), loadMandaditos()) : toast('Error','err');
+  const data = await r.json().catch(()=>({}));
+  r.ok ? (toast(data.mensaje || (data.accion==='eliminado'?'Repartidor eliminado':'Repartidor pausado')), loadMandaditos()) : toast(data.error || 'Error al eliminar','err');
 }
 
 async function loadReporteReparto() {

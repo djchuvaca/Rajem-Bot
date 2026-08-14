@@ -449,11 +449,18 @@ function updateTenantRepartidor(tenant, id, { nombre, activo }) {
   const db = _openWritable(tenant);
   if (!db) return false;
   try {
-    if (nombre !== undefined) db.prepare('UPDATE repartidores SET nombre=? WHERE id=?').run(nombre, id);
+    const actual = db.prepare('SELECT * FROM repartidores WHERE id=?').get(id);
+    if (!actual) return { ok: false, error: 'Repartidor no encontrado' };
+    if (activo === false && actual.en_ruta) return { ok: false, error: 'No puedes pausar un repartidor mientras está en ruta' };
+    if (nombre !== undefined) {
+      const limpio = String(nombre).trim();
+      if (limpio.length < 2 || limpio.length > 80) return { ok: false, error: 'El nombre debe tener entre 2 y 80 caracteres' };
+      db.prepare('UPDATE repartidores SET nombre=? WHERE id=?').run(limpio, id);
+    }
     if (activo !== undefined) db.prepare('UPDATE repartidores SET activo=? WHERE id=?').run(activo ? 1 : 0, id);
     _invalidateTenant(tenant);
-    return true;
-  } catch (_) { return false; }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
   finally { db.close(); }
 }
 
@@ -461,10 +468,19 @@ function deleteTenantRepartidor(tenant, id) {
   const db = _openWritable(tenant);
   if (!db) return false;
   try {
+    const actual = db.prepare(`SELECT r.*, COUNT(h.id) AS historial FROM repartidores r
+      LEFT JOIN entregas_historial h ON h.repartidor_id=r.id WHERE r.id=? GROUP BY r.id`).get(id);
+    if (!actual) return { ok: false, error: 'Repartidor no encontrado' };
+    if (actual.en_ruta) return { ok: false, error: 'No puedes eliminar un repartidor mientras está en ruta' };
+    if (actual.historial > 0) {
+      db.prepare('UPDATE repartidores SET activo=0 WHERE id=?').run(id);
+      _invalidateTenant(tenant);
+      return { ok: true, accion: 'desactivado', mensaje: 'Se pausó para conservar su historial de entregas' };
+    }
     db.prepare('DELETE FROM repartidores WHERE id=?').run(id);
     _invalidateTenant(tenant);
-    return true;
-  } catch (_) { return false; }
+    return { ok: true, accion: 'eliminado' };
+  } catch (e) { return { ok: false, error: e.message }; }
   finally { db.close(); }
 }
 
@@ -474,21 +490,30 @@ function getTenantMandaditosConfig(tenant) {
     mandaditos_silencio_min:     cfg.mandaditos_silencio_min     || '15',
     mandaditos_recordatorio_min: cfg.mandaditos_recordatorio_min || '30',
     mandaditos_timeout_post_min: cfg.mandaditos_timeout_post_min || '20',
+    mandaditos_delay_min:        cfg.mandaditos_delay_min        || '15',
   };
 }
 
 function setTenantMandaditosConfig(tenant, config) {
-  const claves = ['mandaditos_silencio_min', 'mandaditos_recordatorio_min', 'mandaditos_timeout_post_min'];
+  const rangos = {
+    mandaditos_silencio_min: [0, 60], mandaditos_recordatorio_min: [1, 240],
+    mandaditos_timeout_post_min: [1, 240], mandaditos_delay_min: [0, 240],
+  };
+  const valores = {};
+  for (const [clave, [min, max]] of Object.entries(rangos)) {
+    if (config[clave] === undefined) continue;
+    const n = Number(config[clave]);
+    if (!Number.isInteger(n) || n < min || n > max) return { ok: false, error: `${clave} debe estar entre ${min} y ${max} minutos` };
+    valores[clave] = String(n);
+  }
   const db = _openWritable(tenant);
-  if (!db) return false;
+  if (!db) return { ok: false, error: 'Base del tenant no disponible' };
   try {
     const stmt = db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?,?)');
-    for (const clave of claves) {
-      if (config[clave] !== undefined) stmt.run(clave, String(parseInt(config[clave], 10) || 0));
-    }
+    db.transaction(() => { for (const [clave, valor] of Object.entries(valores)) stmt.run(clave, valor); })();
     _invalidateTenant(tenant);
-    return true;
-  } catch (_) { return false; }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
   finally { db.close(); }
 }
 

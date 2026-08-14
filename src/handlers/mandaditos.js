@@ -1,6 +1,8 @@
 'use strict';
-const { getConfig } = require('../db/config');
+const { getConfig, getGrupoMandaditosId } = require('../db/config');
 const {
+  getRepartidores,
+  getRepartidor,
   upsertRepartidor,
   setEnRuta,
   registrarEntregaConfirmada,
@@ -14,10 +16,12 @@ const despachosPendientes = new Map(); // messageId → datos del despacho
 const _timers = new Map();             // jid → { timerRecordatorio, timerTimeout, pedidoColonia, pedidoId, inicio }
 const _zonasSilencio = new Map();      // jid → timestamp hasta el que dura el silencio
 const _esperandoRespuesta = new Set(); // JIDs que acaban de recibir "¿Ya entregaste?"
+const _despachoTimers = new Map();      // pedidoId → timer de solicitud programada
+const _despachosEnAsignacion = new Set(); // messageId en proceso de asignación
 
 // ── NLU de confirmación ───────────────────────────────────────────────────────
 const _PATRONES_CONFIRMADOS = [
-  /\bentregué?\b/i,
+  /\b(entregue|entregué|entregado|entregada)\b/i,
   /\bya\s+(lo\s+)?(entregue|entregué|deje|dejé|di|pase|pasé)\b/i,
   /\bse\s+lo\s+(di|deje|dejé|entregue|entregué)\b/i,
   /\bya\s+quedo\b/i,
@@ -72,22 +76,51 @@ function _lanzarTimers(jid, client, pedidoId, pedidoColonia, inicio) {
   const recordatorioMin = parseInt(getConfig('mandaditos_recordatorio_min') || '30', 10);
   const timeoutPostMin  = parseInt(getConfig('mandaditos_timeout_post_min') || '20', 10);
 
-  const timerRecordatorio = setTimeout(async () => {
+  const transcurrido = Math.max(0, Date.now() - inicio);
+  const recordatorioMs = recordatorioMin * 60 * 1000;
+  const timeoutMs = timeoutPostMin * 60 * 1000;
+
+  const lanzarTimeout = demora => {
+    const t = _timers.get(jid);
+    if (!t) return;
+    t.timerTimeout = setTimeout(async () => {
+      await _confirmarEntrega(jid, client, true);
+    }, Math.max(0, demora));
+    t.timerTimeout.unref?.();
+  };
+  const recordar = async () => {
     const t = _timers.get(jid);
     if (!t) return;
     try { await client.sendMessage(jid, `⏰ ¿Ya entregaste el pedido de *${pedidoColonia}*?`); } catch (_) {}
-    t.timerTimeout = setTimeout(async () => {
-      await _confirmarEntrega(jid, client, true);
-    }, timeoutPostMin * 60 * 1000);
-  }, recordatorioMin * 60 * 1000);
+    lanzarTimeout(timeoutMs);
+  };
 
-  _timers.set(jid, { timerRecordatorio, timerTimeout: null, pedidoColonia, pedidoId, inicio });
+  const restanteRecordatorio = recordatorioMs - transcurrido;
+  const restanteTotal = recordatorioMs + timeoutMs - transcurrido;
+  let timerRecordatorio = null;
+  _timers.set(jid, { timerRecordatorio: null, timerTimeout: null, pedidoColonia, pedidoId, inicio });
+  if (restanteTotal <= 0) {
+    const inmediato = setTimeout(() => _confirmarEntrega(jid, client, true), 0);
+    inmediato.unref?.();
+    _timers.get(jid).timerTimeout = inmediato;
+    return;
+  }
+  if (restanteRecordatorio <= 0) {
+    Promise.resolve(client.sendMessage(jid, `⏰ ¿Ya entregaste el pedido de *${pedidoColonia}*?`)).catch(() => {});
+    lanzarTimeout(restanteTotal);
+    return;
+  }
+  timerRecordatorio = setTimeout(async () => {
+    await recordar();
+  }, restanteRecordatorio);
+  timerRecordatorio.unref?.();
+  _timers.get(jid).timerRecordatorio = timerRecordatorio;
 }
 
 // ── Enviar despacho al grupo de mandaditos ────────────────────────────────────
 async function enviarDespachoMandaditos(client, datos) {
-  const grupoId = process.env.GRUPO_MANDADITOS_ID || getConfig('grupo_mandaditos_id') || null;
-  if (!grupoId) return;
+  const grupoId = getGrupoMandaditosId();
+  if (!grupoId) throw new Error('No hay grupo de Mandaditos configurado');
 
   const negocioColonia = getConfig('negocio_colonia') || getConfig('nombre_negocio') || 'Negocio';
 
@@ -123,11 +156,23 @@ async function handleMensajeMandaditos(msg, client) {
   } catch (_) { return false; }
 
   if (!quotedId || !despachosPendientes.has(quotedId)) return false;
+  if (_despachosEnAsignacion.has(quotedId)) {
+    await msg.reply('⏳ Este pedido ya está siendo asignado a otro repartidor.');
+    return true;
+  }
 
   const datos = despachosPendientes.get(quotedId);
-  despachosPendientes.delete(quotedId); // primer repartidor en responder se queda con el pedido
-
   const repartidorJid  = msg.author || msg.from;
+  const registrado = getRepartidor(repartidorJid);
+  if (registrado && !registrado.activo) {
+    await msg.reply('⛔ Tu acceso como repartidor está pausado. Contacta al administrador.');
+    return true;
+  }
+  if (registrado?.en_ruta) {
+    await msg.reply(`⚠️ Ya tienes asignado el pedido #${registrado.pedido_actual_id || '—'}. Finalízalo antes de tomar otro.`);
+    return true;
+  }
+  _despachosEnAsignacion.add(quotedId);
   const negocioCalle   = getConfig('negocio_calle')     || '(consultar con el administrador)';
   const negocioColonia = datos.negocioColonia            || getConfig('negocio_colonia') || 'Centro';
   const negocioNombre  = getConfig('nombre_negocio')     || 'Taquería';
@@ -139,17 +184,6 @@ async function handleMensajeMandaditos(msg, client) {
     const contacto = await client.getContactById(repartidorJid);
     nombre = contacto?.pushname || contacto?.name || nombre;
   } catch (_) {}
-  upsertRepartidor(repartidorJid, nombre);
-
-  // Arrancar contador y marcar en ruta en BD
-  const inicio       = Date.now();
-  const tiempoInicio = new Date(inicio).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  setEnRuta(repartidorJid, datos.pedidoId, tiempoInicio);
-
-  // Zona de silencio
-  const silencioMin = parseInt(getConfig('mandaditos_silencio_min') || '15', 10);
-  _zonasSilencio.set(repartidorJid, Date.now() + silencioMin * 60 * 1000);
-
   const refCliente = datos.clienteReferencia && datos.clienteReferencia !== 'sin referencia'
     ? `📌 Ref: ${datos.clienteReferencia}\n` : '';
   const refNegocio = negocioRef ? `📌 Ref: ${negocioRef}\n` : '';
@@ -174,13 +208,31 @@ async function handleMensajeMandaditos(msg, client) {
 
   try {
     await client.sendMessage(repartidorJid, privado);
-    await msg.reply(`✅ Pedido #${datos.pedidoId} tomado. Te mandé los detalles por privado. 🛵`);
+    despachosPendientes.delete(quotedId); // solo después de entregar los datos privados
+    upsertRepartidor(repartidorJid, nombre);
+    const inicio = Date.now();
+    setEnRuta(repartidorJid, datos.pedidoId, new Date(inicio).toISOString());
+    const silencioMin = parseInt(getConfig('mandaditos_silencio_min') || '15', 10);
+    _zonasSilencio.set(repartidorJid, Date.now() + silencioMin * 60 * 1000);
+    _lanzarTimers(repartidorJid, client, datos.pedidoId, datos.clienteColonia || '—', inicio);
+    try { await msg.reply(`✅ Pedido #${datos.pedidoId} tomado. Te mandé los detalles por privado. 🛵`); } catch (_) {}
   } catch (e) {
     logger.error(`[Mandaditos] Error al notificar repartidor: ${e.message}`);
+    try { await msg.reply('❌ No pude enviarte los detalles. El pedido sigue disponible para otro intento.'); } catch (_) {}
+  } finally {
+    _despachosEnAsignacion.delete(quotedId);
   }
-
-  _lanzarTimers(repartidorJid, client, datos.pedidoId, datos.clienteColonia || '—', inicio);
   return true;
+}
+
+function reanudarSeguimientoRepartidores(client) {
+  const activos = getRepartidores().filter(r => r.en_ruta && r.pedido_actual_id);
+  for (const rep of activos) {
+    const inicio = new Date(rep.tiempo_ruta_inicio || Date.now()).getTime();
+    _lanzarTimers(rep.jid, client, rep.pedido_actual_id, 'destino registrado', Number.isFinite(inicio) ? inicio : Date.now());
+  }
+  if (activos.length) logger.info(`[Mandaditos] Seguimiento reanudado para ${activos.length} repartidor(es) en ruta`);
+  return activos.length;
 }
 
 // ── Manejar mensajes privados del repartidor (confirmación de entrega) ────────
@@ -241,12 +293,17 @@ async function despacharConDelay(client, datos) {
     const horaDespacho = new Date(Date.now() + delay * 60 * 1000);
     const existente = getDespachosPendientes().find(d => Number(d.pedido_id) === Number(datos.pedidoId));
     const despachoId = existente?.id || guardarDespachoProgramado({ ...datos, horaDespacho: horaDespacho.toISOString() });
+    if (_despachoTimers.has(String(datos.pedidoId))) {
+      return { inmediato: false, delay, despachoId, horaDespacho: new Date(existente?.hora_despacho || horaDespacho), yaProgramado: true };
+    }
     const timer = setTimeout(() => {
+      _despachoTimers.delete(String(datos.pedidoId));
       enviarDespachoMandaditos(client, datos)
         .then(() => marcarDespachoEjecutado(despachoId))
         .catch(e => logger.error(`[Mandaditos] Error en despacho demorado #${datos.pedidoId}: ${e.message}`));
     }, delay * 60 * 1000);
     timer.unref?.();
+    _despachoTimers.set(String(datos.pedidoId), timer);
     logger.info(`[Mandaditos] Despacho #${datos.pedidoId} (db #${despachoId}) programado en ${delay} min`);
     return { inmediato: false, delay, despachoId, horaDespacho };
   }
@@ -258,4 +315,5 @@ module.exports = {
   handleMensajeMandaditos,
   handleMensajeRepartidor,
   esRepartidorActivo,
+  reanudarSeguimientoRepartidores,
 };

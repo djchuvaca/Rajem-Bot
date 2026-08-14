@@ -1307,17 +1307,21 @@ async function reanudarDespachosPendientes(client) {
     if (msRestantes > 0) {
       const horaStr = horaDespacho.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
       console.log(`[Mandaditos] Despacho db #${d.id} (pedido #${d.pedido_id}) reprogramado para las ${horaStr}`);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         enviarDespachoMandaditos(client, despachoData)
           .then(() => marcarDespachoEjecutado(d.id))
           .catch(e => console.error(`[Mandaditos] Error en despacho db #${d.id}:`, e.message));
       }, msRestantes);
+      timer.unref?.();
     } else {
       // La hora pasó mientras el bot estaba apagado → despachar de inmediato
       console.log(`[Mandaditos] Despacho db #${d.id} atrasado, enviando ahora...`);
-      enviarDespachoMandaditos(client, despachoData)
-        .then(() => marcarDespachoEjecutado(d.id))
-        .catch(e => console.error(`[Mandaditos] Error en despacho db #${d.id}:`, e.message));
+      try {
+        await enviarDespachoMandaditos(client, despachoData);
+        marcarDespachoEjecutado(d.id);
+      } catch (e) {
+        console.error(`[Mandaditos] Error en despacho db #${d.id}:`, e.message);
+      }
     }
   }
 }

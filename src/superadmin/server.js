@@ -589,15 +589,15 @@ app.put('/api/tenants/:id/repartidores/:repId', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { nombre, activo } = req.body;
-  const ok = updateTenantRepartidor(tenant, parseInt(req.params.repId), { nombre, activo });
-  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al actualizar' });
+  const resultado = updateTenantRepartidor(tenant, parseInt(req.params.repId), { nombre, activo });
+  resultado.ok ? res.json(resultado) : res.status(400).json({ error: resultado.error || 'Error al actualizar' });
 });
 
 app.delete('/api/tenants/:id/repartidores/:repId', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const ok = deleteTenantRepartidor(tenant, parseInt(req.params.repId));
-  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al eliminar' });
+  const resultado = deleteTenantRepartidor(tenant, parseInt(req.params.repId));
+  resultado.ok ? res.json(resultado) : res.status(400).json({ error: resultado.error || 'Error al eliminar' });
 });
 
 app.get('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
@@ -609,8 +609,8 @@ app.get('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
 app.put('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
   const tenant = getTenant(req.params.id);
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
-  const ok = setTenantMandaditosConfig(tenant, req.body);
-  ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al guardar' });
+  const resultado = setTenantMandaditosConfig(tenant, req.body);
+  resultado.ok ? res.json(resultado) : res.status(400).json({ error: resultado.error || 'Error al guardar' });
 });
 
 app.get('/api/tenants/:id/entregas-historial', requireAuth, (req, res) => {

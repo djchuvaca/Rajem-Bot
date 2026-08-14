@@ -28,7 +28,7 @@ const logger             = require("./src/logger");
 const { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes } = require("./src/handlers/comandos");
 const { handleImagen }   = require("./src/handlers/imagenes");
 const { handleMensaje }  = require("./src/handlers/mensajes");
-const { handleMensajeMandaditos, handleMensajeRepartidor, esRepartidorActivo } = require("./src/handlers/mandaditos");
+const { handleMensajeMandaditos, handleMensajeRepartidor, esRepartidorActivo, reanudarSeguimientoRepartidores } = require("./src/handlers/mandaditos");
 const { initDB, getConfig, setConfig, getGrupoId, getGrupoMandaditosId, getNotifModalidad } = require("./src/db");
 const { resetEntregasHoy } = require("./src/db/repartidores");
 const { startPanel }     = require("./src/panel/server");
@@ -81,6 +81,7 @@ client.on("ready", () => {
     try { setConfig("grupos_wa_cache", JSON.stringify(grupos)); } catch (_) {}
   }).catch(() => {});
   reanudarDespachosPendientes(client).catch(e => logger.error("Error al reanudar despachos:", e.message));
+  try { reanudarSeguimientoRepartidores(client); } catch (e) { logger.error("Error al reanudar seguimiento de repartidores:", e.message); }
   logger.info("Bot de Tacos Javier conectado y listo.")
   console.log("✅ Bot de Tacos Javier conectado y listo!");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

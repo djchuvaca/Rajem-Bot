@@ -67,9 +67,9 @@ function queryOne(sql, params = []) {
 function run(sql, params = []) {
   if (!_bsdb) return;
   if (params.length === 0) {
-    _bsdb.exec(sql);
+    return _bsdb.exec(sql);
   } else {
-    _bsdb.prepare(sql).run(...params);
+    return _bsdb.prepare(sql).run(...params);
   }
 }
 
