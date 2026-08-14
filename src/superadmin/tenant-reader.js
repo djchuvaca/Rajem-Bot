@@ -490,14 +490,13 @@ function getTenantMandaditosConfig(tenant) {
     mandaditos_silencio_min:     cfg.mandaditos_silencio_min     || '15',
     mandaditos_recordatorio_min: cfg.mandaditos_recordatorio_min || '30',
     mandaditos_timeout_post_min: cfg.mandaditos_timeout_post_min || '20',
-    mandaditos_delay_min:        cfg.mandaditos_delay_min        || '15',
   };
 }
 
 function setTenantMandaditosConfig(tenant, config) {
   const rangos = {
     mandaditos_silencio_min: [0, 60], mandaditos_recordatorio_min: [1, 240],
-    mandaditos_timeout_post_min: [1, 240], mandaditos_delay_min: [0, 240],
+    mandaditos_timeout_post_min: [1, 240],
   };
   const valores = {};
   for (const [clave, [min, max]] of Object.entries(rangos)) {

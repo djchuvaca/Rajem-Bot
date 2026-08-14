@@ -130,6 +130,9 @@ function getGrupoId() {
 }
 
 function getGrupoMandaditosId() {
+  // Las pruebas deben usar exclusivamente la BD aislada del tenant y nunca
+  // heredar el JID global real de admin.db o del entorno del servidor.
+  if (process.env.BOT_TEST_MODE === '1') return getConfig("grupo_mandaditos_id") || null;
   const { getGrupoMandaditosGlobal } = require('./admin');
   return getGrupoMandaditosGlobal() || getConfig("grupo_mandaditos_id") || null;
 }
