@@ -34,6 +34,8 @@ test('el Superadmin habilita formatos y productos canónicos en la BD del tenant
   const inicial = getTenantCatalogoAdmin(tenant);
   assert.equal(inicial.formatos.find(f => f.slug === 'taco').activo, false);
   assert.ok(inicial.cortes.some(c => c.slug === 'surtido'));
+  assert.ok(inicial.cortes.some(c => c.seccion === 'carnitas'));
+  assert.ok(inicial.cortes.some(c => c.seccion === 'asada'));
 
   assert.equal(setTenantFormatoActivo(tenant, 1, true), true);
   assert.equal(setTenantProductoActivo(tenant, 'corte', 'surtido', true), true);
