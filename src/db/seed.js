@@ -132,6 +132,46 @@ async function seedDB() {
       resumen    TEXT         DEFAULT '',
       expira_en  TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS conversaciones_trace (
+      id                 TEXT PRIMARY KEY,
+      jid                TEXT NOT NULL,
+      pedido_id          INTEGER REFERENCES pedidos(id),
+      estado             TEXT NOT NULL DEFAULT 'activa',
+      etapa_actual       TEXT NOT NULL DEFAULT 'inicio',
+      requiere_atencion  INTEGER NOT NULL DEFAULT 0,
+      motivo_atencion    TEXT,
+      iniciada_en        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      actualizada_en     TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE TABLE IF NOT EXISTS conversacion_eventos (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id      TEXT NOT NULL REFERENCES conversaciones_trace(id) ON DELETE CASCADE,
+      direccion     TEXT NOT NULL,
+      tipo          TEXT NOT NULL,
+      etapa         TEXT,
+      contenido     TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      fecha          TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE TABLE IF NOT EXISTS alertas_operativas (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id        TEXT REFERENCES conversaciones_trace(id) ON DELETE SET NULL,
+      pedido_id       INTEGER REFERENCES pedidos(id) ON DELETE SET NULL,
+      tipo            TEXT NOT NULL,
+      severidad       TEXT NOT NULL DEFAULT 'media',
+      titulo          TEXT NOT NULL,
+      detalle         TEXT,
+      estado          TEXT NOT NULL DEFAULT 'abierta',
+      ocurrencias     INTEGER NOT NULL DEFAULT 1,
+      resuelta_por    TEXT,
+      nota_resolucion TEXT,
+      creada_en       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      actualizada_en  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      resuelta_en     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_trace_jid_estado ON conversaciones_trace(jid, estado, actualizada_en);
+    CREATE INDEX IF NOT EXISTS idx_eventos_trace ON conversacion_eventos(trace_id, id);
+    CREATE INDEX IF NOT EXISTS idx_alertas_estado ON alertas_operativas(estado, severidad, actualizada_en);
   `);
 
   // ── TABLA CORTES (catálogo de cortes/ingredientes por giro) ──────────────────
@@ -383,6 +423,7 @@ async function seedDB() {
 
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('alerta_pedido_min', '10')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('bot_pausado', '0')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('observabilidad_retencion_dias', '90')");
 
   // Config: modalidad de notificaciones — configurada por super-admin
   // "grupo"    → grupo WA de admins  (requiere 2+ dispositivos, solo admins del grupo ejecutan comandos)

@@ -10,6 +10,7 @@ const {
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
 const { getProductos, getConfig, getMenuItems, getCortesBDObj } = require("../../db");
 const { textoANumero, getCortes, buscarCorteFuzzy, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
+const trazabilidad = require('../../db/observabilidad');
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
 const telefonosReales    = new Map();
@@ -89,6 +90,9 @@ setInterval(async () => {
         || datosCampos.has(numero);
       if (estaActivo) {
         console.log(`[TIMEOUT] Limpiando sesión inactiva: ${numero}`);
+        trazabilidad.crearAlerta(numero, 'cliente_sin_respuesta', 'Conversación abandonada por inactividad', `El cliente no respondió después de ${Math.round(TIMEOUT_SESION_MS / 60000)} minutos.`, { severidad: 'baja' });
+        trazabilidad.registrarRuta(numero, 'timeout_sesion');
+        trazabilidad.cerrarTraza(numero, 'abandonada');
         limpiarTodo(numero);
         clientesNuevos.delete(numero);
         esperandoTipoItem.delete(numero);
@@ -115,6 +119,7 @@ setInterval(async () => {
         const jitter = 1000 + Math.floor(Math.random() * 2000);
         await new Promise(r => setTimeout(r, jitter));
         await client.sendMessage(numero, texto, { linkPreview: false });
+        trazabilidad.registrarSalida(numero, texto, { automatico: true, tipo: 'recordatorio_inactividad' });
         console.log(`[RECORDATORIO] Enviado a ${numero}`);
       } catch (e) {
         console.error(`[RECORDATORIO] Error enviando a ${numero}:`, e.message);

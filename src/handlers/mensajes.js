@@ -11,6 +11,7 @@ const { MENU_FORMATO } = require("../config");
 const { ultimaActividad, recordatorioEnviado, enFlujoActivo, replyConTyping, ordenPendientePreventa } = require("./flujos/utils");
 const botPausado = require("../estado/bot-pausado");
 const { getGrupoId, getNotifDestinoJID } = require("../db");
+const trazabilidad = require('../db/observabilidad');
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido, handleCancelacionPagoMP } = require("./flujos/cancelacion");
 const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
@@ -31,6 +32,11 @@ async function handleMensaje(msg, client) {
   if (botPausado.pausado) return;
 
   const clienteNumero = msg.from;
+  trazabilidad.registrarEntrada(clienteNumero, msg.body || '', {
+    messageId: msg.id?._serialized || null,
+    tipoMensaje: msg.type || 'chat',
+    tieneMedia: !!msg.hasMedia,
+  });
   ultimaActividad.set(clienteNumero, Date.now());
   recordatorioEnviado.delete(clienteNumero);
 
@@ -39,11 +45,19 @@ async function handleMensaje(msg, client) {
   msg.reply = (content, chatId, opts = {}) => {
     if (typeof content === "string")
       console.log("[Bot]: " + content.substring(0, 200) + (content.length > 200 ? "..." : ""));
+    if (typeof content === 'string') trazabilidad.registrarSalida(clienteNumero, content);
     return _origReply(content, chatId, { linkPreview: false, ...opts });
+  };
+
+  const atendidoPor = async (ruta, resultado) => {
+    const atendido = await resultado;
+    if (atendido) trazabilidad.registrarRuta(clienteNumero, ruta);
+    return atendido;
   };
 
   // ── ESPERANDO CAPTURA (texto cuando se espera imagen de transferencia) ──────
   if (esperandoCaptura.has(clienteNumero) && !msg.hasMedia) {
+    trazabilidad.registrarRuta(clienteNumero, 'esperando_captura');
     if (msg.body && msg.body.trim().length > 0) {
       const textoCap = msg.body.trim();
       if (/cancelar|cancela|cancel|cancelo|cancelame|cancelado|ya no quiero|ya no/i.test(textoCap)) {
@@ -127,6 +141,7 @@ async function handleMensaje(msg, client) {
         }
       }
       if (respondio) {
+        trazabilidad.registrarRuta(clienteNumero, 'faq_global', { intenciones: pregsFaq.map(p => p.tipo) });
         if (!esAckSinMenu) {
           if (!estaEnHorario() && !clientesPreventa.has(clienteNumero)) {
             await replyConTyping(msg, mensajeFueraDeHorario());
@@ -140,18 +155,18 @@ async function handleMensaje(msg, client) {
   }
 
   // ── FLUJOS PRINCIPALES (en orden de prioridad) ───────────────────────────────
-  if (await handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero)) return;
-  if (await handleCancelacionConfirmada(msg, client, textoOriginal, clienteNumero)) return;
-  if (await handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero)) return;
-  if (await handlePrimerMensaje(msg, textoOriginal, clienteNumero)) return;
-  if (await handleFueraDeHorario(msg, textoOriginal, clienteNumero)) return;
+  if (await atendidoPor('cancelacion_pago', handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('cancelacion_confirmada', handleCancelacionConfirmada(msg, client, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('motivo_cancelacion', handleMotivoCancelacion(msg, client, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('primer_mensaje', handlePrimerMensaje(msg, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('fuera_de_horario', handleFueraDeHorario(msg, textoOriginal, clienteNumero))) return;
 
   const historial  = getHistorial(clienteNumero);
   const esPreventa = clientesPreventa.has(clienteNumero);
 
-  if (await handleEdicionPendiente(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleConfirmacionDatos(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleTipoEntrega(msg, client, textoOriginal, clienteNumero, historial, esPreventa)) {
+  if (await atendidoPor('edicion_pendiente', handleEdicionPendiente(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('confirmacion_datos', handleConfirmacionDatos(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('tipo_entrega', handleTipoEntrega(msg, client, textoOriginal, clienteNumero, historial, esPreventa))) {
     if (ordenPendientePreventa.has(clienteNumero)) {
       textoOriginal = ordenPendientePreventa.get(clienteNumero);
       ordenPendientePreventa.delete(clienteNumero);
@@ -160,35 +175,37 @@ async function handleMensaje(msg, client) {
       return;
     }
   }
-  if (await handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero)) return;
+  if (await atendidoPor('cancelacion_durante_pedido', handleCancelacionDurantePedido(msg, textoOriginal, clienteNumero))) return;
 
   const esOrdenDom = tipoEntregaCliente.get(clienteNumero) === "domicilio"
     || (tipoEntregaCliente.get(clienteNumero) == null && historial.some(h => h.content && h.content.includes("domicilio")));
 
-  if (await handleEdicionResumen(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleCambiosTipoDesdeResumen(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleCambioMetodoDesdeResumen(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero)) return;
-  if (await handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleCatchAllResumen(msg, clienteNumero)) return;
+  if (await atendidoPor('edicion_resumen', handleEdicionResumen(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('cambio_tipo_resumen', handleCambiosTipoDesdeResumen(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('cambio_pago_resumen', handleCambioMetodoDesdeResumen(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('agregar_desde_resumen', handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('confirmacion_final', handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('resumen_pendiente', handleCatchAllResumen(msg, clienteNumero))) return;
 
-  if (await handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom)) return;
-  if (await handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial, esOrdenDom)) return;
-  if (await handleCambioTipoDuranteTomaPedido(msg, textoOriginal, clienteNumero, historial)) return;
-  if (await handleConfirmacionItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom)) return;
-  if (await handleExtras(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa)) return;
-  if (await handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa)) return;
-  if (await handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa)) return;
-  if (await handleFormularioProgresivo(msg, textoOriginal, clienteNumero, historial, esPreventa)) return;
-  if (await handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrdenDom)) return;
-  if (await handleRepetirPedido(msg, textoOriginal, clienteNumero, historial)) return;
-  if (await handlePedidoSimple(msg, textoOriginal, clienteNumero, historial)) return;
-  if (await handleSinCorte(msg, textoOriginal, clienteNumero)) return;
-  if (await handleSinTipo(msg, textoOriginal, clienteNumero)) return;
-  if (await handleModificacionAgregarMas(msg, textoOriginal, clienteNumero)) return;
-  if (await handlePresupuestoInverso(msg, textoOriginal)) return;
+  if (await atendidoPor('esperando_tipo_item', handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom))) return;
+  if (await atendidoPor('esperando_corte', handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial, esOrdenDom))) return;
+  if (await atendidoPor('cambio_tipo_pedido', handleCambioTipoDuranteTomaPedido(msg, textoOriginal, clienteNumero, historial))) return;
+  if (await atendidoPor('confirmacion_item', handleConfirmacionItem(msg, textoOriginal, clienteNumero, historial, esOrdenDom))) return;
+  if (await atendidoPor('extras', handleExtras(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa))) return;
+  if (await atendidoPor('agregar_mas', handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa))) return;
+  if (await atendidoPor('cambio_tipo_formulario', handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa))) return;
+  if (await atendidoPor('formulario_progresivo', handleFormularioProgresivo(msg, textoOriginal, clienteNumero, historial, esPreventa))) return;
+  if (await atendidoPor('faq_durante_pedido', handleFAQDurantePedido(msg, textoOriginal, clienteNumero, esOrdenDom))) return;
+  if (await atendidoPor('repetir_pedido', handleRepetirPedido(msg, textoOriginal, clienteNumero, historial))) return;
+  if (await atendidoPor('pedido_simple', handlePedidoSimple(msg, textoOriginal, clienteNumero, historial))) return;
+  if (await atendidoPor('sin_corte', handleSinCorte(msg, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('sin_tipo', handleSinTipo(msg, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('modificacion_agregar', handleModificacionAgregarMas(msg, textoOriginal, clienteNumero))) return;
+  if (await atendidoPor('presupuesto_inverso', handlePresupuestoInverso(msg, textoOriginal))) return;
 
   await handleNoEntendi(msg, clienteNumero);
+  trazabilidad.registrarRuta(clienteNumero, 'no_entendido');
+  trazabilidad.crearAlerta(clienteNumero, 'nlu_no_entendido', 'El bot no entendió al cliente', textoOriginal, { severidad: 'media' });
 }
 
 module.exports = { handleMensaje };

@@ -21,6 +21,7 @@ const {
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
 } = require("./utils");
 const { despacharConDelay } = require("../mandaditos");
+const trazabilidad = require('../../db/observabilidad');
 
 // ── HELPERS GIRO-AWARE ────────────────────────────────────────────────────────
 
@@ -375,6 +376,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
         orden:       (pendiente.texto || "").substring(0, 500),
         total, metodo_pago: "transferencia", estado: "pendiente", hora_entrega,
       });
+      if (pedidoMpId) trazabilidad.vincularPedido(clienteNumero, pedidoMpId);
       if (infoPedido.telefono) {
         telefonosReales.set(clienteNumero, infoPedido.telefono);
         try { guardarTelefonoReal(clienteNumero, infoPedido.telefono); } catch (_) {}
@@ -382,6 +384,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
       }
     } catch (e) {
       console.error("[MP] Error al guardar pedido:", e.message);
+      trazabilidad.crearAlerta(clienteNumero, 'error_registro_pedido', 'No se pudo registrar el pedido', e.message, { severidad: 'critica' });
     }
 
     if (pedidoMpId) {
@@ -414,6 +417,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
         return true;
       } catch (e) {
         console.error("[MP] Error al crear enlace de pago:", e.message);
+        trazabilidad.crearAlerta(clienteNumero, 'error_enlace_pago', 'Falló la creación del enlace de pago', e.message, { severidad: 'alta', pedidoId: pedidoMpId });
         // Fallback a transferencia tradicional si MP falla
       }
     }
@@ -459,6 +463,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
       orden:      (pendiente.texto || "").substring(0, 500),
       total, metodo_pago, estado: "pendiente", hora_entrega,
     });
+    if (pedidoId) trazabilidad.vincularPedido(clienteNumero, pedidoId);
     console.log(`BD: Pedido #${pedidoId} registrado para ${telefonoLimpio}`);
     if (infoPedido.telefono) {
       telefonosReales.set(clienteNumero, infoPedido.telefono);
@@ -467,12 +472,17 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     }
   } catch (e) {
     console.error("[BD] Error al guardar pedido:", e.message || e);
+    trazabilidad.crearAlerta(clienteNumero, 'error_registro_pedido', 'No se pudo registrar el pedido', e.message || String(e), { severidad: 'critica' });
     dbError = true;
   }
 
   if (dbError) {
     await msg.reply("Hubo un error al registrar tu pedido en el sistema. Por favor comunícate con nosotros directamente para confirmar tu orden. 🙏");
     return true;
+  }
+
+  if (_coloniaNoVerif && _coloniaTxt) {
+    trazabilidad.crearAlerta(clienteNumero, 'colonia_no_verificada', 'Colonia sin verificar', `El cliente indicó: ${_coloniaTxt}`, { severidad: 'alta', pedidoId });
   }
 
   // ── 2. Despacho mandaditos (solo domicilio, efectivo/tarjeta) ────────────────

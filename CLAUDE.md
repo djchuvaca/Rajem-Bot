@@ -172,6 +172,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
 - **`src/db/repartidores.js`** — CRUD repartidores + historial de entregas. `registrarEntregaConfirmada()` (actualiza promedio, escribe a `entregas_historial`), `registrarEntregaTimeout()` (escribe con `confirmado=0, minutos=NULL`), `getHistorialTenant()`, `getReporteDesempeno()`, `resetEntregasHoy()`.
 - **`src/db/admin.js`** — BD del superadmin (`data/admin.db`). Config global (GROQ_API_KEY global, APP_URL, Sentry DSN), usuarios superadmin, sesiones.
+- **`src/db/observabilidad.js`** — trazabilidad persistente por tenant. Registra mensajes, respuestas, ruta NLU, etapa, pedido asociado y alertas operativas. Las alertas se resuelven desde el panel y las trazas terminadas se conservan 90 días por defecto.
 - **`src/db/index.js`** — re-exporta todo el módulo db.
 
 ### Pagos
@@ -183,7 +184,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 ### Panel del tenant
 - **`src/panel/server.js`** — Express. Auth con sesión, rate limiting login. API REST. Auto-notifica cliente WA al cambiar estado de pedido. Webhooks públicos: `GET /health`, `POST /webhook/mercadopago`, `POST /webhook/stripe`, `POST /webhook/conekta`. Cuando un pago se confirma vía webhook, llama `despacharConDelay()` si el pedido es a domicilio.
 - **`src/panel/whatsapp-bridge.js`** — singleton para compartir el cliente WA sin deps circulares.
-- **`src/panel/public/index.html`** — SPA del panel tenant (~870 líneas). Secciones: dashboard, pedidos (filtros + CSV), clientes, productos, horarios, banco, mensajes bot, config. **Wizard de onboarding** (5 pasos: negocio → horarios → banco → menú → contraseña) se abre automáticamente al primer login si `nombre_negocio` es el default y `localStorage.setup_done` no está fijado.
+- **`src/panel/public/index.html`** — SPA del panel tenant. Secciones: dashboard, pedidos (filtros + CSV), **Atención** (alertas y línea de tiempo de conversaciones), clientes, productos, horarios, banco, mensajes bot y configuración. **Wizard de onboarding** (5 pasos: negocio → horarios → banco → menú → contraseña) se abre automáticamente al primer login si `nombre_negocio` es el default y `localStorage.setup_done` no está fijado.
 
 ### Feature flags
 - **`src/features/index.js`** — `PLANES = { basico, plus, pro }`. `requireFeature(feature)` verifica si la feature está en el plan activo del tenant. Gates en la API del panel con banners de upgrade en el frontend.

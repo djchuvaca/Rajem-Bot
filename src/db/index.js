@@ -9,12 +9,14 @@ const config       = require("./config");
 const modelos      = require("./modelos");
 const businessTypes = require("./business-types");
 const cortesDB     = require("./cortes");
+const observabilidad = require('./observabilidad');
 const { seedDB }   = require("./seed");
 
 // initDB ahora también ejecuta el seed
 async function initDB() {
   await core.initDB();
   await seedDB();
+  observabilidad.limpiarObservabilidadAntigua(config.getConfig('observabilidad_retencion_dias') || 90);
   return core.getDB();
 }
 
@@ -134,4 +136,7 @@ module.exports = {
   guardarDespachoProgramado:  modelos.guardarDespachoProgramado,
   marcarDespachoEjecutado:    modelos.marcarDespachoEjecutado,
   getDespachosPendientes:     modelos.getDespachosPendientes,
+
+  // trazabilidad y atención operativa
+  ...observabilidad,
 };

@@ -34,6 +34,7 @@ const { resetEntregasHoy } = require("./src/db/repartidores");
 const { startPanel }     = require("./src/panel/server");
 const { setWhatsappClient, setWaEstado, setQR, clearQR } = require("./src/panel/whatsapp-bridge");
 const { restaurarTodasLasSesiones } = require("./src/estado");
+const trazabilidad = require('./src/db/observabilidad');
 
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: process.env.TENANT_ID || "carnitas-bot" }),
@@ -248,7 +249,11 @@ const mandaditosId = getGrupoMandaditosId();
   // Serializar mensajes del mismo JID para evitar condiciones de carrera
   const _jid = msg.from;
   const _anterior = _colaJID.get(_jid) ?? Promise.resolve();
-  const _esta = _anterior.catch(() => {}).then(() => handleMensaje(msg, client));
+  const _esta = _anterior.catch(() => {}).then(() => handleMensaje(msg, client)).catch(error => {
+    trazabilidad.registrarEvento(_jid, 'sistema', 'error', error.message || String(error), { etapa: trazabilidad.obtenerEtapaConversacion(_jid) });
+    trazabilidad.crearAlerta(_jid, 'error_flujo_conversacion', 'Error interno durante la conversación', error.message || String(error), { severidad: 'critica' });
+    throw error;
+  });
   _colaJID.set(_jid, _esta);
   _esta.finally(() => { if (_colaJID.get(_jid) === _esta) _colaJID.delete(_jid); });
   await _esta;

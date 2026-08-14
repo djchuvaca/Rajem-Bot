@@ -30,6 +30,7 @@ const { actualizarEstadoPorId } = require("../db");
 const mpPagos = require("../pagos");
 const { despacharConDelay } = require("../handlers/mandaditos");
 const catalogoTenant = require('../giros/catalogo-tenant');
+const observabilidad = require('../db/observabilidad');
 
 // Rate limiting para login (en memoria, se reinicia al reiniciar el servidor)
 const _loginAttempts = new Map();
@@ -353,6 +354,36 @@ app.put("/api/pedidos/:id/estado", requireAuth, (req, res) => {
 app.delete("/api/pedidos/:id", requireAuth, (req, res) => {
   deletePedido(parseInt(req.params.id));
   res.json({ ok: true });
+});
+
+// ── TRAZABILIDAD Y ATENCIÓN OPERATIVA ────────────────────────────────────────
+app.get('/api/observabilidad/resumen', requireAuth, (_req, res) => {
+  const abiertas = queryOne("SELECT COUNT(*) total FROM alertas_operativas WHERE estado='abierta'")?.total || 0;
+  const criticas = queryOne("SELECT COUNT(*) total FROM alertas_operativas WHERE estado='abierta' AND severidad IN ('critica','alta')")?.total || 0;
+  const activas = queryOne("SELECT COUNT(*) total FROM conversaciones_trace WHERE estado='activa' AND actualizada_en >= datetime('now','-48 hours')")?.total || 0;
+  res.json({ alertas_abiertas: abiertas, alertas_prioritarias: criticas, conversaciones_activas: activas });
+});
+
+app.get('/api/observabilidad/alertas', requireAuth, (req, res) => {
+  res.json(observabilidad.listarAlertas({ estado: req.query.estado || 'abierta', limite: req.query.limite }));
+});
+
+app.put('/api/observabilidad/alertas/:id/resolver', requireAuth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'ID inválido' });
+  const ok = observabilidad.resolverAlerta(id, req.session.usuario, req.body.nota || '');
+  if (!ok) return res.status(404).json({ error: 'Alerta abierta no encontrada' });
+  res.json({ ok: true });
+});
+
+app.get('/api/observabilidad/conversaciones', requireAuth, (req, res) => {
+  res.json(observabilidad.listarConversaciones(req.query.limite));
+});
+
+app.get('/api/observabilidad/conversaciones/:id', requireAuth, (req, res) => {
+  const resultado = observabilidad.obtenerConversacion(req.params.id);
+  if (!resultado) return res.status(404).json({ error: 'Conversación no encontrada' });
+  res.json(resultado);
 });
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
