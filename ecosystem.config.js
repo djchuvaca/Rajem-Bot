@@ -22,23 +22,6 @@ module.exports = {
       log_date_format: "YYYY-MM-DD HH:mm:ss",
     },
 
-    // ── Bot tenant (una entrada por cada tenant activo) ────────────────────────
-    {
-      name: process.env.TENANT_ID || "tacos-javier-tepic",
-      script: "index.js",
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "1G",
-      restart_delay: 15000,
-      max_restarts: 10,
-      min_uptime: "30s",
-      env: { NODE_ENV: "production" },
-      out_file:        "logs/bot-out.log",
-      error_file:      "logs/bot-err.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss",
-      merge_logs: true,
-    },
-
     // ── Webhook de deploy automático desde GitHub ──────────────────────────────
     {
       name: "webhook-deploy",

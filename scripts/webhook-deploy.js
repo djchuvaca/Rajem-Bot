@@ -52,41 +52,31 @@ async function handleDeploy(req, res) {
 
   res.writeHead(200); res.end('Deploy iniciado');
 
-  // Analizar qué archivos cambiaron para elegir la acción mínima
+  // Analizar qué archivos cambiaron
   const changed = (payload.commits || [])
     .flatMap(c => [...(c.added || []), ...(c.removed || []), ...(c.modified || [])]);
 
-  // Arquitectura: todo corre en Docker EXCEPTO scripts/webhook-deploy.js (PM2 en host)
-  // src/superadmin/public/ está montado como volumen — no necesita rebuild
-  const onlySuperadminStatic = changed.length > 0 && changed.every(f =>
-    f.startsWith('src/superadmin/public/')
-  );
-  const isDockerFile = f =>
-    f !== 'scripts/webhook-deploy.js' &&        // webhook corre en PM2, no Docker
-    !f.startsWith('src/superadmin/public/');    // volumen montado, no baked en imagen
-  // Cualquier cambio en archivos baked en la imagen Docker requiere rebuild
-  const needsDockerBuild = !onlySuperadminStatic && changed.some(f => isDockerFile(f));
-  const needsPm2         = changed.includes('scripts/webhook-deploy.js');
+  const needsNpmInstall  = changed.some(f => ['package.json', 'package-lock.json'].includes(f));
+  const needsWebhookSelf = changed.includes('scripts/webhook-deploy.js');
+  const onlyStatic       = changed.length > 0 && changed.every(f => f.startsWith('src/superadmin/public/'));
 
-  let dockerCmd;
-  if (needsDockerBuild) {
-    dockerCmd = 'docker compose down && docker compose up -d --build';
-    const razon = changed.some(f => ['package.json','package-lock.json','Dockerfile'].includes(f))
-      ? 'dependencias/Dockerfile'
-      : 'código fuente';
-    console.log(`[webhook] Cambios en ${razon} — rebuild completo de imagen`);
-  } else if (onlySuperadminStatic) {
-    dockerCmd = null;
-    console.log('[webhook] Solo estáticos de superadmin — volumen actualiza sin reiniciar');
-  } else {
-    dockerCmd = null;
-    console.log('[webhook] Solo cambios en PM2 — sin acción Docker');
+  // git pull siempre
+  const cmds = [`cd ${PROJECT}`, 'git pull'];
+
+  if (needsNpmInstall) {
+    cmds.push('npm install --omit=dev --silent');
+    console.log('[webhook] package.json cambió — npm install incluido');
   }
 
-  // git stash/pop falla si no hay cambios locales — simplemente pullamos directo
-  const cmds = [`cd ${PROJECT}`, 'git pull'];
-  if (dockerCmd) cmds.push(dockerCmd);
-  if (needsPm2) cmds.push('pm2 restart webhook-deploy');
+  if (!onlyStatic) {
+    // Reiniciar superadmin y todos los bots de tenant (todos excepto webhook-deploy)
+    cmds.push(
+      `pm2 list --no-color 2>/dev/null | awk '/online|stopped|errored/{print $4}' | grep -v '^webhook-deploy$' | xargs -r pm2 restart 2>/dev/null || true`
+    );
+    console.log('[webhook] Reiniciando apps PM2 (excepto webhook-deploy)');
+  } else {
+    console.log('[webhook] Solo estáticos de superadmin — no se reinician procesos');
+  }
 
   const cmd = cmds.join(' && ');
   console.log(`[webhook] Push de ${payload.pusher?.name || 'unknown'} — ejecutando: ${cmd}`);
@@ -96,6 +86,11 @@ async function handleDeploy(req, res) {
     if (stdout) console.log('[webhook]', stdout.trim());
     if (stderr) console.error('[webhook]', stderr.trim());
     console.log('[webhook] ✅ Deploy completado');
+    // Reiniciar webhook-deploy al final si el propio script cambió
+    if (needsWebhookSelf) {
+      console.log('[webhook] Reiniciando webhook-deploy en 3s...');
+      setTimeout(() => exec('pm2 restart webhook-deploy'), 3000);
+    }
   });
 }
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # scripts/provisionar-tenant.sh
-# Provisiona un nuevo tenant en el mismo repo:
+# Provisiona un nuevo tenant en el mismo repo (bare-metal / PM2):
 #   - Crea envs/{TENANT_ID}.env con variables de entorno
 #   - Registra el tenant en data/tenants.json
-#   - Añade el servicio al docker-compose.yml
-#   - Arranca el contenedor
+#   - Arranca el bot del tenant con PM2
 #
 # Modo interactivo (terminal):
 #   bash scripts/provisionar-tenant.sh
@@ -50,8 +49,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
-COMPOSE="$RAIZ/docker-compose.yml"
-OVERRIDE="$RAIZ/docker-compose.override.yml"
 TENANTS_FILE="$RAIZ/data/tenants.json"
 ENVS_DIR="$RAIZ/envs"
 
@@ -60,9 +57,9 @@ TENANT_ID=$(get_val "TENANT_ID" "ID del tenant (ej: tacos-pepe-gdl)")
 [[ -z "$TENANT_ID" ]]                   && error "El ID no puede estar vacío."
 [[ ! "$TENANT_ID" =~ ^[a-z0-9-]+$ ]]   && error "El ID debe ser minúsculas, números y guiones."
 
-# Verificar que no exista ya
-if grep -q "^  ${TENANT_ID}:" "$OVERRIDE" 2>/dev/null; then
-  error "El tenant '${TENANT_ID}' ya existe en docker-compose.override.yml."
+# Verificar que no exista ya en PM2
+if command -v pm2 &>/dev/null && pm2 list --no-color 2>/dev/null | grep -q " ${TENANT_ID} "; then
+  error "El tenant '${TENANT_ID}' ya está corriendo en PM2. Detenlo primero con: pm2 delete ${TENANT_ID}"
 fi
 if [[ -f "$ENVS_DIR/${TENANT_ID}.env" ]]; then
   error "Ya existe envs/${TENANT_ID}.env — elimínalo antes de reprovisionar."
@@ -72,6 +69,7 @@ NOMBRE=$(get_val    "PROV_NOMBRE"     "Nombre del negocio"      "$TENANT_ID")
 CIUDAD=$(get_val    "PROV_CIUDAD"     "Ciudad"                  "")
 ESTADO=$(get_val    "PROV_ESTADO"     "Estado"                  "")
 GRUPO_ID=$(get_val        "PROV_GRUPO_ID"         "GRUPO_ID de WhatsApp (enter para omitir)"           "")
+GROQ_API_KEY=$(get_val    "PROV_GROQ_API_KEY"     "GROQ_API_KEY (enter para omitir)"                  "")
 BUSINESS_TYPE=$(get_val   "PROV_BUSINESS_TYPE"    "Giro de negocio (taqueria/pizzeria/hamburgueseria)"  "taqueria")
 SECCION_TAQUERIA=$(get_val "PROV_SECCION_TAQUERIA" "Sección taquería (ambas/carnitas/asada)"            "ambas")
 PLAN=$(get_val            "PROV_PLAN"             "Plan (basico / plus / pro)"                         "basico")
@@ -89,7 +87,6 @@ ports = [t.get('panel_port', 0) for t in data.get('tenants', [])]
 print(' '.join(map(str, ports)))
 " 2>/dev/null || echo "")
     while echo "$PUERTOS_USADOS" | grep -qw "$PUERTO_SUGERIDO" || \
-          docker ps --format "{{.Ports}}" 2>/dev/null | grep -q ":${PUERTO_SUGERIDO}->" || \
           ss -tlnp 2>/dev/null | grep -q ":${PUERTO_SUGERIDO} "; do
       PUERTO_SUGERIDO=$((PUERTO_SUGERIDO + 1))
     done
@@ -110,11 +107,12 @@ cat > "$ENVS_DIR/${TENANT_ID}.env" <<EOF
 TENANT_ID=${TENANT_ID}
 NOMBRE_NEGOCIO=${NOMBRE}
 GRUPO_ID=${GRUPO_ID}
-PANEL_PORT=3000
+PANEL_PORT=${PANEL_PORT}
 PANEL_SECRET=${PANEL_SECRET}
 BUSINESS_TYPE=${BUSINESS_TYPE}
 SECCION_TAQUERIA_INICIAL=${SECCION_TAQUERIA}
 EOF
+[[ -n "$GROQ_API_KEY" ]] && echo "GROQ_API_KEY=${GROQ_API_KEY}" >> "$ENVS_DIR/${TENANT_ID}.env"
 ok "envs/${TENANT_ID}.env creado."
 
 # ── 3. Registrar en data/tenants.json ─────────────────────────────────────────
@@ -156,37 +154,49 @@ else
   warn "python3 no disponible — registra el tenant manualmente en data/tenants.json."
 fi
 
-# ── 4. Añadir servicio a docker-compose.override.yml ─────────────────────────
-info "Añadiendo servicio ${TENANT_ID} a docker-compose.override.yml..."
-# Crear el override con cabecera si no existe
-if [[ ! -f "$OVERRIDE" ]]; then
-  echo "services:" > "$OVERRIDE"
+# ── 4. Crear configuración PM2 y arrancar ─────────────────────────────────────
+TMP_CONF="/tmp/${TENANT_ID}-pm2.json"
+if command -v python3 &>/dev/null; then
+  python3 - <<PYEOF
+import json
+env = {
+    "NODE_ENV": "production",
+    "TENANT_ID": "${TENANT_ID}",
+    "PANEL_PORT": "${PANEL_PORT}",
+    "PANEL_SECRET": "${PANEL_SECRET}",
+}
+if "${GRUPO_ID}":     env["GRUPO_ID"]     = "${GRUPO_ID}"
+if "${GROQ_API_KEY}": env["GROQ_API_KEY"] = "${GROQ_API_KEY}"
+
+config = {
+    "apps": [{
+        "name": "${TENANT_ID}",
+        "script": "${RAIZ}/index.js",
+        "cwd": "${RAIZ}",
+        "autorestart": True,
+        "watch": False,
+        "max_memory_restart": "1G",
+        "restart_delay": 15000,
+        "max_restarts": 10,
+        "min_uptime": "30s",
+        "out_file":        "${RAIZ}/logs/bot-out.log",
+        "error_file":      "${RAIZ}/logs/bot-err.log",
+        "log_date_format": "YYYY-MM-DD HH:mm:ss",
+        "merge_logs": True,
+        "env": env
+    }]
+}
+with open("${TMP_CONF}", "w") as f:
+    json.dump(config, f, indent=2)
+print("Configuracion PM2 lista.")
+PYEOF
 fi
-cat >> "$OVERRIDE" <<EOF
 
-  # Tenant: ${NOMBRE}
-  ${TENANT_ID}:
-    build: .
-    container_name: ${TENANT_ID}
-    restart: unless-stopped
-    env_file: envs/${TENANT_ID}.env
-    environment:
-      - TZ=America/Mazatlan
-    ports:
-      - "${PANEL_PORT}:3000"
-    volumes:
-      - ./data:/Rajem-Bot/data
-      - ./logs:/Rajem-Bot/logs
-      - ./.wwebjs_auth:/Rajem-Bot/.wwebjs_auth
-      - ./.wwebjs_cache:/Rajem-Bot/.wwebjs_cache
-EOF
-ok "Servicio añadido a docker-compose.override.yml."
-
-# ── 5. Construir y arrancar el contenedor ─────────────────────────────────────
-if command -v docker &>/dev/null; then
-  info "Construyendo imagen y arrancando contenedor ${TENANT_ID}..."
-  if docker compose up -d --build "$TENANT_ID"; then
-    ok "Contenedor arrancado. El bot iniciará en ~30s."
+if command -v pm2 &>/dev/null; then
+  info "Arrancando bot '${TENANT_ID}' con PM2..."
+  if pm2 start "$TMP_CONF"; then
+    pm2 save
+    rm -f "$TMP_CONF"
     # Marcar como activo en tenants.json
     if command -v python3 &>/dev/null; then
       python3 - <<PYEOF
@@ -197,13 +207,15 @@ for t in data['tenants']:
     if t['id'] == '${TENANT_ID}': t['activo'] = True
 with open(file, 'w') as f: json.dump(data, f, ensure_ascii=False, indent=2)
 PYEOF
-      ok "Tenant marcado como Activo."
+      ok "Tenant marcado como activo."
     fi
+    ok "Bot arrancado. Iniciará en ~30s y mostrará el QR en el super admin."
   else
-    warn "docker compose falló. Arráncalo manualmente:\n   cd $RAIZ && docker compose up -d --build $TENANT_ID"
+    warn "pm2 start falló. Intenta manualmente: pm2 start ${TMP_CONF}"
   fi
 else
-  warn "Docker no encontrado. Arranca el bot manualmente: cd $RAIZ && docker compose up -d --build $TENANT_ID"
+  warn "pm2 no encontrado en PATH. Arranca el bot manualmente:"
+  warn "  pm2 start ${TMP_CONF}"
 fi
 
 # ── Resumen ───────────────────────────────────────────────────────────────────
@@ -212,11 +224,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 ok "Tenant \"${NOMBRE}\" (${TENANT_ID}) provisionado."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo -e "  Panel      : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
-echo -e "  Contenedor : ${CYAN}${TENANT_ID}${NC}"
-echo -e "  BD         : ${CYAN}data/${TENANT_ID}.db${NC}"
+echo -e "  Panel tenant : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
+echo -e "  Proceso PM2  : ${CYAN}pm2 logs ${TENANT_ID}${NC}"
+echo -e "  BD           : ${CYAN}data/${TENANT_ID}.db${NC}"
 echo ""
-echo -e "${YELLOW}Escanea el QR desde el super admin o con:${NC}"
-echo -e "  ${CYAN}docker logs -f ${TENANT_ID}${NC}"
+echo -e "${YELLOW}Escanea el QR desde el super admin (sección QR del tenant).${NC}"
 echo ""
 echo "[LISTO]"

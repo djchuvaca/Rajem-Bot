@@ -130,7 +130,7 @@ app.post('/api/tenants/:id/eliminar', requireAuth, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   const options = {
-    hostname: process.env.WEBHOOK_HOST || 'host.docker.internal',
+    hostname: process.env.WEBHOOK_HOST || 'localhost',
     port:     webhookPort,
     path:     '/eliminar',
     method:   'POST',
@@ -375,7 +375,7 @@ app.post('/api/provisionar', requireAuth, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   const options = {
-    hostname: process.env.WEBHOOK_HOST || 'host.docker.internal',
+    hostname: process.env.WEBHOOK_HOST || 'localhost',
     port:     webhookPort,
     path:     '/provisionar',
     method:   'POST',
