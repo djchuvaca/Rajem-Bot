@@ -51,16 +51,18 @@ function _clearTimers(jid) {
 }
 
 async function _confirmarEntrega(jid, client, porTimeout = false) {
-  const t       = _timers.get(jid);
-  const inicio  = t?.inicio || Date.now();
-  const minutos = Math.round((Date.now() - inicio) / 60000);
+  const t        = _timers.get(jid);
+  const inicio   = t?.inicio || Date.now();
+  const minutos  = Math.round((Date.now() - inicio) / 60000);
+  const pedidoId = t?.pedidoId   || null;
+  const colonia  = t?.pedidoColonia || null;
   _clearTimers(jid);
 
   if (porTimeout) {
-    registrarEntregaTimeout(jid);
+    registrarEntregaTimeout(jid, pedidoId, colonia);
     try { await client.sendMessage(jid, '⏱️ Registré tu entrega automáticamente por tiempo de espera. ¡Gracias!'); } catch (_) {}
   } else {
-    registrarEntregaConfirmada(jid, minutos);
+    registrarEntregaConfirmada(jid, minutos, pedidoId, colonia);
     try { await client.sendMessage(jid, `✅ ¡Gracias! Entrega registrada (${minutos} min). ¡Buen trabajo! 🛵`); } catch (_) {}
   }
 }

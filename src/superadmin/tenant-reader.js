@@ -395,6 +395,47 @@ function setTenantMandaditosConfig(tenant, config) {
   finally { db.close(); }
 }
 
+function getTenantEntregasHistorial(tenant, { repartidorId = null, desde = null, hasta = null } = {}) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    const condiciones = ['1=1'];
+    const params      = [];
+    if (repartidorId) { condiciones.push('h.repartidor_id=?'); params.push(repartidorId); }
+    if (desde)        { condiciones.push('h.fecha>=?');        params.push(desde); }
+    if (hasta)        { condiciones.push('h.fecha<=?');        params.push(hasta); }
+    return db.prepare(`
+      SELECT h.*, r.nombre AS repartidor_nombre
+      FROM entregas_historial h
+      JOIN repartidores r ON r.id = h.repartidor_id
+      WHERE ${condiciones.join(' AND ')}
+      ORDER BY h.creado_en DESC
+      LIMIT 500
+    `).all(...params);
+  } catch (_) { return []; }
+}
+
+function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    return db.prepare(`
+      SELECT r.id, r.nombre, r.activo, r.promedio_entrega_min AS promedio_global,
+             COUNT(h.id)                                              AS total_entregas,
+             SUM(CASE WHEN h.confirmado=1 THEN 1 ELSE 0 END)         AS confirmadas,
+             SUM(CASE WHEN h.confirmado=0 THEN 1 ELSE 0 END)         AS timeouts,
+             ROUND(AVG(CASE WHEN h.confirmado=1 THEN h.minutos END), 1) AS promedio_min_periodo
+      FROM repartidores r
+      LEFT JOIN entregas_historial h
+        ON h.repartidor_id = r.id
+        AND (? IS NULL OR h.fecha >= ?)
+        AND (? IS NULL OR h.fecha <= ?)
+      GROUP BY r.id
+      ORDER BY total_entregas DESC, r.nombre
+    `).all(desde, desde, hasta, hasta);
+  } catch (_) { return []; }
+}
+
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig,
@@ -404,4 +445,5 @@ module.exports = {
   getTenantPlan, setTenantPlan,
   getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
   getTenantMandaditosConfig, setTenantMandaditosConfig,
+  getTenantEntregasHistorial, getTenantReporteReparto,
 };

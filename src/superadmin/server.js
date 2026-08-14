@@ -23,6 +23,7 @@ const {
   getTenantPlan, setTenantPlan,
   getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
   getTenantMandaditosConfig, setTenantMandaditosConfig,
+  getTenantEntregasHistorial, getTenantReporteReparto,
 } = require('./tenant-reader');
 
 const _loginAttempts = new Map();
@@ -490,6 +491,24 @@ app.put('/api/tenants/:id/mandaditos-config', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const ok = setTenantMandaditosConfig(tenant, req.body);
   ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Error al guardar' });
+});
+
+app.get('/api/tenants/:id/entregas-historial', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { repartidor_id, desde, hasta } = req.query;
+  res.json(getTenantEntregasHistorial(tenant, {
+    repartidorId: repartidor_id ? parseInt(repartidor_id) : null,
+    desde: desde || null,
+    hasta: hasta || null,
+  }));
+});
+
+app.get('/api/tenants/:id/reporte-reparto', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const { desde, hasta } = req.query;
+  res.json(getTenantReporteReparto(tenant, { desde: desde || null, hasta: hasta || null }));
 });
 
 function startSuperAdmin(port = 3001, waClient = null) {

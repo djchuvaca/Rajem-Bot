@@ -393,6 +393,54 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
             <tbody id="mand-tbody"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody>
           </table>
         </div>
+
+        <!-- Reporte de desempeño -->
+        <div class="card-title" style="margin:20px 0 10px">📊 Reporte de desempeño</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Desde</label>
+            <input type="date" id="rep-desde" style="height:32px;font-size:13px">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Hasta</label>
+            <input type="date" id="rep-hasta" style="height:32px;font-size:13px">
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadReporteReparto()">Cargar reporte</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Repartidor</th><th>Entregas (periodo)</th><th>Confirmadas</th><th>Timeouts</th><th>Prom. min (periodo)</th><th>Prom. global</th>
+            </tr></thead>
+            <tbody id="rep-tbody"><tr><td colspan="6" class="empty">Selecciona un periodo y haz clic en Cargar reporte</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- Historial de entregas -->
+        <div class="card-title" style="margin:20px 0 10px">📋 Historial de entregas</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Repartidor</label>
+            <select id="hist-rep" style="height:32px;font-size:13px"><option value="">Todos</option></select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Desde</label>
+            <input type="date" id="hist-desde" style="height:32px;font-size:13px">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Hasta</label>
+            <input type="date" id="hist-hasta" style="height:32px;font-size:13px">
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadHistorialReparto()">Cargar historial</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Repartidor</th><th>Pedido #</th><th>Colonia</th><th>Minutos</th><th>Estado</th>
+            </tr></thead>
+            <tbody id="hist-tbody"><tr><td colspan="6" class="empty">Selecciona filtros y haz clic en Cargar historial</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1369,6 +1417,13 @@ async function loadMandaditos() {
   const tbody = document.getElementById('mand-tbody');
   if (!rr.ok) { tbody.innerHTML='<tr><td colspan="9" class="empty">Error al cargar</td></tr>'; return; }
   const reps = await rr.json();
+  // Poblar select de historial
+  const histSel = document.getElementById('hist-rep');
+  if (histSel) {
+    const current = histSel.value;
+    histSel.innerHTML = '<option value="">Todos</option>' + reps.map(r => `<option value="${r.id}">${esc(r.nombre)}</option>`).join('');
+    if (current) histSel.value = current;
+  }
   if (!reps.length) { tbody.innerHTML='<tr><td colspan="9" class="empty">Sin repartidores registrados aún</td></tr>'; return; }
   tbody.innerHTML = reps.map(r => `
     <tr>
@@ -1421,6 +1476,54 @@ async function eliminarRepartidor(id) {
   if (!confirm('¿Eliminar este repartidor del registro?')) return;
   const r = await fetch(`/api/tenants/${_mandTenantId}/repartidores/${id}`, { method:'DELETE' });
   r.ok ? (toast('Repartidor eliminado'), loadMandaditos()) : toast('Error','err');
+}
+
+async function loadReporteReparto() {
+  if (!_mandTenantId) return toast('Selecciona un negocio','err');
+  const desde = document.getElementById('rep-desde').value || '';
+  const hasta  = document.getElementById('rep-hasta').value  || '';
+  const params = new URLSearchParams();
+  if (desde) params.set('desde', desde);
+  if (hasta)  params.set('hasta', hasta);
+  const r = await fetch(`/api/tenants/${_mandTenantId}/reporte-reparto?${params}`);
+  const tbody = document.getElementById('rep-tbody');
+  if (!r.ok) { tbody.innerHTML='<tr><td colspan="6" class="empty">Error al cargar</td></tr>'; return; }
+  const data = await r.json();
+  if (!data.length) { tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos para el periodo seleccionado</td></tr>'; return; }
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td>${esc(d.nombre)}${d.activo ? '' : ' <span class="badge badge-gray" style="font-size:10px">Pausado</span>'}</td>
+      <td>${d.total_entregas}</td>
+      <td>${d.confirmadas}</td>
+      <td>${d.timeouts}</td>
+      <td>${d.promedio_min_periodo != null ? d.promedio_min_periodo+' min' : '—'}</td>
+      <td>${d.promedio_global != null ? d.promedio_global+' min' : '—'}</td>
+    </tr>`).join('');
+}
+
+async function loadHistorialReparto() {
+  if (!_mandTenantId) return toast('Selecciona un negocio','err');
+  const repId  = document.getElementById('hist-rep').value   || '';
+  const desde  = document.getElementById('hist-desde').value || '';
+  const hasta  = document.getElementById('hist-hasta').value  || '';
+  const params = new URLSearchParams();
+  if (repId) params.set('repartidor_id', repId);
+  if (desde) params.set('desde', desde);
+  if (hasta)  params.set('hasta', hasta);
+  const r = await fetch(`/api/tenants/${_mandTenantId}/entregas-historial?${params}`);
+  const tbody = document.getElementById('hist-tbody');
+  if (!r.ok) { tbody.innerHTML='<tr><td colspan="6" class="empty">Error al cargar</td></tr>'; return; }
+  const data = await r.json();
+  if (!data.length) { tbody.innerHTML='<tr><td colspan="6" class="empty">Sin entregas para los filtros seleccionados</td></tr>'; return; }
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td>${d.fecha}</td>
+      <td>${esc(d.repartidor_nombre)}</td>
+      <td>${d.pedido_id ? '#'+d.pedido_id : '—'}</td>
+      <td>${esc(d.colonia || '—')}</td>
+      <td>${d.minutos != null ? d.minutos+' min' : '—'}</td>
+      <td>${d.confirmado ? '<span class="badge badge-green">Confirmada</span>' : '<span class="badge badge-gray">Timeout</span>'}</td>
+    </tr>`).join('');
 }
 
 // Poblar select de mandaditos junto con los demás selects de tenant

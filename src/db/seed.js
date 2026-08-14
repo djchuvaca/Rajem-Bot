@@ -519,6 +519,17 @@ async function seedDB() {
     creado_en             TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
 
+  run(`CREATE TABLE IF NOT EXISTS entregas_historial (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    repartidor_id   INTEGER NOT NULL REFERENCES repartidores(id) ON DELETE CASCADE,
+    pedido_id       INTEGER,
+    colonia         TEXT,
+    minutos         INTEGER,
+    confirmado      INTEGER NOT NULL DEFAULT 1,
+    fecha           TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+    creado_en       TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  )`);
+
   // ── ENTORNO DE PRUEBAS: activar item_types y poblar productos ────────────────
   // En producción, el tenant activa item_types y agrega productos desde el panel.
   // En tests (BOT_TEST_MODE=1), se activan automáticamente para que el NLU funcione.
