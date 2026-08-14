@@ -2160,9 +2160,6 @@ const GRUPOS_CONFIG = [
   { id:'postventa',      icon:'❌', title:'5. Después del pedido',   sub:'Respuesta utilizada si el cliente solicita cancelar una orden registrada',       color:'var(--red)',    colorBg:'rgba(239,68,68,0.1)',   claves:['cancelacion_enviada'] },
 ];
 
-// Derivado para saveGrupoMensajes
-const GRUPOS_MENSAJES = Object.fromEntries(GRUPOS_CONFIG.map(g => [g.id, g.claves]));
-
 function _waFormat(text) {
   if (!text || !text.trim()) return '<span style="opacity:.35;font-style:italic">El mensaje aparecerá aquí...</span>';
   return text
@@ -2279,12 +2276,32 @@ async function loadMensajes() {
   const msgs = await api('/api/mensajes');
   let contexto = {};
   try { contexto = await api('/api/mensajes/contexto'); } catch (_) {}
+  const tieneContextoFormatos = Array.isArray(contexto.formatos_pieza);
+  const formatos = tieneContextoFormatos ? contexto.formatos_pieza : [];
+  for (const formato of formatos) {
+    MSG_META[formato.clave] = {
+      icon: formato.emoji || '🍽️',
+      label: `Texto bajo ${formato.nombre}`,
+      trigger: `Solo si hay ${formato.nombre} activos`,
+      hint: `Texto exclusivo que WhatsApp muestra debajo del precio de ${formato.nombre}.`,
+      vars: [],
+    };
+  }
+  const grupoMenu = GRUPOS_CONFIG.find(g => g.id === 'menu');
+  if (grupoMenu && tieneContextoFormatos) {
+    grupoMenu.claves = [
+      ...formatos.map(f => f.clave),
+      ...(contexto.aplica?.menu_gramos_nota ? ['menu_gramos_nota'] : []),
+      ...(contexto.aplica?.menu_por_cantidad ? ['menu_por_cantidad'] : []),
+      'menu_salsas_nota','menu_pie_salsas','menu_nota_precios','menu_domicilio_nota',
+    ];
+  }
   const map  = Object.fromEntries(msgs.map(m => [m.clave, m.valor]));
   renderAllMensajes(map, contexto);
 }
 
 async function saveGrupoMensajes(grupoId, mostrarAviso = true) {
-  const claves = GRUPOS_MENSAJES[grupoId] || [];
+  const claves = GRUPOS_CONFIG.find(g => g.id === grupoId)?.claves || [];
   for (const clave of claves) {
     const el = document.getElementById(`msg-${clave}`);
     if (el) await api('/api/mensajes', 'POST', { clave, valor: el.value });

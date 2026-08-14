@@ -393,6 +393,29 @@ describe("menu_domicilio_nota en respuestaMenu", () => {
 });
 
 describe("convergencia del menú WhatsApp con activación del tenant", () => {
+  test("usa un texto independiente para cada presentación por pieza", () => {
+    run("INSERT OR REPLACE INTO mensajes_bot(clave,valor) VALUES('menu_formato_taco_nota','NOTA SOLO TACOS')");
+    run("INSERT OR REPLACE INTO mensajes_bot(clave,valor) VALUES('menu_formato_torta_nota','NOTA SOLO TORTAS')");
+    try {
+      const menu = respuestaMenu();
+      assert.match(menu, /\*TACOS\*[\s\S]*NOTA SOLO TACOS/);
+      assert.match(menu, /\*TORTAS\*[\s\S]*NOTA SOLO TORTAS/);
+    } finally {
+      run("DELETE FROM mensajes_bot WHERE clave IN ('menu_formato_taco_nota','menu_formato_torta_nota')");
+    }
+  });
+
+  test("el texto particular desaparece junto con su presentación desactivada", () => {
+    run("INSERT OR REPLACE INTO mensajes_bot(clave,valor) VALUES('menu_formato_taco_nota','NOTA PRESENTACION INACTIVA')");
+    run("UPDATE menu_items SET activo=0 WHERE categoria='corte' AND formato_slug='taco'");
+    try {
+      assert.doesNotMatch(respuestaMenu(), /NOTA PRESENTACION INACTIVA/);
+    } finally {
+      run("UPDATE menu_items SET activo=1 WHERE categoria='corte' AND formato_slug='taco'");
+      run("DELETE FROM mensajes_bot WHERE clave='menu_formato_taco_nota'");
+    }
+  });
+
   test("oculta un corte desactivado en todas sus presentaciones", () => {
     run("UPDATE menu_items SET activo=0 WHERE categoria='corte' AND producto_slug='buche'");
     try {

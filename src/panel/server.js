@@ -176,13 +176,25 @@ app.post("/api/banco", requireAuth, (req, res) => {
 });
 
 // ── MENSAJES BOT ──────────────────────────────────────────────────────────────
-function _clavesMensajesGiro() {
-  return new Set(Object.keys(getGiroActivo()?.mensajesDefaults || {}));
+function _mensajesPermitidosGiro() {
+  const giro = getGiroActivo();
+  const defaults = giro?.mensajesDefaults || {};
+  const permitidos = new Map(Object.entries(defaults));
+  for (const formato of giro?.itemTypes || []) {
+    if (!formato.soporta_gramos && !formato.soporta_pesos) {
+      permitidos.set(`menu_formato_${formato.slug}_nota`, defaults.menu_taco_nota || '');
+    }
+  }
+  return permitidos;
 }
 
 app.get("/api/mensajes", requireAuth, (req, res) => {
-  const permitidas = _clavesMensajesGiro();
-  res.json(getAllMensajes().filter(m => permitidas.has(m.clave)));
+  const permitidos = _mensajesPermitidosGiro();
+  const guardados = new Map(getAllMensajes().map(m => [m.clave, m.valor]));
+  res.json([...permitidos].map(([clave, valorDefault]) => ({
+    clave,
+    valor: guardados.has(clave) ? guardados.get(clave) : valorDefault,
+  })));
 });
 
 app.get("/api/mensajes/contexto", requireAuth, (_req, res) => {
@@ -201,6 +213,14 @@ app.get("/api/mensajes/contexto", requireAuth, (_req, res) => {
       bebidas:        bebidas.length,
       salsas:         salsas.length,
     },
+    formatos_pieza: formatos
+      .filter(f => !f.soporta_gramos && !f.soporta_pesos && cortes.some(i => i.formato_slug === f.slug))
+      .map(f => ({
+        slug: f.slug,
+        nombre: f.nombre_plural || f.nombre || f.slug,
+        emoji: f.emoji || '🍽️',
+        clave: `menu_formato_${f.slug}_nota`,
+      })),
     aplica: {
       menu_taco_nota:      tieneFormato(f => !f.soporta_gramos && !f.soporta_pesos),
       menu_gramos_nota:    tieneFormato(f => Boolean(f.soporta_gramos)),
@@ -217,7 +237,7 @@ app.get("/api/mensajes/contexto", requireAuth, (_req, res) => {
 app.post("/api/mensajes", requireAuth, (req, res) => {
   const clave = String(req.body.clave || '');
   const valor = typeof req.body.valor === 'string' ? req.body.valor : '';
-  if (!_clavesMensajesGiro().has(clave)) return res.status(400).json({ error: 'El mensaje no pertenece al Giro activo' });
+  if (!_mensajesPermitidosGiro().has(clave)) return res.status(400).json({ error: 'El mensaje no pertenece al Giro activo' });
   if (valor.length > 4000) return res.status(400).json({ error: 'El mensaje excede 4000 caracteres' });
   setMensaje(clave, valor);
   res.json({ ok: true });

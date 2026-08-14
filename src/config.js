@@ -74,6 +74,7 @@ function getMenuFormato() {
     let seccionPrecios = "";
     for (const it of itsPorUnidad) {
       const campo = it.precio_campo || 'precio_taco';
+      const notaFormato = getMensaje(`menu_formato_${it.slug}_nota`) ?? notaTaco;
 
       // Precios de menu_items para este formato
       const preciosFormato = cortesItems
@@ -91,7 +92,7 @@ function getMenuFormato() {
         const maxP = Math.max(...preciosFormato);
         precioDisplay = minP === maxP ? `$${minP} c/u` : `desde $${minP} c/u`;
       }
-      seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — ${precioDisplay}\n${notaTaco}\n\n`;
+      seccionPrecios += `${it.emoji} *${it.nombre_plural.toUpperCase()}* — ${precioDisplay}\n${notaFormato}\n\n`;
     }
 
     // ── Sección por gramos ────────────────────────────────────────────────────
