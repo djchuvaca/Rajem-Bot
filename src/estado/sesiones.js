@@ -10,7 +10,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, esperandoConfirmacionItem,
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, pendientesConfirmacion,
-  esperandoExtras, ordenPreResumen, esperandoPagoMP,
+  esperandoExtras, ordenPreResumen, esperandoPagoMP, esperandoColonia,
 } = require("./maps");
 
 function serializarEstado(numero) {
@@ -38,6 +38,7 @@ function serializarEstado(numero) {
   if (esperandoExtras.has(numero))            estado.esperandoExtras       = esperandoExtras.get(numero);
   if (ordenPreResumen.has(numero))            estado.ordenPreResumen       = ordenPreResumen.get(numero);
   if (esperandoPagoMP.has(numero))            estado.esperandoPagoMP       = esperandoPagoMP.get(numero);
+  if (esperandoColonia.has(numero))           estado.esperandoColonia      = esperandoColonia.get(numero);
   return estado;
 }
 
@@ -66,6 +67,7 @@ function restaurarEstado(numero, estado, historial = []) {
   if (estado.esperandoExtras)         esperandoExtras.set(numero, estado.esperandoExtras);
   if (estado.ordenPreResumen)         ordenPreResumen.set(numero, estado.ordenPreResumen);
   if (estado.esperandoPagoMP)         esperandoPagoMP.set(numero, estado.esperandoPagoMP);
+  if (estado.esperandoColonia)        esperandoColonia.set(numero, estado.esperandoColonia);
   if (historial.length > 0)           conversaciones.set(numero, historial);
 }
 
@@ -87,7 +89,7 @@ const _CLAVES_FLUJO_ACTIVO = new Set([
   "resumenPendiente", "esperandoCaptura", "esperandoConfirmItem",
   "esperandoAgregarMas", "esperandoConfirmDatos", "esperandoEdicion",
   "esperandoCorte", "esperandoTipoItem", "esperandoCancelacion", "esperandoExtras",
-  "ordenPreResumen", "pendienteConfirmacion", "esperandoPagoMP",
+  "ordenPreResumen", "pendienteConfirmacion", "esperandoPagoMP", "esperandoColonia",
   // Datos de formulario — el cliente llenó parte de su dirección/datos; restaurar evita que repita todo
   "datosCampos",
 ]);

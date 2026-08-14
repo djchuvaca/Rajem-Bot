@@ -1,5 +1,6 @@
 const { queryAll } = require('../db/core');
 const { getConfig } = require('../db/config');
+const diccionarioTepic = require('./geotepic/diccionario_colonias_tepic');
 
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -40,6 +41,7 @@ function _geoConfig() {
       fallback: parseInt(getConfig('domicilio_costo') || '50'),
       lat:      parseFloat(getConfig('negocio_lat')   || '0'),
       lon:      parseFloat(getConfig('negocio_lon')   || '0'),
+      permitirAproximada: getConfig('geo_tarifa_aproximada') === '1',
     };
     _cfgTs = now;
   }
@@ -81,7 +83,7 @@ function _targets(colonia) {
 }
 
 // ── Búsqueda con scoring ──────────────────────────────────────────────────────
-function buscarColonia(nombre) {
+function _buscarColoniaLegacy(nombre) {
   if (!nombre) return null;
   const norm = normalizar(nombre);
   if (!norm || norm.length < 2) return null;
@@ -144,9 +146,42 @@ function buscarColonia(nombre) {
   return (mejorPuntaje >= 0.5 || (mejorPuntaje > 0 && candidatos === 1)) ? mejorMatch : null;
 }
 
+function buscarColoniaDetallada(nombre) {
+  if (!nombre) return { estado: 'no_encontrada', confianza: 0 };
+  const activas = _colonias();
+  const localPara = coloniaDiccionario => {
+    const targetsDiccionario = [coloniaDiccionario.nombre, coloniaDiccionario.nombreOficial, ...(coloniaDiccionario.alias || [])]
+      .map(normalizar).filter(Boolean);
+    return activas.find(c => _targets(c).some(t => targetsDiccionario.includes(t))) || null;
+  };
+  const resultado = diccionarioTepic.buscarColonia(nombre);
+  if (resultado.estado === 'encontrada') {
+    const local = localPara(resultado.colonia);
+    if (local) return { ...resultado, colonia: local };
+  }
+  if (resultado.estado === 'ambigua') {
+    const opcionesActivas = [...new Map((resultado.opciones || [])
+      .map(o => localPara(diccionarioTepic.COLONIAS[o.id])).filter(Boolean)
+      .map(c => [c.id, c])).values()];
+    if (opcionesActivas.length === 1)
+      return { estado: 'encontrada', colonia: opcionesActivas[0], confianza: resultado.confianza, metodo: 'ambiguedad_resuelta_por_activacion' };
+    if (opcionesActivas.length > 1)
+      return { ...resultado, opciones: opcionesActivas.map(c => ({ id: c.geo_tepic_id || c.id, nombre: c.nombre, tipo: c.tipo, codigoPostal: c.codigo_postal })) };
+  }
+  const legacy = _buscarColoniaLegacy(nombre);
+  return legacy
+    ? { estado: 'encontrada', colonia: legacy, confianza: 0.8, metodo: 'catalogo_tenant' }
+    : { estado: 'no_encontrada', confianza: 0 };
+}
+
+function buscarColonia(nombre) {
+  const resultado = buscarColoniaDetallada(nombre);
+  return resultado.estado === 'encontrada' ? resultado.colonia : null;
+}
+
 // ── Cálculo de tarifa ─────────────────────────────────────────────────────────
 function calcularTarifaDomicilio(nombreColonia) {
-  const { fallback, lat: negocioLat, lon: negocioLon } = _geoConfig();
+  const { fallback, lat: negocioLat, lon: negocioLon, permitirAproximada } = _geoConfig();
 
   if (!negocioLat || !negocioLon) {
     console.warn('[GEO] negocio_lat/negocio_lon no configurados — todos los domicilios usan tarifa plana');
@@ -156,6 +191,11 @@ function calcularTarifaDomicilio(nombreColonia) {
   const colonia = buscarColonia(nombreColonia);
   if (!colonia) {
     return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
+  }
+
+  if (!colonia.verificada && !permitirAproximada) {
+    return { tarifa: fallback, zona: null, distancia: null, encontrada: true, fueraDeCobertura: false,
+      coloniaNombre: colonia.nombre, requiereVerificacion: true };
   }
 
   const distancia = haversine(negocioLat, negocioLon, colonia.lat, colonia.lon);
@@ -190,4 +230,4 @@ function calcularTarifaDomicilio(nombreColonia) {
   return { tarifa: fallback, zona: null, distancia: Math.round(distancia * 10) / 10, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
 }
 
-module.exports = { haversine, normalizar, buscarColonia, calcularTarifaDomicilio, invalidarCacheColonias, invalidarCacheConfig };
+module.exports = { haversine, normalizar, buscarColonia, buscarColoniaDetallada, calcularTarifaDomicilio, invalidarCacheColonias, invalidarCacheConfig };

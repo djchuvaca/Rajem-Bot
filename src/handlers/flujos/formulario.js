@@ -9,6 +9,7 @@ const {
   siguienteCampoFaltante, manejarOpcional, camposCompletos, camposATexto,
   persistirEstado, detectarEdicion, aplicarEdicion, extraerTelefonoDeJID,
   sanitizarColonia, resumenPendiente,
+  esperandoColonia,
 } = require("../../estado");
 const { generarResumen } = require("../../pedido/resumen");
 const { getCliente, getTelefonoReal } = require("../../db");
@@ -17,7 +18,7 @@ const { estaEnHorario, mensajeFueraDeHorario, getRangoHorario } = require("../..
 const { detectarPreguntaFrecuente, calcularScore, detectarSinTipo, parsearPedidoSimple } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 const { telefonosReales, replyConTyping, ordenPendientePreventa, enFlujoActivo } = require("./utils");
-const { buscarColonia } = require("../../geo");
+const { buscarColonia, buscarColoniaDetallada } = require("../../geo");
 
 // Contador de intentos fallidos de colonia por cliente (vive solo en memoria, se limpia al aceptar)
 const _intentosColonia = new Map();
@@ -331,6 +332,26 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   const esOrdenDomicilio = camposActualesFormulario.tipoEntrega === "domicilio"
     || (camposActualesFormulario.tipoEntrega == null && tipoEntregaCliente.get(clienteNumero) === "domicilio");
 
+  if (esOrdenDomicilio && esperandoColonia.has(clienteNumero)) {
+    const opciones = esperandoColonia.get(clienteNumero).opciones || [];
+    const limpio = textoOriginal.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const ordinales = { "la primera": 0, primera: 0, "la segunda": 1, segunda: 1, "la tercera": 2, tercera: 2 };
+    let indice = /^\d+$/.test(limpio) ? Number(limpio) - 1 : ordinales[limpio];
+    let elegida = Number.isInteger(indice) ? opciones[indice] : null;
+    if (!elegida) elegida = opciones.find(o => {
+      const nombre = o.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return limpio === nombre || (o.codigoPostal && limpio.includes(o.codigoPostal)) || (o.tipo && limpio.includes(o.tipo.replace(/_/g, " ")));
+    });
+    if (!elegida) {
+      const lista = opciones.map((o, i) => `${i + 1}. *${o.nombre}*${o.codigoPostal ? ` — CP ${o.codigoPostal}` : ""}`).join("\n");
+      await msg.reply(`No pude identificar cuál elegiste. Responde con el *número*, nombre completo o código postal:\n${lista}`);
+      return true;
+    }
+    esperandoColonia.delete(clienteNumero);
+    textoOriginal = elegida.nombre;
+    persistirEstado(clienteNumero);
+  }
+
   // FAQ durante formulario: responde y re-muestra el progreso
   {
     const pregFaqForm = detectarPreguntaFrecuente(textoOriginal);
@@ -423,7 +444,19 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   if (esOrdenDomicilio && !coloniaAntes) {
     const caVal = datosCampos.get(clienteNumero) || {};
     if (caVal.colonia && !caVal._coloniaNoVerificada) {
-      const encontrada = buscarColonia(caVal.colonia);
+      const resultadoColonia = buscarColoniaDetallada(caVal.colonia);
+      const encontrada = resultadoColonia.estado === "encontrada" ? resultadoColonia.colonia : null;
+      if (resultadoColonia.estado === "ambigua") {
+        caVal.colonia = null;
+        datosCampos.set(clienteNumero, caVal);
+        persistirEstado(clienteNumero);
+        esperandoColonia.set(clienteNumero, { opciones: resultadoColonia.opciones });
+        persistirEstado(clienteNumero);
+        const lista = resultadoColonia.opciones.map((o, i) => `${i + 1}. *${o.nombre}*${o.tipo ? ` (${o.tipo.replace(/_/g, " ")})` : ""}${o.codigoPostal ? ` — CP ${o.codigoPostal}` : ""}`).join("\n");
+        await msg.reply(mostrarFormularioProgresivo(clienteNumero, true, esPreventa) +
+          `\n\nEncontré varias colonias con ese nombre:\n${lista}\n\nEscribe el *nombre completo* de la que corresponde a tu domicilio.`);
+        return true;
+      }
       if (!encontrada) {
         const intentos = _intentosColonia.get(clienteNumero) || 0;
         if (intentos < 2) {

@@ -242,7 +242,7 @@ app.post('/api/tenants/:id/config/bulk', requireAuth, (req, res) => {
 app.get('/api/geo/tepic/colonias', requireAuth, (_req, res) => {
   try {
     geoTepic.inicializarDesdeTenants(getTenants());
-    res.json(geoTepic.listarColonias());
+    res.json(geoTepic.listarColonias({ incluirExcluidas: _req.query.incluir_excluidas === '1' }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -259,6 +259,16 @@ app.put('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
 app.delete('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
   try { res.json({ ok: geoTepic.eliminarColonia(req.params.colId) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post('/api/geo/tepic/colonias/:colId/restaurar', requireAuth, (req, res) => {
+  try { res.json({ ok: geoTepic.restaurarColonia(req.params.colId) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.get('/api/geo/tepic/auditoria', requireAuth, (req, res) => {
+  try { res.json(geoTepic.listarAuditoria(req.query.limite)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Vista de soporte: definición maestra + activación particular del tenant Tepic.

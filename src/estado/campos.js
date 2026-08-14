@@ -12,6 +12,7 @@ const {
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem,
   esperandoExtras, ordenPreResumen, pendientesConfirmacion,
+  esperandoColonia,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
@@ -108,6 +109,7 @@ function limpiarTodo(numero) {
   ordenPreResumen.delete(numero);
   pendientesConfirmacion.delete(numero);
   referenciaPreguntas.delete(numero);
+  esperandoColonia.delete(numero);
   eliminarSesion(numero);
 }
 

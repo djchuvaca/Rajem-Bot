@@ -777,7 +777,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <table id="colonias-table">
             <thead><tr>
               <th class="sortable" onclick="ordenarColonias('nombre')">Colonia <span id="si-nombre"></span></th>
-              <th>Latitud</th><th>Longitud</th>
+              <th>CP</th><th>Coordenadas</th>
               <th class="sortable" onclick="ordenarColonias('distancia')">Distancia <span id="si-distancia"></span></th>
               <th class="sortable" onclick="ordenarColonias('zona_actual')">Zona asignada <span id="si-zona_actual"></span></th>
               <th class="sortable" onclick="ordenarColonias('activo')">Estado <span id="si-activo"></span></th>
@@ -2468,8 +2468,8 @@ function renderColonias(lista) {
   tbody.innerHTML = lista.length ? lista.map(c => `
     <tr>
       <td><strong>${c.nombre}</strong></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.lat}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.lon}</td>
+      <td>${c.codigo_postal||'—'}</td>
+      <td title="${c.fuente_coordenadas||'Sin fuente'}"><span class="badge ${c.verificada?'badge-green':'badge-yellow'}">${c.verificada?'Verificadas':'Aproximadas'}</span><br><small style="font-family:'DM Mono',monospace;color:var(--muted)">${c.lat}, ${c.lon}</small></td>
       <td>${c.distancia != null ? c.distancia + ' km' : '<span style="color:var(--muted)">—</span>'}</td>
       <td>${c.zona_actual ? `<span class="badge badge-blue">${c.zona_actual}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       <td><span class="badge ${c.activo ? 'badge-green' : 'badge-gray'}">${c.activo ? 'Activa' : 'Inactiva'}</span></td>

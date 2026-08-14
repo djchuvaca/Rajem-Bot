@@ -31,6 +31,7 @@ const esperandoTipoItem = new Map();
 const esperandoExtras   = new Map(); // reemplaza esperandoAgregarMas + esperandoSalsas en flujo normal
 const ordenPreResumen   = new Map(); // orden guardada mientras se recopila el formulario post-orden
 const esperandoPagoMP   = new Map(); // { pedidoId, telefono, nombre, expiraEn } tras enviar link MP
+const esperandoColonia  = new Map(); // opciones ofrecidas por una colonia ambigua
 
 const CARPETA_CAPTURAS = path.join(__dirname, "../../capturas");
 if (!fs.existsSync(CARPETA_CAPTURAS)) fs.mkdirSync(CARPETA_CAPTURAS);
@@ -41,5 +42,5 @@ module.exports = {
   clientesPreventa, horaEntregaPreventa, esperandoMotivoCancelacion,
   pedidosConfirmados, esperandoConfirmacionItem, esperandoAgregarMas,
   pedidoJSONActual, referenciaPreguntas,
-  esperandoConfirmacionDatos, tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, esperandoExtras, ordenPreResumen, esperandoPagoMP, CARPETA_CAPTURAS,
+  esperandoConfirmacionDatos, tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem, esperandoExtras, ordenPreResumen, esperandoPagoMP, esperandoColonia, CARPETA_CAPTURAS,
 };

@@ -7,7 +7,7 @@ const path    = require('path');
 const Database = require('better-sqlite3');
 const bcrypt  = require('bcryptjs');
 
-const ADMIN_DB_PATH = path.join(__dirname, '../../data/admin.db');
+const ADMIN_DB_PATH = process.env.ADMIN_DB_PATH || path.join(__dirname, '../../data/admin.db');
 let _db = null;
 
 function getAdminDB() {
@@ -43,6 +43,25 @@ function _init() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
   `);
+
+  // GeoTepic enriquecido. Las migraciones son aditivas para conservar instalaciones existentes.
+  const geoColumns = [
+    ['diccionario_id', 'TEXT'], ['nombre_oficial', 'TEXT'], ['codigo_postal', 'TEXT'],
+    ['municipio', 'TEXT'], ['ciudad', 'TEXT'], ['zona', 'TEXT'],
+    ['fuente_coordenadas', 'TEXT'], ['precision_coordenadas', 'TEXT'], ['confianza', 'TEXT'],
+    ['verificada', 'INTEGER NOT NULL DEFAULT 0'], ['palabras_clave', "TEXT NOT NULL DEFAULT '[]'"],
+    ['grupo_ambiguedad', 'TEXT'], ['origen', 'TEXT'],
+    ['administrada', 'INTEGER NOT NULL DEFAULT 0'], ['excluida', 'INTEGER NOT NULL DEFAULT 0'],
+  ];
+  const existentesGeo = new Set(_db.prepare('PRAGMA table_info(geo_tepic_colonias)').all().map(c => c.name));
+  for (const [nombre, tipo] of geoColumns) {
+    if (!existentesGeo.has(nombre)) _db.exec(`ALTER TABLE geo_tepic_colonias ADD COLUMN ${nombre} ${tipo}`);
+  }
+  _db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_geo_tepic_diccionario_id ON geo_tepic_colonias(diccionario_id) WHERE diccionario_id IS NOT NULL');
+  _db.exec(`CREATE TABLE IF NOT EXISTS geo_tepic_auditoria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, colonia_id INTEGER, accion TEXT NOT NULL,
+    datos_antes TEXT, datos_despues TEXT, usuario TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  )`);
 
   // Defaults de global_config — solo inserta si no existe
   const defaults = [

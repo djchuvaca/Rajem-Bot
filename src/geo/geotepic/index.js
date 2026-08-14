@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { getAdminDB } = require('../../db/admin');
-const CATALOGO_INICIAL = require('./tepic-nayarit.json');
+const DICCIONARIO = require('./diccionario_colonias_tepic');
 
 const ROOT_PATH = path.join(__dirname, '../../..');
 
@@ -37,22 +37,92 @@ function _normalizarAliases(aliases) {
   return JSON.stringify(Array.isArray(aliases) ? aliases.map(a => String(a).trim()).filter(Boolean) : []);
 }
 
-function _catalogo() {
-  return getAdminDB().prepare(`SELECT id, nombre, slug, tipo, lat, lon, aliases, activo
-    FROM geo_tepic_colonias ORDER BY nombre COLLATE NOCASE`).all();
+function _catalogo({ incluirExcluidas = false } = {}) {
+  return getAdminDB().prepare(`SELECT id, diccionario_id, nombre, nombre_oficial, slug, tipo,
+    codigo_postal, municipio, ciudad, zona, lat, lon, aliases, fuente_coordenadas,
+    precision_coordenadas, confianza, verificada, palabras_clave, grupo_ambiguedad, origen,
+    administrada, excluida, activo FROM geo_tepic_colonias
+    ${incluirExcluidas ? '' : 'WHERE excluida=0'} ORDER BY nombre COLLATE NOCASE`).all();
+}
+
+function _auditar(db, coloniaId, accion, antes, despues, usuario = 'sistema') {
+  db.prepare('INSERT INTO geo_tepic_auditoria (colonia_id,accion,datos_antes,datos_despues,usuario) VALUES (?,?,?,?,?)')
+    .run(coloniaId || null, accion, antes ? JSON.stringify(antes) : null, despues ? JSON.stringify(despues) : null, usuario);
+}
+
+function _filaDiccionario(c) {
+  return {
+    diccionario_id: c.id,
+    nombre: c.nombre,
+    nombre_oficial: c.nombreOficial || c.nombre,
+    slug: slugify(c.nombre),
+    tipo: c.tipo || 'colonia',
+    codigo_postal: c.codigoPostal || null,
+    municipio: c.municipio || 'Tepic',
+    ciudad: c.ciudad || 'Tepic',
+    zona: c.zona || 'urbana',
+    lat: c.coordenadas.latitud,
+    lon: c.coordenadas.longitud,
+    aliases: _normalizarAliases(c.alias),
+    fuente_coordenadas: c.coordenadas.fuente || null,
+    precision_coordenadas: c.coordenadas.precision || null,
+    confianza: c.coordenadas.confianza || null,
+    verificada: c.coordenadas.verificada ? 1 : 0,
+    palabras_clave: JSON.stringify(c.palabrasClave || []),
+    grupo_ambiguedad: c.grupoAmbiguedad || null,
+    origen: c.origen || null,
+    activo: c.activa === false ? 0 : 1,
+  };
+}
+
+function sincronizarCatalogoMaestro() {
+  const db = getAdminDB();
+  const columnas = `diccionario_id,nombre,nombre_oficial,slug,tipo,codigo_postal,municipio,ciudad,zona,
+    lat,lon,aliases,fuente_coordenadas,precision_coordenadas,confianza,verificada,palabras_clave,
+    grupo_ambiguedad,origen,activo`;
+  const insertar = db.prepare(`INSERT INTO geo_tepic_colonias (${columnas})
+    VALUES (@diccionario_id,@nombre,@nombre_oficial,@slug,@tipo,@codigo_postal,@municipio,@ciudad,@zona,
+      @lat,@lon,@aliases,@fuente_coordenadas,@precision_coordenadas,@confianza,@verificada,@palabras_clave,
+      @grupo_ambiguedad,@origen,@activo)`);
+  const actualizar = db.prepare(`UPDATE geo_tepic_colonias SET diccionario_id=@diccionario_id,
+    nombre=@nombre,nombre_oficial=@nombre_oficial,slug=@slug,tipo=@tipo,codigo_postal=@codigo_postal,
+    municipio=@municipio,ciudad=@ciudad,zona=@zona,lat=@lat,lon=@lon,aliases=@aliases,
+    fuente_coordenadas=@fuente_coordenadas,precision_coordenadas=@precision_coordenadas,
+    confianza=@confianza,verificada=@verificada,palabras_clave=@palabras_clave,
+    grupo_ambiguedad=@grupo_ambiguedad,origen=@origen,updated_at=datetime('now','localtime') WHERE id=@row_id`);
+  let cambios = 0;
+  db.transaction(() => {
+    for (const colonia of Object.values(DICCIONARIO.COLONIAS)) {
+      const fila = _filaDiccionario(colonia);
+      const existente = db.prepare(`SELECT id, activo, administrada, excluida FROM geo_tepic_colonias
+        WHERE diccionario_id=? OR slug=? OR lower(nombre)=lower(?) ORDER BY diccionario_id IS NOT NULL DESC LIMIT 1`)
+        .get(fila.diccionario_id, fila.slug, fila.nombre);
+      if (existente && !existente.administrada && !existente.excluida) actualizar.run({ ...fila, activo: existente.activo, row_id: existente.id });
+      else if (existente) continue;
+      else { insertar.run(fila); cambios++; }
+    }
+  })();
+  return cambios;
+}
+
+function respaldarCatalogoMaestro() {
+  const db = getAdminDB();
+  const filas = _catalogo({ incluirExcluidas: true });
+  if (!filas.length) return null;
+  const dbFile = db.name || path.join(ROOT_PATH, 'data/admin.db');
+  const carpeta = path.join(path.dirname(dbFile), 'backups', 'geotepic');
+  fs.mkdirSync(carpeta, { recursive: true });
+  const fecha = new Date().toISOString().slice(0, 10);
+  const destino = path.join(carpeta, `geotepic-${fecha}.json`);
+  if (!fs.existsSync(destino)) fs.writeFileSync(destino, JSON.stringify({ generado: new Date().toISOString(), colonias: filas }, null, 2), 'utf8');
+  return destino;
 }
 
 function inicializarDesdeTenants(tenants = []) {
   const admin = getAdminDB();
-  if (admin.prepare('SELECT COUNT(*) n FROM geo_tepic_colonias').get().n > 0) return 0;
-  if (CATALOGO_INICIAL.length) {
-    const insert = admin.prepare(`INSERT OR IGNORE INTO geo_tepic_colonias
-      (nombre, slug, tipo, lat, lon, aliases, activo) VALUES (?,?,?,?,?,?,1)`);
-    admin.transaction(() => {
-      for (const c of CATALOGO_INICIAL) insert.run(c.nombre, c.slug || slugify(c.nombre), c.tipo || 'colonia', c.lat, c.lon, _normalizarAliases(c.aliases));
-    })();
-    return CATALOGO_INICIAL.length;
-  }
+  respaldarCatalogoMaestro();
+  const importadas = sincronizarCatalogoMaestro();
+  if (admin.prepare('SELECT COUNT(*) n FROM geo_tepic_colonias').get().n > 0) return importadas;
   const origen = tenants.find(t => esTenantTepic(t) && t.db_path && fs.existsSync(_tenantPath(t)));
   if (!origen) return 0;
   const db = new Database(_tenantPath(origen), { readonly: true });
@@ -68,27 +138,61 @@ function inicializarDesdeTenants(tenants = []) {
   } finally { db.close(); }
 }
 
-function listarColonias({ incluirInactivas = true } = {}) {
-  const rows = _catalogo();
+function listarColonias({ incluirInactivas = true, incluirExcluidas = false } = {}) {
+  const rows = _catalogo({ incluirExcluidas });
   return incluirInactivas ? rows : rows.filter(c => c.activo);
 }
 
-function guardarColonia({ id, nombre, tipo = 'colonia', lat, lon, aliases = [], activo = 1 }) {
+function guardarColonia({ id, nombre, nombre_oficial = null, tipo = 'colonia', codigo_postal = null,
+  municipio = 'Tepic', ciudad = 'Tepic', zona = 'urbana', lat, lon, aliases = [], activo = 1,
+  fuente_coordenadas = 'superadmin', precision_coordenadas = 'punto_manual', confianza = 'media',
+  verificada = 0, palabras_clave = [], grupo_ambiguedad = null, origen = 'superadmin', usuario = 'superadmin' }) {
   const db = getAdminDB();
   const slug = slugify(nombre);
   if (!nombre || !slug || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) throw new Error('Datos de colonia inválidos');
   if (id) {
-    const result = db.prepare(`UPDATE geo_tepic_colonias SET nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=?,activo=?,updated_at=datetime('now','localtime') WHERE id=?`)
-      .run(nombre.trim(), slug, tipo, Number(lat), Number(lon), _normalizarAliases(aliases), activo ? 1 : 0, Number(id));
+    const antes = db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id));
+    const result = db.prepare(`UPDATE geo_tepic_colonias SET nombre=?,nombre_oficial=?,slug=?,tipo=?,codigo_postal=?,municipio=?,ciudad=?,zona=?,lat=?,lon=?,aliases=?,activo=?,fuente_coordenadas=?,precision_coordenadas=?,confianza=?,verificada=?,palabras_clave=?,grupo_ambiguedad=?,origen=?,administrada=1,excluida=0,updated_at=datetime('now','localtime') WHERE id=?`)
+      .run(nombre.trim(), nombre_oficial || nombre.trim(), slug, tipo, codigo_postal, municipio, ciudad, zona,
+        Number(lat), Number(lon), _normalizarAliases(aliases), activo ? 1 : 0, fuente_coordenadas,
+        precision_coordenadas, confianza, verificada ? 1 : 0, _normalizarAliases(palabras_clave),
+        grupo_ambiguedad, origen, Number(id));
     if (!result.changes) throw new Error('Colonia maestra no encontrada');
+    _auditar(db, Number(id), 'actualizar', antes, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id)), usuario);
     return Number(id);
   }
-  return db.prepare(`INSERT INTO geo_tepic_colonias (nombre,slug,tipo,lat,lon,aliases,activo) VALUES (?,?,?,?,?,?,?)`)
-    .run(nombre.trim(), slug, tipo, Number(lat), Number(lon), _normalizarAliases(aliases), activo ? 1 : 0).lastInsertRowid;
+  const nuevoId = db.prepare(`INSERT INTO geo_tepic_colonias (nombre,nombre_oficial,slug,tipo,codigo_postal,municipio,ciudad,zona,lat,lon,aliases,activo,fuente_coordenadas,precision_coordenadas,confianza,verificada,palabras_clave,grupo_ambiguedad,origen,administrada) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`)
+    .run(nombre.trim(), nombre_oficial || nombre.trim(), slug, tipo, codigo_postal, municipio, ciudad, zona,
+      Number(lat), Number(lon), _normalizarAliases(aliases), activo ? 1 : 0, fuente_coordenadas,
+      precision_coordenadas, confianza, verificada ? 1 : 0, _normalizarAliases(palabras_clave),
+      grupo_ambiguedad, origen).lastInsertRowid;
+  _auditar(db, nuevoId, 'crear', null, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(nuevoId), usuario);
+  return nuevoId;
 }
 
-function eliminarColonia(id) {
-  return getAdminDB().prepare('DELETE FROM geo_tepic_colonias WHERE id=?').run(Number(id)).changes > 0;
+function eliminarColonia(id, usuario = 'superadmin') {
+  const db = getAdminDB();
+  const antes = db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id));
+  if (!antes) return false;
+  const result = antes.diccionario_id
+    ? db.prepare("UPDATE geo_tepic_colonias SET excluida=1,activo=0,administrada=1,updated_at=datetime('now','localtime') WHERE id=?").run(Number(id))
+    : db.prepare('DELETE FROM geo_tepic_colonias WHERE id=?').run(Number(id));
+  if (result.changes) _auditar(db, Number(id), antes.diccionario_id ? 'excluir' : 'eliminar', antes, null, usuario);
+  return result.changes > 0;
+}
+
+function restaurarColonia(id, usuario = 'superadmin') {
+  const db = getAdminDB();
+  const antes = db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=? AND diccionario_id IS NOT NULL').get(Number(id));
+  if (!antes) return false;
+  const result = db.prepare("UPDATE geo_tepic_colonias SET excluida=0,activo=1,administrada=0,updated_at=datetime('now','localtime') WHERE id=?").run(Number(id));
+  sincronizarCatalogoMaestro();
+  _auditar(db, Number(id), 'restaurar', antes, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id)), usuario);
+  return result.changes > 0;
+}
+
+function listarAuditoria(limite = 200) {
+  return getAdminDB().prepare('SELECT * FROM geo_tepic_auditoria ORDER BY id DESC LIMIT ?').all(Math.min(1000, Math.max(1, Number(limite) || 200)));
 }
 
 function sincronizarTenant(tenant) {
@@ -99,21 +203,29 @@ function sincronizarTenant(tenant) {
   db.pragma('busy_timeout = 5000');
   try {
     try { db.exec('ALTER TABLE colonias ADD COLUMN geo_tepic_id INTEGER'); } catch (_) {}
+    for (const sql of [
+      'ALTER TABLE colonias ADD COLUMN codigo_postal TEXT',
+      'ALTER TABLE colonias ADD COLUMN fuente_coordenadas TEXT',
+      'ALTER TABLE colonias ADD COLUMN precision_coordenadas TEXT',
+      'ALTER TABLE colonias ADD COLUMN confianza TEXT',
+      'ALTER TABLE colonias ADD COLUMN verificada INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE colonias ADD COLUMN grupo_ambiguedad TEXT',
+    ]) { try { db.exec(sql); } catch (_) {} }
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_colonias_geo_tepic_id ON colonias(geo_tepic_id) WHERE geo_tepic_id IS NOT NULL');
     const master = _catalogo();
     const porSlug = db.prepare('SELECT id, activo FROM colonias WHERE slug=?');
     const porNombre = db.prepare('SELECT id, activo FROM colonias WHERE lower(nombre)=lower(?)');
-    const link = db.prepare('UPDATE colonias SET geo_tepic_id=?,nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=? WHERE id=?');
-    const update = db.prepare('UPDATE colonias SET nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=? WHERE geo_tepic_id=?');
-    const insert = db.prepare(`INSERT INTO colonias (nombre,slug,tipo,lat,lon,aliases,activo,geo_tepic_id) VALUES (?,?,?,?,?,?,0,?)`);
+    const link = db.prepare('UPDATE colonias SET geo_tepic_id=?,nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=?,codigo_postal=?,fuente_coordenadas=?,precision_coordenadas=?,confianza=?,verificada=?,grupo_ambiguedad=? WHERE id=?');
+    const update = db.prepare('UPDATE colonias SET nombre=?,slug=?,tipo=?,lat=?,lon=?,aliases=?,codigo_postal=?,fuente_coordenadas=?,precision_coordenadas=?,confianza=?,verificada=?,grupo_ambiguedad=? WHERE geo_tepic_id=?');
+    const insert = db.prepare(`INSERT INTO colonias (nombre,slug,tipo,lat,lon,aliases,codigo_postal,fuente_coordenadas,precision_coordenadas,confianza,verificada,grupo_ambiguedad,activo,geo_tepic_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?)`);
     db.transaction(() => {
       for (const c of master) {
         const existingLinked = db.prepare('SELECT id FROM colonias WHERE geo_tepic_id=?').get(c.id);
-        if (existingLinked) update.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.id);
+        if (existingLinked) update.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, c.id);
         else {
           const legacy = porSlug.get(c.slug) || porNombre.get(c.nombre);
-          if (legacy) link.run(c.id, c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, legacy.id);
-          else insert.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.id);
+          if (legacy) link.run(c.id, c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, legacy.id);
+          else insert.run(c.nombre, c.slug, c.tipo, c.lat, c.lon, c.aliases, c.codigo_postal, c.fuente_coordenadas, c.precision_coordenadas, c.confianza, c.verificada, c.grupo_ambiguedad, c.id);
         }
         if (!c.activo) db.prepare('UPDATE colonias SET activo=0 WHERE geo_tepic_id=?').run(c.id);
       }
@@ -126,9 +238,13 @@ function sincronizarTenant(tenant) {
 
 function listarParaTenant(tenant) {
   sincronizarTenant(tenant);
-  const activos = new Set(_catalogo().filter(c => c.activo).map(c => c.id));
+  const master = new Map(_catalogo().filter(c => c.activo).map(c => [c.id, c]));
   const db = new Database(_tenantPath(tenant), { readonly: true });
-  try { return db.prepare('SELECT * FROM colonias WHERE geo_tepic_id IS NOT NULL ORDER BY nombre COLLATE NOCASE').all().filter(c => activos.has(c.geo_tepic_id)); }
+  try {
+    return db.prepare('SELECT * FROM colonias WHERE geo_tepic_id IS NOT NULL ORDER BY nombre COLLATE NOCASE').all()
+      .filter(c => master.has(c.geo_tepic_id))
+      .map(c => ({ ...master.get(c.geo_tepic_id), id: c.id, geo_tepic_id: c.geo_tepic_id, activo: c.activo }));
+  }
   finally { db.close(); }
 }
 
@@ -142,4 +258,4 @@ function activarEnTenant(tenant, geoTepicId, activo) {
   finally { db.close(); }
 }
 
-module.exports = { esTenantTepic, resolverTenant, inicializarDesdeTenants, listarColonias, guardarColonia, eliminarColonia, sincronizarTenant, listarParaTenant, activarEnTenant };
+module.exports = { esTenantTepic, resolverTenant, inicializarDesdeTenants, sincronizarCatalogoMaestro, respaldarCatalogoMaestro, listarColonias, guardarColonia, eliminarColonia, restaurarColonia, listarAuditoria, sincronizarTenant, listarParaTenant, activarEnTenant };

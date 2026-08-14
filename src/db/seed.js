@@ -190,6 +190,12 @@ async function seedDB() {
   try { db.run("ALTER TABLE colonias ADD COLUMN tipo    TEXT DEFAULT 'colonia'"); } catch (_) {}
   try { db.run("ALTER TABLE colonias ADD COLUMN aliases TEXT DEFAULT '[]'"); } catch (_) {}
   try { db.run("ALTER TABLE colonias ADD COLUMN geo_tepic_id INTEGER DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN codigo_postal TEXT DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN fuente_coordenadas TEXT DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN precision_coordenadas TEXT DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN confianza TEXT DEFAULT NULL"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN verificada INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
+  try { db.run("ALTER TABLE colonias ADD COLUMN grupo_ambiguedad TEXT DEFAULT NULL"); } catch (_) {}
   try { db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_colonias_geo_tepic_id ON colonias(geo_tepic_id) WHERE geo_tepic_id IS NOT NULL"); } catch (_) {}
 
   // Poblar slug en registros existentes que no lo tengan
@@ -236,6 +242,7 @@ async function seedDB() {
   const _configBase = [
     ["nombre_negocio",           process.env.NOMBRE_NEGOCIO || "Mi Negocio"],
     ["domicilio_costo",          "50"],
+    ["geo_tarifa_aproximada",    "0"],
     ["moneda",                   "$"],
     ["grupo_id",                 process.env.GRUPO_ID || ""],
     ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],

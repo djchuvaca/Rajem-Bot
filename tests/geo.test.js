@@ -15,7 +15,7 @@ const {
   invalidarCacheConfig,
 } = require('../src/geo');
 const { esTenantTepic, resolverTenant } = require('../src/geo/geotepic');
-const catalogoTepic = require('../src/geo/geotepic/tepic-nayarit.json');
+const diccionarioTepic = require('../src/geo/geotepic/diccionario_colonias_tepic');
 
 describe('GeoTepic — alcance territorial', () => {
   const tenants = [
@@ -34,9 +34,35 @@ describe('GeoTepic — alcance territorial', () => {
   });
 
   test('incluye el catálogo canónico completo para instalaciones nuevas', () => {
-    assert.strictEqual(catalogoTepic.length, 181);
-    assert.strictEqual(new Set(catalogoTepic.map(c => c.slug)).size, 181);
-    assert.ok(catalogoTepic.every(c => c.nombre && Number.isFinite(c.lat) && Number.isFinite(c.lon)));
+    const catalogo = Object.values(diccionarioTepic.COLONIAS);
+    assert.strictEqual(catalogo.length, 300);
+    assert.strictEqual(new Set(catalogo.map(c => c.id)).size, 300);
+    assert.ok(catalogo.every(c => c.nombre && Number.isFinite(c.coordenadas.latitud) && Number.isFinite(c.coordenadas.longitud)));
+  });
+});
+
+describe('GeoTepic — diccionario enriquecido', () => {
+  test('contiene 300 asentamientos con coordenadas y trazabilidad', () => {
+    const colonias = Object.values(diccionarioTepic.COLONIAS);
+    assert.strictEqual(colonias.length, 300);
+    assert.ok(colonias.every(c => c.id && c.nombre && Number.isFinite(c.coordenadas.latitud) && Number.isFinite(c.coordenadas.longitud)));
+    assert.strictEqual(colonias.filter(c => c.coordenadas.verificada).length, 163);
+  });
+
+  test('detecta nombres ambiguos sin seleccionar arbitrariamente', () => {
+    const r = diccionarioTepic.buscarColonia('Los Fresnos');
+    assert.strictEqual(r.estado, 'ambigua');
+    assert.deepStrictEqual(r.opciones.map(o => o.nombre).sort(), ['Los Fresnos', 'Los Fresnos Oriente', 'Los Fresnos Poniente'].sort());
+  });
+
+  test('reconoce una forma coloquial sin artículos', () => {
+    const r = diccionarioTepic.buscarColonia('vistas cantera');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Vistas de La Cantera');
+  });
+
+  test('una frase genérica inexistente no produce una colonia', () => {
+    assert.strictEqual(diccionarioTepic.buscarColonia('colonia que no existe').estado, 'no_encontrada');
   });
 });
 
@@ -82,6 +108,7 @@ before(async () => {
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('negocio_lat', ?)", [_NEG_LAT]);
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('negocio_lon', ?)", [_NEG_LON]);
   run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('domicilio_costo', '50')");
+  run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('geo_tarifa_aproximada', '1')");
 
   // Forzar recarga de cachés
   invalidarCacheColonias();
@@ -240,6 +267,18 @@ describe('buscarColonia — casos nulos', () => {
 // calcularTarifaDomicilio()
 // ═══════════════════════════════════════════════════════════════════════════
 describe('calcularTarifaDomicilio', () => {
+  test('una coordenada aproximada usa tarifa plana si el tenant no la autoriza', () => {
+    run("UPDATE colonias SET verificada=0 WHERE nombre='Centro Histórico'");
+    run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('geo_tarifa_aproximada', '0')");
+    invalidarCacheColonias(); invalidarCacheConfig();
+    const r = calcularTarifaDomicilio('Centro Histórico');
+    assert.strictEqual(r.encontrada, true);
+    assert.strictEqual(r.requiereVerificacion, true);
+    assert.strictEqual(r.tarifa, 50);
+    run("UPDATE colonias SET verificada=1 WHERE nombre='Centro Histórico'");
+    run("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('geo_tarifa_aproximada', '1')");
+    invalidarCacheColonias(); invalidarCacheConfig();
+  });
   test('colonia no encontrada usa tarifa fallback', () => {
     const r = calcularTarifaDomicilio('ColoniaInexistente');
     assert.strictEqual(r.encontrada, false);

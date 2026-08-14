@@ -178,12 +178,13 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
         <div id="geo-colonias">
           <div class="toolbar">
             <input type="text" id="col-search" placeholder="Buscar colonia…" oninput="filtrarColonias()">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" id="col-excluidas" onchange="loadColonias()"> Mostrar excluidas</label>
             <button class="btn btn-primary" onclick="openColoniaModal()">+ Agregar a GeoTepic</button>
           </div>
           <div class="table-wrap" style="max-height:400px;overflow-y:auto">
             <table>
-              <thead><tr><th>Nombre</th><th>Tipo</th><th>Lat</th><th>Lon</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody id="colonias-tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+              <thead><tr><th>Nombre</th><th>Tipo</th><th>CP</th><th>Coordenadas</th><th>Confianza</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="colonias-tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -923,7 +924,8 @@ async function loadGeo() {
   await loadColonias();
 }
 async function loadColonias() {
-  const r = await fetch('/api/geo/tepic/colonias');
+  const incluirExcluidas = document.getElementById('col-excluidas')?.checked ? '1' : '0';
+  const r = await fetch('/api/geo/tepic/colonias?incluir_excluidas='+incluirExcluidas);
   if(!r.ok) {
     document.getElementById('colonias-tbody').innerHTML='<tr><td colspan="6" class="empty">Error al cargar colonias</td></tr>';
     return;
@@ -933,7 +935,8 @@ async function loadColonias() {
 }
 function filtrarColonias() {
   const q = document.getElementById('col-search').value.toLowerCase();
-  const filtered = _colonias.filter(c => c.nombre.toLowerCase().includes(q));
+  const filtered = _colonias.filter(c => [c.nombre,c.nombre_oficial,c.codigo_postal,c.tipo,c.fuente_coordenadas]
+    .filter(Boolean).some(v => String(v).toLowerCase().includes(q)));
   renderColoniasData(filtered);
 }
 function renderColonias() { renderColoniasData(_colonias); }
@@ -942,14 +945,14 @@ function renderColoniasData(data) {
     <tr>
       <td>${esc(c.nombre)}</td>
       <td><span class="chip">${c.tipo||'colonia'}</span></td>
-      <td>${c.lat?.toFixed(4)||'—'}</td>
-      <td>${c.lon?.toFixed(4)||'—'}</td>
-      <td>${c.activo?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
+      <td>${esc(c.codigo_postal||'—')}</td>
+      <td><span title="${esc(c.fuente_coordenadas||'Sin fuente')}">${c.verificada?'<span class="badge badge-green">Verificadas</span>':'<span class="badge badge-yellow">Aproximadas</span>'}<br><small>${c.lat?.toFixed(4)||'—'}, ${c.lon?.toFixed(4)||'—'}</small></span></td>
+      <td><span class="badge ${c.confianza==='alta'?'badge-green':'badge-yellow'}">${esc(c.confianza||'sin clasificar')}</span></td>
+      <td>${c.excluida?'<span class="badge badge-gray">Excluida</span>':c.activo?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
       <td style="display:flex;gap:4px">
-        <button class="btn btn-secondary btn-sm" onclick="editColonia(${c.id})">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteColonia(${c.id})">✕</button>
+        ${c.excluida?`<button class="btn btn-secondary btn-sm" onclick="restoreColonia(${c.id})">Restaurar</button>`:`<button class="btn btn-secondary btn-sm" onclick="editColonia(${c.id})">Editar</button><button class="btn btn-danger btn-sm" onclick="deleteColonia(${c.id})">✕</button>`}
       </td>
-    </tr>`).join('') || '<tr><td colspan="6" class="empty">Sin colonias configuradas. Agrégalas desde esta sección.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Sin colonias configuradas. Agrégalas desde esta sección.</td></tr>';
 }
 
 let _mcMap = null, _mcMarker = null;
@@ -1025,7 +1028,8 @@ async function saveColonia() {
   if(!nombre||isNaN(lat)||isNaN(lon)){toast('Faltan datos','err');return;}
   const url = id ? `/api/geo/tepic/colonias/${id}` : '/api/geo/tepic/colonias';
   const method = id ? 'PUT' : 'POST';
-  const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,lat,lon,tipo,activo,aliases})});
+  const existente = id ? _colonias.find(c=>c.id===parseInt(id)) : null;
+  const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({...existente,nombre,lat,lon,tipo,activo,aliases})});
   if(r.ok){closeModal('modal-colonia');loadColonias();toast(id?'Colonia actualizada':'Colonia agregada');}
   else toast('Error al guardar','err');
 }
@@ -1035,6 +1039,11 @@ async function deleteColonia(id) {
   const r=await fetch(`/api/geo/tepic/colonias/${id}`,{method:'DELETE'});
   if(r.ok){loadColonias();toast('Colonia eliminada');}
   else toast('Error','err');
+}
+async function restoreColonia(id) {
+  const r=await fetch(`/api/geo/tepic/colonias/${id}/restaurar`,{method:'POST'});
+  if(r.ok){loadColonias();toast('Colonia restaurada desde el diccionario oficial');}
+  else toast('Error al restaurar','err');
 }
 
 // Zonas
