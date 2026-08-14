@@ -426,6 +426,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     const _pedidoMpId = typeof pedidoMpId !== "undefined" ? pedidoMpId : null;
     esperandoCaptura.set(clienteNumero, { resumen: pendiente.texto, telefono: infoPedido.telefono, pedidoId: _pedidoMpId });
     resumenPendiente.delete(clienteNumero);
+    persistirEstado(clienteNumero);
     await msg.reply(DATOS_BANCO());
     return true;
   }

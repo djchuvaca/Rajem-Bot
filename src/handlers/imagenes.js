@@ -16,7 +16,7 @@ const { ordenPendientePreventa, telefonosReales } = require("./flujos/utils");
 const { dividirNombreCompleto } = require('../clientes/nombre');
 
 async function handleImagen(msg, client) {
-  if (!msg.hasMedia || (msg.type !== "image" && msg.type !== "document")) return false;
+  if (!msg.hasMedia) return false;
   if (!esperandoCaptura.has(msg.from)) return false;
 
   const clienteNumero = msg.from;
@@ -24,8 +24,17 @@ async function handleImagen(msg, client) {
   const horaVenta     = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 
   try {
-    const media         = await msg.downloadMedia();
-    const ext           = media.mimetype.split("/")[1] || "jpg";
+    const media = await msg.downloadMedia();
+    if (!media?.data) throw new Error("WhatsApp no entregó el contenido del archivo");
+    const mimetype = String(media.mimetype || "").toLowerCase().split(";")[0].trim();
+    const esImagen = mimetype.startsWith("image/");
+    const esPdf = mimetype === "application/pdf";
+    if (!esImagen && !esPdf) {
+      await msg.reply("Necesito una imagen o PDF del comprobante de transferencia. Intenta enviarlo nuevamente, por favor. 📸");
+      return true;
+    }
+    const extensiones = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf" };
+    const ext = extensiones[mimetype] || (esImagen ? "img" : "pdf");
     const nombreArchivo = `captura_${clienteNumero.replace(/[^0-9]/g, "")}_${Date.now()}.${ext}`;
     fs.writeFileSync(path.join(CARPETA_CAPTURAS, nombreArchivo), Buffer.from(media.data, "base64"));
     console.log(`📸 Captura guardada: ${nombreArchivo}`);
