@@ -115,6 +115,16 @@ async function handleComandos(msg, client) {
   const texto = msg.body && msg.body.trim();
   if (!texto) return;
 
+  // Diagnóstico seguro: solo revela el identificador del mismo grupo desde
+  // el que se solicita. No requiere ser administrador del grupo.
+  if (/^!(?:jid|idgrupo)$/i.test(texto) && String(msg.from || '').endsWith('@g.us')) {
+    await msg.reply(`🆔 *JID de este grupo:*
+${msg.from}
+
+Puedes copiarlo completo en la configuración del tenant.`);
+    return true;
+  }
+
   // Cuando viene de un grupo: solo los admins del grupo pueden ejecutar comandos
   if (msg.from.endsWith('@g.us')) {
     try {
@@ -178,6 +188,7 @@ async function handleComandos(msg, client) {
       `!abrir — reabrir el negocio\n` +
       `!top — top clientes por número de pedidos\n\n` +
       `*Bot:*\n` +
+      `!jid — mostrar el identificador de este grupo\n` +
       `!pausar — pausar respuestas automáticas\n` +
       `!reanudar — reactivar el bot\n` +
       `!sesiones — ver sesiones activas de clientes\n` +

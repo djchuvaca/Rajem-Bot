@@ -120,6 +120,7 @@ client.on("ready", () => {
   console.log("    !resetear [tel]             — limpiar sesión de un cliente");
   console.log("    !limpiar                    — eliminar TODAS las sesiones activas");
   console.log("    !estado                     — uptime, sesiones y estado del bot");
+  console.log("    !jid                        — mostrar el JID del grupo actual");
   console.log("    !ayuda                      — lista de comandos en el grupo");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 });
