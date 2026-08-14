@@ -1,158 +1,347 @@
-# Bot de Tacos Javier — Guía para Claude
+# Rajem's Technology — Bot SaaS de WhatsApp para Taquerías
+
+## Descripción del sistema
+
+Plataforma SaaS multi-tenant de bots de WhatsApp para negocios de comida (actualmente taquería). Cada **tenant** es un negocio independiente con su propio bot, base de datos, sesión de WhatsApp y panel de administración. Un **superadmin** centralizado gestiona todos los tenants.
+
+**Stack:** Node.js · `whatsapp-web.js` · `better-sqlite3` (SQLite) · Express · PM2 · Groq (llama-3.3-70b-versatile como fallback NLU)
+
+**Flujo de un mensaje:** cliente escribe → NLU local (`pedidoParser.js`) → fallback Groq si no se entiende → respuesta WA.
+
+---
+
+## Arquitectura de deployment (producción)
+
+El sistema corre en **bare-metal con PM2** — sin Docker. Un solo VPS aloja todos los procesos.
+
+```
+VPS
+├── PM2
+│   ├── superadmin        → src/superadmin/standalone.js  (puerto 3001)
+│   ├── webhook-deploy    → scripts/webhook-deploy.js      (puerto 4000)
+│   ├── carnitas-bot      → index.js  (creado al provisionar tenant)
+│   ├── tacos-pepe-gdl    → index.js  (creado al provisionar tenant)
+│   └── ...más tenants
+│
+├── /root/Rajem-Bot/          ← codebase compartido (un solo repo)
+│   ├── data/
+│   │   ├── tenants.json      ← registro de todos los tenants
+│   │   ├── carnitas-bot.db   ← BD de cada tenant (nombre = TENANT_ID)
+│   │   ├── tacos-pepe-gdl.db
+│   │   └── backups/
+│   ├── envs/
+│   │   ├── carnitas-bot.env  ← env vars de cada tenant
+│   │   └── tacos-pepe-gdl.env
+│   └── .wwebjs_auth/
+│       ├── session-carnitas-bot/    ← sesión WA por tenant (clientId = TENANT_ID)
+│       └── session-tacos-pepe-gdl/
+```
+
+### Por qué un solo codebase para todos los tenants
+- `src/db/core.js` abre `data/{TENANT_ID}.db` — cada tenant tiene su propia BD
+- `index.js` usa `LocalAuth({ clientId: TENANT_ID })` — cada tenant tiene su propia sesión WA
+- El panel del tenant corre en el puerto `PANEL_PORT` configurado en su .env
+
+---
 
 ## Arrancar el proyecto
-```
-npm start              # producción (Node directo)
-npm run dev            # desarrollo — nodemon reinicia al guardar (15-30s para reconectar WA)
-npm run pm2:start      # producción con PM2 (recomendado en servidor)
-npm test               # 4 archivos de tests con el runner nativo de Node
-```
-Panel web en `http://localhost:3000` (usuario: `admin`, contraseña: `admin123`)
 
-## Descripción general
-Bot de WhatsApp para taquería. Flujo: cliente escribe → parser NLU local → fallback Groq (llama-3.3-70b-versatile) → respuesta. Usa `whatsapp-web.js` + **`better-sqlite3`** (SQLite nativo, persistencia automática a disco).
+### Desarrollo local (un solo bot)
+```bash
+npm start        # producción directa
+npm run dev      # nodemon — reinicia al guardar (15-30s para reconectar WA)
+npm test         # 4 archivos de tests con el runner nativo de Node
+```
+Panel tenant en `http://localhost:3000` (usuario: `admin`, contraseña: `admin123`)
+
+### Producción en VPS (primera vez)
+```bash
+git clone https://github.com/djchuvaca/Rajem-Bot.git && cd Rajem-Bot
+npm install
+
+# Crear .env mínimo (solo para superadmin y webhook)
+cat > .env <<EOF
+WEBHOOK_PORT=4000
+WEBHOOK_SECRET=<openssl rand -hex 32>
+SUPERADMIN_SECRET=<openssl rand -hex 32>
+EOF
+
+pm2 start ecosystem.config.js --only superadmin,webhook-deploy
+pm2 save
+pm2 startup   # ejecutar el comando que imprima
+```
+Superadmin en `http://IP-VPS:3001` (usuario: `admin`, contraseña: `admin123`)
+
+### Comandos PM2 útiles
+```bash
+pm2 list                          # ver todos los procesos
+pm2 logs superadmin --lines 50    # logs del superadmin
+pm2 logs carnitas-bot --lines 50  # logs de un tenant
+pm2 restart carnitas-bot          # reiniciar un tenant
+pm2 delete carnitas-bot           # eliminar un tenant de PM2
+```
+
+---
+
+## Flujo de provisionamiento de un tenant
+
+1. En el superadmin (`http://IP:3001`), ir a **Tenants → Nuevo tenant**
+2. Llenar: ID (slug único), nombre, GRUPO_ID, plan, sección taquería, puerto del panel
+3. Hacer clic en **Provisionar** → el superadmin llama a `POST /api/provisionar` → proxea a `webhook-deploy:4000/provisionar`
+4. `webhook-deploy` ejecuta `scripts/provisionar-tenant.sh` que:
+   - Crea `envs/{TENANT_ID}.env`
+   - Registra en `data/tenants.json`
+   - Genera JSON de configuración PM2 con todas las env vars del tenant
+   - Ejecuta `pm2 start {json}` y `pm2 save`
+5. El bot arranca, `index.js` llama `initDB()` que crea `data/{TENANT_ID}.db` y ejecuta `seed.js`
+6. `seed.js` seedea todas las tablas usando las env vars del proceso (NOMBRE_NEGOCIO, SECCION_TAQUERIA_INICIAL, BUSINESS_TYPE, PLAN_ACTIVO)
+7. El superadmin muestra el QR del tenant para vincular WhatsApp
+
+### Variables que `provisionar-tenant.sh` pasa al JSON de PM2
+```
+TENANT_ID, NOMBRE_NEGOCIO, GRUPO_ID, PANEL_PORT, PANEL_SECRET,
+GROQ_API_KEY (opcional), BUSINESS_TYPE, SECCION_TAQUERIA_INICIAL, PLAN_ACTIVO
+```
+**CRÍTICO:** Si alguna de estas vars no llega al proceso de PM2, `seed.js` usará su default hardcodeado. Ver sección de Bugs conocidos.
+
+### Eliminar un tenant
+El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-deploy:4000/eliminar` → ejecuta `scripts/eliminar-tenant.sh` que:
+- `pm2 delete {TENANT_ID} && pm2 save`
+- Elimina `envs/{TENANT_ID}.env`
+- Elimina `data/{TENANT_ID}.db` y backups
+- Elimina `.wwebjs_auth/session-{TENANT_ID}/`
+- Limpia `data/tenants.json`
 
 ---
 
 ## Mapa de archivos clave
 
-### Entrada
-- `index.js` — arranque, cliente WA, deduplicación de mensajes (Set de 200 IDs), **resolución de LIDs** (si `msg.from` termina en `@lid`, llama a `client.getContactLidAndPhone()` y reemplaza `msg.from` con el JID real antes de enrutar), router principal. Incluye: init Sentry, reconnección con backoff, backup automático cada 6h, handlers globales de error.
+### Entrada del bot (por tenant)
+- **`index.js`** — arranque, cliente WA, deduplicación de mensajes (Set de 200 IDs), **resolución de LIDs** (si `msg.from` termina en `@lid`, llama a `client.getContactLidAndPhone()` y reemplaza `msg.from` con el JID real antes de enrutar), router principal. Incluye: init Sentry, reconnección con backoff exponencial (5s→10s→20s→…→máx 5min, 8 reintentos), backup automático cada 6h, reset de `entregas_hoy` a medianoche, handlers globales de error.
+
+### Superadmin (proceso separado)
+- **`src/superadmin/standalone.js`** — punto de entrada PM2. Llama `startSuperAdmin(port, null)`. Lee `.env` del root del repo. Puerto configurado con `SUPERADMIN_PORT` (default: 3001).
+- **`src/superadmin/server.js`** — Express. Auth con sesión SQLite. Rate limiting login (5/min/IP). Endpoints REST para gestionar tenants, colonias, zonas, planes, solicitudes geo, repartidores, reparto. Llama a `webhook-deploy` via HTTP (localhost:4000) para provisionar/eliminar tenants. `WEBHOOK_HOST` default: `localhost` (bare-metal). En Docker sería `host.docker.internal`.
+- **`src/superadmin/tenant-reader.js`** — abre conexiones **readonly** a las BDs de cada tenant para métricas y monitoreo. También hace escrituras puntuales (config, colonias, zonas) abriendo conexiones temporales r/w. Funciones clave: `getTenants()`, `upsertTenant()`, `deleteTenant()`, `getTenantStats()`, `getTenantConfig()`, `setTenantConfig()`, `getTenantPlan()`, `setTenantPlan()`, `getTenantBotEstado()`, `getTenantQR()`, `getTenantColonias()`, `getTenantZonas()`, `getTenantRepartidores()`, `getTenantEntregasHistorial()`, `getTenantReporteReparto()`.
+- **`src/superadmin/public/index.html`** — SPA del superadmin. Secciones: Dashboard (cards por tenant con stats), Tenants (CRUD + provisionar), Geo (colonias + zonas por tenant), Mandaditos (config + repartidores + historial + reporte de desempeño), Config global. Selectores de tenant en Geo y Mandaditos se pueblan via `populateTenantSelects()` al cargar.
 
 ### Infraestructura
-- `src/logger.js` — Winston logger. Salida coloreada en consola, `logs/bot-err.log` (solo errores) y `logs/bot-combined.log`. Se crea el directorio `logs/` automáticamente si no existe.
-- `ecosystem.config.js` — Configuración PM2 para producción. `autorestart: true`, `restart_delay: 15000`, `max_restarts: 10`, logs en `logs/`.
+- **`src/logger.js`** — Winston logger. Consola coloreada + `logs/bot-err.log` + `logs/bot-combined.log`. Crea `logs/` automáticamente.
+- **`ecosystem.config.js`** — Configuración PM2. **Solo tiene 2 apps**: `superadmin` y `webhook-deploy`. Los bots de tenant **NO** están en este archivo — se registran en PM2 dinámicamente al provisionar.
+- **`scripts/webhook-deploy.js`** — servidor HTTP en puerto 4000. Endpoints: `GET /health`, `POST /deploy` (webhook GitHub — git pull + pm2 restart), `POST /provisionar` (ejecuta `provisionar-tenant.sh`), `POST /eliminar` (ejecuta `eliminar-tenant.sh`).
+- **`scripts/provisionar-tenant.sh`** — aprovisiona un tenant: crea envs/.env, registra en tenants.json, genera JSON PM2, ejecuta pm2 start. Soporta modo no-interactivo (`PROV_NON_INTERACTIVE=1`).
+- **`scripts/eliminar-tenant.sh`** — elimina un tenant completo: pm2 delete, archivos, BD, sesión WA.
 
-### Handlers
-- `src/handlers/mensajes.js` — router delgado (~178 líneas): encadena todos los sub-handlers en orden de prioridad. Usa `detectarTodasPreguntasFrecuentes()` para el bloque global de FAQs (multi-intent).
-- `src/handlers/pedidoParser.js` — NLU local de pedidos: detecta cortes, cantidades, modificaciones, preguntas FAQ. Cachés: `_cortesCache` + `_cortesRegexCache` (TTL 60s, invalidables con `invalidarCacheCortes()`). Exporta `detectarPreguntaFrecuente` (primera coincidencia) y `detectarTodasPreguntasFrecuentes` (multi-intent, array). Intents: `precio`, `horario`, `domicilio`, `menu`, `ubicacion`, `metodos_pago`, `descripcion_corte`, `pedido_listo`, `ya_en_camino`, `despedida`, `total_parcial`. Funciones clave del NLU multi-giro: `_buildItemTypesPattern()` (regex dinámica de todos los item types activos), `_getItemTypesActivos()` (cache TTL 60s desde BD), `detectarTipoItemDesdeTexto(texto)` (retorna objeto item_type o null), `listaItemTypes(soloUnidad?)` (lista legible; `soloUnidad=true` excluye gramos/pesos), `parsearItem(fragmento)` (parsea un fragmento con tipo+cantidad+corte).
-- `src/handlers/respuestas.js` — respuestas FAQ sin Groq. `aplicarQuitarUno(ordenTexto, corte?)` acepta corte opcional para reducir ítem específico.
-- `src/handlers/comandos.js` — comandos de grupo: ver pedidos (!pedidos, !pendientes, !confirmados, !cancelados, !rechazados, !domicilios, !mostradores, !pedido), gestionar (!confirmar, !listo, !cancelar, !rechazar), clientes (!cliente, !buscar, !historial, !top, !editar, !mensaje), reportes (!stats, !reporte ayer/semana/mes), menú (!precios, !precio, !agotado, !disponible), control (!cerrar, !abrir, !pausar, !reanudar, !sesiones, !resetear, !limpiar, !estado, !ayuda)
-- `src/handlers/imagenes.js` — recibe comprobantes de transferencia vía imagen
+### Handlers del bot
+- **`src/handlers/mensajes.js`** — router delgado (~178 líneas): encadena sub-handlers en orden de prioridad. Usa `detectarTodasPreguntasFrecuentes()` para el bloque global de FAQs (multi-intent).
+- **`src/handlers/pedidoParser.js`** — NLU local. Cachés `_cortesCache` + `_cortesRegexCache` (TTL 60s). Exporta `detectarPreguntaFrecuente` (primera coincidencia) y `detectarTodasPreguntasFrecuentes` (array, solo usar en `mensajes.js`). Intents: `precio`, `horario`, `domicilio`, `menu`, `ubicacion`, `metodos_pago`, `descripcion_corte`, `pedido_listo`, `ya_en_camino`, `despedida`, `total_parcial`. Funciones NLU multi-giro: `_buildItemTypesPattern()`, `_getItemTypesActivos()`, `detectarTipoItemDesdeTexto(texto)`, `listaItemTypes(soloUnidad?)`, `parsearItem(fragmento)`.
+- **`src/handlers/respuestas.js`** — respuestas FAQ sin Groq. `aplicarQuitarUno(ordenTexto, corte?)` acepta corte opcional.
+- **`src/handlers/comandos.js`** — comandos de grupo: `!pedidos`, `!pendientes`, `!confirmados`, `!cancelados`, `!rechazados`, `!domicilios`, `!mostradores`, `!pedido`, `!confirmar`, `!listo`, `!cancelar`, `!rechazar`, `!cliente`, `!buscar`, `!historial`, `!top`, `!editar`, `!mensaje`, `!stats`, `!reporte`, `!precios`, `!precio`, `!agotado`, `!disponible`, `!cerrar`, `!abrir`, `!pausar`, `!reanudar`, `!sesiones`, `!resetear`, `!limpiar`, `!estado`, `!ayuda`. El comando `!confirmar` en pedidos a domicilio llama `despacharConDelay()`.
+- **`src/handlers/imagenes.js`** — recibe comprobantes de transferencia vía imagen.
+- **`src/handlers/mandaditos.js`** — módulo de reparto. Ver sección Mandaditos.
 
-#### Flujos (`src/handlers/flujos/`)
-- `formulario.js` — primer mensaje, tipo de entrega, formulario progresivo, cambio de tipo durante formulario. Captura datos del primer mensaje con `interpretarCampos`. Usa `extraerTelefonoDeJID` para pre-llenar teléfono.
-- `orden.js` — toma de pedido: estados críticos bloqueantes, corte, tipo ítem, confirmación, agregar más, parser local, Groq fallback (con retry y timeout 15s)
-- `edicion.js` — edición de campos durante el formulario y resumen
-- `resumen.js` — resumen final, confirmación de pedido, cambios desde resumen, catch-all resumen. La BD se guarda **antes** de confirmar al cliente; si falla, el cliente recibe error en lugar de confirmación falsa. Si MercadoPago está configurado, genera link de pago; si no, usa flujo banco + foto.
-- `cancelacion.js` — flujo de cancelación en todas sus etapas
-- `utils.js` — helpers compartidos: `replyConTyping` (incluye **rate limiting 2s/JID**), `enFlujoActivo`, `parsearSinCorteItems`, `palabrasConfirmacion`. Contiene también `telefonosReales`, `ultimoPedido`, `ultimaActividad`, `recordatorioEnviado`. Timeout en **dos fases**: **20 min** → recordatorio contextual + jitter 1-3s, **35 min** → limpiar sesión.
+### Flujos (`src/handlers/flujos/`)
+- **`formulario.js`** — primer mensaje, tipo de entrega, formulario progresivo, cambio de tipo durante formulario. `interpretarCampos()` captura datos del primer mensaje. `extraerTelefonoDeJID()` pre-llena teléfono.
+- **`orden.js`** — toma de pedido: estados críticos bloqueantes, corte, tipo ítem, confirmación, agregar más, parser local, Groq fallback (retry + timeout 15s).
+- **`edicion.js`** — edición de campos durante el formulario y desde el resumen.
+- **`resumen.js`** — resumen final, confirmación. BD se guarda **antes** de confirmar al cliente. Si MP está configurado, genera link de pago; si no, flujo banco+foto. En domicilios efectivo/tarjeta llama `despacharConDelay()` al confirmar.
+- **`cancelacion.js`** — flujo de cancelación.
+- **`utils.js`** — `replyConTyping()` (rate limiting **2s/JID**), `enFlujoActivo()`, `parsearSinCorteItems()`, `palabrasConfirmacion`. Maps en memoria: `telefonosReales`, `ultimoPedido`, `ultimaActividad`, `recordatorioEnviado`. Timeout en dos fases: **20 min** → recordatorio contextual (jitter 1-3s), **35 min** → `limpiarTodo()`.
 
 ### Estado (Maps en memoria)
-- `src/estado/maps.js` — **todos los Maps**: `clientesNuevos`, `pendientesConfirmacion`, `tipoEntregaCliente`, `esperandoTipoItem`, `datosCampos`, `pedidoJSONActual`, etc.
-- `src/estado/bot-pausado.js` — singleton `{ pausado: false }`. Chequeado al inicio de `handleMensaje`; si es `true`, el bot no procesa ningún mensaje de cliente. Los comandos `!pausar` y `!reanudar` del grupo lo modifican.
-- `src/estado/campos.js` — interpretación de campos del formulario progresivo, `limpiarTodo()`, `interpretarCampos()`, `siguienteCampoFaltante()`. También contiene `extraerTelefono()` (regex unificada con validación LADA `^[2-9]`) y `extraerTelefonoDeJID()` (extrae teléfono de JID @c.us; devuelve `null` para `@lid` — la resolución real ocurre en `index.js`). `PALABRAS_NO_NOMBRE` incluye palabras geográficas.
-- `src/estado/sesiones.js` — serialización/restauración de sesiones a BD. TTL: 48h. Todos los Maps críticos incluyendo `pendientesConfirmacion` se serializan.
-- `src/estado/index.js` — re-exporta todo el estado incluyendo `extraerTelefono` y `extraerTelefonoDeJID`
+- **`src/estado/maps.js`** — todos los Maps: `clientesNuevos`, `pendientesConfirmacion`, `tipoEntregaCliente`, `esperandoTipoItem`, `datosCampos`, `pedidoJSONActual`, etc.
+- **`src/estado/bot-pausado.js`** — singleton `{ pausado: false }`. `!pausar`/`!reanudar` lo modifican.
+- **`src/estado/campos.js`** — `limpiarTodo()`, `interpretarCampos()`, `siguienteCampoFaltante()`, `extraerTelefono()` (regex con validación LADA mexicano `^[2-9]`), `extraerTelefonoDeJID()` (devuelve `null` para `@lid`).
+- **`src/estado/sesiones.js`** — serialización/restauración a BD. TTL 48h. Todos los Maps críticos incluyendo `pendientesConfirmacion`.
+- **`src/estado/index.js`** — re-exporta todo.
 
 ### Giros (módulos de negocio)
-- `src/giros/taqueria.js` — **fuente de verdad del giro taquería**. Define:
-  - `itemTypes[]` — formatos de venta: taco, torta, quesadilla, vampiro, burrito, gramos (100gr.), por_pesos. Cada uno con `slug`, `nombre`, `nombre_plural`, `aliases`, `soporta_gramos`, `soporta_pesos`, `precio_campo`.
-  - `cortes[]` — 16 cortes con `slug`, `nombre`, `aliases`, `seccion` (asada|carnitas), `subclase`, `precio_base`.
-  - `configDefaults`, `vocabulario`, `mensajesDefaults`, `comportamiento`.
-  - Consumido por `seed.js` al provisionar y sincronizado a BD en cada arranque.
-- `src/giros/index.js` — `getGiroActivo()` devuelve el módulo del giro configurado en BD.
+- **`src/giros/taqueria.js`** — fuente de verdad del giro taquería. Define `itemTypes[]` (taco, torta, quesadilla, vampiro, burrito, gramos, por_pesos), `cortes[]` (16 cortes con slug, aliases, seccion asada|carnitas), `configDefaults`, `vocabulario`, `mensajesDefaults`, `comportamiento`. Consumido por `seed.js` en cada arranque.
+- **`src/giros/index.js`** — `getGiroActivo()`, `getGiro(slug)`, `listGiros()`.
+- **`src/giros/hamburgueseria/nlu.js`** — stubs NLU para hamburguesería (no implementado aún).
 
-### Base de datos (better-sqlite3)
-- `src/db/core.js` — **mejor-sqlite3** nativo. `initDB()` abre el archivo SQLite en `data/tacos_javier.db`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente). `queryAll()`, `queryOne()`, `run()` usan `prepare().all/get/run`. Shim de compatibilidad en `getDB()` para código legacy que usa la API sql.js (`run()/exec()`). `journal_mode = DELETE` (sin archivos WAL, simplifica backups).
-- `src/db/seed.js` — crea tablas y datos iniciales. Migraciones inline con `ALTER TABLE ... ADD COLUMN`. `_seedBusinessTypes()` sincroniza `item_types` desde el módulo giro en cada arranque. `BOT_TEST_MODE=1` activa todos los item_types y seedea productos de prueba.
-- `src/db/cortes.js` — catálogo de cortes/ingredientes del giro. `getCortesBD()` devuelve mapa `{alias→slug}` para NLU (TTL 60s). `getCortesBDObj()` devuelve objetos completos. `getPrecioCorteFormato(corteSlug, formatoSlug)` con fallback a `precio_base` y luego a config global. Invalida con `invalidarCacheCortesBD()`.
-- `src/db/modelos.js` — CRUD de productos, clientes, pedidos. `actualizarEstadoPedido()` busca por teléfono, `actualizarEstadoPorId()` busca por ID (usa el webhook de MP). Funciones adicionales: `setProductoActivo`, `updateProductoPrecio`, `getTopClientes`, `getPedidosPorCliente`, `actualizarEstadoConfirmado`, `getPedidosPorFecha`.
-- `src/db/config.js` — configuración, horarios, banco, mensajes_bot, `guardarTelefonoReal()`, `getJIDReal()`, `guardarJIDReal()`
-- `src/db/index.js` — re-exporta todo el módulo db
+### Base de datos
+- **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. `journal_mode = DELETE` (sin WAL). `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
+- **`src/db/seed.js`** — crea todas las tablas + migraciones inline + datos iniciales. Lee env vars del proceso: `BUSINESS_TYPE`, `NOMBRE_NEGOCIO`, `GRUPO_ID`, `SECCION_TAQUERIA_INICIAL`, `PLAN_ACTIVO`. `_seedBusinessTypes()` sincroniza `item_types` desde los módulos giro. `BOT_TEST_MODE=1` activa todos los item_types y seedea productos de prueba.
+- **`src/db/cortes.js`** — catálogo de cortes. `getCortesBD()` → mapa `{alias→slug}` para NLU (TTL 60s). `getPrecioCorteFormato(corteSlug, formatoSlug)` con fallback a `precio_base` → config global.
+- **`src/db/modelos.js`** — CRUD productos, clientes, pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhook MP).
+- **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
+- **`src/db/repartidores.js`** — CRUD repartidores + historial de entregas. `registrarEntregaConfirmada()` (actualiza promedio, escribe a `entregas_historial`), `registrarEntregaTimeout()` (escribe con `confirmado=0, minutos=NULL`), `getHistorialTenant()`, `getReporteDesempeno()`, `resetEntregasHoy()`.
+- **`src/db/admin.js`** — BD del superadmin (`data/admin.db`). Config global (GROQ_API_KEY global, APP_URL, Sentry DSN), usuarios superadmin, sesiones.
+- **`src/db/index.js`** — re-exporta todo el módulo db.
 
 ### Pagos
-- `src/pagos/mercadopago.js` — wrapper SDK v3. `estaConfigurado()` verifica `MERCADOPAGO_ACCESS_TOKEN` + `APP_URL`. `crearEnlacePago()` crea una Preference con expiración de 30 min y guarda contexto en `_pendientes` (Map en memoria). `procesarPago(paymentId)` verifica el estado en la API de MP y devuelve contexto. **Si el servidor reinicia durante el pago, el link ya existe en MP pero no se auto-notifica vía WA** — el admin puede confirmar manualmente desde el panel.
+- **`src/pagos/mercadopago.js`** — SDK v3. `estaConfigurado()`, `crearEnlacePago()` (Preference 30min), `procesarPago(paymentId)`. Si reinicia durante un pago, el link existe en MP pero no se auto-notifica — confirmar manual desde panel.
+- **`src/pagos/stripe.js`** — driver Stripe (Plan Plus).
+- **`src/pagos/conekta.js`** — driver Conekta (Plan Plus).
+- **`src/pagos/index.js`** — selecciona el driver activo según `pasarela_activa` en BD.
 
-### Panel
-- `src/panel/server.js` — Express, autenticación con sesión, rate limiting login (5/min/IP), API REST, auto-notifica cliente vía WA al cambiar estado de pedido. Endpoints públicos: `GET /health`, `POST /webhook/mercadopago`.
-- `src/panel/whatsapp-bridge.js` — singleton para compartir el cliente WA sin deps circulares
-- `src/panel/public/index.html` — SPA del panel (~870 líneas). Secciones: dashboard (stats + histórico), pedidos (filtros + CSV), clientes, productos, horarios, banco, mensajes bot, config, **wizard de onboarding** (5 pasos: negocio → horarios → banco → menú → contraseña). Auto-refresh cada 20s. El wizard se abre automáticamente al primer login si `nombre_negocio` es el valor por defecto y `localStorage.setup_done` no está fijado.
+### Panel del tenant
+- **`src/panel/server.js`** — Express. Auth con sesión, rate limiting login. API REST. Auto-notifica cliente WA al cambiar estado de pedido. Webhooks públicos: `GET /health`, `POST /webhook/mercadopago`, `POST /webhook/stripe`, `POST /webhook/conekta`. Cuando un pago se confirma vía webhook, llama `despacharConDelay()` si el pedido es a domicilio.
+- **`src/panel/whatsapp-bridge.js`** — singleton para compartir el cliente WA sin deps circulares.
+- **`src/panel/public/index.html`** — SPA del panel tenant (~870 líneas). Secciones: dashboard, pedidos (filtros + CSV), clientes, productos, horarios, banco, mensajes bot, config. **Wizard de onboarding** (5 pasos: negocio → horarios → banco → menú → contraseña) se abre automáticamente al primer login si `nombre_negocio` es el default y `localStorage.setup_done` no está fijado.
+
+### Feature flags
+- **`src/features/index.js`** — `PLANES = { basico, plus, pro }`. `requireFeature(feature)` verifica si la feature está en el plan activo del tenant. Gates en la API del panel con banners de upgrade en el frontend.
 
 ### Scripts
-- `scripts/onboarding.js` — asistente CLI interactivo (alternativa al wizard web). 5 pasos en terminal.
-- `scripts/backup-db.js` — copia `data/tacos_javier.db` a `data/backups/tacos_javier_YYYY-MM-DD_HH-mm-ss.db`. Se ejecuta automáticamente cada 6h desde `index.js` via `child_process.fork()`. También disponible como `npm run backup`.
-- `scripts/reset-password.js` — resetea la contraseña del panel sin necesitar la actual.
-- `scripts/nuevo-tenant.js` — provisiona una nueva instancia del bot (SaaS).
-- `scripts/check-nuevos-tipos.js` — suite de 27 casos de prueba para NLU multi-tipo (quesadillas, burritos, vampiros, gramos, pesos, multi-ítem, herencia `ultimoTipo`). Usar con `BOT_TEST_MODE=1`. **No usar `npm test`** — correr directo: `node scripts/check-nuevos-tipos.js`.
+- **`scripts/backup-db.js`** — copia `data/{TENANT_ID}.db` a `data/backups/{TENANT_ID}_YYYY-MM-DD_HH-mm-ss.db`. Se ejecuta automáticamente cada 6h desde `index.js` via `fork()`. También: `npm run backup`.
+- **`scripts/reset-password.js`** — resetea la contraseña del panel sin necesitar la actual.
+- **`scripts/check-nuevos-tipos.js`** — 27 casos de prueba para NLU multi-tipo. Correr con `BOT_TEST_MODE=1`, **no** con `npm test`: `node scripts/check-nuevos-tipos.js`.
+- **`scripts/auto-pull.sh`** — git pull automático (alternativa lightweight al webhook).
 
 ### Otros
-- `src/prompts/base.js` — prompt de sistema para Groq
-- `src/horario.js` — lógica de horario de atención
-- `src/config.js` — helpers de configuración del negocio
-- `src/pedido/precios.js` — cálculo de precios desde BD
+- **`src/prompts/base.js`** — prompt de sistema para Groq.
+- **`src/horario.js`** — lógica de horario de atención.
+- **`src/config.js`** — helpers de configuración del negocio.
+- **`src/pedido/precios.js`** — cálculo de precios desde BD.
+- **`src/nlu/core.js`** — utilidades NLU genéricas reutilizables por todos los giros.
 
 ---
 
-## Convenciones
-- **Idioma**: código, variables, comentarios y mensajes al cliente en **español**
-- **Sin mocks de BD**: usar better-sqlite3 real en cualquier prueba (no `jest.mock`)
-- **Teléfonos**: siempre 10 dígitos locales. JID de WA (`5213XXXXXXXXXX@c.us`) → `slice(-10)` para extraer el número
-- **Commits**: en español, descriptivos
+## Módulo de Mandaditos (reparto)
 
-## Variables de entorno (`.env`)
-```
-GROQ_API_KEY=gsk_...          # Requerida
-GRUPO_ID=521XXXXXXXXXX@g.us   # Requerida — JID del grupo de administración
-PANEL_PORT=3000                # Opcional, default 3000
-PANEL_SECRET=...               # Recomendado en producción (sin esto, el panel usa un secreto inseguro)
-TENANT_ID=carnitas-bot         # Identificador de instancia (sesión WA)
-SENTRY_DSN=                    # Opcional — activa Sentry si se define
-MERCADOPAGO_ACCESS_TOKEN=      # Opcional — activa pagos con link
-APP_URL=https://mi-servidor.com # Necesario si MP está activo (webhook)
-GROQ_TIMEOUT_MS=15000          # Opcional — timeout para llamadas a Groq (default 15000ms)
-WEBHOOK_PORT=4000              # Puerto del servidor de deploy automático (default 4000)
-WEBHOOK_SECRET=...             # Secreto compartido con GitHub para verificar firma HMAC
-BOT_TEST_MODE=1                # Solo scripts — activa todos los item_types y seedea productos de prueba
-```
+`src/handlers/mandaditos.js` gestiona el flujo completo de despacho a repartidores.
 
-## Configuración desde BD (tabla `configuracion`)
-Claves editables desde el panel web (sección Configuración):
+### Flujo
+1. Cliente confirma pedido a domicilio → se llama `despacharConDelay(client, datos)`
+2. `despacharConDelay()` lee `mandaditos_delay_min` de la BD. Si > 0, programa un `setTimeout`; si = 0, despacha inmediatamente. **La preventa y `reanudarDespachosPendientes` llaman directamente a `enviarDespachoMandaditos()` sin delay.**
+3. `enviarDespachoMandaditos()` envía un mensaje al grupo de mandaditos (`GRUPO_MANDADITOS_ID` o `grupo_mandaditos_id` en BD) con los datos del pedido.
+4. El primer repartidor que **quote-responde** ese mensaje toma el pedido → se llama `handleMensajeMandaditos()`.
+5. El repartidor recibe instrucciones de recolección y entrega por privado. Se activa zona de silencio (`mandaditos_silencio_min`).
+6. Después de `mandaditos_recordatorio_min`, el bot pregunta si ya entregó. El repartidor responde con NLU de confirmación o sí/no.
+7. Si confirma: `registrarEntregaConfirmada()` — actualiza promedio, escribe a `entregas_historial` con `confirmado=1`.
+8. Si no responde en `mandaditos_timeout_post_min`: `registrarEntregaTimeout()` — escribe a `entregas_historial` con `confirmado=0, minutos=NULL`.
+9. En `index.js`, si el remitente es repartidor activo (`esRepartidorActivo(jid)`), el mensaje se intercepta ANTES de llegar al bot normal.
+10. `resetEntregasHoy()` se llama cada medianoche (programado en `index.js` con `_programarResetMedianoche()`).
+
+### Tabla `repartidores` (BD del tenant)
+`id, jid, nombre, activo, en_ruta, pedido_actual_id, tiempo_ruta_inicio, entregas_hoy, entregas_total, entregas_confirmadas, promedio_entrega_min, ultima_actividad, creado_en`
+
+### Tabla `entregas_historial` (BD del tenant)
+`id, repartidor_id, pedido_id, colonia, minutos, confirmado (1=NLU, 0=timeout), fecha, creado_en`
+El promedio de tiempo se calcula **solo** de entregas con `confirmado=1`.
+
+### Config BD del tenant (claves mandaditos)
 | Clave | Default | Descripción |
 |---|---|---|
-| `nombre_negocio` | Tacos Javier | Nombre del negocio |
-| `tipo_negocio` | carnitas de puerco | Tipo de negocio (usado en Groq) |
-| `precio_taco` | 30 | Precio global por taco |
-| `precio_torta` | 40 | Precio global por torta |
-| `precio_100g` | 32 | Precio global por 100g |
-| `precio_salsa` | 15 | Precio de salsa extra |
-| `domicilio_costo` | 50 | Costo fijo de domicilio |
-| `metodos_mostrador` | efectivo, tarjeta o transferencia | Métodos en mostrador |
-| `metodos_domicilio` | efectivo o transferencia | Métodos a domicilio |
-| `tiempo_cancelacion` | 15 | Minutos para cancelar tras confirmar |
-| `timeout_recordatorio_min` | 20 | Minutos de inactividad antes del recordatorio |
-| `timeout_sesion_min` | 35 | Minutos de inactividad antes de limpiar sesión |
+| `grupo_mandaditos_id` | `` | JID del grupo de repartidores |
+| `mandaditos_delay_min` | `15` | Minutos de espera tras confirmación del vendedor para despachar |
+| `mandaditos_silencio_min` | `15` | Minutos sin interrumpir al repartidor tras asignarle el pedido |
+| `mandaditos_recordatorio_min` | `30` | Minutos tras asignación para preguntar si entregó |
+| `mandaditos_timeout_post_min` | `20` | Minutos adicionales tras recordatorio antes de registrar timeout |
 
-## Reconnección automática (`index.js`)
-Cuando WhatsApp se desconecta, el bot reintenta con **backoff exponencial**:
-- Delay inicial: 5s → 10s → 20s → ... → máx 5 min
-- Máximo 8 reintentos (`_MAX_REINTENTOS`). Si se supera, el proceso queda en espera hasta que PM2 lo reinicie.
-- `_reintentos` se resetea en el evento `ready`.
-- **`client.destroy()` antes de `client.initialize()`**: libera el proceso de Chromium y los archivos del perfil bloqueados antes de reiniciar. Si `destroy()` falla (EBUSY), se loguea como warning y se continúa. Sin este paso, el reintento lanzaba "browser is already running".
+---
 
-## Backup automático
-`_runBackup()` en `index.js` ejecuta `scripts/backup-db.js` via `fork()`:
-- Primera ejecución al iniciar el bot
-- Luego cada 6 horas
-- Los archivos se guardan en `data/backups/` con timestamp
+## Variables de entorno
 
-## Rate limiting de mensajes WA
-`replyConTyping()` en `utils.js` garantiza **mínimo 2s entre mensajes al mismo JID**. Si el intervalo no se ha cumplido, espera el tiempo restante antes de enviar. Reduce riesgo de ban por spam.
+### `.env` del root (para superadmin y webhook-deploy)
+```
+SUPERADMIN_PORT=3001       # Puerto del superadmin (default 3001)
+SUPERADMIN_SECRET=...      # Secret de sesión del superadmin
+WEBHOOK_PORT=4000          # Puerto del webhook-deploy (default 4000)
+WEBHOOK_SECRET=...         # Secreto HMAC compartido con GitHub
+WEBHOOK_HOST=localhost     # Host del webhook-deploy (default localhost; Docker: host.docker.internal)
+SENTRY_DSN=                # Opcional — activa Sentry si se define
+```
 
-## Estados críticos bloqueantes (orden.js)
+### Variables que `provisionar-tenant.sh` inyecta en el JSON PM2 de cada tenant
+```
+TENANT_ID=carnitas-bot              # Slug único del tenant (determina BD y sesión WA)
+NOMBRE_NEGOCIO=Tacos Javier         # Seeded en configuracion.nombre_negocio
+GRUPO_ID=521XXXXXXXXXX@g.us         # JID del grupo admin de WhatsApp
+PANEL_PORT=3002                     # Puerto del panel del tenant
+PANEL_SECRET=...                    # Secret de sesión del panel del tenant
+GROQ_API_KEY=gsk_...               # Opcional — puede configurarse desde superadmin (admin.db)
+BUSINESS_TYPE=taqueria              # Giro del negocio — determina NLU y productos
+SECCION_TAQUERIA_INICIAL=ambas      # ambas | carnitas | asada
+PLAN_ACTIVO=basico                  # basico | plus | pro — seeded en configuracion.plan_activo
+```
 
-Cuando el bot está en uno de estos estados, **bloquea cualquier otro input** y solo acepta la respuesta esperada. Al 2.° error consecutivo agrega ejemplos en el mensaje.
+### Variables opcionales adicionales para el proceso del tenant
+```
+SENTRY_DSN=                         # Activa Sentry
+MERCADOPAGO_ACCESS_TOKEN=           # Activa pagos con link MP
+APP_URL=https://mi-servidor.com     # Necesario si MP/Stripe/Conekta está activo
+GROQ_TIMEOUT_MS=15000               # Timeout Groq (default 15000ms)
+BOT_TEST_MODE=1                     # Solo scripts — activa todos los item_types
+```
 
-| Estado (Map) | Solo acepta | Ejemplos mostrados al 2.° error |
+---
+
+## Configuración desde BD (tabla `configuracion` de cada tenant)
+
+| Clave | Default | Descripción |
+|---|---|---|
+| `nombre_negocio` | `Mi Negocio` | Nombre del negocio (seeded desde `NOMBRE_NEGOCIO` env) |
+| `business_type_slug` | `taqueria` | Giro activo (seeded desde `BUSINESS_TYPE` env) |
+| `seccion_taqueria` | `ambas` | Sección visible para NLU (seeded desde `SECCION_TAQUERIA_INICIAL`) |
+| `plan_activo` | `basico` | Plan de membresía (seeded desde `PLAN_ACTIVO` env) |
+| `grupo_id` | `` | JID del grupo admin WA (seeded desde `GRUPO_ID` env) |
+| `domicilio_costo` | `50` | Costo fijo de domicilio |
+| `metodos_mostrador` | `efectivo, tarjeta o transferencia` | |
+| `metodos_domicilio` | `efectivo o transferencia` | |
+| `tiempo_cancelacion` | `15` | Minutos para cancelar tras confirmar |
+| `timeout_recordatorio_min` | `20` | Minutos de inactividad antes del recordatorio |
+| `timeout_sesion_min` | `35` | Minutos de inactividad antes de limpiar sesión |
+| `tipo_servicio` | `ambos` | mostrador \| domicilio \| ambos |
+| `pasarela_activa` | `` | mercadopago \| stripe \| conekta \| vacío |
+| `notif_modalidad` | `grupo` | grupo \| privado \| autochat \| ninguno |
+| `bot_pausado` | `0` | 1 = bot pausado para todos los clientes |
+| `negocio_lat`, `negocio_lon` | `` | Coordenadas del negocio (para cálculo de distancia) |
+| `negocio_calle`, `negocio_colonia`, `negocio_referencia` | `` | Dirección del negocio |
+| `alerta_pedido_min` | `10` | Minutos tras confirmar para alertar si no se ha visto |
+| `estrategia_precio_mixto` | `mas_caro` | mas_caro \| promedio |
+| `mandaditos_delay_min` | `15` | Delay de despacho a repartidores tras confirmar |
+
+---
+
+## Bugs conocidos y pendientes
+
+### BUG 1 — `provisionar-tenant.sh`: env vars no llegan al proceso PM2
+**Síntomas:** Al provisionar un tenant nuevo, la BD se seedea con defaults incorrectos:
+- `nombre_negocio = "Mi Negocio"` en lugar del nombre real
+- `seccion_taqueria = "ambas"` aunque se seleccionó "carnitas" o "asada"
+- `plan_activo = "basico"` aunque se asignó "plus" o "pro"
+
+**Causa:** `provisionar-tenant.sh` escribe las vars en `envs/{TENANT_ID}.env` pero el JSON de PM2 que genera no incluye `NOMBRE_NEGOCIO`, `SECCION_TAQUERIA_INICIAL` ni `PLAN_ACTIVO` en el bloque `env`. El proceso PM2 arranca sin esas vars y `seed.js` usa sus defaults.
+
+**Fix pendiente:**
+1. En `provisionar-tenant.sh`, agregar al dict de env de Python: `NOMBRE_NEGOCIO`, `SECCION_TAQUERIA_INICIAL`, `BUSINESS_TYPE`, `PLAN_ACTIVO`
+2. En `seed.js` línea 323, cambiar `"basico"` por `process.env.PLAN_ACTIVO || "basico"`
+
+### BUG 2 — Colonias vacías en superadmin inmediatamente tras provisionar
+**Síntoma:** La sección Geo del superadmin muestra tabla vacía para el tenant recién creado.
+
+**Causa:** `seed.js` no seedea colonias (por diseño — son específicas de cada ciudad). La BD recién creada tiene la tabla `colonias` vacía. El superadmin la lee correctamente — simplemente no hay datos.
+
+**Comportamiento esperado:** El superadmin debe agregar las colonias manualmente en Geo → Colonias. La UI debe mostrar un mensaje claro de "Sin colonias configuradas" en lugar de tabla vacía sin contexto.
+
+**Fix pendiente:** Mejorar el mensaje vacío en la UI del superadmin (`index.html`, sección de colonias).
+
+### BUG 3 — Plan en tenants.json no se sincroniza a BD del tenant existente
+**Síntoma:** Si se cambia el plan de un tenant en el superadmin cuando el bot ya está corriendo, el plan en `tenants.json` se actualiza pero la BD del tenant puede quedar desincronizada.
+
+**Causa:** `POST /api/tenants` y `PUT /api/tenants/:id/plan` llaman `setTenantPlan()` que intenta escribir a la BD del tenant. Si la BD no existe aún (bot nunca arrancó), falla silenciosamente.
+
+**Fix:** El superadmin ya llama `setTenantPlan()` correctamente — el problema solo ocurre si el bot nunca ha corrido. Una vez el bot arranca y crea la BD, el plan se puede setear normalmente.
+
+---
+
+## Estados críticos bloqueantes (`orden.js`)
+
+Cuando el bot está en uno de estos estados, bloquea cualquier otro input y solo acepta la respuesta esperada. Al 2.° error consecutivo muestra ejemplos.
+
+| Estado (Map) | Solo acepta | Ejemplos al 2.° error |
 |---|---|---|
 | `esperandoCorte` | corte de carne | *surtido, carne, buche, cuero, lengua* |
-| `esperandoTipoItem` | taco o torta | *tacos, tortas* |
-| `esperandoConfirmacionItem` | sí/no y variantes, modificaciones, FAQ | *sí, dale, correcto / no, nel* |
-| `esperandoAgregarMas` | sí/no y variantes, subtotal, edición, FAQ | *sí / no, ya es todo* |
+| `esperandoTipoItem` | tipo de ítem | *tacos, tortas* |
+| `esperandoConfirmacionItem` | sí/no, modificaciones, FAQ | *sí, dale / no, nel* |
+| `esperandoAgregarMas` | sí/no, subtotal, edición, FAQ | *sí / no, ya es todo* |
 
 El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se resetea al recibir respuesta válida.
 
-**Orden del router en `mensajes.js`** (de mayor a menor prioridad):
+**Orden del router en `mensajes.js`** (mayor a menor prioridad):
 1. `handleEsperandoTipoItem` — estado activo
 2. `handleEsperandoCorte` — estado activo
 3. `handleConfirmacionItem` — estado activo
@@ -163,51 +352,64 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 
 **FAQs durante estados críticos:** se responden y luego se repite la pregunta del estado activo. No interrumpen el flujo.
 
-## Comando `!limpiar`
-Elimina todas las sesiones activas de clientes con confirmación de dos pasos:
-- `!limpiar` — muestra cuántas sesiones hay y pide confirmación
-- `!limpiar confirmar` — limpia todos los Maps y sesiones activas
-- Si no hay sesiones activas, responde que no hay nada que limpiar
+---
+
+## Notas NLU críticas (`pedidoParser.js`)
+
+- `"y aparte"` **no** fuerza Groq — se limpia en `preprocesarCantidades()` como conector de bebida.
+- `textoANumero()` maneja compuestos: "treinta y dos" → "32".
+- `detectarTodasPreguntasFrecuentes(texto)` → array — **solo usar en `mensajes.js`** fuera de flujo activo. En handlers de estado usar `detectarPreguntaFrecuente`.
+- Intent `pedido_listo` — evaluado ANTES que `horario` para evitar que "¿ya están listos?" responda con horario de apertura.
+- En `handleEsperandoCorte`: "de todos"/"de todo"/"cualquiera" → "surtido".
+- `buscarCorteFuzzy()` usa Levenshtein ≤ 2. **IMPORTANTE**: antes del fuzzy se hace `if (detectarTipoItemDesdeTexto(palabra)) continue` para evitar que "burritos" coincida con "cueritos" (corte cuero, distancia=2).
+- `_buildItemTypesPattern()` construye regex dinámica desde BD — se regenera con TTL 60s.
+- `listaItemTypes(soloUnidad=true)` excluye gramos/pesos — usar en mensajes al cliente cuando no aplica venta por peso.
+- `detectarModificacion()` extrae `corte` en `quitar_uno`. `aplicarQuitarUno(ordenTexto, corte?)` lo recibe como parámetro opcional.
 
 ---
 
-## Bugs conocidos / pendientes
-- (ninguno conocido actualmente)
-
-## Notas NLU relevantes (pedidoParser.js)
-- `"y aparte"` **no** fuerza Groq — se limpia en `preprocesarCantidades()` como conector de bebida.
-- `textoANumero()` maneja compuestos: "treinta y dos" → "32", "veinte y uno" → "21".
-- `detectarTodasPreguntasFrecuentes(texto)` devuelve array — usar solo en `mensajes.js` para el bloque global (fuera de flujo activo). En handlers de estado usar `detectarPreguntaFrecuente`.
-- `detectarModificacion()` extrae `corte` en `quitar_uno` cuando el cliente lo especifica. `aplicarQuitarUno` lo recibe como segundo parámetro opcional.
-- `PATRON_CAMBIAR_CORTE` cubre: "cambia X por Y", "sin X y pon Y", "en lugar de X ponme Y", "en vez de X dame Y", "mejor Y que X".
-- `PATRON_AGREGAR_MAS` cubre: "agrega N más", "N más", "ponme otros N", "súmame N", "añade N", "también quiero N".
-- Nuevo intent `pedido_listo` — evaluado ANTES que `horario` para que "¿ya están listos?" no responda con el horario de apertura.
-- En `handleEsperandoCorte`: "de todos"/"de todo"/"cualquiera" → "surtido" antes de llegar al error path.
-- En `handleFAQDurantePedido`: cuando el tipo es "precio" y hay pedido acumulado, añade el subtotal actual a la respuesta.
-- **NLU multi-tipo (quesadillas, vampiros, burritos):** `_buildItemTypesPattern()` construye regex dinámica desde BD. `parsearPedidoSimple()` usa esta regex tanto en el path multi-ítem como en el single-ítem. El path multi-ítem extiende `ultimoTipo` a todos los item types de unidad (`!soporta_gramos && !soporta_pesos`), no solo taco/torta.
-- **`extraerCorte` y fuzzy:** `buscarCorteFuzzy(palabra)` usa Levenshtein ≤ 2. **Importante**: antes del fuzzy se hace `if (detectarTipoItemDesdeTexto(palabra)) continue` para evitar que nombres de item types (ej. "burritos") coincidan por distancia con aliases de cortes (ej. "burritos" → "cueritos" → corte "cuero", distancia=2). Sin esta guardia, `detectarSinCorte("3 burritos")` retornaría null.
-- `listaItemTypes(soloUnidad = false)` — con `soloUnidad=true` filtra para excluir gramos/pesos. Usar en mensajes al cliente cuando no aplica venta por peso (ej. `handleEsperandoTipoItem`, `_textoRecordatorio`).
-
 ## Notas de implementación importantes
-- `extraerTelefono(texto)` — usar siempre esta función para extraer teléfonos de texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52 prefijo y separadores (331-234-5678, 331 234 5678).
-- `extraerTelefonoDeJID(jid)` — usar siempre esta función para extraer teléfono de un JID de WhatsApp. Devuelve `null` para JIDs en formato `@lid` (identificadores de dispositivo, no son teléfonos reales). Para `@c.us` y `@lid:` maneja el separador ":" correctamente.
-- **Resolución de LIDs en `index.js`:** WhatsApp envía `msg.from` en formato `3310000001:12@lid` en ciertos dispositivos. El handler de `"message"` detecta el sufijo `@lid` y llama a `client.getContactLidAndPhone([msg.from])` para obtener el JID real (`pn` field). El `msg.from` se reemplaza antes de enrutar, así todos los handlers downstream siempre trabajan con JIDs de teléfono real.
-- En `handleConfirmacionFinal` (resumen.js): la BD se guarda **antes** de notificar al grupo y confirmar al cliente. Si falla, retorna sin confirmar.
-- El timeout de sesiones tiene **dos fases**: **20 min** → `_textoRecordatorio()` envía mensaje contextual según estado del cliente (con jitter 1-3s), **35 min** → `limpiarTodo()`. `recordatorioEnviado` se borra en `mensajes.js` cuando el cliente responde.
+
+- **`extraerTelefono(texto)`** — siempre usar esta función para teléfonos en texto libre. Valida LADA mexicano (primer dígito 2-9), detecta +52, separadores (331-234-5678).
+- **`extraerTelefonoDeJID(jid)`** — devuelve `null` para JIDs `@lid`. Para `@c.us` extrae los últimos 10 dígitos.
+- **Resolución de LIDs en `index.js`:** `msg.from` puede llegar como `3310000001:12@lid`. El handler detecta `@lid`, llama `client.getContactLidAndPhone([msg.from])` y reemplaza `msg.from` con el JID real antes de enrutar. Todos los handlers downstream siempre reciben JIDs de teléfono real.
+- **`guardarDB()`** es no-op — better-sqlite3 persiste automáticamente en cada escritura. El shim existe para no romper código legacy.
+- En `handleConfirmacionFinal` (`resumen.js`): la BD se guarda **antes** de notificar al grupo y confirmar al cliente. Si falla, el cliente recibe error en lugar de confirmación falsa.
 - Nombre compuesto en BD: 1 palabra→solo nombre, 2→nombre+apellido, 3+→primeras dos palabras como nombre, resto como apellido.
-- **`guardarDB()`** es no-op desde la migración a better-sqlite3 — better-sqlite3 persiste cada escritura automáticamente. El shim existe para no romper llamadas legacy.
+- Timeout de sesiones: **dos fases** — 20 min → `_textoRecordatorio()` contextual (jitter 1-3s), 35 min → `limpiarTodo()`. `recordatorioEnviado` se borra en `mensajes.js` cuando el cliente responde.
+- **BD del superadmin**: `data/admin.db` — separada de los tenants. Contiene config global, usuarios superadmin, sesiones de la SPA. Gestionada por `src/db/admin.js`.
+
+---
+
+## Convenciones
+
+- **Idioma:** código, variables, comentarios y mensajes al cliente en **español**
+- **Sin mocks de BD:** usar better-sqlite3 real en cualquier prueba (no `jest.mock`)
+- **Teléfonos:** siempre 10 dígitos locales. JID WA (`5213XXXXXXXXXX@c.us`) → `slice(-10)`
+- **Commits:** en español, descriptivos
+- **No usar `npm test` para scripts de prueba NLU** — correr directo con `node scripts/check-nuevos-tipos.js`
+
+---
 
 ## Hoja de ruta — Arquitectura multi-giro/multi-tenant
 
-| Fase | Qué se construye                                                                                                                                                              | Impacto                       | Estado                  |
-|:----:|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|-------------------------|
-|  1   | Separar ecosistema taquería — `src/nlu/core.js`, `src/giros/taqueria/index.js`, `src/giros/taqueria/nlu.js`, `pedidoParser.js` como router delegante                         | Habilita multi-giro           | ✅ Commit `50a7414`     |
-|  2   | Extraer `nlu/core.js` con utilidades genéricas puras (completado junto con Fase 1)                                                                                            | Reutilizable por todos giros  | ✅ Incluido en Fase 1   |
-|  3   | Formalizar `geo/` como servicio de plataforma — solicitudes geo (tenant→superadmin), seed ciudad-agnóstico, aliases en `buscarColonia()`, 31 tests unitarios                 | Multi-ciudad                  | ✅ Fase 3 completa      |
-|  4   | Feature flags por plan — `src/features/index.js` (PLANES: basico/plus/pro), `plan_activo` en BD tenant, `requireFeature()` en API del panel, gates UI con badge + banners de upgrade, endpoints superadmin `GET/PUT /api/tenants/:id/plan` | Modelo de negocio real | ✅ Fase 4 completa |
-|  5   | Implementar hamburguesería como segundo giro activo (NLU stubs ya existen en `src/giros/hamburgueseria/nlu.js`)                                                               | Valida la abstracción         | Pendiente               |
-|  6   | Drivers Stripe (`src/pagos/stripe.js`) y Conekta (`src/pagos/conekta.js`); webhooks `/webhook/stripe` y `/webhook/conekta`; superadmin UI de credenciales; `_notificarPagoConfirmado()` helper compartido | Plan Plus completo | ✅ Fase 6 completa |
-|  7   | `reparto/` + `asistente-ia/`                                                                                                                                                  | Plan Pro                      | Pendiente               |
+| Fase | Qué se construye | Estado |
+|:----:|---|---|
+| 1 | Separar ecosistema taquería — `src/nlu/core.js`, `src/giros/taqueria/`, `pedidoParser.js` como router delegante | ✅ `50a7414` |
+| 2 | Extraer `nlu/core.js` con utilidades genéricas puras | ✅ incluido en Fase 1 |
+| 3 | Servicio geo — solicitudes geo tenant→superadmin, seed ciudad-agnóstico, aliases en `buscarColonia()` | ✅ completa |
+| 4 | Feature flags por plan — `src/features/index.js`, `requireFeature()`, gates UI, endpoints superadmin plan | ✅ completa |
+| 5 | ~~Hamburguesería como segundo giro~~ | ❌ descartada |
+| 6 | Drivers Stripe + Conekta, webhooks, `_notificarPagoConfirmado()` helper compartido | ✅ completa |
+| 7 | Mandaditos/reparto — despacho con delay configurable, historial de entregas, reporte de desempeño | ✅ completa |
+| 8 | Mejoras al diccionario de colonias — aliases ampliados para reducir fallos de matching | Pendiente |
+| 9 | Tarifas de reparto por distancia — el superadmin fija tarifas fijas por zona (NO dinámica) | Pendiente |
+| 10 | Corrección de 3 bugs de provisionamiento (ver sección Bugs conocidos) | Pendiente |
 
-## Repo
-GitHub privado: `djchuvaca/Tacos-Javier-Bot` — rama `main`
+---
+
+## Repo y deployment
+
+- **GitHub:** `djchuvaca/Rajem-Bot` — rama `main`
+- **Webhook GitHub → VPS:** configurar `POST https://IP:4000/deploy` con secret = `WEBHOOK_SECRET`
+- En cada push a `main`: `git pull` + `npm install` si cambió `package.json` + `pm2 restart` de todos los procesos excepto `webhook-deploy` (se reinicia solo al final con delay de 3s)
