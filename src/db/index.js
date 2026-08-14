@@ -64,6 +64,7 @@ module.exports = {
   getPasarelaConfig:       config.getPasarelaConfig,
   getNotifModalidad:       config.getNotifModalidad,
   getNotifDestinoJID:      config.getNotifDestinoJID,
+  getTipoServicio:         config.getTipoServicio,
 
   // business types & item types
   getAllBusinessTypes:     businessTypes.getAllBusinessTypes,

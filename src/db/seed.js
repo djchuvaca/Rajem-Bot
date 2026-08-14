@@ -423,6 +423,7 @@ async function seedDB() {
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_colonia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('negocio_referencia', '')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('grupo_mandaditos_id', '')");
+  run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('tipo_servicio', 'ambos')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_silencio_min', '15')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_recordatorio_min', '30')");
   run("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('mandaditos_timeout_post_min', '20')");

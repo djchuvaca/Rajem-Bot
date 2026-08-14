@@ -2,7 +2,7 @@
 // Respuestas automáticas a preguntas frecuentes y modificaciones — sin Groq
 // Compatible con cualquier negocio configurado en la BD
 
-const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes, getMenuItems } = require("../db");
+const { getConfig, getMensaje, getProductos, getHorarios, getBanco, getItemTypes, getMenuItems, getTipoServicio } = require("../db");
 const { getPrecios } = require("../pedido/precios");
 const { estaEnHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");
@@ -185,15 +185,19 @@ function respuestaHorario() {
 
 // ── RESPUESTA: DOMICILIO ──────────────────────────────────────────────────────
 function respuestaDomicilio() {
-  const negocio  = getNegocio();
-  const zonaCobertura = getConfig("zona_cobertura") || null;
+  const negocio = getNegocio();
+  const ts = getTipoServicio();
 
+  if (ts === "solo_mostrador") {
+    return `🏪 *${negocio}* solo atiende en mostrador.\n\nNo contamos con servicio a domicilio, pero con gusto te preparamos tu pedido para que pases a recoger. 😊`;
+  }
+
+  const zonaCobertura = getConfig("zona_cobertura") || null;
   let resp = `🛵 *Servicio a domicilio de ${negocio}:*\n\n`;
   resp += `✅ Sí hacemos domicilio\n`;
   resp += `💵 Costo: _El precio se ajusta a la distancia de tu colonia_ 📍\n`;
   if (zonaCobertura) resp += `📍 Zona de cobertura: ${zonaCobertura}\n`;
   resp += `\n_¿Te hacemos un pedido a domicilio?_ 😊`;
-
   return resp;
 }
 
@@ -203,6 +207,8 @@ function respuestaMenu() {
   try {
     return MENU_FORMATO();
   } catch (e) {
+    const ts = getTipoServicio();
+    if (ts !== "ambos") return "¡Con gusto te comparto el menú! ¿Qué se te antoja? 😊";
     return "¡Con gusto te comparto el menú! ¿Me dices si tu pedido es para domicilio o mostrador?";
   }
 }

@@ -120,6 +120,11 @@ function getTelefonoReal(numeroWhatsApp) {
   return row ? row.valor : null;
 }
 
+// 'ambos' | 'solo_domicilio' | 'solo_mostrador'
+function getTipoServicio() {
+  return getConfig("tipo_servicio") || "ambos";
+}
+
 function getGrupoId() {
   return getConfig("grupo_id") || process.env.GRUPO_ID || null;
 }
@@ -176,4 +181,5 @@ module.exports = {
   getGrupoId, getGrupoMandaditosId,
   getPasarelaActiva, getPasarelaConfig,
   getNotifModalidad, getNotifDestinoJID,
+  getTipoServicio,
 };

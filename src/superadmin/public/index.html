@@ -266,6 +266,14 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
             <div class="card">
               <div class="card-header"><div class="card-title">🏪 Configuración de Giro</div></div>
               <div class="form-group">
+                <label>Tipo de servicio</label>
+                <select id="tc-tipo-servicio">
+                  <option value="ambos">Domicilio y mostrador</option>
+                  <option value="solo_domicilio">Solo domicilio</option>
+                  <option value="solo_mostrador">Solo mostrador</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label>Sección de taquería activa</label>
                 <select id="tc-seccion-taqueria">
                   <option value="ambas">Ambas (carnitas + asada)</option>
@@ -1010,6 +1018,7 @@ async function loadTenantConfig() {
   toggleNotifJIDField();
   document.getElementById('tc-timeout-rec').value=_tcConfig.timeout_recordatorio_min||'20';
   document.getElementById('tc-timeout-ses').value=_tcConfig.timeout_sesion_min||'35';
+  document.getElementById('tc-tipo-servicio').value=_tcConfig.tipo_servicio||'ambos';
   document.getElementById('tc-seccion-taqueria').value=_tcConfig.seccion_taqueria||'ambas';
   document.getElementById('tc-lat').value=_tcConfig.negocio_lat||'';
   document.getElementById('tc-lon').value=_tcConfig.negocio_lon||'';
@@ -1086,6 +1095,7 @@ async function saveTenantConfig() {
     notif_privado_jid: document.getElementById('tc-privado-jid').value.trim(),
     timeout_recordatorio_min: document.getElementById('tc-timeout-rec').value,
     timeout_sesion_min:       document.getElementById('tc-timeout-ses').value,
+    tipo_servicio:     document.getElementById('tc-tipo-servicio').value,
     seccion_taqueria:  document.getElementById('tc-seccion-taqueria').value,
     negocio_lat:       document.getElementById('tc-lat').value,
     negocio_lon:       document.getElementById('tc-lon').value,

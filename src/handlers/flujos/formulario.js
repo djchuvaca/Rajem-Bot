@@ -1,5 +1,6 @@
 // src/handlers/flujos/formulario.js
 const { detectarTipoEntrega } = require("../entrega");
+const { getTipoServicio } = require("../../db/config");
 const {
   clientesPreventa, clientesNuevos, datosRecibidos, datosCampos,
   tipoEntregaCliente, horaEntregaPreventa, referenciaPreguntas,
@@ -66,12 +67,27 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
     }
     return true;
   }
+  const tipoServicio = getTipoServicio();
   const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const tieneTipoEntrega = /\bdomicilio\b|\benvio\b|\ba\s+casa\b|\bmostrador\b|\brecoger\b|\bpara\s+llevar\b/.test(tNorm);
 
   const telKnown        = extraerTelefonoDeJID(clienteNumero) || telefonosReales.get(clienteNumero);
   const clienteConocido = telKnown ? getCliente(telKnown) : null;
   const primerNombre    = clienteConocido?.nombre?.split(" ")[0] || null;
+
+  if (_tieneSeñalesDePedido(textoOriginal)) {
+    ordenPendientePreventa.set(clienteNumero, textoOriginal);
+  }
+
+  // Cuando solo hay un tipo de servicio no se pregunta — handleTipoEntrega auto-setea
+  if (tipoServicio !== "ambos") {
+    if (primerNombre) {
+      await replyConTyping(msg, `Hola de nuevo, *${primerNombre}*! 😊`);
+    } else {
+      await replyConTyping(msg, SALUDO());
+    }
+    return false; // caer a handleTipoEntrega para que auto-setee el tipo
+  }
 
   // Para clientes recurrentes sin tipo de entrega en el primer mensaje:
   // saludar por nombre y preguntar tipo de entrega; el menú se envía después en handleTipoEntrega.
@@ -84,11 +100,6 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
     } else {
       await replyConTyping(msg, SALUDO());
     }
-  }
-
-  // Guardar intento de pedido para retomarlo automáticamente tras el formulario
-  if (_tieneSeñalesDePedido(textoOriginal)) {
-    ordenPendientePreventa.set(clienteNumero, textoOriginal);
   }
 
   if (!tieneTipoEntrega) return true;
@@ -140,13 +151,21 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
   if (historial.length !== 0) return false;
   if (enFlujoActivo(clienteNumero)) return false;
 
-  const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const esMostradorLocal = /\bpara\s+llevar\b|\bpa[`']?\s*llevar\b|\bpaso\s+(yo\s+)?a\s+recoger\b|\bvoy\s+a?\s*recoger\b|\bme\s+(?:lo\s+)?llevo\b|\bpara\s+recoger\b|\blo\s+recojo\b|\byo\s+(recojo|paso\b)/.test(tNorm);
-  const tipoEntrega = esMostradorLocal ? "mostrador" : await detectarTipoEntrega(textoOriginal);
-  if (tipoEntrega === "ninguno") {
-    if (_tieneSeñalesDePedido(textoOriginal)) return false;
-    await msg.reply("*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*");
-    return true;
+  const tipoServicio = getTipoServicio();
+  let tipoEntrega;
+  if (tipoServicio === "solo_domicilio") {
+    tipoEntrega = "domicilio";
+  } else if (tipoServicio === "solo_mostrador") {
+    tipoEntrega = "mostrador";
+  } else {
+    const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const esMostradorLocal = /\bpara\s+llevar\b|\bpa[`']?\s*llevar\b|\bpaso\s+(yo\s+)?a\s+recoger\b|\bvoy\s+a?\s*recoger\b|\bme\s+(?:lo\s+)?llevo\b|\bpara\s+recoger\b|\blo\s+recojo\b|\byo\s+(recojo|paso\b)/.test(tNorm);
+    tipoEntrega = esMostradorLocal ? "mostrador" : await detectarTipoEntrega(textoOriginal);
+    if (tipoEntrega === "ninguno") {
+      if (_tieneSeñalesDePedido(textoOriginal)) return false;
+      await msg.reply("*¿Tu pedido será para domicilio o pasas a recoger al mostrador?*");
+      return true;
+    }
   }
 
   // Pre-cargar datos del cliente frecuente (silencioso — el formulario se muestra después del pedido)
@@ -214,6 +233,7 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
 // ── 2C. CAMBIO DE TIPO DURANTE FORMULARIO (post-orden) ───────────────────────
 async function handleCambioTipoDuranteFormulario(msg, textoOriginal, clienteNumero, esPreventa) {
   if (!ordenPreResumen.has(clienteNumero)) return false;
+  if (getTipoServicio() !== "ambos") return false; // solo un tipo activo — no aplica cambio
 
   const esCambioDomicilio = /cambi(a|ar|ame|amelo|arme)\s*(a|al|para|el)?\s*domicilio/i.test(textoOriginal)
     || /quiero\s*(que\s*)?(sea\s*)?a\s*domicilio/i.test(textoOriginal)
@@ -273,14 +293,21 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
 
   // Capturar tipo de entrega si el flujo de orden corrió antes de preguntar
   if (!camposActualesFormulario.tipoEntrega && !tipoEntregaCliente.has(clienteNumero)) {
-    const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const esDom = /\bdomicilio\b|\benv[íi]o\b|\ba\s+casa\b/.test(tNorm);
-    const esMos = /\bmostrador\b|\brecoger\b|\bpara\s+llevar\b|\bpa['`]?\s*llevar\b|\bpaso\b|\bvoy\s+a\s+recoger\b|\byo\s+paso\b/.test(tNorm);
-    if (esDom || esMos) {
-      const tipo = esDom ? "domicilio" : "mostrador";
+    const ts = getTipoServicio();
+    let tipo = null;
+    if (ts === "solo_domicilio") {
+      tipo = "domicilio";
+    } else if (ts === "solo_mostrador") {
+      tipo = "mostrador";
+    } else {
+      const tNorm = textoOriginal.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const esDom = /\bdomicilio\b|\benv[íi]o\b|\ba\s+casa\b/.test(tNorm);
+      const esMos = /\bmostrador\b|\brecoger\b|\bpara\s+llevar\b|\bpa['`]?\s*llevar\b|\bpaso\b|\bvoy\s+a\s+recoger\b|\byo\s+paso\b/.test(tNorm);
+      if (esDom || esMos) tipo = esDom ? "domicilio" : "mostrador";
+    }
+    if (tipo) {
       tipoEntregaCliente.set(clienteNumero, tipo);
       camposActualesFormulario.tipoEntrega = tipo;
-      // Pre-cargar datos del cliente frecuente si existen
       const telGuardado = telefonosReales.get(clienteNumero) || getTelefonoReal(clienteNumero);
       const telBuscar   = telGuardado || extraerTelefonoDeJID(clienteNumero);
       const clienteBD   = telBuscar ? getCliente(telBuscar) : null;
