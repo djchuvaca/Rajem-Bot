@@ -160,7 +160,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   const negocio    = getNombreNegocio();
   const tarifaInfo = esDomicilio ? calcularTarifaDomicilio(c.colonia) : null;
   const domCosto   = tarifaInfo ? tarifaInfo.tarifa : getDomCosto();
-  const horaConf   = c.hora || horaEntregaPreventa.get(clienteNumero);
+  const horaConf   = esPreventa ? (c.hora || horaEntregaPreventa.get(clienteNumero)) : null;
   const esTransf   = /transferencia/i.test(c.metodo || "");
   const subtotal   = calcularSubtotal(ordenTexto);
   const total      = esDomicilio ? subtotal + domCosto : subtotal;

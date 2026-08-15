@@ -191,6 +191,19 @@ describe("siguienteCampoFaltante", () => {
     assert.equal(f, null);
     _mapa.delete(NUM2);
   });
+
+  test("una preventa no queda completa hasta capturar su hora", () => {
+    const numero = "3310000015@c.us";
+    _mapa.delete(numero);
+    interpretarCampos(numero, "Laura Pérez", false, true);
+    interpretarCampos(numero, "3115551234", false, true);
+    interpretarCampos(numero, "efectivo", false, true);
+    assert.equal(siguienteCampoFaltante(numero, false, true)?.campo, "hora");
+    assert.equal(camposCompletos(numero, false, true), false);
+    interpretarCampos(numero, "a las 10:30", false, true);
+    assert.equal(camposCompletos(numero, false, true), true);
+    _mapa.delete(numero);
+  });
 });
 
 describe("interpretarCampos — conversación natural", () => {
@@ -202,10 +215,18 @@ describe("interpretarCampos — conversación natural", () => {
     _mapa.delete(numero);
   });
 
-  test("captura hora para un pedido normal, no solo preventa", () => {
+  test("ignora una hora dentro del horario porque el pedido es lo antes posible", () => {
     const numero = "3310000011@c.us";
     _mapa.delete(numero);
     const campos = interpretarCampos(numero, "paso a recoger a las nueve y media", false, false);
+    assert.equal(campos.hora, null);
+    _mapa.delete(numero);
+  });
+
+  test("captura hora cuando el pedido es una preventa fuera del horario", () => {
+    const numero = "3310000014@c.us";
+    _mapa.delete(numero);
+    const campos = interpretarCampos(numero, "paso a recoger a las nueve y media", false, true);
     assert.equal(campos.hora, "9:30 a.m.");
     _mapa.delete(numero);
   });
@@ -223,7 +244,7 @@ describe("interpretarCampos — conversación natural", () => {
     assert.match(campos.calle, /México 123/i);
     assert.match(campos.colonia, /Centro/i);
     assert.equal(campos.metodo, "efectivo");
-    assert.equal(campos.hora, "11:00 a.m.");
+    assert.equal(campos.hora, null);
     _mapa.delete(numero);
   });
 

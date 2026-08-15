@@ -19,6 +19,7 @@ const {
   normalizar,
   invalidarCacheCortes,
 } = require("../src/handlers/pedidoParser");
+const { parsearSinCorteItems } = require("../src/handlers/flujos/utils");
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,17 @@ function itemTorta(cantidad, corte)   { return { presentacion: "torta",  cantida
 function itemGramos(gramos, corte)    { return { presentacion: "gramos", gramos,   corte }; }
 function itemPesos(monto, corte)      { return { presentacion: "pesos",  monto,    corte }; }
 function pedido(...items)             { return { tipo: "pedido", items }; }
+
+test("conserva formatos implícitos entre un producto completo y una venta por pesos", () => {
+  assert.deepEqual(
+    parsearSinCorteItems("dame 3 tacos de surtido una quesadilla y 150 pesos"),
+    pedido(
+      itemTaco(3, "surtido"),
+      { presentacion: "quesadilla", cantidad: 1, corte: null },
+      itemPesos(150, null)
+    )
+  );
+});
 
 // ── SETUP BD ─────────────────────────────────────────────────────────────────
 

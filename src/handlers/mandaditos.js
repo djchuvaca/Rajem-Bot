@@ -142,8 +142,9 @@ async function enviarDespachoMandaditos(client, datos) {
 
   const negocioColonia = getConfig('negocio_colonia') || getConfig('nombre_negocio') || 'Negocio';
 
+  const etiquetaProgramada = datos.esProgramada ? ' — ORDEN PROGRAMADA' : '';
   const texto =
-    `🛵 *Pedido #${datos.pedidoId} — Solicitud de reparto*\n` +
+    `🛵 *Pedido #${datos.pedidoId} — Solicitud de reparto${etiquetaProgramada}*\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
     `📍 *Colonia origen:* ${negocioColonia}\n` +
     `📍 *Colonia destino:* ${datos.clienteColonia || '—'}\n` +

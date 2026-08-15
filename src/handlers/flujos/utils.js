@@ -173,7 +173,7 @@ function parsearSinCorteItems(texto) {
     { re: /\bun\s+kilo\b|\b1\s*kg\b|\b1000\s*g/i,          gramos: 1000 },
   ];
   const partes = texto
-    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)/i)
+    .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)|\s+(?=\d+\s+[a-záéíóúñ])/i)
     .map(p => p.trim().replace(/^y\s+/i, ""))
     .filter(Boolean);
   const CORTES_ACTIVOS = getCortes(); // { surtido: "surtido", buche: "buche", ... } desde BD

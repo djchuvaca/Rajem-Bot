@@ -452,6 +452,7 @@ Puedes copiarlo completo en la configuración del tenant.`);
               clienteReferencia: clienteBD.referencia,
               totalOrden:        `$${pedidoBD.total}`,
               tarifaDomicilio:   tarifa,
+              esProgramada:      !!pedidoBD.hora_entrega,
             };
 
             if (pedidoBD.hora_entrega) {

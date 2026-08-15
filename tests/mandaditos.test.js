@@ -80,6 +80,12 @@ describe('Mandaditos — programación persistente', { concurrency: false }, () 
     assert.deepEqual(getDespachosPendientes(), []);
   });
 
+  test('identifica claramente una solicitud de orden programada', async () => {
+    const client = clienteWA();
+    await enviarDespachoMandaditos(client, { ...DATOS, pedidoId: 7002, esProgramada: true });
+    assert.match(client.envios[0].texto, /ORDEN PROGRAMADA/);
+  });
+
   test('un despacho vencido se recupera al arrancar y queda ejecutado', async () => {
     guardarDespachoProgramado({ ...DATOS, horaDespacho: new Date(Date.now() - 60000).toISOString() });
     const client = clienteWA();

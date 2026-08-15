@@ -20,7 +20,6 @@ const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
   replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
 } = require("./utils");
-const { despacharConDelay } = require("../mandaditos");
 const trazabilidad = require('../../db/observabilidad');
 const { dividirNombreCompleto } = require('../../clientes/nombre');
 
@@ -365,7 +364,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
         referencia:   (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null,
       });
       const total       = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
-      const hora_entrega = horaEntregaPreventa.get(clienteNumero) || null;
+      const hora_entrega = esPreventa ? (horaEntregaPreventa.get(clienteNumero) || null) : null;
       pedidoMpId = registrarPedido({
         cliente_id: cliente ? cliente.id : null,
         tipo:        infoPedido.tipo || "mostrador",
@@ -445,7 +444,7 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     const calle_numero  = camposCliente.calle || null;
     const colonia       = camposCliente.colonia || null;
     const referencia    = (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null;
-    const hora_entrega  = camposCliente.hora || horaEntregaPreventa.get(clienteNumero) || null;
+    const hora_entrega  = esPreventa ? (camposCliente.hora || horaEntregaPreventa.get(clienteNumero) || null) : null;
     const total         = parseFloat((infoPedido.total || "0").replace(/[^0-9.]/g, "")) || 0;
     const metodo_pago   = camposCliente.metodo || "efectivo";
     const cliente = upsertCliente({ nombre, apellido, telefono: telefonoLimpio, calle_numero, colonia, referencia });
@@ -477,23 +476,8 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
     trazabilidad.crearAlerta(clienteNumero, 'colonia_no_verificada', 'Colonia sin verificar', `El cliente indicó: ${_coloniaTxt}`, { severidad: 'alta', pedidoId });
   }
 
-  // ── 2. Despacho mandaditos (solo domicilio, efectivo/tarjeta) ────────────────
-  if (pedidoId && infoPedido.tipo === 'domicilio') {
-    const camposMand  = datosCampos.get(clienteNumero) || {};
-    const tarifaMand  = parseInt(getConfig('domicilio_costo') || '50', 10);
-    despacharConDelay(client, {
-      pedidoId,
-      clienteNombre:     infoPedido.nombre     || 'Cliente',
-      clienteTelefono:   infoPedido.telefono   || null,
-      clienteCalle:      camposMand.calle      || null,
-      clienteColonia:    camposMand.colonia    || null,
-      clienteReferencia: camposMand.referencia || null,
-      totalOrden:        infoPedido.total      || '$0',
-      tarifaDomicilio:   tarifaMand,
-    }).catch(e => console.error('[Mandaditos] Error al programar despacho:', e.message));
-  }
-
-  // ── 3. Notificar al destino administrativo y confirmar al cliente ────────────
+  // Aviso inmediato al tenant. Mandaditos comienza únicamente después de que
+  // el tenant ejecute !confirmar; este aviso nunca inicia el reloj de despacho.
   const notifJID = getNotifDestinoJID();
   if (notifJID) {
     try {

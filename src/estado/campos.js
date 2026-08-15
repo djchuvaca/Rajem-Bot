@@ -145,8 +145,9 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
     if (detectado) campos.metodo = detectado;
   }
 
-  // ── Hora de entrega o recolección ────────────────────────────────────────
-  if (!campos.hora && /(?:a\s+las?|paso|voy|llego|recojo|recibir|entrega|\b(?:am|pm|a\.m\.|p\.m\.)\b)/i.test(textoCompleto)) {
+  // La hora solo forma parte de una preventa iniciada fuera del horario.
+  // Dentro del servicio, cualquier pedido se entiende "lo antes posible".
+  if (esPreventa && !campos.hora && /(?:a\s+las?|paso|voy|llego|recojo|recibir|entrega|\b(?:am|pm|a\.m\.|p\.m\.)\b)/i.test(textoCompleto)) {
     const hora = validarHoraPedido(textoCompleto);
     if (hora) { campos.hora = hora; delete campos._horaFueraRango; }
     else campos._horaFueraRango = true;
@@ -272,7 +273,7 @@ function mostrarFormularioProgresivo(numero, esDomicilio = false, esPreventa = f
   }
 
   msg += `💳 *Método de pago:* ${lleno(campos.metodo)}`;
-  msg += `\n🕖 *Hora de ${esDomicilio ? "entrega" : "recolección"}:* ${lleno(campos.hora)}`;
+  if (esPreventa) msg += `\n🕖 *Hora de ${esDomicilio ? "entrega" : "recolección"}:* ${lleno(campos.hora)}`;
   msg += `\n${SEP}`;
   return msg;
 }
@@ -302,7 +303,7 @@ function siguienteCampoFaltante(numero, esDomicilio = false, esPreventa = false)
     const metodos = getMetodosPago(esDomicilio).texto;
     return { campo: "metodo", pregunta: `*¿Cómo vas a pagar?* ${metodos}.` };
   }
-  if (!campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre ${getRangoHorario()})` };
+  if (esPreventa && !campos.hora) return { campo: "hora", pregunta: `*¿A qué hora ${esDomicilio ? "deseas recibirlo" : "pasas a recoger"}?* (entre ${getRangoHorario()})` };
 
   return null;
 }
@@ -321,7 +322,7 @@ function camposCompletos(numero, esDomicilio = false, esPreventa = false) {
   const campos = datosCampos.get(numero) || {};
   if (!campos.nombre || !campos.telefono || !campos.metodo) return false;
   if (esDomicilio && (!campos.calle || !campos.colonia))    return false;
-  if (!campos.hora)                                         return false;
+  if (esPreventa && !campos.hora)                           return false;
   if (esDomicilio && !referenciaPreguntas.has(numero) && !campos.referencia) return false;
   return true;
 }

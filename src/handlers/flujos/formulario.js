@@ -370,7 +370,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   const esConfirmacionDatos = /^(si|sí|ok|okey|va|dale|claro|correcto|listo|sip|sep|exacto|perfecto|todo\s+bien|está\s+bien|esta\s+bien|así\s+es|asi\s+es|afirmativo|bueno|bien)$/i.test(textoOriginal.trim());
   if (esConfirmacionDatos && camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
-    if (camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
+    if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
     datosRecibidos.add(clienteNumero);
     const ordenTexto = ordenPreResumen.get(clienteNumero);
     ordenPreResumen.delete(clienteNumero);
@@ -489,7 +489,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
 
   if (camposCompletos(clienteNumero, esOrdenDomicilio, esPreventa)) {
     const camposAct = datosCampos.get(clienteNumero);
-    if (camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
+    if (esPreventa && camposAct.hora) horaEntregaPreventa.set(clienteNumero, camposAct.hora);
     datosRecibidos.add(clienteNumero);
     const ordenTexto = ordenPreResumen.get(clienteNumero);
     ordenPreResumen.delete(clienteNumero);

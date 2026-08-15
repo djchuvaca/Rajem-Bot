@@ -10,6 +10,7 @@ const {
   extraerDatosPedido,
   CARPETA_CAPTURAS,
   datosCampos,
+  clientesPreventa,
   horaEntregaPreventa,
   persistirEstado,
 } = require("../estado");
@@ -146,7 +147,9 @@ async function handleImagen(msg, client) {
 
     const infoPedido    = extraerDatosPedido(datos.resumen);
     const camposCliente = datosCampos.get(clienteNumero) || {};
-    const hora_entrega  = camposCliente.hora || horaEntregaPreventa.get(clienteNumero) || null;
+    const hora_entrega  = clientesPreventa.has(clienteNumero)
+      ? (camposCliente.hora || horaEntregaPreventa.get(clienteNumero) || null)
+      : null;
 
     // Guardar pedido en BD. Si el flujo MP registró el pedido pero falló al crear
     // el enlace y cayó aquí como fallback, datos.pedidoId ya tiene el ID → no duplicar.
