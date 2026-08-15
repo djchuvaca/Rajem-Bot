@@ -43,6 +43,13 @@ test('resuelve un autor @lid contra el teléfono del administrador', async () =>
   assert.equal(await _esAdministradorGrupo(msg, client, chat), true);
 });
 
+test('reconoce como administrador al usuario propio en un mensaje saliente', async () => {
+  const msg = { fromMe: true };
+  const chat = { participants: [{ id: { $1: '5213110000000@c.us' }, isAdmin: true }] };
+  const client = { info: { wid: { $1: '5213110000000@c.us' } } };
+  assert.equal(await _esAdministradorGrupo(msg, client, chat), true);
+});
+
 test('un comando de no administrador recibe una explicación', async () => {
   const respuestas = [];
   const msg = {

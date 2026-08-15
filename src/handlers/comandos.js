@@ -100,7 +100,7 @@ function _jid(valor) {
 }
 
 async function _esAdministradorGrupo(msg, client, chat) {
-  const autorOriginal = _jid(msg.author);
+  const autorOriginal = _jid(msg.author) || (msg.fromMe ? _jid(client?.info?.wid) : '');
   const candidatos = new Set([autorOriginal]);
   if (autorOriginal.endsWith('@lid') && typeof client?.getContactLidAndPhone === 'function') {
     try {

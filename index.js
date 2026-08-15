@@ -175,7 +175,7 @@ client.on("group_join", async (notification) => {
 const _msgProcesados = new Set();
 const _colaJID = new Map(); // cola de procesamiento por JID (evita concurrencia)
 
-client.on("message", async (msg) => {
+async function procesarMensaje(msg) {
   if (msg.from === "status@broadcast") return;
   if (msg.from.endsWith("@broadcast")) return;
 
@@ -257,7 +257,13 @@ client.on("message", async (msg) => {
   _colaJID.set(_jid, _esta);
   _esta.finally(() => { if (_colaJID.get(_jid) === _esta) _colaJID.delete(_jid); });
   await _esta;
-});
+}
+
+// `message` cubre mensajes recibidos. `message_create` también cubre los que
+// envía la propia cuenta vinculada (por ejemplo, !confirmar desde su teléfono).
+// La deduplicación por ID evita procesar dos veces los mensajes entrantes.
+client.on("message", procesarMensaje);
+client.on("message_create", procesarMensaje);
 
 // ── Reset entregas_hoy a medianoche ──────────────────────────────────────────
 function _programarResetMedianoche() {
