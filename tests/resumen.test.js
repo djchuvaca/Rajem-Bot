@@ -92,6 +92,12 @@ describe("procesarItemJSON", () => {
     assert.match(r, /1 torta[^s]/);
   });
 
+  test("presentación dinámica — muestra y cobra una quesadilla", () => {
+    const r = procesarItemJSON({ presentacion: "quesadilla", cantidad: 1, corte: "carne" }, precios);
+    assert.match(r, /1 quesadilla de carne/);
+    assert.match(r, /\$50/);
+  });
+
   test("gramos — muestra cantidad y precio", () => {
     const r = procesarItemJSON({ presentacion: "gramos", gramos: 200, corte: "cuero" }, precios);
     assert.match(r, /200g/);

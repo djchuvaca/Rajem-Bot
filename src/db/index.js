@@ -72,6 +72,7 @@ module.exports = {
   getBusinessType:         businessTypes.getBusinessType,
   getBusinessTypeSlug:     businessTypes.getBusinessTypeSlug,
   getItemTypes:            businessTypes.getItemTypes,
+  getItemTypeBySlug:       businessTypes.getItemTypeBySlug,
   invalidarCacheItemTypes: businessTypes.invalidarCacheItemTypes,
 
   // cortes (catálogo de cortes/ingredientes — nuevo modelo)

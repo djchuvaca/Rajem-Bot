@@ -68,6 +68,12 @@ function getItemTypes(businessTypeSlug) {
   return _cache;
 }
 
+/** Devuelve una presentación activa del giro actual por su slug. */
+function getItemTypeBySlug(slug, businessTypeSlug) {
+  if (!slug) return null;
+  return getItemTypes(businessTypeSlug).find(tipo => tipo.slug === slug) || null;
+}
+
 function invalidarCacheItemTypes() { _bustCache(); }
 
 function getBusinessTypeSlug() {
@@ -82,6 +88,7 @@ module.exports = {
   getBusinessType,
   // Item types
   getItemTypes,
+  getItemTypeBySlug,
   invalidarCacheItemTypes,
   getBusinessTypeSlug,
 };

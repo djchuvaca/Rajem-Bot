@@ -120,6 +120,11 @@ describe("calcularPrecioItem", () => {
     assert.strictEqual(calcularPrecioItem(item, precios), 100);
   });
 
+  test("quesadilla — usa el precio de su presentación activa", () => {
+    const item = { presentacion: "quesadilla", cantidad: 1, corte: "carne" };
+    assert.strictEqual(calcularPrecioItem(item, precios), 50);
+  });
+
   test("corte null — usa precio global sin lanzar error", () => {
     const item = { presentacion: "taco", cantidad: 2, corte: null };
     assert.strictEqual(calcularPrecioItem(item, precios), 60);
