@@ -2,7 +2,11 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { initDB } = require('../src/db');
+const { setConfig } = require('../src/db/config');
 const { handleComandos, _esAdministradorGrupo } = require('../src/handlers/comandos');
+
+test.before(async () => { await initDB(); });
 
 test('!jid responde el identificador del grupo aunque el solicitante no sea admin', async () => {
   const respuestas = [];
@@ -56,15 +60,27 @@ test('reconoce como administrador al usuario propio en un mensaje saliente', asy
   assert.equal(await _esAdministradorGrupo(msg, client, chat), true);
 });
 
-test('un comando de no administrador recibe una explicación', async () => {
+test('rechaza comandos enviados desde un grupo distinto al administrativo', async () => {
+  setConfig('grupo_id', '120363000000000001@g.us');
   const respuestas = [];
   const msg = {
     body: '!confirmar 3110000000',
     from: '120363012345678901@g.us',
     author: '5213119999999@c.us',
-    getChat: async () => ({ participants: [{ id: { _serialized: '5213119999999@c.us' }, isAdmin: false }] }),
     reply: async texto => respuestas.push(texto),
   };
   assert.equal(await handleComandos(msg, {}), false);
-  assert.match(respuestas[0], /administrador/i);
+  assert.match(respuestas[0], /grupo configurado/i);
+});
+
+test('procesa el grupo administrativo aunque msg.getChat falle con r', async () => {
+  const grupo = '120363000000000001@g.us';
+  setConfig('grupo_id', grupo);
+  const respuestas = [];
+  await handleComandos({
+    body: '!confirmar 3110000000', from: grupo,
+    getChat: async () => { throw new Error('r'); },
+    reply: async texto => respuestas.push(texto),
+  }, {});
+  assert.match(respuestas[0], /No encontré ese pedido/i);
 });

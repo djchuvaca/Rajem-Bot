@@ -149,17 +149,13 @@ Puedes copiarlo completo en la configuración del tenant.`);
     return true;
   }
 
-  // Cuando viene de un grupo: solo los admins del grupo pueden ejecutar comandos
+  // WhatsApp Web actualmente puede lanzar el error interno `r` al consultar
+  // participantes mediante msg.getChat(). Autorizamos exclusivamente el JID
+  // del grupo administrativo que el tenant configuró explícitamente.
   if (msg.from.endsWith('@g.us')) {
-    try {
-      const chat = await msg.getChat();
-      if (!(await _esAdministradorGrupo(msg, client, chat))) {
-        if (texto.startsWith('!')) await msg.reply('⛔ Este comando solo puede ejecutarlo un administrador del grupo.');
-        return false;
-      }
-    } catch (error) {
-      if (texto.startsWith('!')) await msg.reply('⚠️ No pude verificar tus permisos de administrador. Intenta nuevamente en unos segundos.');
-      console.error('[Comandos] No se pudieron verificar permisos del grupo:', error?.message || String(error));
+    const grupoConfigurado = getConfig('grupo_id') || process.env.GRUPO_ID || '';
+    if (!grupoConfigurado || msg.from !== grupoConfigurado) {
+      if (texto.startsWith('!')) await msg.reply('⛔ Los comandos administrativos solo funcionan en el grupo configurado para este negocio. Usa *!jid* para verificar este grupo.');
       return false;
     }
   }

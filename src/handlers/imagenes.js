@@ -1,5 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
+const { MessageMedia } = require("whatsapp-web.js");
 const { upsertCliente, registrarPedido, getMensaje, getConfig, getNotifDestinoJID, guardarTelefonoReal, guardarJIDReal } = require("../db");
 const {
   esperandoCaptura,
@@ -133,7 +134,12 @@ async function handleImagen(msg, client) {
           `⚠️ *Validar antes de confirmar*${reenviadoOriginal ? " (reenvío original; descarga local no disponible)" : ""}\n` +
           `Usa: !confirmar ${datos.telefono}`
         );
-        if (media) await client.sendMessage(destinoJID, media);
+        if (media) {
+          const adjunto = media instanceof MessageMedia
+            ? media
+            : new MessageMedia(media.mimetype, media.data, media.filename || undefined, media.filesize || undefined);
+          await client.sendMessage(destinoJID, adjunto);
+        }
         console.log("📲 Resumen + comprobante enviados al destino administrativo");
       } catch (e) { console.error("❌ Error al enviar comprobante al destino administrativo:", e.message); }
     }
