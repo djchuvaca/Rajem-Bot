@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const { initDB } = require('../src/db');
-const { handleImagen, descargarMediaConReintento, descargarMediaDirecto } = require('../src/handlers/imagenes');
+const { handleImagen, descargarMediaConReintento, descargarMediaDirecto, reenviarComprobanteOriginal } = require('../src/handlers/imagenes');
 const { esperandoCaptura, pendientesConfirmacion, CARPETA_CAPTURAS, limpiarTodo } = require('../src/estado');
 
 test.before(async () => { await initDB(); });
@@ -79,4 +79,22 @@ test('usa descarga directa si downloadMedia falla con el error r', async () => {
   const msg = { id: { $1: 'mensaje-nuevo' }, downloadMedia: async () => { throw new Error('r'); } };
   const client = { pupPage: { evaluate: async () => esperado } };
   assert.equal(await descargarMediaConReintento(msg, client), esperado);
+});
+
+test('reenvía el mensaje original cuando msg.forward está disponible', async () => {
+  let destino = null;
+  const msg = { forward: async jid => { destino = jid; } };
+  assert.equal(await reenviarComprobanteOriginal(msg, {}, '120363000000000000@g.us'), true);
+  assert.equal(destino, '120363000000000000@g.us');
+});
+
+test('usa reenvío directo compatible con el identificador nuevo $1', async () => {
+  const llamadas = [];
+  const msg = {
+    id: { $1: 'mensaje-nuevo' },
+    forward: async () => { throw new Error('r'); },
+  };
+  const client = { pupPage: { evaluate: async (_fn, destino, id) => llamadas.push({ destino, id }) } };
+  assert.equal(await reenviarComprobanteOriginal(msg, client, '120363000000000000@g.us'), true);
+  assert.deepEqual(llamadas, [{ destino: '120363000000000000@g.us', id: 'mensaje-nuevo' }]);
 });

@@ -1,6 +1,6 @@
 const fs   = require("fs");
 const path = require("path");
-const { upsertCliente, registrarPedido, getMensaje, getConfig, getGrupoId, guardarTelefonoReal, guardarJIDReal } = require("../db");
+const { upsertCliente, registrarPedido, getMensaje, getConfig, getNotifDestinoJID, guardarTelefonoReal, guardarJIDReal } = require("../db");
 const {
   esperandoCaptura,
   clientesNuevos,
@@ -64,6 +64,30 @@ async function descargarMediaConReintento(msg, client) {
   }
 }
 
+async function reenviarComprobanteOriginal(msg, client, destinoJID) {
+  if (!destinoJID) return false;
+  try {
+    if (typeof msg.forward === "function") {
+      await msg.forward(destinoJID);
+      return true;
+    }
+  } catch (error) {
+    console.warn("[Comprobante] Falló msg.forward; intentando reenvío directo:", error?.message || String(error));
+  }
+
+  const messageId = msg.id?._serialized || msg.id?.$1;
+  if (!messageId || !client?.pupPage) return false;
+  try {
+    await client.pupPage.evaluate(async (chatId, msgId) => {
+      await window.WWebJS.forwardMessage(chatId, msgId);
+    }, destinoJID, messageId);
+    return true;
+  } catch (error) {
+    console.error("[Comprobante] Falló el reenvío directo:", error?.stack || error?.message || String(error));
+    return false;
+  }
+}
+
 async function handleImagen(msg, client) {
   if (!msg.hasMedia) return false;
   if (!esperandoCaptura.has(msg.from)) return false;
@@ -73,32 +97,45 @@ async function handleImagen(msg, client) {
   const horaVenta     = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 
   try {
-    const media = await descargarMediaConReintento(msg, client);
-    if (!media?.data) throw new Error("WhatsApp no entregó el contenido del archivo");
-    const mimetype = String(media.mimetype || "").toLowerCase().split(";")[0].trim();
-    const esImagen = mimetype.startsWith("image/");
-    const esPdf = mimetype === "application/pdf";
-    if (!esImagen && !esPdf) {
-      await msg.reply("Necesito una imagen o PDF del comprobante de transferencia. Intenta enviarlo nuevamente, por favor. 📸");
-      return true;
+    const destinoJID = getNotifDestinoJID();
+    let media = null;
+    let reenviadoOriginal = false;
+    try {
+      media = await descargarMediaConReintento(msg, client);
+      if (!media?.data) throw new Error("WhatsApp no entregó el contenido del archivo");
+    } catch (errorDescarga) {
+      const tipo = String(msg.type || "").toLowerCase();
+      if (tipo !== "image" && tipo !== "document") throw errorDescarga;
+      reenviadoOriginal = await reenviarComprobanteOriginal(msg, client, destinoJID);
+      if (!reenviadoOriginal) throw errorDescarga;
+      console.warn("[Comprobante] Descarga no disponible; mensaje original reenviado para validación manual");
     }
-    const extensiones = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf" };
-    const ext = extensiones[mimetype] || (esImagen ? "img" : "pdf");
-    const nombreArchivo = `captura_${clienteNumero.replace(/[^0-9]/g, "")}_${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(CARPETA_CAPTURAS, nombreArchivo), Buffer.from(media.data, "base64"));
-    console.log(`📸 Captura guardada: ${nombreArchivo}`);
 
-    const grupoId = getGrupoId();
-    if (grupoId) {
+    if (media) {
+      const mimetype = String(media.mimetype || "").toLowerCase().split(";")[0].trim();
+      const esImagen = mimetype.startsWith("image/");
+      const esPdf = mimetype === "application/pdf";
+      if (!esImagen && !esPdf) {
+        await msg.reply("Necesito una imagen o PDF del comprobante de transferencia. Intenta enviarlo nuevamente, por favor. 📸");
+        return true;
+      }
+      const extensiones = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf" };
+      const ext = extensiones[mimetype] || (esImagen ? "img" : "pdf");
+      const nombreArchivo = `captura_${clienteNumero.replace(/[^0-9]/g, "")}_${Date.now()}.${ext}`;
+      fs.writeFileSync(path.join(CARPETA_CAPTURAS, nombreArchivo), Buffer.from(media.data, "base64"));
+      console.log(`📸 Captura guardada: ${nombreArchivo}`);
+    }
+
+    if (destinoJID) {
       try {
-        await client.sendMessage(grupoId,
+        await client.sendMessage(destinoJID,
           `🔔 *COMPROBANTE DE TRANSFERENCIA*\n🕐 *Hora:* ${horaVenta}\n\n${datos.resumen}\n\n` +
-          `⚠️ *Validar antes de confirmar*\n` +
+          `⚠️ *Validar antes de confirmar*${reenviadoOriginal ? " (reenvío original; descarga local no disponible)" : ""}\n` +
           `Usa: !confirmar ${datos.telefono}`
         );
-        await client.sendMessage(grupoId, media);
-        console.log("📲 Resumen + captura enviados al grupo");
-      } catch (e) { console.error("❌ Error al enviar al grupo:", e.message); }
+        if (media) await client.sendMessage(destinoJID, media);
+        console.log("📲 Resumen + comprobante enviados al destino administrativo");
+      } catch (e) { console.error("❌ Error al enviar comprobante al destino administrativo:", e.message); }
     }
 
     const infoPedido    = extraerDatosPedido(datos.resumen);
@@ -160,4 +197,4 @@ async function handleImagen(msg, client) {
   return true;
 }
 
-module.exports = { handleImagen, descargarMediaConReintento, descargarMediaDirecto };
+module.exports = { handleImagen, descargarMediaConReintento, descargarMediaDirecto, reenviarComprobanteOriginal };
