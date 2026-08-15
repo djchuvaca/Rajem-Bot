@@ -19,6 +19,24 @@ const _esperandoRespuesta = new Set(); // JIDs que acaban de recibir "¿Ya entre
 const _despachoTimers = new Map();      // pedidoId → timer de solicitud programada
 const _despachosEnAsignacion = new Set(); // messageId en proceso de asignación
 
+function _jid(valor) {
+  if (!valor) return '';
+  if (typeof valor === 'string') return valor;
+  return valor._serialized || valor.$1
+    || (valor.user && valor.server ? `${valor.user}@${valor.server}` : '');
+}
+
+async function _resolverJidPrivado(jid, client) {
+  const original = _jid(jid);
+  if (!original.endsWith('@lid') || typeof client?.getContactLidAndPhone !== 'function') return original;
+  try {
+    const resultados = await client.getContactLidAndPhone([original]);
+    return _jid(resultados?.[0]?.pn) || original;
+  } catch (_) {
+    return original;
+  }
+}
+
 // ── NLU de confirmación ───────────────────────────────────────────────────────
 const _PATRONES_CONFIRMADOS = [
   /\b(entregue|entregué|entregado|entregada)\b/i,
@@ -136,7 +154,7 @@ async function enviarDespachoMandaditos(client, datos) {
 
   try {
     const enviado = await client.sendMessage(grupoId, texto);
-    const msgId = enviado?.id?._serialized;
+    const msgId = enviado?.id?._serialized || enviado?.id?.$1;
     if (msgId) despachosPendientes.set(msgId, { ...datos, negocioColonia });
   } catch (e) {
     logger.error(`[Mandaditos] Error al enviar despacho #${datos.pedidoId}: ${e.message}`);
@@ -152,7 +170,7 @@ async function handleMensajeMandaditos(msg, client) {
   let quotedId;
   try {
     const quoted = await msg.getQuotedMessage();
-    quotedId = quoted?.id?._serialized;
+    quotedId = quoted?.id?._serialized || quoted?.id?.$1;
   } catch (_) { return false; }
 
   if (!quotedId || !despachosPendientes.has(quotedId)) return false;
@@ -162,7 +180,7 @@ async function handleMensajeMandaditos(msg, client) {
   }
 
   const datos = despachosPendientes.get(quotedId);
-  const repartidorJid  = msg.author || msg.from;
+  const repartidorJid = await _resolverJidPrivado(msg.author || msg.from, client);
   const registrado = getRepartidor(repartidorJid);
   if (registrado && !registrado.activo) {
     await msg.reply('⛔ Tu acceso como repartidor está pausado. Contacta al administrador.');

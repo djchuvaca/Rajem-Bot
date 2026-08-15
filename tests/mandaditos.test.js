@@ -124,6 +124,24 @@ describe('Mandaditos — asignación y bases de repartidores', { concurrency: fa
     assert.equal(historial[0].confirmado, 1);
   });
 
+  test('resuelve el @lid del mismo número cliente/admin/repartidor antes del privado', async () => {
+    const client = clienteWA();
+    client.getContactLidAndPhone = async ids => {
+      assert.deepEqual(ids, ['777777777@lid']);
+      return [{ pn: { user: '5213117654321', server: 'c.us' } }];
+    };
+    await enviarDespachoMandaditos(client, { ...DATOS, pedidoId: 8201 });
+    const respuestaGrupo = {
+      from: '120363099999999999@g.us', fromMe: false, hasQuotedMsg: true,
+      author: { user: '777777777', server: 'lid' },
+      getQuotedMessage: async () => ({ id: { $1: 'mensaje-1' } }),
+      reply: async texto => client.envios.push({ jid: 'grupo-respuesta', texto }),
+    };
+    assert.equal(await handleMensajeMandaditos(respuestaGrupo, client), true);
+    assert.ok(client.envios.some(e => e.jid === '5213117654321@c.us' && /Punto de entrega/.test(e.texto)));
+    assert.equal(getRepartidor('5213117654321@c.us').pedido_actual_id, 8201);
+  });
+
   test('un timeout libera al repartidor y queda registrado en historial', () => {
     run("INSERT INTO repartidores(jid,nombre) VALUES('5213110000001@c.us','Rep Timeout')");
     setEnRuta('5213110000001@c.us', 8002, new Date().toISOString());

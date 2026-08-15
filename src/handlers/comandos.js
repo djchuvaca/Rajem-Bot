@@ -96,7 +96,9 @@ function nombresCortesActivos() {
 function _jid(valor) {
   if (!valor) return '';
   if (typeof valor === 'string') return valor;
-  return valor._serialized || valor.$1 || valor.id?._serialized || valor.id?.$1 || '';
+  return valor._serialized || valor.$1 || valor.id?._serialized || valor.id?.$1
+    || (valor.user && valor.server ? `${valor.user}@${valor.server}` : '')
+    || (valor.id?.user && valor.id?.server ? `${valor.id.user}@${valor.id.server}` : '');
 }
 
 async function _esAdministradorGrupo(msg, client, chat) {

@@ -36,6 +36,12 @@ test('reconoce un administrador con identificador nuevo $1', async () => {
   assert.equal(await _esAdministradorGrupo(msg, {}, chat), true);
 });
 
+test('reconoce identificadores Wid expuestos como user/server', async () => {
+  const msg = { author: { user: '5213110000000', server: 'c.us' } };
+  const chat = { participants: [{ id: { user: '5213110000000', server: 'c.us' }, isAdmin: true }] };
+  assert.equal(await _esAdministradorGrupo(msg, {}, chat), true);
+});
+
 test('resuelve un autor @lid contra el teléfono del administrador', async () => {
   const msg = { author: '123456789@lid' };
   const chat = { participants: [{ id: { _serialized: '5213110000000@c.us' }, isSuperAdmin: true }] };
