@@ -93,6 +93,28 @@ function nombresCortesActivos() {
   return catalogoTenant.getCortesTenant().filter(c => slugs.has(c.slug)).map(c => c.nombre.toLowerCase());
 }
 
+function _jid(valor) {
+  if (!valor) return '';
+  if (typeof valor === 'string') return valor;
+  return valor._serialized || valor.$1 || valor.id?._serialized || valor.id?.$1 || '';
+}
+
+async function _esAdministradorGrupo(msg, client, chat) {
+  const autorOriginal = _jid(msg.author);
+  const candidatos = new Set([autorOriginal]);
+  if (autorOriginal.endsWith('@lid') && typeof client?.getContactLidAndPhone === 'function') {
+    try {
+      const resultados = await client.getContactLidAndPhone([autorOriginal]);
+      const telefono = _jid(resultados?.[0]?.pn);
+      if (telefono) candidatos.add(telefono);
+    } catch (_) {}
+  }
+  return (chat?.participants || []).some(participante => {
+    const id = _jid(participante.id || participante);
+    return candidatos.has(id) && (participante.isAdmin || participante.isSuperAdmin);
+  });
+}
+
 // ── HELPERS MANDADITOS ────────────────────────────────────────────────────────
 // Parsea "8:00 a.m." / "12:30 p.m." a un Date de hoy
 function _parsearHoraEntrega(horaStr) {
@@ -129,10 +151,14 @@ Puedes copiarlo completo en la configuración del tenant.`);
   if (msg.from.endsWith('@g.us')) {
     try {
       const chat = await msg.getChat();
-      const participante = chat.participants.find(p => p.id._serialized === msg.author);
-      if (!participante?.isAdmin && !participante?.isSuperAdmin) return;
-    } catch (_) {
-      return; // sin permiso verificable = bloquear
+      if (!(await _esAdministradorGrupo(msg, client, chat))) {
+        if (texto.startsWith('!')) await msg.reply('⛔ Este comando solo puede ejecutarlo un administrador del grupo.');
+        return false;
+      }
+    } catch (error) {
+      if (texto.startsWith('!')) await msg.reply('⚠️ No pude verificar tus permisos de administrador. Intenta nuevamente en unos segundos.');
+      console.error('[Comandos] No se pudieron verificar permisos del grupo:', error?.message || String(error));
+      return false;
     }
   }
 
@@ -1326,4 +1352,4 @@ async function reanudarDespachosPendientes(client) {
   }
 }
 
-module.exports = { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes };
+module.exports = { handleComandos, setPendienteConfirmacionGrupo, reanudarDespachosPendientes, _esAdministradorGrupo };

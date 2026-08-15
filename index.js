@@ -180,7 +180,7 @@ client.on("message", async (msg) => {
   if (msg.from.endsWith("@broadcast")) return;
 
   // Deduplicación: ignorar si ya procesamos este mensaje (reentregas de WA)
-  const _msgId = msg.id?._serialized;
+  const _msgId = msg.id?._serialized || msg.id?.$1;
   if (_msgId) {
     if (_msgProcesados.has(_msgId)) return;
     _msgProcesados.add(_msgId);
@@ -198,12 +198,14 @@ client.on("message", async (msg) => {
   }
 
   if (msg.from.endsWith("@g.us")) {
-const mandaditosId = getGrupoMandaditosId();
+    const mandaditosId = getGrupoMandaditosId();
     if (mandaditosId && msg.from === mandaditosId) {
-      await handleMensajeMandaditos(msg, client);
-    } else {
-      await handleComandos(msg, client);
+      const atendidoMandaditos = await handleMensajeMandaditos(msg, client);
+      if (atendidoMandaditos) return;
     }
+    // El mismo grupo puede cumplir ambas funciones. Si Mandaditos no consumió
+    // el mensaje, todavía debe llegar al manejador de comandos administrativos.
+    await handleComandos(msg, client);
     return;
   }
 
