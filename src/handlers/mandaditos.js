@@ -202,8 +202,15 @@ async function handleMensajeMandaditos(msg, client) {
   try {
     quoted = await msg.getQuotedMessage();
   } catch (e) {
-    logger.warn(`[Mandaditos] No se pudo leer el mensaje citado: ${e.message || e}`);
-    return false;
+    // WhatsApp Web puede lanzar el error minificado "r" al reconstruir la
+    // cita en Puppeteer. Message conserva el modelo citado original en
+    // _data.quotedMsg; contiene body e id suficientes para asociar el pedido.
+    quoted = msg?._data?.quotedMsg || null;
+    if (!quoted) {
+      logger.warn(`[Mandaditos] No se pudo leer el mensaje citado: ${e.message || e}`);
+      return false;
+    }
+    logger.info(`[Mandaditos] Usando contexto de cita incluido en el evento porque getQuotedMessage falló: ${e.message || e}`);
   }
 
   const resuelto = _resolverDespachoCitado(quoted);
