@@ -322,3 +322,249 @@ describe('calcularTarifaDomicilio', () => {
     invalidarCacheConfig();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// diccionarioTepic.buscarColonia() — casos reales de WhatsApp
+// ═══════════════════════════════════════════════════════════════════════════
+describe('diccionarioTepic — escritura exacta y variantes de mayúsculas', () => {
+  test('nombre exacto con acento', () => {
+    const r = diccionarioTepic.buscarColonia('Tepic Centro');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('sin acento', () => {
+    const r = diccionarioTepic.buscarColonia('Emiliano Zapata');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Emiliano Zapata');
+  });
+  test('todo minúsculas', () => {
+    const r = diccionarioTepic.buscarColonia('tepic centro');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('todo mayúsculas', () => {
+    const r = diccionarioTepic.buscarColonia('TEPIC CENTRO');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('colonia con número — 12 de Diciembre', () => {
+    const r = diccionarioTepic.buscarColonia('12 de Diciembre');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '12 de Diciembre');
+  });
+  test('colonia con número — 15 de Mayo minúsculas', () => {
+    const r = diccionarioTepic.buscarColonia('15 de mayo');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '15 de Mayo');
+  });
+  test('colonia con número — 4 Milpas', () => {
+    const r = diccionarioTepic.buscarColonia('4 Milpas');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '4 Milpas');
+  });
+});
+
+describe('diccionarioTepic — prefijos comunes', () => {
+  test('prefijo "colonia"', () => {
+    const r = diccionarioTepic.buscarColonia('colonia tepic centro');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('prefijo "col."', () => {
+    const r = diccionarioTepic.buscarColonia('col. tepic centro');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('prefijo "fracc."', () => {
+    const r = diccionarioTepic.buscarColonia('fracc. vistas de la cantera');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Vistas de La Cantera');
+  });
+  test('código postal incluido en el texto', () => {
+    const r = diccionarioTepic.buscarColonia('12 de Diciembre 63170');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '12 de Diciembre');
+  });
+  test('código postal con "CP" incluido', () => {
+    const r = diccionarioTepic.buscarColonia('15 de Mayo CP 63190');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '15 de Mayo');
+  });
+});
+
+describe('diccionarioTepic — frases naturales de WhatsApp', () => {
+  test('"vivo en tepic centro"', () => {
+    const r = diccionarioTepic.buscarColonia('vivo en tepic centro');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('"en la col emiliano zapata"', () => {
+    const r = diccionarioTepic.buscarColonia('en la col emiliano zapata');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Emiliano Zapata');
+  });
+  test('"es la colonia 12 de diciembre"', () => {
+    const r = diccionarioTepic.buscarColonia('es la colonia 12 de diciembre');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '12 de Diciembre');
+  });
+  test('"mi colonia es vistas de la cantera"', () => {
+    const r = diccionarioTepic.buscarColonia('mi colonia es vistas de la cantera');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Vistas de La Cantera');
+  });
+  test('"estoy en brisas de san juan"', () => {
+    const r = diccionarioTepic.buscarColonia('estoy en brisas de san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Brisas de San Juan');
+  });
+});
+
+describe('diccionarioTepic — abreviaciones sin "de" (falsos positivos corregidos)', () => {
+  test('"brisas san juan" → Brisas de San Juan (no San Juan)', () => {
+    const r = diccionarioTepic.buscarColonia('brisas san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Brisas de San Juan');
+  });
+  test('"lomas san juan" → Lomas de San Juan', () => {
+    const r = diccionarioTepic.buscarColonia('lomas san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Lomas de San Juan');
+  });
+  test('"pedregal san juan" → Pedregal de San Juan', () => {
+    const r = diccionarioTepic.buscarColonia('pedregal san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Pedregal de San Juan');
+  });
+  test('"rincon san juan" → Rincón de San Juan', () => {
+    const r = diccionarioTepic.buscarColonia('rincon san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Rincón de San Juan');
+  });
+  test('"villas san juan" → Villas de San Juan', () => {
+    const r = diccionarioTepic.buscarColonia('villas san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Villas de San Juan');
+  });
+  test('"aves paraiso" → Aves del Paraíso', () => {
+    const r = diccionarioTepic.buscarColonia('aves paraiso');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Aves del Paraíso');
+  });
+  test('"islas paraiso" → Islas del Paraíso', () => {
+    const r = diccionarioTepic.buscarColonia('islas paraiso');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Islas del Paraíso');
+  });
+  test('"jardines paraiso" → Jardines del Paraíso', () => {
+    const r = diccionarioTepic.buscarColonia('jardines paraiso');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Jardines del Paraíso');
+  });
+  test('"lomas lindavista" → Lomas de Lindavista', () => {
+    const r = diccionarioTepic.buscarColonia('lomas lindavista');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Lomas de Lindavista');
+  });
+  test('"villas paraiso" → Villas del Paraíso', () => {
+    const r = diccionarioTepic.buscarColonia('villas paraiso');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Villas del Paraíso');
+  });
+  test('"valle verde matatipac" → Valle Verde de Matatipac', () => {
+    const r = diccionarioTepic.buscarColonia('valle verde matatipac');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Valle Verde de Matatipac');
+  });
+});
+
+describe('diccionarioTepic — palabras clave y coincidencia parcial', () => {
+  test('"vistas cantera" → Vistas de La Cantera', () => {
+    const r = diccionarioTepic.buscarColonia('vistas cantera');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Vistas de La Cantera');
+  });
+  test('"vistas de cantera" → Vistas de La Cantera', () => {
+    const r = diccionarioTepic.buscarColonia('vistas de cantera');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Vistas de La Cantera');
+  });
+  test('"brisas de san juan" exacto', () => {
+    const r = diccionarioTepic.buscarColonia('brisas de san juan');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Brisas de San Juan');
+  });
+});
+
+describe('diccionarioTepic — typos comunes (coincidencia aproximada)', () => {
+  test('"emiliano zapatta" (doble t)', () => {
+    const r = diccionarioTepic.buscarColonia('emiliano zapatta');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Emiliano Zapata');
+  });
+  test('"tepic cetro" (letra faltante en centro)', () => {
+    const r = diccionarioTepic.buscarColonia('tepic cetro');
+    // ambigua con un solo candidato es aceptable (se resuelve por activación en el tenant)
+    assert.ok(r.estado === 'encontrada' || r.estado === 'ambigua', 'debe encontrar o reportar ambigüedad resoluble');
+    if (r.estado === 'ambigua') assert.strictEqual(r.opciones[0].nombre, 'Tepic Centro');
+    if (r.estado === 'encontrada') assert.strictEqual(r.colonia.nombre, 'Tepic Centro');
+  });
+  test('"4 milpaz" (z en lugar de s)', () => {
+    const r = diccionarioTepic.buscarColonia('4 milpaz');
+    assert.ok(r.estado === 'encontrada' || r.estado === 'ambigua');
+    if (r.estado === 'ambigua') assert.strictEqual(r.opciones[0].nombre, '4 Milpas');
+    if (r.estado === 'encontrada') assert.strictEqual(r.colonia.nombre, '4 Milpas');
+  });
+  test('"12 diciembre" (falta "de")', () => {
+    const r = diccionarioTepic.buscarColonia('12 diciembre');
+    assert.ok(r.estado === 'encontrada' || r.estado === 'ambigua');
+    if (r.estado === 'ambigua') assert.strictEqual(r.opciones[0].nombre, '12 de Diciembre');
+    if (r.estado === 'encontrada') assert.strictEqual(r.colonia.nombre, '12 de Diciembre');
+  });
+});
+
+describe('diccionarioTepic — ambigüedades conocidas', () => {
+  test('"Los Fresnos" es ambigua (tres colonias)', () => {
+    const r = diccionarioTepic.buscarColonia('Los Fresnos');
+    assert.strictEqual(r.estado, 'ambigua');
+    const nombres = r.opciones.map(o => o.nombre).sort();
+    assert.deepStrictEqual(nombres, ['Los Fresnos', 'Los Fresnos Oriente', 'Los Fresnos Poniente'].sort());
+  });
+  test('"Los Fresnos Oriente" es preciso', () => {
+    const r = diccionarioTepic.buscarColonia('Los Fresnos Oriente');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Los Fresnos Oriente');
+  });
+  test('"Los Fresnos Poniente" es preciso', () => {
+    const r = diccionarioTepic.buscarColonia('Los Fresnos Poniente');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, 'Los Fresnos Poniente');
+  });
+  test('"Amado Nervo" es ambigua (colonia vs fraccionamiento)', () => {
+    const r = diccionarioTepic.buscarColonia('Amado Nervo');
+    assert.strictEqual(r.estado, 'ambigua');
+    assert.ok(r.opciones.length >= 2);
+  });
+  test('"El Paraiso" es ambigua (El Paraíso vs Ampliación El Paraíso)', () => {
+    const r = diccionarioTepic.buscarColonia('El Paraiso');
+    assert.strictEqual(r.estado, 'ambigua');
+    assert.ok(r.opciones.some(o => o.nombre === 'El Paraíso'));
+  });
+});
+
+describe('diccionarioTepic — entradas que no deben producir colonia', () => {
+  test('nombre completamente inventado', () => {
+    assert.strictEqual(diccionarioTepic.buscarColonia('ColoniaQueNoExisteXYZ123').estado, 'no_encontrada');
+  });
+  test('string vacío', () => {
+    assert.strictEqual(diccionarioTepic.buscarColonia('').estado, 'no_encontrada');
+  });
+  test('solo una letra', () => {
+    assert.strictEqual(diccionarioTepic.buscarColonia('a').estado, 'no_encontrada');
+  });
+  test('palabra genérica sola sin colonia asociada', () => {
+    // "zapata" solo no debe encontrar Emiliano Zapata (demasiado corto / ambiguo)
+    const r = diccionarioTepic.buscarColonia('zapata');
+    assert.ok(r.estado !== 'encontrada' || r.confianza < 0.92, 'palabra sola no debe resolverse con alta confianza');
+  });
+});

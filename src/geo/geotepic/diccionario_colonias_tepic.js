@@ -843,7 +843,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Aves del Paraíso",
       "Fracc Aves del Paraíso",
       "Aves del Paraíso 63129",
-      "Aves del Paraíso CP 63129"
+      "Aves del Paraíso CP 63129",
+      "Aves Paraíso"
     ],
     "palabrasClave": [
       "aves",
@@ -1131,7 +1132,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Brisas de San Juan",
       "Fracc Brisas de San Juan",
       "Brisas de San Juan 63117",
-      "Brisas de San Juan CP 63117"
+      "Brisas de San Juan CP 63117",
+      "Brisas San Juan"
     ],
     "palabrasClave": [
       "brisas",
@@ -3879,7 +3881,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Islas del Paraíso",
       "Fracc Islas del Paraíso",
       "Islas del Paraíso 63035",
-      "Islas del Paraíso CP 63035"
+      "Islas del Paraíso CP 63035",
+      "Islas Paraíso"
     ],
     "palabrasClave": [
       "islas",
@@ -4008,7 +4011,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Jardines del Paraíso",
       "Fracc Jardines del Paraíso",
       "Jardines del Paraíso 63035",
-      "Jardines del Paraíso CP 63035"
+      "Jardines del Paraíso CP 63035",
+      "Jardines Paraíso"
     ],
     "palabrasClave": [
       "jardines",
@@ -5367,7 +5371,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Lomas de Lindavista",
       "Fracc Lomas de Lindavista",
       "Lomas de Lindavista 63115",
-      "Lomas de Lindavista CP 63115"
+      "Lomas de Lindavista CP 63115",
+      "Lomas Lindavista"
     ],
     "palabrasClave": [
       "lomas",
@@ -5399,7 +5404,8 @@ const COLONIAS = Object.freeze({
       "Colonia Lomas de San Juan",
       "Col Lomas de San Juan",
       "Lomas de San Juan 63128",
-      "Lomas de San Juan CP 63128"
+      "Lomas de San Juan CP 63128",
+      "Lomas San Juan"
     ],
     "palabrasClave": [
       "lomas",
@@ -6855,7 +6861,8 @@ const COLONIAS = Object.freeze({
       "Colonia Pedregal de San Juan",
       "Col Pedregal de San Juan",
       "Pedregal de San Juan 63164",
-      "Pedregal de San Juan CP 63164"
+      "Pedregal de San Juan CP 63164",
+      "Pedregal San Juan"
     ],
     "palabrasClave": [
       "pedregal",
@@ -7667,7 +7674,9 @@ const COLONIAS = Object.freeze({
       "Colonia Rincón de San Juan",
       "Col Rincón de San Juan",
       "Rincón de San Juan 63138",
-      "Rincón de San Juan CP 63138"
+      "Rincón de San Juan CP 63138",
+      "Rincón San Juan",
+      "Rincon San Juan"
     ],
     "palabrasClave": [
       "rincon",
@@ -9038,7 +9047,8 @@ const COLONIAS = Object.freeze({
       "Colonia Valle Verde de Matatipac",
       "Col Valle Verde de Matatipac",
       "Valle Verde de Matatipac 63035",
-      "Valle Verde de Matatipac CP 63035"
+      "Valle Verde de Matatipac CP 63035",
+      "Valle Verde Matatipac"
     ],
     "palabrasClave": [
       "valle",
@@ -9463,7 +9473,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Villas de San Juan",
       "Fracc Villas de San Juan",
       "Villas de San Juan 63129",
-      "Villas de San Juan CP 63129"
+      "Villas de San Juan CP 63129",
+      "Villas San Juan"
     ],
     "palabrasClave": [
       "villas",
@@ -9595,7 +9606,8 @@ const COLONIAS = Object.freeze({
       "Fraccionamiento Villas del Paraíso",
       "Fracc Villas del Paraíso",
       "Villas del Paraíso 63035",
-      "Villas del Paraíso CP 63035"
+      "Villas del Paraíso CP 63035",
+      "Villas Paraíso"
     ],
     "palabrasClave": [
       "villas",
