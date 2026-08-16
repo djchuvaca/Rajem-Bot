@@ -348,10 +348,12 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   const pendiente  = resumenPendiente.get(clienteNumero);
   const horaVenta  = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
   const infoPedido = extraerDatosPedido(pendiente.texto);
+  // Declarado aquí para que sea accesible en el bloque fallback de transferencia
+  // si MP falla tras haber registrado el pedido (evita duplicados en BD).
+  let pedidoMpId = null;
 
   if (pendiente.esTransferencia && mpPagos.estaConfigurado()) {
     // ── Pago en línea con MercadoPago ────────────────────────────────────────
-    let pedidoMpId = null;
     try {
       const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
       const { nombre, apellido } = dividirNombreCompleto(infoPedido.nombre);

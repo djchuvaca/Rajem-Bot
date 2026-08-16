@@ -3,7 +3,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
   esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo, esperandoPagoMP,
 } = require("../../estado");
-const { actualizarEstadoPedido, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId } = require("../../db");
+const { actualizarEstadoPedido, actualizarEstadoPorId, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId } = require("../../db");
 const { detectarPreguntaFrecuente } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 const { SALUDO } = require("../../config");
@@ -122,7 +122,7 @@ async function handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero
   if (expirado) {
     esperandoPagoMP.delete(clienteNumero);
     limpiarTodo(clienteNumero);
-    try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (_) {}
+    try { actualizarEstadoPorId(datos.pedidoId, "cancelado"); } catch (_) {}
     await msg.reply("El link de pago ya venció (30 minutos). Si quieres hacer un nuevo pedido, escríbeme cuando gustes.");
     return true;
   }
@@ -132,7 +132,7 @@ async function handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero
   if (RE_CANCELAR.test(textoOriginal)) {
     esperandoPagoMP.delete(clienteNumero);
     limpiarTodo(clienteNumero);
-    try { actualizarEstadoPedido(datos.telefono, "cancelado"); } catch (_) {}
+    try { actualizarEstadoPorId(datos.pedidoId, "cancelado"); } catch (_) {}
     const grupoId = getGrupoId();
     if (grupoId) {
       const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });

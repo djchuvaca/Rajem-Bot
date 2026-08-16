@@ -20,7 +20,7 @@ const {
 const { queryOne, queryAll, run, getBsdb } = require("../db/core");
 const SqliteSessionStore = require("../db/session-store");
 const { invalidarCacheCortes } = require("../handlers/pedidoParser");
-const { invalidarCacheColonias, invalidarCacheConfig } = require("../geo");
+const { invalidarCacheColonias, invalidarCacheConfig, calcularTarifaDomicilio } = require("../geo");
 const geoTepic = require('../geo/geotepic');
 
 const { getWhatsappClient, getStatusInfo, getQR } = require("./whatsapp-bridge");
@@ -546,7 +546,11 @@ async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
         [resultado.pedidoId]
       );
       if (row && row.tipo === 'domicilio') {
-        const tarifa = parseInt(getConfig('domicilio_costo') || '50', 10);
+        let tarifa = parseInt(getConfig('domicilio_costo') || '50', 10);
+        try {
+          const tarifaZona = calcularTarifaDomicilio(row.colonia);
+          if (tarifaZona?.tarifa != null) tarifa = tarifaZona.tarifa;
+        } catch (_) {}
         despacharConDelay(waClient, {
           pedidoId:          resultado.pedidoId,
           clienteNombre:     resultado.nombre      || 'Cliente',
