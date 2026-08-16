@@ -20,8 +20,8 @@ const {
   invalidarCacheCortes,
 } = require("../src/handlers/pedidoParser");
 const { parsearSinCorteItems } = require("../src/handlers/flujos/utils");
-const { handleSinCorte } = require("../src/handlers/flujos/orden");
-const { esperandoCorte } = require("../src/estado");
+const { handleSinCorte, handleConfirmacionItem } = require("../src/handlers/flujos/orden");
+const { esperandoCorte, esperandoConfirmacionItem } = require("../src/estado");
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,32 @@ function itemTorta(cantidad, corte)   { return { presentacion: "torta",  cantida
 function itemGramos(gramos, corte)    { return { presentacion: "gramos", gramos,   corte }; }
 function itemPesos(monto, corte)      { return { presentacion: "pesos",  monto,    corte }; }
 function pedido(...items)             { return { tipo: "pedido", items }; }
+
+test("quita los 2 tacos elimina la partida completa durante la confirmacion", async () => {
+  const jid = "5213119999001@c.us";
+  const respuestas = [];
+  esperandoConfirmacionItem.set(jid, {
+    lineas: "2 tacos de surtido — $60\n1 torta de surtido — $45\n⚖️ ~625g de costilla — $200\n💰 Subtotal: $305",
+  });
+  try {
+    const atendido = await handleConfirmacionItem(
+      { reply: async texto => respuestas.push(texto) },
+      "quitA LOS 2 TACOS",
+      jid,
+      [],
+      false,
+      false
+    );
+    assert.equal(atendido, true);
+    assert.equal(respuestas.length, 1);
+    assert.doesNotMatch(respuestas[0], /tacos/i);
+    assert.match(respuestas[0], /1 torta de surtido/i);
+    assert.match(respuestas[0], /costilla/i);
+    assert.match(respuestas[0], /Subtotal: \$245/i);
+  } finally {
+    esperandoConfirmacionItem.delete(jid);
+  }
+});
 
 test("conserva formatos implícitos entre un producto completo y una venta por pesos", () => {
   assert.deepEqual(

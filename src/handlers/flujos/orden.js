@@ -20,7 +20,8 @@ const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
 const { getUltimoPedido } = require("../../db");
 const { MENU_FORMATO } = require("../../config");
 const {
-  telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, palabrasConfirmacion, listaCortes,
+  telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, quitarItemDeOrden,
+  palabrasConfirmacion, listaCortes,
 } = require("./utils");
 
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
@@ -371,6 +372,22 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
 
   const quiereModificar = /quit(a|ar|ame|amelo|amelos)|elimina|borra|cambia|sin\s+los?|no\s+(quiero|pongas?)\s+los?/i.test(textoOriginal);
   if (quiereModificar) {
+    // "Quita los 2 tacos" elimina esa partida completa; no significa
+    // "quita un taco". "Quítame uno" conserva la reducción unitaria.
+    const quitaPartidaCompleta = /\bquit(?:a|ar|ame|amelo|amelos)\s+(?:los|las)\s+\d+\s+(?:tacos?|tortas?)\b/i.test(textoOriginal);
+    if (quitaPartidaCompleta) {
+      const resultado = quitarItemDeOrden(itemData.lineas, textoOriginal);
+      if (resultado.exito) {
+        const subtotalMod = calcularSubtotal(resultado.nuevaOrden);
+        const textoFinalMod = resultado.nuevaOrden + "\n💰 Subtotal: $" + subtotalMod;
+        pedidoJSONActual.delete(clienteNumero);
+        esperandoConfirmacionItem.set(clienteNumero, { ...itemData, lineas: textoFinalMod });
+        historial.push({ role: "user", content: textoOriginal });
+        historial.push({ role: "assistant", content: textoFinalMod });
+        await msg.reply(textoFinalMod + "\n\n*¿Es correcto?*");
+        return true;
+      }
+    }
     const modLocal = detectarModificacion(textoOriginal);
     if (modLocal) {
       const textoMod = aplicarModificacion(modLocal, itemData.lineas);
