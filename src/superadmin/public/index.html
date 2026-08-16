@@ -206,6 +206,12 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
 
         <!-- Zonas -->
         <div id="geo-zonas" style="display:none">
+          <div style="display:flex;gap:8px;margin-bottom:4px;align-items:center;font-size:12px;color:#aaa;font-weight:600;padding:0 2px">
+            <span style="flex:2">Nombre de zona</span>
+            <span style="flex:1">Distancia máx (km)</span>
+            <span style="flex:1">Tarifa ($)</span>
+            <span style="width:34px"></span>
+          </div>
           <div id="zonas-form"></div>
           <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Zona</button>
           <button class="btn btn-primary" style="margin-left:8px" onclick="saveZonas()">Guardar zonas</button>
@@ -1157,9 +1163,9 @@ async function loadZonas() {
 function renderZonas() {
   document.getElementById('zonas-form').innerHTML = _zonas.map((z,i)=>`
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-      <input type="text" value="${z.nombre_zona}" onchange="_zonas[${i}].nombre_zona=this.value" style="flex:2">
-      <input type="number" value="${z.distancia_max}" onchange="_zonas[${i}].distancia_max=parseFloat(this.value)" style="flex:1" placeholder="km máx">
-      <input type="number" value="${z.tarifa}" onchange="_zonas[${i}].tarifa=parseFloat(this.value)" style="flex:1" placeholder="tarifa $">
+      <input type="text" value="${z.nombre_zona}" onchange="_zonas[${i}].nombre_zona=this.value" style="flex:2" placeholder="Ej. Zona Centro">
+      <input type="number" value="${z.distancia_max||''}" onchange="_zonas[${i}].distancia_max=parseFloat(this.value)" style="flex:1" placeholder="Ej. 3" min="0.1" step="0.1">
+      <input type="number" value="${z.tarifa||''}" onchange="_zonas[${i}].tarifa=parseFloat(this.value)" style="flex:1" placeholder="Ej. 40" min="0" step="1">
       <button class="btn btn-danger btn-sm" onclick="_zonas.splice(${i},1);renderZonas()">✕</button>
     </div>`).join('');
 }
