@@ -2174,7 +2174,7 @@ const COLONIAS = Object.freeze({
   "el_aguacate": {
     "id": "el_aguacate",
     "nombre": "El Aguacate",
-    "nombreOficial": null,
+    "nombreOficial": "El Aguacate",
     "tipo": "colonia",
     "codigoPostal": null,
     "municipio": "Tepic",
@@ -3321,7 +3321,7 @@ const COLONIAS = Object.freeze({
   "gardenias": {
     "id": "gardenias",
     "nombre": "Gardenias",
-    "nombreOficial": null,
+    "nombreOficial": "Gardenias",
     "tipo": "colonia",
     "codigoPostal": null,
     "municipio": "Tepic",
@@ -5001,13 +5001,14 @@ const COLONIAS = Object.freeze({
     "ciudad": "Tepic",
     "zona": "urbana",
     "coordenadas": {
-      "latitud": 21.4968628,
-      "longitud": -104.7918461,
-      "referencia": "resultado_cartografico_por_nombre",
-      "fuente": "google_maps_search",
-      "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "latitud": 21.510,
+      "longitud": -104.905,
+      "referencia": "estimacion_centroide_cp63129",
+      "fuente": "estimacion_cp",
+      "precision": "estimacion_zona_pendiente_verificacion",
+      "confianza": "baja",
+      "verificada": false,
+      "nota": "Coordenadas originales (-104.7918) eran de google_maps_search y quedaban ~9km al este de todas las demás colonias del CP 63129; corregidas con estimación centroide del código postal"
     },
     "alias": [
       "Leonardo Rodríguez Alcaine",
