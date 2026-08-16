@@ -120,6 +120,15 @@ BUSINESS_TYPE=${BUSINESS_TYPE}
 SECCION_TAQUERIA_INICIAL=${SECCION_TAQUERIA}
 PLAN_ACTIVO=${PLAN}
 PANEL_INITIAL_PASSWORD=${PANEL_INITIAL_PASSWORD}
+
+# ── Pagos (opcional) ──────────────────────────────────────────────────────────
+# APP_URL=https://mi-servidor.com        # Requerido si MP/Stripe/Conekta está activo
+# MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   # Activa pagos con link de MercadoPago
+# STRIPE_SECRET_KEY=sk_live_...          # Activa pagos con Stripe (Plan Plus)
+# CONEKTA_PRIVATE_KEY=key_...            # Activa pagos con Conekta (Plan Plus)
+
+# ── NLU / IA (opcional) ───────────────────────────────────────────────────────
+# GROQ_API_KEY=gsk_...                   # Fallback NLU con Groq (llama-3.3-70b)
 EOF
 [[ -n "$GROQ_API_KEY" ]] && echo "GROQ_API_KEY=${GROQ_API_KEY}" >> "$ENVS_DIR/${TENANT_ID}.env"
 ok "envs/${TENANT_ID}.env creado."
