@@ -434,12 +434,22 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   let pedidoId = null;
   let _coloniaNoVerif = false;
   let _coloniaTxt = '';
+  let _fueraDeCobertura = false;
+  let _requiereVerifGeo = false;
   try {
     const telefonoLimpio = infoPedido.telefono || extraerTelefonoDeJID(clienteNumero);
     const { nombre, apellido } = dividirNombreCompleto(infoPedido.nombre);
     const camposCliente = datosCampos.get(clienteNumero) || {};
     _coloniaNoVerif = !!camposCliente._coloniaNoVerificada;
     _coloniaTxt     = camposCliente.colonia || '';
+    if (infoPedido.tipo === 'domicilio' && _coloniaTxt && !_coloniaNoVerif) {
+      try {
+        const { calcularTarifaDomicilio } = require('../../geo');
+        const gi = calcularTarifaDomicilio(_coloniaTxt);
+        _fueraDeCobertura = !!gi.fueraDeCobertura;
+        _requiereVerifGeo = !!gi.requiereVerificacion;
+      } catch (_) {}
+    }
     const calle_numero  = camposCliente.calle || null;
     const colonia       = camposCliente.colonia || null;
     const referencia    = (camposCliente.referencia && camposCliente.referencia !== "sin referencia") ? camposCliente.referencia : null;
@@ -474,6 +484,12 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
   if (_coloniaNoVerif && _coloniaTxt) {
     trazabilidad.crearAlerta(clienteNumero, 'colonia_no_verificada', 'Colonia sin verificar', `El cliente indicó: ${_coloniaTxt}`, { severidad: 'alta', pedidoId });
   }
+  if (_fueraDeCobertura) {
+    trazabilidad.crearAlerta(clienteNumero, 'pedido_fuera_cobertura', 'Pedido fuera de zona de cobertura', `Colonia: ${_coloniaTxt}`, { severidad: 'alta', pedidoId });
+  }
+  if (_requiereVerifGeo) {
+    trazabilidad.crearAlerta(clienteNumero, 'colonia_sin_verificar', 'Tarifa de envío aproximada', `Colonia "${_coloniaTxt}" sin coordenadas verificadas`, { severidad: 'media', pedidoId });
+  }
 
   // Aviso inmediato al tenant. Mandaditos comienza únicamente después de que
   // el tenant ejecute !confirmar; este aviso nunca inicia el reloj de despacho.
@@ -486,6 +502,16 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
       try {
         await client.sendMessage(notifJID, `⚠️ *Pedido #${pedidoId} — colonia sin verificar*\nEl cliente indicó: "${_coloniaTxt}" pero no coincide con ninguna colonia registrada.\nConfirma la dirección y ajusta la tarifa de envío antes de salir.`);
       } catch (e) { console.error("Error al notificar colonia no verificada:", e.message); }
+    }
+    if (_fueraDeCobertura) {
+      try {
+        await client.sendMessage(notifJID, `⚠️ *Pedido #${pedidoId} — fuera de zona de cobertura*\nColonia: "${_coloniaTxt}" supera la distancia máxima configurada.\nVerifica si puedes realizar la entrega antes de confirmar.`);
+      } catch (e) { console.error("Error al notificar fuera de cobertura:", e.message); }
+    }
+    if (_requiereVerifGeo) {
+      try {
+        await client.sendMessage(notifJID, `⚠️ *Pedido #${pedidoId} — tarifa de envío aproximada*\nLa colonia "${_coloniaTxt}" no tiene coordenadas verificadas.\nAjusta la tarifa si es necesario antes de confirmar.`);
+      } catch (e) { console.error("Error al notificar tarifa aproximada:", e.message); }
     }
   }
 

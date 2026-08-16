@@ -181,11 +181,16 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     resumen += `📍 *Dirección:* ${c.calle || "—"}, Col. ${coloniaMostrar}\n`;
     if (c.colonia && tarifaInfo && !tarifaInfo.encontrada) {
       resumen += `⚠️ _Colonia no reconocida — la tarifa de envío se ajustará al verificar tu dirección_\n`;
+    } else if (c.colonia && tarifaInfo?.requiereVerificacion) {
+      resumen += `⚠️ _La tarifa de envío es aproximada — se ajustará al verificar tu dirección_\n`;
     }
     resumen += `📌 *Referencia:* ${c.referencia && c.referencia !== "sin referencia" ? c.referencia : "sin referencia"}\n`;
     resumen += `💵 *Subtotal:* $${subtotal}\n`;
     const zonaLabel = tarifaInfo?.zona ? ` (${tarifaInfo.zona})` : '';
     resumen += `🛵 *Tarifa domicilio${zonaLabel}:* $${domCosto}\n`;
+    if (tarifaInfo?.fueraDeCobertura) {
+      resumen += `⚠️ _Tu colonia supera nuestra zona de cobertura habitual — te confirmaremos si aplica la entrega_\n`;
+    }
   }
 
   resumen += `💰 *TOTAL: $${total}*\n`;

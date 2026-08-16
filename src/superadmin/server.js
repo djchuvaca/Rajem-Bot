@@ -388,7 +388,8 @@ app.put('/api/tenants/:id/zonas', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { zonas } = req.body;
   if (!Array.isArray(zonas)) return res.status(400).json({ error: 'Formato inválido' });
-  if (zonas.some(z => !z.nombre_zona || !Number.isFinite(Number(z.distancia_max)) || !Number.isFinite(Number(z.tarifa)))) return res.status(400).json({ error: 'Hay zonas inválidas' });
+  if (zonas.some(z => !z.nombre_zona || !Number.isFinite(Number(z.distancia_max)) || Number(z.distancia_max) <= 0 || !Number.isFinite(Number(z.tarifa)) || Number(z.tarifa) < 0))
+    return res.status(400).json({ error: 'Hay zonas inválidas: la distancia debe ser mayor a 0 y la tarifa no puede ser negativa' });
   if (!setTenantZonas(tenant, zonas)) return res.status(500).json({ error: 'No se pudieron guardar las zonas' });
   res.json({ ok: true });
 });
