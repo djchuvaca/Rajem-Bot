@@ -18,10 +18,10 @@ function getUbicacion() {
 
 function getMetodosPago(esDomicilio = false) {
   try {
-    if (esDomicilio) return getConfig("metodos_domicilio") || "efectivo y transferencia";
+    if (esDomicilio) return getConfig("metodos_domicilio") || "efectivo, tarjeta y transferencia";
     return getConfig("metodos_mostrador") || "efectivo, tarjeta y transferencia";
   } catch (e) {
-    return esDomicilio ? "efectivo y transferencia" : "efectivo, tarjeta y transferencia";
+    return "efectivo, tarjeta y transferencia";
   }
 }
 

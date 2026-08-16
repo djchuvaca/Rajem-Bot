@@ -12,7 +12,7 @@ const {
   esperandoAgregarMas, pedidoJSONActual, esperandoConfirmacionDatos,
   tipoEntregaCliente, esperandoCorte, esperandoEdicion, esperandoTipoItem,
   esperandoExtras, ordenPreResumen, pendientesConfirmacion,
-  esperandoColonia,
+  esperandoColonia, esperandoPagoMP, erroresConsec,
 } = require("./maps");
 const { persistirEstado } = require("./sesiones");
 const { eliminarSesion }  = require("../db");
@@ -65,7 +65,7 @@ function sanitizarColonia(texto) {
 
 function getMetodosPago(esDomicilio = false) {
   const texto = String(getConfig(esDomicilio ? "metodos_domicilio" : "metodos_mostrador") ||
-    (esDomicilio ? "efectivo o transferencia" : "efectivo, tarjeta o transferencia"));
+    "efectivo, tarjeta o transferencia");
   const valores = [];
   if (/efectivo|cash/i.test(texto)) valores.push("efectivo");
   if (/tarjeta|terminal/i.test(texto)) valores.push("tarjeta");
@@ -110,6 +110,8 @@ function limpiarTodo(numero) {
   pendientesConfirmacion.delete(numero);
   referenciaPreguntas.delete(numero);
   esperandoColonia.delete(numero);
+  esperandoPagoMP.delete(numero);
+  erroresConsec.delete(numero);
   eliminarSesion(numero);
 }
 

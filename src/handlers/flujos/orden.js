@@ -25,7 +25,7 @@ const {
 } = require("./utils");
 
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
-const _erroresConsec = new Map();
+const { erroresConsec: _erroresConsec } = require("../../estado/maps");
 function _sumarError(num) { _erroresConsec.set(num, (_erroresConsec.get(num) || 0) + 1); return _erroresConsec.get(num); }
 function _resetError(num) { _erroresConsec.delete(num); }
 

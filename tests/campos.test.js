@@ -154,10 +154,10 @@ describe("interpretarCampos — domicilio", () => {
     assert.match(campos.colonia, /centro/i);
   });
 
-  test("domicilio no acepta tarjeta como método de pago", () => {
+  test("domicilio acepta tarjeta como método de pago", () => {
     _mapa.delete(NUM);
     const campos = interpretarCampos(NUM, "con tarjeta", true, false);
-    assert.equal(campos.metodo, null);
+    assert.equal(campos.metodo, "tarjeta");
   });
 });
 

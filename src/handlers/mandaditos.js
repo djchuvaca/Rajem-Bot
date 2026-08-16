@@ -173,12 +173,14 @@ async function enviarDespachoMandaditos(client, datos) {
   const negocioColonia = getConfig('negocio_colonia') || getConfig('nombre_negocio') || 'Negocio';
 
   const etiquetaProgramada = datos.esProgramada ? ' — ORDEN PROGRAMADA' : '';
+  const metodoPago = datos.metodoPago || 'efectivo';
+  const comentarioPago = metodoPago === 'efectivo' ? '_(se paga al entregar)_' : '_(se paga al recoger)_';
   const texto =
     `🛵 *Pedido #${datos.pedidoId} — Solicitud de reparto${etiquetaProgramada}*\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
     `📍 *Colonia origen:* ${negocioColonia}\n` +
     `📍 *Colonia destino:* ${datos.clienteColonia || '—'}\n` +
-    `💰 *Total de la orden:* ${datos.totalOrden}\n` +
+    `💰 *Total de la orden:* ${datos.totalOrden} ${comentarioPago}\n` +
     `🛵 *Tarifa de envío:* $${datos.tarifaDomicilio}\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
     `_¿Quién está disponible? *Responde este mensaje* para tomar el pedido._`;

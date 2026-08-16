@@ -450,9 +450,10 @@ Puedes copiarlo completo en la configuración del tenant.`);
               clienteCalle:      clienteBD.calle_numero,
               clienteColonia:    clienteBD.colonia,
               clienteReferencia: clienteBD.referencia,
-              totalOrden:        `$${pedidoBD.total}`,
+              totalOrden:        pedidoBD.total != null ? `$${pedidoBD.total}` : '$—',
               tarifaDomicilio:   tarifa,
               esProgramada:      !!pedidoBD.hora_entrega,
+              metodoPago:        pedidoBD.metodo_pago || 'efectivo',
             };
 
             if (pedidoBD.hora_entrega) {
@@ -1318,6 +1319,8 @@ async function reanudarDespachosPendientes(client) {
   for (const d of pendientes) {
     const horaDespacho = new Date(d.hora_despacho);
     const msRestantes  = horaDespacho.getTime() - Date.now();
+    const pedidosCliente = getPedidosPorCliente(d.cliente_tel);
+    const pedidoBDRestart = pedidosCliente.find(p => p.id === Number(d.pedido_id));
     const despachoData = {
       pedidoId:          d.pedido_id,
       clienteNombre:     d.cliente_nombre,
@@ -1327,6 +1330,7 @@ async function reanudarDespachosPendientes(client) {
       clienteReferencia: d.cliente_ref,
       totalOrden:        d.total_orden,
       tarifaDomicilio:   d.tarifa,
+      metodoPago:        pedidoBDRestart?.metodo_pago || 'efectivo',
     };
 
     if (msRestantes > 0) {

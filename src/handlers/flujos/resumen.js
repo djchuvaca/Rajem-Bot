@@ -243,13 +243,12 @@ async function handleCambioMetodoDesdeResumen(msg, textoOriginal, clienteNumero,
 
   const campos        = datosCampos.get(clienteNumero) || {};
   const esOrdenDomMet = tipoEntregaCliente.get(clienteNumero) === "domicilio";
-  if (/tarjeta/i.test(textoOriginal) && esOrdenDomMet) {
-    await msg.reply("Para pedidos a domicilio solo aceptamos *efectivo o transferencia*. *¿Cuál prefieres?*");
+  const nuevoMetodo = normalizarMetodoPago(textoOriginal, esOrdenDomMet);
+  if (!nuevoMetodo) {
+    await msg.reply(`Ese método no está disponible. *¿Cuál prefieres?* ${getMetodosPago(esOrdenDomMet).texto}.`);
     return true;
   }
-  if (/transferencia/i.test(textoOriginal))   campos.metodo = "transferencia";
-  else if (/tarjeta/i.test(textoOriginal))    campos.metodo = "tarjeta";
-  else if (/efectivo/i.test(textoOriginal))   campos.metodo = "efectivo";
+  campos.metodo = nuevoMetodo;
   datosCampos.set(clienteNumero, campos);
 
   const pendienteActual = resumenPendiente.get(clienteNumero);

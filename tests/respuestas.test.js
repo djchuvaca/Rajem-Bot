@@ -144,9 +144,9 @@ describe("respuestaMetodosPago", () => {
     assert.match(r, /tarjeta/i);
   });
 
-  test("domicilio NO menciona tarjeta", () => {
+  test("domicilio menciona tarjeta", () => {
     const r = respuestaMetodosPago(true);
-    assert.doesNotMatch(r, /tarjeta/i);
+    assert.match(r, /tarjeta/i);
   });
 
   test("ambos modos mencionan efectivo", () => {

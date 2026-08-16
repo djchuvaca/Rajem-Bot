@@ -401,9 +401,7 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
     const formProgresivo = mostrarFormularioProgresivo(clienteNumero, esOrdenDomicilio, esPreventa);
     const tipoPedido     = esOrdenDomicilio ? "recibirlo" : "pasar a recoger";
     const rango    = getRangoHorario();
-    const msgHora  = campos._horaFueraRango === "antes"
-      ? `Esa hora está fuera de nuestro horario de *${rango}*`
-      : `Esa hora está fuera de nuestro horario de *${rango}*`;
+    const msgHora  = `Esa hora está fuera de nuestro horario de *${rango}*`;
     await msg.reply(formProgresivo + "\n\n" + msgHora + "\n*¿A qué hora deseas " + tipoPedido + "?* (entre " + rango + ")");
     delete campos._horaFueraRango;
     datosCampos.set(clienteNumero, campos);

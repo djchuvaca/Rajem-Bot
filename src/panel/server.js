@@ -540,7 +540,7 @@ async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
   if (resultado.pedidoId) {
     try {
       const row = queryOne(
-        `SELECT p.tipo, p.total, c.calle_numero, c.colonia, c.referencia
+        `SELECT p.tipo, p.total, p.metodo_pago, c.calle_numero, c.colonia, c.referencia
          FROM pedidos p LEFT JOIN clientes c ON p.cliente_id = c.id
          WHERE p.id = ?`,
         [resultado.pedidoId]
@@ -556,6 +556,7 @@ async function _notificarPagoConfirmado(resultado, proveedor = 'Pasarela') {
           clienteReferencia: row.referencia        || null,
           totalOrden:        `$${row.total         || 0}`,
           tarifaDomicilio:   tarifa,
+          metodoPago:        row.metodo_pago       || 'efectivo',
         }).catch(e => console.error('[Mandaditos] Error al programar despacho pago:', e.message));
       }
     } catch (e) { console.error('[Mandaditos] Error consultando pedido para despacho:', e.message); }

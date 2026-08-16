@@ -169,6 +169,7 @@ async function seedDB() {
       actualizada_en  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
       resuelta_en     TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON pedidos(cliente_id);
     CREATE INDEX IF NOT EXISTS idx_trace_jid_estado ON conversaciones_trace(jid, estado, actualizada_en);
     CREATE INDEX IF NOT EXISTS idx_eventos_trace ON conversacion_eventos(trace_id, id);
     CREATE INDEX IF NOT EXISTS idx_alertas_estado ON alertas_operativas(estado, severidad, actualizada_en);
@@ -293,7 +294,7 @@ async function seedDB() {
     ["moneda",                   "$"],
     ["grupo_id",                 process.env.GRUPO_ID || ""],
     ["metodos_mostrador",        "efectivo, tarjeta o transferencia"],
-    ["metodos_domicilio",        "efectivo o transferencia"],
+    ["metodos_domicilio",        "efectivo, tarjeta o transferencia"],
     ["tiempo_cancelacion",       "15"],
     ["timeout_recordatorio_min", "20"],
     ["timeout_sesion_min",       "35"],
