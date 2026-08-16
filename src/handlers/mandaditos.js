@@ -185,8 +185,13 @@ async function enviarDespachoMandaditos(client, datos) {
 
   try {
     const enviado = await client.sendMessage(grupoId, texto);
-    const msgId = enviado?.id?._serialized || enviado?.id?.$1;
-    if (msgId) despachosPendientes.set(msgId, { ...datos, negocioColonia });
+    const msgId = _messageId(enviado?.id);
+    // Algunas versiones recientes de WhatsApp Web confirman el envío pero no
+    // exponen un messageId serializable. El pedido debe seguir disponible para
+    // asignación mediante el número incluido en el texto citado.
+    const clave = msgId || `pedido:${datos.pedidoId}`;
+    despachosPendientes.set(clave, { ...datos, negocioColonia });
+    if (!msgId) logger.warn(`[Mandaditos] Despacho #${datos.pedidoId} enviado sin messageId; registrado por número de pedido`);
   } catch (e) {
     logger.error(`[Mandaditos] Error al enviar despacho #${datos.pedidoId}: ${e.message}`);
     throw e;
@@ -274,7 +279,11 @@ async function handleMensajeMandaditos(msg, client) {
 
   try {
     await client.sendMessage(repartidorJid, privado);
-    despachosPendientes.delete(quotedId); // solo después de entregar los datos privados
+    // Eliminar cualquier clave alternativa del mismo pedido solo después de
+    // entregar los datos privados.
+    for (const [id, pendiente] of despachosPendientes.entries()) {
+      if (Number(pendiente.pedidoId) === Number(datos.pedidoId)) despachosPendientes.delete(id);
+    }
     upsertRepartidor(repartidorJid, nombre);
     const inicio = Date.now();
     setEnRuta(repartidorJid, datos.pedidoId, new Date(inicio).toISOString());
