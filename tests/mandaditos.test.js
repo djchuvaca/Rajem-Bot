@@ -148,6 +148,24 @@ describe('Mandaditos — asignación y bases de repartidores', { concurrency: fa
     assert.equal(getRepartidor('5213117654321@c.us').pedido_actual_id, 8201);
   });
 
+  test('asocia la cita por número de pedido cuando WhatsApp cambia el messageId', async () => {
+    const client = clienteWA();
+    await enviarDespachoMandaditos(client, { ...DATOS, pedidoId: 8301 });
+    const respuestaGrupo = {
+      from: '120363099999999999@g.us', fromMe: false, hasQuotedMsg: true,
+      author: '5213117654322@c.us',
+      getQuotedMessage: async () => ({
+        id: { _serialized: 'formato-distinto-del-mismo-mensaje' },
+        body: '🛵 Pedido #8301 — Solicitud de reparto\n¿Quién está disponible?',
+      }),
+      reply: async texto => client.envios.push({ jid: 'grupo-respuesta', texto }),
+    };
+
+    assert.equal(await handleMensajeMandaditos(respuestaGrupo, client), true);
+    assert.ok(client.envios.some(e => e.jid === '5213117654322@c.us' && /Punto de entrega/.test(e.texto)));
+    assert.equal(getRepartidor('5213117654322@c.us').pedido_actual_id, 8301);
+  });
+
   test('un timeout libera al repartidor y queda registrado en historial', () => {
     run("INSERT INTO repartidores(jid,nombre) VALUES('5213110000001@c.us','Rep Timeout')");
     setEnRuta('5213110000001@c.us', 8002, new Date().toISOString());

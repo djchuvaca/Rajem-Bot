@@ -26,6 +26,36 @@ function _jid(valor) {
     || (valor.user && valor.server ? `${valor.user}@${valor.server}` : '');
 }
 
+function _messageId(valor) {
+  if (!valor) return '';
+  if (typeof valor === 'string') return valor;
+  return valor._serialized || valor.$1 || valor.id || valor._id || '';
+}
+
+function _pedidoIdDesdeSolicitud(texto) {
+  const match = String(texto || '').match(/Pedido\s*#\s*(\d+)\s*[\u2014-]\s*Solicitud de reparto/i);
+  return match ? Number(match[1]) : null;
+}
+
+function _resolverDespachoCitado(quoted) {
+  const quotedId = _messageId(quoted?.id);
+  if (quotedId && despachosPendientes.has(quotedId)) {
+    return { quotedId, datos: despachosPendientes.get(quotedId), por: 'message_id' };
+  }
+
+  // whatsapp-web.js no siempre devuelve el mismo formato de ID para el mensaje
+  // enviado y para el citado. El número de pedido dentro de nuestra plantilla es
+  // un segundo identificador inequívoco dentro de los despachos pendientes.
+  const body = quoted?.body || quoted?.caption || quoted?._data?.body || '';
+  const pedidoId = _pedidoIdDesdeSolicitud(body);
+  if (pedidoId !== null) {
+    for (const [id, datos] of despachosPendientes.entries()) {
+      if (Number(datos.pedidoId) === pedidoId) return { quotedId: id, datos, por: 'pedido_id' };
+    }
+  }
+  return { quotedId, datos: null, por: null, pedidoId };
+}
+
 async function _resolverJidPrivado(jid, client) {
   const original = _jid(jid);
   if (!original.endsWith('@lid') || typeof client?.getContactLidAndPhone !== 'function') return original;
@@ -168,19 +198,29 @@ async function handleMensajeMandaditos(msg, client) {
   if (msg.fromMe) return false;
   if (!msg.hasQuotedMsg) return false;
 
-  let quotedId;
+  let quoted;
   try {
-    const quoted = await msg.getQuotedMessage();
-    quotedId = quoted?.id?._serialized || quoted?.id?.$1;
-  } catch (_) { return false; }
+    quoted = await msg.getQuotedMessage();
+  } catch (e) {
+    logger.warn(`[Mandaditos] No se pudo leer el mensaje citado: ${e.message || e}`);
+    return false;
+  }
 
-  if (!quotedId || !despachosPendientes.has(quotedId)) return false;
+  const resuelto = _resolverDespachoCitado(quoted);
+  const quotedId = resuelto.quotedId;
+  if (!resuelto.datos) {
+    logger.warn(`[Mandaditos] Cita no asociada a un despacho pendiente (id=${quotedId || 'sin-id'}, pedido=${resuelto.pedidoId || 'sin-pedido'}, pendientes=${despachosPendientes.size})`);
+    return false;
+  }
+  if (resuelto.por === 'pedido_id') {
+    logger.info(`[Mandaditos] Cita del pedido #${resuelto.datos.pedidoId} resuelta por contenido; WhatsApp cambió el formato del messageId`);
+  }
   if (_despachosEnAsignacion.has(quotedId)) {
     await msg.reply('⏳ Este pedido ya está siendo asignado a otro repartidor.');
     return true;
   }
 
-  const datos = despachosPendientes.get(quotedId);
+  const datos = resuelto.datos;
   const repartidorJid = await _resolverJidPrivado(msg.author || msg.from, client);
   const registrado = getRepartidor(repartidorJid);
   if (registrado && !registrado.activo) {
