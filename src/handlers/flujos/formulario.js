@@ -22,8 +22,10 @@ const { buscarColonia, buscarColoniaDetallada } = require("../../geo");
 
 // Contador de intentos fallidos de colonia por cliente (vive solo en memoria, se limpia al aceptar)
 const _intentosColonia = new Map();
-// Clientes a los que ya se les envió el menú en handlePrimerMensaje (evita doble saludo en handleTipoEntrega)
+// Clientes a los que ya se les envió el saludo (evita doble saludo en handleTipoEntrega)
 const _menuEnviado = new Set();
+// Clientes a los que ya se les mostró el menú completo antes de handleTipoEntrega (evita doble menú)
+const _menuYaMostrado = new Set();
 
 // ── DETECCIÓN Y RESUMEN DE SEÑALES DE PEDIDO ─────────────────────────────────
 const _PRESUPUESTO_RE = /\bpor\s*\$\s*\d+|\$\s*\d+\s*(de|en)\b/i;
@@ -53,8 +55,9 @@ async function handlePrimerMensaje(msg, textoOriginal, clienteNumero) {
   if (clientesNuevos.has(clienteNumero)) return false;
 
   clientesNuevos.add(clienteNumero);
-  _intentosColonia.delete(clienteNumero); // Resetear contador de intentos de sesión anterior
-  _menuEnviado.delete(clienteNumero); // Resetear flag de menú enviado de sesión anterior
+  _intentosColonia.delete(clienteNumero);
+  _menuEnviado.delete(clienteNumero);
+  _menuYaMostrado.delete(clienteNumero);
   if (!estaEnHorario()) {
     if (_tieneSeñalesDePedido(textoOriginal)) {
       ordenPendientePreventa.set(clienteNumero, textoOriginal);
@@ -116,7 +119,8 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
 
   if (aceptaPreventa) {
     clientesPreventa.add(clienteNumero);
-    _menuEnviado.add(clienteNumero); // SALUDO() ya fue enviado; handleTipoEntrega no repite el saludo
+    _menuEnviado.add(clienteNumero);
+    _menuYaMostrado.add(clienteNumero); // SALUDO() incluye el menú — no repetir en handleTipoEntrega
     persistirEstado(clienteNumero);
     await msg.reply(`¡Perfecto! Tomamos tu pedido en preventa.\nTu orden estará lista a partir de *${getRangoHorario().split(" a ")[0]}* al inicio de nuestro horario. 😊\n\n` + SALUDO());
     return true;
@@ -213,20 +217,30 @@ async function handleTipoEntrega(msg, client, textoOriginal, clienteNumero, hist
   historial.push({ role: "assistant", content: "Perfecto, aquí el menú." });
 
   persistirEstado(clienteNumero);
-  const primerNombre = clienteBD?.nombre?.split(" ")[0] || null;
+  const primerNombre    = clienteBD?.nombre?.split(" ")[0] || null;
   const saludoYaEnviado = _menuEnviado.has(clienteNumero);
+  const menuYaMostrado  = _menuYaMostrado.has(clienteNumero);
   _menuEnviado.delete(clienteNumero);
-  if (primerNombre && !saludoYaEnviado) {
-    // Primer mensaje del cliente ya incluía tipo de entrega — saludar aquí
-    await replyConTyping(msg, `Hola de nuevo *${primerNombre}*! 😊 Aquí te mando el menú:`);
+  _menuYaMostrado.delete(clienteNumero);
+
+  if (menuYaMostrado) {
+    // El menú ya fue mostrado antes (FAQ o preventa) — solo confirmar el tipo sin repetirlo
+    const confirmacion = tipoEntrega === "domicilio"
+      ? "Perfecto! 🛵 Tomamos tu pedido a domicilio."
+      : "Perfecto! Tomamos tu pedido para mostrador.";
+    await replyConTyping(msg, confirmacion);
     await new Promise(r => setTimeout(r, 400));
   } else {
-    // Saludo ya fue enviado en handlePrimerMensaje — solo confirmar tipo de entrega
-    const intro = tipoEntrega === "domicilio" ? "Perfecto! 🛵 Aquí te mando el menú:" : "Perfecto! Aquí te mando el menú:";
-    await replyConTyping(msg, intro);
+    if (primerNombre && !saludoYaEnviado) {
+      // Primer mensaje del cliente ya incluía tipo de entrega — saludar aquí
+      await replyConTyping(msg, `Hola de nuevo *${primerNombre}*! 😊 Aquí te mando el menú:`);
+    } else {
+      const intro = tipoEntrega === "domicilio" ? "Perfecto! 🛵 Aquí te mando el menú:" : "Perfecto! Aquí te mando el menú:";
+      await replyConTyping(msg, intro);
+    }
     await new Promise(r => setTimeout(r, 400));
+    await msg.reply(MENU_FORMATO());
   }
-  await msg.reply(MENU_FORMATO());
   console.log(`Bot: [TIPO ENTREGA — ${tipoEntrega.toUpperCase()}${esPreventa ? " PREVENTA" : ""}]`);
   return true;
 }
@@ -516,10 +530,13 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   return true;
 }
 
+function marcarMenuMostrado(clienteNumero) { _menuYaMostrado.add(clienteNumero); }
+
 module.exports = {
   handlePrimerMensaje,
   handleFueraDeHorario,
   handleTipoEntrega,
   handleCambioTipoDuranteFormulario,
   handleFormularioProgresivo,
+  marcarMenuMostrado,
 };

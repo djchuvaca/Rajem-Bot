@@ -14,7 +14,7 @@ const { getGrupoId, getNotifDestinoJID } = require("../db");
 const trazabilidad = require('../db/observabilidad');
 
 const { handleCancelacionConfirmada, handleMotivoCancelacion, handleCancelacionDurantePedido, handleCancelacionPagoMP } = require("./flujos/cancelacion");
-const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo } = require("./flujos/formulario");
+const { handlePrimerMensaje, handleFueraDeHorario, handleTipoEntrega, handleCambioTipoDuranteFormulario, handleFormularioProgresivo, marcarMenuMostrado } = require("./flujos/formulario");
 const { handleEdicionPendiente, handleConfirmacionDatos } = require("./flujos/edicion");
 const {
   handleEdicionResumen, handleCambiosTipoDesdeResumen, handleCambioMetodoDesdeResumen,
@@ -106,12 +106,17 @@ async function handleMensaje(msg, client) {
       await msg.reply("Solo proceso mensajes de texto. Escríbeme tu pedido y con gusto te atiendo 😊");
     return;
   }
-  if (!msg.body || !msg.body.trim()) return;
+  if (!msg.body || !msg.body.trim()) {
+    if (!clientesNuevos.has(clienteNumero) && msg.hasMedia) {
+      await msg.reply("Solo proceso mensajes de texto. Escríbeme tu pedido y con gusto te atiendo 😊");
+    }
+    return;
+  }
 
   let textoOriginal = msg.body.trim();
   if (/^[👍✅☑🙌💯👌🤙]+$/u.test(textoOriginal))       textoOriginal = "si";
   else if (/^[👎❌🚫🙅]+$/u.test(textoOriginal))         textoOriginal = "no";
-  if (textoOriginal.length < 2) return;
+  if (textoOriginal.length < 2 && clientesNuevos.has(clienteNumero)) return;
 
   // Ignorar previews automáticos de WhatsApp
   if (/^[\w.-]+\.[a-z]{2,}$/i.test(textoOriginal)) return;
@@ -147,6 +152,7 @@ async function handleMensaje(msg, client) {
             await replyConTyping(msg, mensajeFueraDeHorario());
           } else if (estaEnHorario() && !enFlujoActivo(clienteNumero)) {
             await replyConTyping(msg, MENU_FORMATO());
+            marcarMenuMostrado(clienteNumero);
           }
         }
         return;
