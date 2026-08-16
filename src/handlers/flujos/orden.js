@@ -1580,7 +1580,11 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
 // ── DETECCIÓN SIN CORTE ───────────────────────────────────────────────────────
 async function handleSinCorte(msg, textoOriginal, clienteNumero) {
   const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
-  if (!detectarSinCorte(textoLimpio)) return false;
+  const pedidoParcial = parsearSinCorteItems(textoLimpio);
+  // En pedidos mixtos detectarSinCorte puede ver primero un producto completo y
+  // devolver null aunque otro formato siga sin corte. La estructura parcial es
+  // la autoridad: debe existir al menos un artículo pendiente de aclaración.
+  if (!pedidoParcial?.items?.some(item => !item.corte)) return false;
 
   // Verificar si el cliente mencionó un corte del catálogo que hoy no está disponible
   const { getCortesBDObj } = require('../../db/cortes');
@@ -1599,8 +1603,6 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
       return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
     })
     .map(c => c.nombre);
-
-  const pedidoParcial = parsearSinCorteItems(textoLimpio);
 
   if (cortesNoDispNombres.length > 0) {
     // Informar todos los cortes no disponibles y poner en estado esperandoCorte

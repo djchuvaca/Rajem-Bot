@@ -20,6 +20,8 @@ const {
   invalidarCacheCortes,
 } = require("../src/handlers/pedidoParser");
 const { parsearSinCorteItems } = require("../src/handlers/flujos/utils");
+const { handleSinCorte } = require("../src/handlers/flujos/orden");
+const { esperandoCorte } = require("../src/estado");
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,28 @@ test("conserva formatos implícitos entre un producto completo y una venta por p
       itemPesos(150, null)
     )
   );
+});
+
+test("un pedido mixto pregunta por la torta pendiente aunque los demás tengan corte", async () => {
+  const jid = "5213119999000@c.us";
+  const respuestas = [];
+  esperandoCorte.delete(jid);
+  try {
+    const atendido = await handleSinCorte(
+      { reply: async texto => respuestas.push(texto) },
+      "dame 3 tacos de surtido una torta y 200 de costilla",
+      jid
+    );
+    assert.equal(atendido, true);
+    assert.match(respuestas[0], /corte.*torta|torta.*corte/i);
+    assert.deepEqual(esperandoCorte.get(jid).items, [
+      itemTaco(3, "surtido"),
+      { presentacion: "torta", cantidad: 1, corte: null },
+      itemPesos(200, "costilla"),
+    ]);
+  } finally {
+    esperandoCorte.delete(jid);
+  }
 });
 
 // ── SETUP BD ─────────────────────────────────────────────────────────────────
