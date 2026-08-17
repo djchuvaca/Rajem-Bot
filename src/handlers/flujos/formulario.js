@@ -120,7 +120,6 @@ async function handleFueraDeHorario(msg, textoOriginal, clienteNumero) {
   if (aceptaPreventa) {
     clientesPreventa.add(clienteNumero);
     _menuEnviado.add(clienteNumero);
-    _menuYaMostrado.add(clienteNumero); // SALUDO() incluye el menú — no repetir en handleTipoEntrega
     persistirEstado(clienteNumero);
     await msg.reply(`¡Perfecto! Tomamos tu pedido en preventa.\nTu orden estará lista a partir de *${getRangoHorario().split(" a ")[0]}* al inicio de nuestro horario. 😊\n\n` + SALUDO());
     return true;
