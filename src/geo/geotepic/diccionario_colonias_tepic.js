@@ -10004,15 +10004,32 @@ function opciones(ids) {
   });
 }
 
+function _detectarTipoEnTexto(texto) {
+  const t = texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/\bfracc(?:ionamiento)?\b/.test(t)) return "fraccionamiento";
+  if (/\bu\.?\s*h\.?\b|\bunidad\s+habitacional\b/.test(t)) return "unidad_habitacional";
+  if (/\bcol(?:onia)?\b/.test(t)) return "colonia";
+  return null;
+}
+
+function _desambiguarPorTipo(ids, tipoDetectado) {
+  if (!tipoDetectado || !ids.length) return null;
+  const filtrados = ids.filter(id => COLONIAS[id]?.tipo === tipoDetectado);
+  return filtrados.length === 1 ? filtrados[0] : null;
+}
+
 function buscarColonia(texto, { permitirAproximada = true } = {}) {
   const consulta = normalizarTexto(texto);
   if (!consulta) return { estado: "no_encontrada", confianza: 0, textoDetectado: consulta };
+  const tipoDetectado = _detectarTipoEnTexto(texto);
 
   const exactas = INDICE_COLONIAS.get(consulta) ?? [];
   if (exactas.length === 1) {
     return { estado: "encontrada", colonia: COLONIAS[exactas[0]], confianza: 1, metodo: "alias_exacto", textoDetectado: consulta };
   }
   if (exactas.length > 1) {
+    const porTipo = _desambiguarPorTipo(exactas, tipoDetectado);
+    if (porTipo) return { estado: "encontrada", colonia: COLONIAS[porTipo], confianza: 0.98, metodo: "alias_exacto_tipo", textoDetectado: consulta };
     return { estado: "ambigua", confianza: 1, metodo: "alias_exacto_ambiguo", textoDetectado: consulta, opciones: opciones(exactas) };
   }
 
@@ -10028,6 +10045,8 @@ function buscarColonia(texto, { permitirAproximada = true } = {}) {
     if (mejores.length === 1) {
       return { estado: "encontrada", colonia: COLONIAS[mejores[0]], confianza: 0.97, metodo: "alias_en_mensaje", textoDetectado: consulta };
     }
+    const porTipo = _desambiguarPorTipo(mejores, tipoDetectado);
+    if (porTipo) return { estado: "encontrada", colonia: COLONIAS[porTipo], confianza: 0.96, metodo: "alias_en_mensaje_tipo", textoDetectado: consulta };
     return { estado: "ambigua", confianza: 0.97, metodo: "alias_en_mensaje_ambiguo", textoDetectado: consulta, opciones: opciones(mejores) };
   }
 
