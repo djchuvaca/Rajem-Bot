@@ -740,6 +740,11 @@ setInterval(async () => {
      LEFT JOIN clientes c ON p.cliente_id = c.id
      WHERE p.estado = 'pendiente'
        AND datetime(p.fecha, 'localtime') <= datetime('now', 'localtime', '-' || ? || ' minutes')
+       AND NOT EXISTS (
+         SELECT 1 FROM pagos_pendientes pp
+         WHERE pp.pedido_id = CAST(p.id AS TEXT)
+           AND pp.expira_en > datetime('now')
+       )
      ORDER BY p.fecha ASC`,
     [alertaMin]
   );
