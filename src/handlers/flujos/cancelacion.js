@@ -3,7 +3,7 @@ const {
   pedidosConfirmados, esperandoMotivoCancelacion, clientesNuevos,
   esperandoTipoItem, esperandoExtras, ordenPreResumen, limpiarTodo, esperandoPagoMP,
 } = require("../../estado");
-const { actualizarEstadoPedido, actualizarEstadoPorId, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId } = require("../../db");
+const { actualizarEstadoPedido, actualizarEstadoPorId, actualizarEstadoConfirmado, getMensaje, getConfig, getGrupoId, eliminarPagoPendiente } = require("../../db");
 const { detectarPreguntaFrecuente } = require("../pedidoParser");
 const { generarRespuestaAutomatica } = require("../respuestas");
 const { SALUDO } = require("../../config");
@@ -142,6 +142,7 @@ async function handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero
     esperandoPagoMP.delete(clienteNumero);
     limpiarTodo(clienteNumero);
     try { actualizarEstadoPorId(datos.pedidoId, "cancelado"); } catch (_) {}
+    try { eliminarPagoPendiente(datos.pedidoId); } catch (_) {}
     const grupoId = getGrupoId();
     if (grupoId) {
       const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
