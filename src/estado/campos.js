@@ -244,7 +244,7 @@ function interpretarCampos(numero, textoNuevo, esDomicilio = false, esPreventa =
       }
       if (campos.calle && !campos.colonia &&
           /^[a-záéíóúüñ0-9\s]{3,40}$/i.test(l) &&
-          !PALABRAS_NO_NOMBRE.test(l) &&
+          !/efectivo|tarjeta|transferencia|spei|dep[oó]sito/i.test(l) &&
           !/^sin\s+\w+|cerca\s+de|frente\s+a|junto\s+a|entre\s+(las?\s+)?calle/i.test(l)) {
         campos.colonia = sanitizarColonia(l.trim()); continue;
       }

@@ -1697,7 +1697,7 @@ async function handleModificacionAgregarMas(msg, textoOriginal, clienteNumero) {
 async function handleAgregarMas(msg, textoOriginal, clienteNumero, historial, esOrdenDom, esPreventa) {
   if (!esperandoAgregarMas.has(clienteNumero)) return false;
 
-  const esAgregarNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
+  const esAgregarNo = /^(no|nel|nop|nada\s*m[aá]s?|ya\s*es\s*todo|eso\s*es\s*todo|listo|ya|solo\s*eso|eso|no\s*,?\s*(gracias|gra|gras)|no\s*,\s*(ya\s+es\s+todo|eso\s+es\s+todo)|as[ií]\s*est[aá](\s*bien)?|ya\s*fue|ya\s*con\s*eso)$/i.test(textoOriginal.trim());
   const esAgregarSi = /^(si|sí|ok|va|dale|claro|sale|andale|quiero|agrega|más|mas)$/i.test(textoOriginal.trim());
 
   // "¿Cuánto llevo?"

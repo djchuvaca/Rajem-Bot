@@ -200,6 +200,7 @@ async function handleCambiosTipoDesdeResumen(msg, textoOriginal, clienteNumero, 
     }
     camposDom.tipoEntrega = "domicilio";
     datosCampos.set(clienteNumero, camposDom);
+    tipoEntregaCliente.set(clienteNumero, "domicilio");
     if (camposDom.calle && camposDom.colonia) {
       const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, true, esPreventa);
       resumenPendiente.set(clienteNumero, { texto: resumenNuevo.texto, esTransferencia: resumenNuevo.esTransferencia });
@@ -222,6 +223,7 @@ async function handleCambiosTipoDesdeResumen(msg, textoOriginal, clienteNumero, 
   campos.calle = null; campos.colonia = null; campos.referencia = null;
   campos.tipoEntrega = "mostrador";
   datosCampos.set(clienteNumero, campos);
+  tipoEntregaCliente.set(clienteNumero, "mostrador");
   resumenPendiente.delete(clienteNumero);
   if (ordenExtraida) {
     const resumenNuevo = generarResumen(clienteNumero, ordenExtraida, false, esPreventa);
