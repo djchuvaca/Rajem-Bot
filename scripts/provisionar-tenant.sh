@@ -52,6 +52,10 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 TENANTS_FILE="$RAIZ/data/tenants.json"
 ENVS_DIR="$RAIZ/envs"
 
+# Nginx — configurables via variables de entorno
+DOMINIO="${DOMINIO:-}"
+NGINX_CONF="${NGINX_CONF:-/etc/nginx/sites-available/batiast}"
+
 # ── 1. Recopilar datos ────────────────────────────────────────────────────────
 TENANT_ID=$(get_val "TENANT_ID" "ID del tenant (ej: tacos-pepe-gdl)")
 [[ -z "$TENANT_ID" ]]                   && error "El ID no puede estar vacío."
@@ -233,6 +237,24 @@ PYEOF
       ok "Tenant marcado como activo."
     fi
     ok "Bot arrancado. Iniciará en ~30s y mostrará el QR en el super admin."
+
+    # ── Registrar subdominio en Nginx ─────────────────────────────────────────
+    if [[ -n "$DOMINIO" && -f "$NGINX_CONF" ]]; then
+      if grep -q "${TENANT_ID}\.${DOMINIO}" "$NGINX_CONF"; then
+        ok "Subdominio ${TENANT_ID}.${DOMINIO} ya existía en Nginx."
+      else
+        sudo sed -i "/default[[:space:]]*0;/i\\    ${TENANT_ID}.${DOMINIO}  ${PANEL_PORT};" "$NGINX_CONF"
+        if sudo nginx -t &>/dev/null; then
+          sudo systemctl reload nginx
+          ok "Subdominio https://${TENANT_ID}.${DOMINIO} registrado en Nginx."
+        else
+          warn "Error en configuración de Nginx — agrega manualmente: ${TENANT_ID}.${DOMINIO}  ${PANEL_PORT};"
+          sudo sed -i "/${TENANT_ID}\.${DOMINIO}/d" "$NGINX_CONF"
+        fi
+      fi
+    elif [[ -n "$DOMINIO" ]]; then
+      warn "Nginx no encontrado en ${NGINX_CONF} — agrega manualmente: ${TENANT_ID}.${DOMINIO}  ${PANEL_PORT};"
+    fi
   else
     warn "pm2 start falló. Intenta manualmente: pm2 start ${TMP_CONF}"
   fi
@@ -247,7 +269,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 ok "Tenant \"${NOMBRE}\" (${TENANT_ID}) provisionado."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo -e "  Panel tenant : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
+if [[ -n "$DOMINIO" ]]; then
+  echo -e "  Panel tenant : ${CYAN}https://${TENANT_ID}.${DOMINIO}${NC}"
+else
+  echo -e "  Panel tenant : ${CYAN}http://TU-IP:${PANEL_PORT}${NC}"
+fi
 echo -e "  Usuario panel: ${CYAN}admin${NC}"
 echo -e "  Contraseña   : ${CYAN}${PANEL_INITIAL_PASSWORD}${NC}  (cambiar en el primer ingreso)"
 echo -e "  Proceso PM2  : ${CYAN}pm2 logs ${TENANT_ID}${NC}"

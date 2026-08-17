@@ -16,6 +16,9 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 
 [[ -z "${TENANT_ID:-}" ]] && echo "Error: TENANT_ID no definido" && exit 1
 
+DOMINIO="${DOMINIO:-}"
+NGINX_CONF="${NGINX_CONF:-/etc/nginx/sites-available/batiast}"
+
 echo ""
 echo "======================================="
 echo "  Eliminando tenant: ${TENANT_ID}"
@@ -32,7 +35,22 @@ else
   echo "Proceso PM2 '${TENANT_ID}' no estaba corriendo."
 fi
 
-# 2. Eliminar de data/tenants.json
+# 2. Eliminar subdominio de Nginx
+if [[ -n "$DOMINIO" && -f "$NGINX_CONF" ]]; then
+  if grep -q "${TENANT_ID}\.${DOMINIO}" "$NGINX_CONF"; then
+    sudo sed -i "/${TENANT_ID}\.${DOMINIO}/d" "$NGINX_CONF"
+    if sudo nginx -t &>/dev/null; then
+      sudo systemctl reload nginx
+      echo "Subdominio ${TENANT_ID}.${DOMINIO} eliminado de Nginx."
+    else
+      echo "Advertencia: error al recargar Nginx — revisa ${NGINX_CONF} manualmente."
+    fi
+  else
+    echo "Subdominio ${TENANT_ID}.${DOMINIO} no estaba en Nginx."
+  fi
+fi
+
+# 4. Eliminar de data/tenants.json
 if [[ -f "$RAIZ/data/tenants.json" ]] && command -v python3 &>/dev/null; then
   python3 - <<PYEOF
 import json
@@ -49,7 +67,7 @@ else
   echo "tenants.json no encontrado o python3 no disponible."
 fi
 
-# 3. Eliminar archivo .env del tenant
+# 5. Eliminar archivo .env del tenant
 if [[ -f "$RAIZ/envs/${TENANT_ID}.env" ]]; then
   rm "$RAIZ/envs/${TENANT_ID}.env"
   echo "Archivo envs/${TENANT_ID}.env eliminado."
@@ -57,7 +75,7 @@ else
   echo "Archivo .env no encontrado."
 fi
 
-# 4. Eliminar datos del tenant (BD, backups, sesión WA)
+# 6. Eliminar datos del tenant (BD, backups, sesión WA)
 if [[ -f "$RAIZ/data/${TENANT_ID}.db" ]]; then
   rm "$RAIZ/data/${TENANT_ID}.db"
   echo "Base de datos data/${TENANT_ID}.db eliminada."
