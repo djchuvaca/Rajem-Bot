@@ -1805,6 +1805,39 @@ async function handlePresupuestoInverso(msg, textoOriginal) {
   } catch (_) { return false; }
 }
 
+// ── GROQ NLU FALLBACK ─────────────────────────────────────────────────────────
+// Solo se activa cuando todos los handlers locales fallaron y el mensaje tiene
+// señales razonables de pedido. Groq interpreta y devuelve JSON estructurado;
+// el bot responde con sus propias plantillas — el cliente nunca ve la diferencia.
+async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial) {
+  const { estaDisponible } = require('../../groq/client');
+  if (!estaDisponible()) return false;
+
+  // Solo si el cliente ya eligió tipo de entrega (está en flujo activo de pedido)
+  if (!tipoEntregaCliente.has(clienteNumero)) return false;
+
+  // Solo si el mensaje tiene señales razonables de pedido (evita llamadas innecesarias)
+  const { calcularScore } = require('../pedidoParser');
+  if (calcularScore(textoOriginal) < 3) return false;
+
+  const { interpretarPedidoConGroq } = require('../../groq/nlu');
+  const { getItemTypes } = require('../../db');
+
+  const cortes    = getCortes();
+  const itemTypes = getItemTypes() || [];
+  const jsonGroq  = await interpretarPedidoConGroq(textoOriginal, cortes, itemTypes);
+  if (!jsonGroq || jsonGroq.tipo !== 'pedido') return false;
+
+  const esOrdenDom = tipoEntregaCliente.get(clienteNumero) === 'domicilio';
+  const esPreventa = clientesPreventa.has(clienteNumero);
+  const { textoLimpio, refrescos, salsas } = separarRefresco(textoOriginal);
+
+  historial.push({ role: 'user', content: textoOriginal });
+  await _avanzarExtrasOConfirmar(msg, clienteNumero, historial, jsonGroq, refrescos, salsas, esOrdenDom, esPreventa);
+  console.log(`Bot: [GROQ NLU] items: ${jsonGroq.items.length} — ${jsonGroq.items.map(i => `${i.cantidad}×${i.presentacion}/${i.corte || '?'}`).join(', ')}`);
+  return true;
+}
+
 // ── FALLBACK LOCAL ────────────────────────────────────────────────────────────
 async function handleNoEntendi(msg, clienteNumero) {
   const { enFlujoActivo } = require("./utils");
@@ -1826,5 +1859,6 @@ module.exports = {
   handleSinTipo,
   handleModificacionAgregarMas,
   handlePresupuestoInverso,
+  handleGroqFallback,
   handleNoEntendi,
 };

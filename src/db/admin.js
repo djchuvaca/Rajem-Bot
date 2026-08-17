@@ -83,6 +83,7 @@ function _init() {
     ['app_url',             process.env.APP_URL              || ''],
     ['grupo_mandaditos_id', process.env.GRUPO_MANDADITOS_ID || ''],
     ['sentry_dsn',          process.env.SENTRY_DSN          || ''],
+    ['groq_api_key',        ''],
   ];
   const stmt = _db.prepare('INSERT OR IGNORE INTO global_config (clave, valor) VALUES (?,?)');
   for (const [clave, valor] of defaults) stmt.run(clave, valor);
@@ -134,12 +135,13 @@ function listarAuditoriaAdmin(limite = 200) {
 }
 
 // ── Getters de conveniencia ────────────────────────────────────────────────────
-function getAppUrl()        { return getGlobalConfig('app_url')         || process.env.APP_URL              || ''; }
+function getAppUrl()               { return getGlobalConfig('app_url')             || process.env.APP_URL              || ''; }
 function getGrupoMandaditosGlobal() { return getGlobalConfig('grupo_mandaditos_id') || process.env.GRUPO_MANDADITOS_ID || ''; }
+function getGroqApiKeyGlobal()      { return getGlobalConfig('groq_api_key')        || ''; }
 
 module.exports = {
   getAdminDB,
   getGlobalConfig, setGlobalConfig, getAllGlobalConfig,
   getSuperadminUsuario, updateSuperadminPassword, registrarAuditoria, listarAuditoriaAdmin,
-  getAppUrl, getGrupoMandaditosGlobal,
+  getAppUrl, getGrupoMandaditosGlobal, getGroqApiKeyGlobal,
 };

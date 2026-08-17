@@ -25,7 +25,7 @@ const {
   handleExtras, handleAgregarMas,
   handleFAQDurantePedido, handleRepetirPedido, handlePedidoSimple,
   handleEsperandoCorte, handleSinCorte, handleSinTipo,
-  handleModificacionAgregarMas, handlePresupuestoInverso, handleNoEntendi,
+  handleModificacionAgregarMas, handlePresupuestoInverso, handleGroqFallback, handleNoEntendi,
 } = require("./flujos/orden");
 
 async function handleMensaje(msg, client) {
@@ -208,6 +208,7 @@ async function handleMensaje(msg, client) {
   if (await atendidoPor('sin_tipo', handleSinTipo(msg, textoOriginal, clienteNumero))) return;
   if (await atendidoPor('modificacion_agregar', handleModificacionAgregarMas(msg, textoOriginal, clienteNumero))) return;
   if (await atendidoPor('presupuesto_inverso', handlePresupuestoInverso(msg, textoOriginal))) return;
+  if (await atendidoPor('groq_fallback', handleGroqFallback(msg, textoOriginal, clienteNumero, historial))) return;
 
   await handleNoEntendi(msg, clienteNumero);
   trazabilidad.registrarRuta(clienteNumero, 'no_entendido');

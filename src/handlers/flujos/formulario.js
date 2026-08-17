@@ -409,6 +409,8 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   }
 
   const coloniaAntes = (datosCampos.get(clienteNumero) || {}).colonia;
+  const _campoAntes  = siguienteCampoFaltante(clienteNumero, esOrdenDomicilio, esPreventa);
+  let _coloniaValidadaPorGroq = false;
   const campos = interpretarCampos(clienteNumero, textoOriginal, esOrdenDomicilio, esPreventa);
 
   if (campos._horaFueraRango) {
@@ -452,8 +454,70 @@ async function handleFormularioProgresivo(msg, textoOriginal, clienteNumero, his
   }
   acumularDatos(clienteNumero, textoOriginal);
 
+  // ── Groq fallback: si el local no capturó el campo esperado, intentar extracción con IA ──
+  {
+    const _campoAhora  = siguienteCampoFaltante(clienteNumero, esOrdenDomicilio, esPreventa);
+    const _localFallo  = _campoAntes && _campoAhora && _campoAntes.campo === _campoAhora.campo;
+    if (_localFallo) {
+      const { estaDisponible }              = require('../../groq/client');
+      const { extraerDatosFormularioConGroq } = require('../../groq/formulario');
+      if (estaDisponible()) {
+        const caActual  = datosCampos.get(clienteNumero) || {};
+        const faltantes = [];
+        if (!caActual.nombre)   faltantes.push('nombre');
+        if (!caActual.telefono) faltantes.push('telefono');
+        if (esOrdenDomicilio) {
+          if (!caActual.calle)      faltantes.push('calle');
+          if (!caActual.colonia)    faltantes.push('colonia');
+          if (!caActual.referencia) faltantes.push('referencia');
+        }
+        const groqDatos = await extraerDatosFormularioConGroq(textoOriginal, faltantes);
+        if (groqDatos) {
+          // Colonia se maneja por separado — debe pasar por buscarColoniaDetallada
+          const coloniaGroq = groqDatos.colonia;
+          delete groqDatos.colonia;
+
+          // Merge campos no-colonia: solo llenar si están vacíos
+          for (const [campo, valor] of Object.entries(groqDatos)) {
+            if (!caActual[campo] && valor) caActual[campo] = valor;
+          }
+
+          // Colonia: validar contra el diccionario geo antes de almacenar
+          if (esOrdenDomicilio && coloniaGroq && !caActual.colonia) {
+            const resCol = buscarColoniaDetallada(coloniaGroq);
+            if (resCol.estado === 'encontrada') {
+              caActual.colonia = resCol.colonia.nombre;
+              delete caActual._coloniaNoVerificada;
+              _intentosColonia.delete(clienteNumero);
+              _coloniaValidadaPorGroq = true;
+            } else if (resCol.estado === 'ambigua') {
+              caActual.colonia = null;
+              datosCampos.set(clienteNumero, caActual);
+              persistirEstado(clienteNumero);
+              esperandoColonia.set(clienteNumero, { opciones: resCol.opciones });
+              persistirEstado(clienteNumero);
+              const lista = resCol.opciones.map((o, i) =>
+                `${i + 1}. *${o.nombre}*${o.tipo ? ` (${o.tipo.replace(/_/g, ' ')})` : ''}${o.codigoPostal ? ` — CP ${o.codigoPostal}` : ''}`
+              ).join('\n');
+              await msg.reply(
+                mostrarFormularioProgresivo(clienteNumero, true, esPreventa) +
+                `\n\nEncontré varias colonias con ese nombre:\n${lista}\n\nEscribe el *nombre completo* de la que corresponde a tu domicilio.`
+              );
+              return true;
+            }
+            // no_encontrada: colonia queda null, _intentosColonia no incrementa
+          }
+
+          datosCampos.set(clienteNumero, caActual);
+          persistirEstado(clienteNumero);
+          console.log(`[GROQ FORM] extraídos: ${[...Object.keys(groqDatos), coloniaGroq && _coloniaValidadaPorGroq ? 'colonia' : null].filter(Boolean).join(', ')}`);
+        }
+      }
+    }
+  }
+
   // ── Validar colonia recién capturada en este mensaje ─────────────────────────
-  if (esOrdenDomicilio && !coloniaAntes) {
+  if (esOrdenDomicilio && !coloniaAntes && !_coloniaValidadaPorGroq) {
     const caVal = datosCampos.get(clienteNumero) || {};
     if (caVal.colonia && !caVal._coloniaNoVerificada) {
       const resultadoColonia = buscarColoniaDetallada(caVal.colonia);

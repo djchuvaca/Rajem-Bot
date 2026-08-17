@@ -535,6 +535,11 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
           <label>Sentry DSN (monitoreo de errores)</label>
           <input id="g-sentry" type="text" placeholder="https://…@sentry.io/…">
         </div>
+        <div class="form-group">
+          <label>Groq API Key <span style="color:var(--muted);font-weight:400;font-size:12px">(NLU de soporte — compartida entre todos los tenants)</span></label>
+          <input id="g-groq" type="password" placeholder="gsk_… — dejar vacío para desactivar">
+          <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="const e=document.getElementById('g-groq');e.type=e.type==='password'?'text':'password'">👁</button>
+        </div>
         <button class="btn btn-primary" onclick="saveGlobalConfig()">Guardar</button>
       </div>
       <div class="card" style="max-width:500px;margin-top:16px">
@@ -1626,11 +1631,16 @@ async function loadGlobalConfig() {
   document.getElementById('g-appurl').value=m.app_url||'';
   document.getElementById('g-mandaditos').value=m.grupo_mandaditos_id||'';
   document.getElementById('g-sentry').value=m.sentry_dsn||'';
+  const groqEl=document.getElementById('g-groq');
+  groqEl.value='';
+  groqEl.placeholder=m.groq_api_key?'Configurada — dejar vacío para conservar':'gsk_… — dejar vacío para desactivar';
 }
 async function saveGlobalConfig() {
+  const groqVal=document.getElementById('g-groq').value.trim();
   const config={app_url:document.getElementById('g-appurl').value.trim(),grupo_mandaditos_id:document.getElementById('g-mandaditos').value.trim(),sentry_dsn:document.getElementById('g-sentry').value.trim()};
+  if(groqVal) config.groq_api_key=groqVal;
   const r=await fetch('/api/global-config/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config})});
-  r.ok ? toast('Config global guardada') : toast('Error','err');
+  if(r.ok){toast('Config global guardada');loadGlobalConfig();}else toast('Error','err');
 }
 async function cambiarPassword() {
   const actual=document.getElementById('g-pass-actual').value;
