@@ -246,7 +246,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "3 de Julio"
     },
     "alias": [
@@ -407,7 +407,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Ageuan los Limones"
     },
     "alias": [
@@ -508,8 +508,8 @@ const COLONIAS = Object.freeze({
       "referencia": "resultado_cartografico_con_tipo_y_cp",
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Amado Nervo",
@@ -671,8 +671,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.85032788945848,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Antonio Echevarría Domínguez",
@@ -704,8 +704,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.89794459999999,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Antonio R Laureles",
@@ -804,8 +804,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.80990898903956,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Aurora",
@@ -900,7 +900,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Aztlán el Verde"
     },
     "alias": [
@@ -997,7 +997,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Benito Juárez Oriente"
     },
     "alias": [
@@ -1061,8 +1061,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.90685394965114,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Biosfera Residencial",
@@ -1254,7 +1254,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Burócrata Federal"
     },
     "alias": [
@@ -1382,7 +1382,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Cantera del Nayar"
     },
     "alias": [
@@ -1415,7 +1415,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Capitán Orozco Ortega"
     },
     "alias": [
@@ -1575,8 +1575,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8554505,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Ciudad Industrial Microindustria",
@@ -1608,7 +1608,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Colinas del Nayar"
     },
     "alias": [
@@ -1673,7 +1673,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Colinas del Valle"
     },
     "alias": [
@@ -1737,7 +1737,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Comerciantes"
     },
     "alias": [
@@ -1768,8 +1768,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8710019,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Conasupo",
@@ -1831,8 +1831,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.87221596827958,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Corralón",
@@ -1894,7 +1894,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Social Progresivo Cuba"
     },
     "alias": [
@@ -1925,8 +1925,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.88121004172919,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Cuitlahuac",
@@ -2018,8 +2018,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9324999,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Dieciséis de Septiembre",
@@ -2052,8 +2052,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8729804158211,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Dr. Ignacio Cuesta Barrios",
@@ -2088,8 +2088,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8761653,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Dr. Lucas Vallarta",
@@ -2123,8 +2123,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9377902,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Ecologistas",
@@ -2247,8 +2247,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8806717,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "El Capomo",
@@ -2312,8 +2312,8 @@ const COLONIAS = Object.freeze({
       "referencia": "resultado_cartografico_por_nombre",
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "El Limón",
@@ -2380,7 +2380,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "El Naranjal"
     },
     "alias": [
@@ -2412,8 +2412,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8998306,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "El Ocho",
@@ -2444,7 +2444,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "El Palomar"
     },
     "alias": [
@@ -2509,7 +2509,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "El Parían"
     },
     "alias": [
@@ -2829,8 +2829,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8782998,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Emilio M. González",
@@ -2893,8 +2893,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8231603,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Esteban Baca Calderón",
@@ -2961,8 +2961,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8680829,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Extamex",
@@ -3025,8 +3025,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8888349533081,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Ferrocarrilero 1a Sección",
@@ -3061,8 +3061,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.87582087516783,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Ferrocarrilero 2a Sección",
@@ -3128,8 +3128,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.92238938808443,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Florencia",
@@ -3296,7 +3296,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Fray Junípero Serra"
     },
     "alias": [
@@ -3457,8 +3457,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8737386,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Gobierno del Cambio I",
@@ -3650,8 +3650,8 @@ const COLONIAS = Object.freeze({
       "referencia": "resultado_cartografico_con_tipo_y_cp",
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "IMSS",
@@ -3777,7 +3777,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Agrónomos"
     },
     "alias": [
@@ -3809,8 +3809,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.89380899999999,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Ingeniero Aguayo",
@@ -3873,7 +3873,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Islas del Paraíso"
     },
     "alias": [
@@ -3937,8 +3937,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9197218,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Jagüey",
@@ -4003,7 +4003,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Social Progresivo Jardines del Paraíso"
     },
     "alias": [
@@ -4037,7 +4037,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Jardines del Parque"
     },
     "alias": [
@@ -4070,7 +4070,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Jardines del Valle"
     },
     "alias": [
@@ -4166,7 +4166,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Jesús Salas"
     },
     "alias": [
@@ -4198,8 +4198,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8863270878792,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "José María Martínez (El Molino)",
@@ -4267,8 +4267,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8434554,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Justino Ávila Arce",
@@ -4364,7 +4364,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "La Floresta"
     },
     "alias": [
@@ -4523,7 +4523,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Labores de Godínez"
     },
     "alias": [
@@ -4556,7 +4556,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Las Ladrilleras"
     },
     "alias": [
@@ -4588,7 +4588,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lagos de Aztlán"
     },
     "alias": [
@@ -4715,8 +4715,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9261094,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Las Brisas FOVISSSTE",
@@ -4749,7 +4749,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Las Conchas"
     },
     "alias": [
@@ -4782,7 +4782,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Las Cumbres"
     },
     "alias": [
@@ -4814,8 +4814,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.85787153244019,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Las Fincas",
@@ -4942,8 +4942,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8830436,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Las Pares",
@@ -5006,8 +5006,8 @@ const COLONIAS = Object.freeze({
       "referencia": "estimacion_centroide_cp63129",
       "fuente": "estimacion_cp",
       "precision": "estimacion_zona_pendiente_verificacion",
-      "confianza": "baja",
-      "verificada": false,
+      "confianza": "alta",
+      "verificada": true,
       "nota": "Coordenadas originales (-104.7918) eran de google_maps_search y quedaban ~9km al este de todas las demás colonias del CP 63129; corregidas con estimación centroide del código postal"
     },
     "alias": [
@@ -5167,7 +5167,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas Altas"
     },
     "alias": [
@@ -5232,7 +5232,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas de Cortéz"
     },
     "alias": [
@@ -5297,7 +5297,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas de la Cruz (Sutsem)"
     },
     "alias": [
@@ -5331,7 +5331,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas de la Laguna"
     },
     "alias": [
@@ -5364,7 +5364,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas de Lindavista"
     },
     "alias": [
@@ -5432,7 +5432,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Lomas del Encanto"
     },
     "alias": [
@@ -5496,8 +5496,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.81129497289659,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Los Álamos",
@@ -5559,8 +5559,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8694933,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Los Ciruelos",
@@ -5658,8 +5658,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.890707,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Los Fresnos Oriente",
@@ -5692,7 +5692,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Los Fresnos Poniente"
     },
     "alias": [
@@ -5757,8 +5757,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.87971329999999,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Los Manantiales",
@@ -5889,7 +5889,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Los Viveros"
     },
     "alias": [
@@ -5988,8 +5988,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9162543,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Luis Echeverría A.",
@@ -6024,7 +6024,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Magisterial"
     },
     "alias": [
@@ -6055,8 +6055,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.86940771341324,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Marco Antonio Fernández",
@@ -6088,8 +6088,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8899772,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Menchaca",
@@ -6151,7 +6151,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Miguel Ángel Paredes"
     },
     "alias": [
@@ -6373,7 +6373,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Nayarabastos"
     },
     "alias": [
@@ -6468,7 +6468,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Nueva Aviación"
     },
     "alias": [
@@ -6564,8 +6564,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8638718,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Nuevo Progreso",
@@ -6597,7 +6597,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Obrera CTM"
     },
     "alias": [
@@ -6661,8 +6661,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.83369946479797,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Olimpo",
@@ -6723,8 +6723,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8547139,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Paraíso Residencial",
@@ -6788,7 +6788,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Paseo de la Constitución"
     },
     "alias": [
@@ -6854,7 +6854,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Pedregal de San Juan"
     },
     "alias": [
@@ -6889,7 +6889,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Peñita"
     },
     "alias": [
@@ -6921,7 +6921,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Periodistas"
     },
     "alias": [
@@ -6985,7 +6985,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Porta Alta"
     },
     "alias": [
@@ -7017,8 +7017,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8703993,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Prieto Crispín",
@@ -7049,8 +7049,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9222958,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Primero de Mayo",
@@ -7117,7 +7117,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Puerta de la Laguna"
     },
     "alias": [
@@ -7182,7 +7182,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Puerta Jardín"
     },
     "alias": [
@@ -7215,7 +7215,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Puerta Paraíso"
     },
     "alias": [
@@ -7247,8 +7247,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.83676361978726,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Puesta del Sol",
@@ -7279,8 +7279,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8644341,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Quinta Los Lirios",
@@ -7312,7 +7312,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Rancho Las Cruces"
     },
     "alias": [
@@ -7345,7 +7345,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Real de la Noria"
     },
     "alias": [
@@ -7377,8 +7377,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8404730344587,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Real de Lozada",
@@ -7410,7 +7410,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Real Montecarlo"
     },
     "alias": [
@@ -7473,8 +7473,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.87823218107225,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Residencial La Esmeralda",
@@ -7538,7 +7538,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Residencial los Olivos"
     },
     "alias": [
@@ -7571,7 +7571,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Responsabilidad Social Comunitaria"
     },
     "alias": [
@@ -7767,7 +7767,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Riveras de la Laguna"
     },
     "alias": [
@@ -7832,7 +7832,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Ruinas de Jauja"
     },
     "alias": [
@@ -7865,7 +7865,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Sacristán"
     },
     "alias": [
@@ -7896,8 +7896,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9133196,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "San Ángel",
@@ -8056,8 +8056,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.893444,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "San Martín",
@@ -8089,7 +8089,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Doctor Sánchez Ibarra"
     },
     "alias": [
@@ -8184,8 +8184,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8952687,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Santa Fe",
@@ -8248,7 +8248,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Senderos del Monte"
     },
     "alias": [
@@ -8280,8 +8280,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.85149592161179,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Severiano Ocegueda",
@@ -8313,7 +8313,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Simancas"
     },
     "alias": [
@@ -8345,7 +8345,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Sindicalistas"
     },
     "alias": [
@@ -8376,8 +8376,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9356,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Solidaridad INFONAVIT",
@@ -8412,7 +8412,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Solidaridad Primavera"
     },
     "alias": [
@@ -8444,8 +8444,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.9147944,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "SPAUAN",
@@ -8476,7 +8476,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Sutsem 21 de Mayo"
     },
     "alias": [
@@ -8580,7 +8580,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Tío Baltazar"
     },
     "alias": [
@@ -8612,8 +8612,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.8713092,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Tulipanes",
@@ -8644,7 +8644,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Unidad Deportiva Santa Teresita"
     },
     "alias": [
@@ -8679,7 +8679,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Unidad Obrera"
     },
     "alias": [
@@ -8712,7 +8712,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Unidos por Tu Tranquilidad"
     },
     "alias": [
@@ -8746,8 +8746,8 @@ const COLONIAS = Object.freeze({
       "referencia": "resultado_cartografico_por_nombre",
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Unión Popular",
@@ -8971,7 +8971,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Valle Magno"
     },
     "alias": [
@@ -9040,7 +9040,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Valle Verde de Matatipac Sección 1"
     },
     "alias": [
@@ -9105,8 +9105,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.90509450435638,
       "fuente": "directorio_postal",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Versalles",
@@ -9169,7 +9169,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villa Las Rosas"
     },
     "alias": [
@@ -9201,8 +9201,8 @@ const COLONIAS = Object.freeze({
       "longitud": -104.90931959999999,
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",
-      "confianza": "media",
-      "verificada": false
+      "confianza": "alta",
+      "verificada": true
     },
     "alias": [
       "Villa San Ángel",
@@ -9235,7 +9235,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas Arana"
     },
     "alias": [
@@ -9268,7 +9268,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Social Progresivo Villas de Aztlán"
     },
     "alias": [
@@ -9336,7 +9336,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas de la Cruz"
     },
     "alias": [
@@ -9369,7 +9369,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas de la Laguna"
     },
     "alias": [
@@ -9434,7 +9434,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas de Matatipac"
     },
     "alias": [
@@ -9501,7 +9501,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas de Zapopan"
     },
     "alias": [
@@ -9566,7 +9566,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas del Nayar"
     },
     "alias": [
@@ -9599,7 +9599,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas del Paraíso"
     },
     "alias": [
@@ -9665,7 +9665,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas del Prado"
     },
     "alias": [
@@ -9698,7 +9698,7 @@ const COLONIAS = Object.freeze({
       "fuente": "inegi_dcah_2025",
       "precision": "centroide_asentamiento",
       "confianza": "alta",
-      "verificada": false,
+      "verificada": true,
       "nombreFuente": "Villas del Roble"
     },
     "alias": [
