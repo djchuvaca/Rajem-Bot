@@ -330,6 +330,13 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
               </div>
               <div id="tc-mini-mapa" style="height:180px;border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
               <small style="color:var(--muted);font-size:11px">Haz clic en el mapa para fijar las coordenadas</small>
+              <div class="form-group" style="margin-top:12px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="tc-geo-aprox" style="width:16px;height:16px">
+                  <span>Usar coordenadas aproximadas para calcular tarifas por zona</span>
+                </label>
+                <small style="color:var(--muted);font-size:11px;margin-top:4px;display:block">Activa esto para que las zonas de tarifa apliquen aunque las coordenadas de la colonia no estén verificadas. Requerido si tienes zonas configuradas.</small>
+              </div>
             </div>
           </div>
         </div>
@@ -1221,6 +1228,7 @@ async function loadTenantConfig() {
   document.getElementById('tc-negocio-referencia').value=_tcConfig.negocio_referencia||'';
   document.getElementById('tc-lat').value=_tcConfig.negocio_lat||'';
   document.getElementById('tc-lon').value=_tcConfig.negocio_lon||'';
+  document.getElementById('tc-geo-aprox').checked=_tcConfig.geo_tarifa_aproximada==='1';
   document.getElementById('tc-pasarela').value=_tcConfig.pasarela_activa||'';
   document.getElementById('tc-public-url').value=_tcConfig.public_url||'';
   renderPasarelaFields();
@@ -1355,8 +1363,9 @@ async function saveTenantConfig() {
     negocio_calle:      document.getElementById('tc-negocio-calle').value.trim(),
     negocio_colonia:    document.getElementById('tc-negocio-colonia').value.trim(),
     negocio_referencia: document.getElementById('tc-negocio-referencia').value.trim(),
-    negocio_lat:       document.getElementById('tc-lat').value,
-    negocio_lon:       document.getElementById('tc-lon').value,
+    negocio_lat:            document.getElementById('tc-lat').value,
+    negocio_lon:            document.getElementById('tc-lon').value,
+    geo_tarifa_aproximada:  document.getElementById('tc-geo-aprox').checked ? '1' : '0',
     pasarela_activa:   pasarela,
     pasarela_config:   pasarelaConfig,
     public_url:        document.getElementById('tc-public-url').value.trim().replace(/\/$/,''),
