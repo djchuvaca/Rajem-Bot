@@ -8815,6 +8815,7 @@ const COLONIAS = Object.freeze({
     },
     "alias": [
       "Valle de Matatipac",
+      "Valles de Matatipac",
       "Colonia Valle de Matatipac",
       "Col Valle de Matatipac",
       "Valle de Matatipac 63195",
