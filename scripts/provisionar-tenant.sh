@@ -126,7 +126,7 @@ PLAN_ACTIVO=${PLAN}
 PANEL_INITIAL_PASSWORD=${PANEL_INITIAL_PASSWORD}
 
 # ── Pagos (opcional) ──────────────────────────────────────────────────────────
-# APP_URL=https://mi-servidor.com        # Requerido si MP/Stripe/Conekta está activo
+$(if [[ -n "$DOMINIO" ]]; then echo "APP_URL=https://${TENANT_ID}.${DOMINIO}"; else echo "# APP_URL=https://mi-servidor.com        # Requerido si MP/Stripe/Conekta está activo"; fi)
 # MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   # Activa pagos con link de MercadoPago
 # STRIPE_SECRET_KEY=sk_live_...          # Activa pagos con Stripe (Plan Plus)
 # CONEKTA_PRIVATE_KEY=key_...            # Activa pagos con Conekta (Plan Plus)
@@ -194,6 +194,7 @@ env = {
 }
 if "${GRUPO_ID}":     env["GRUPO_ID"]     = "${GRUPO_ID}"
 if "${GROQ_API_KEY}": env["GROQ_API_KEY"] = "${GROQ_API_KEY}"
+if "${DOMINIO}":      env["APP_URL"]      = "https://${TENANT_ID}.${DOMINIO}"
 
 config = {
     "apps": [{
