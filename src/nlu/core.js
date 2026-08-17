@@ -112,6 +112,12 @@ function _tieneNegacionAntes(texto, posicion) {
 function preprocesarCantidades(texto) {
   return texto
     .replace(/\by\s+aparte\b/gi, '')
+    // Frases distributivas — "de uno en uno", "de a uno", "uno por uno", etc.
+    // deben eliminarse antes de que textoANumero convierta "uno" → "1"
+    .replace(/\bde\s+un[ao]?\s+en\s+un[ao]?\b/gi, '')
+    .replace(/\bde\s+a\s+un[ao]?\b/gi, '')
+    .replace(/\bun[ao]?\s+a\s+un[ao]?\b/gi, '')
+    .replace(/\bun[ao]?\s+por\s+un[ao]?\b/gi, '')
     .replace(/\bunos?\s+(?=\d)/gi, '')
     .replace(/\bcomo\s+(?=\d)/gi, '')
     .replace(/\bnada\s+m[aá]s\s+(?=\d)/gi, '')
