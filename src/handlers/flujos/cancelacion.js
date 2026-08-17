@@ -118,11 +118,20 @@ async function handleCancelacionPagoMP(msg, client, textoOriginal, clienteNumero
   const datos   = esperandoPagoMP.get(clienteNumero);
   const expirado = Date.now() > datos.expiraEn;
 
-  // Link expirado: cancelar en BD y limpiar
+  // Link expirado: cancelar en BD, notificar grupo y limpiar
   if (expirado) {
     esperandoPagoMP.delete(clienteNumero);
     limpiarTodo(clienteNumero);
     try { actualizarEstadoPorId(datos.pedidoId, "cancelado"); } catch (_) {}
+    const grupoId = getGrupoId();
+    if (grupoId) {
+      const horaCancel = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      try {
+        await client.sendMessage(grupoId,
+          `Solicitud de Cancelacion\nHora: ${horaCancel}\nCliente: ${datos.nombre || "—"}\nTelefono: ${datos.telefono || "—"}\nMotivo: Link de pago MercadoPago vencido sin pagar`
+        );
+      } catch (_) {}
+    }
     await msg.reply("El link de pago ya venció (30 minutos). Si quieres hacer un nuevo pedido, escríbeme cuando gustes.");
     return true;
   }

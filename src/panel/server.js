@@ -772,6 +772,32 @@ setInterval(async () => {
   for (const id of _pedidosAlertados) {
     if (!idsActuales.has(id)) _pedidosAlertados.delete(id);
   }
+
+  // ── Auto-cancelar pedidos con link MP vencido ─────────────────────────────
+  if (_alertasInicializado && waClient) {
+    const vencidos = queryAll(
+      `SELECT p.id, c.nombre, c.apellido, c.telefono, pp.pedido_id
+       FROM pagos_pendientes pp
+       JOIN pedidos p ON CAST(p.id AS TEXT) = pp.pedido_id
+       LEFT JOIN clientes c ON p.cliente_id = c.id
+       WHERE pp.expira_en <= datetime('now')
+         AND p.estado = 'pendiente'`
+    );
+    for (const v of vencidos) {
+      try { actualizarEstadoPorId(v.id, 'cancelado'); } catch (_) {}
+      run('DELETE FROM pagos_pendientes WHERE pedido_id = ?', [String(v.id)]);
+      const grupoId = getGrupoId();
+      if (grupoId) {
+        const nombre = [v.nombre, v.apellido].filter(Boolean).join(' ') || v.telefono || '—';
+        const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        try {
+          await waClient.sendMessage(grupoId,
+            `Solicitud de Cancelacion\nHora: ${hora}\nCliente: ${nombre}\nTelefono: ${v.telefono || '—'}\nMotivo: Link de pago MercadoPago vencido sin pagar`
+          );
+        } catch (_) {}
+      }
+    }
+  }
 }, 60 * 1000).unref();
 
 // ── COLONIAS Y TARIFAS DE ENVÍO ───────────────────────────────────────────────
