@@ -23,6 +23,7 @@ const {
   levenshtein,
   SEÑALES_COMPLEJO,
   PATRON_DISTRIBUCION,
+  PATRON_PORCIONADO,
   MEDIDAS,
   _FILLER_PART,
   PATRON_EN_CAMINO,
@@ -469,6 +470,127 @@ function parsearPedidoMultiLinea(texto) {
   return items.length >= 2 ? { tipo: 'pedido', items } : null;
 }
 
+// ── PORCIONADO POR PLATOS ─────────────────────────────────────────────────────
+
+function _tipoPlural(item) {
+  const mapa = { taco: 'tacos', torta: 'tortas', quesadilla: 'quesadillas', burrito: 'burritos' };
+  return mapa[item.presentacion] || `${item.presentacion}s`;
+}
+
+/**
+ * Parsea pedidos con indicación de porcionado por platos.
+ * Recibe texto YA procesado por textoANumero + preprocesarCantidades.
+ *
+ * Familia A — tamaños explícitos por plato:
+ *   "5 tacos de carne: un plato con 3 y uno con 2"
+ *   "6 tacos de surtido, 1 de 4 y 1 de 2"
+ *
+ * Familia B — distribución igual:
+ *   "3 tacos de carne de 1 en 1"
+ *   "6 tacos de surtido de 2 en 2"
+ *   "4 tacos en platos de 2"
+ *   "100 de surtido con 3 tacos de carne de 1 en 1"  (ítem mixto: solo se porcionan los tacos)
+ *
+ * Retorna: { tipo: 'pedido', items: [...] }
+ *        | { tipo: 'error_porcionado', mensaje: string }  (suma/división inválida)
+ *        | null  (no se pudo parsear)
+ */
+function _parsearPorcionado(texto) {
+  // ── A. Tamaños explícitos por plato ──────────────────────────────────────
+  const RE_TAMAÑO = /(?:un[ao]?|1|otro[ao]?)\s+(?:plato\s+)?(?:con|de)\s+(\d+)/gi;
+  const matchesTam = [...texto.matchAll(RE_TAMAÑO)];
+
+  if (matchesTam.length >= 2) {
+    const tamaños = matchesTam.map(m => parseInt(m[1]));
+    const primerIdx = matchesTam[0].index;
+    const textoBase = texto.substring(0, primerIdx).replace(/[\s,;:]+$/, '').trim();
+
+    if (textoBase.length > 0) {
+      const partesBase = dividirEnItems(textoBase);
+      const itemsPrevios = [];
+      let itemPortionable = null;
+
+      for (const parte of partesBase) {
+        if (_FILLER_PART.test(normalizar(parte).trim())) continue;
+        const subPartes = _subDividirSiTipoEmbebido(parte);
+        for (const sub of subPartes) {
+          const item = parsearItem(sub.replace(/[\s,;:]+$/, '').trim());
+          if (!item || item._sinCorte) return null;
+          const itemFinal = _aplicarSurtidoEspecial({ ...item });
+          itemsPrevios.push(itemFinal);
+          itemPortionable = itemFinal;
+        }
+      }
+
+      if (itemPortionable && 'cantidad' in itemPortionable && !itemPortionable._sinCorte) {
+        const total = itemPortionable.cantidad;
+        const suma  = tamaños.reduce((a, b) => a + b, 0);
+        if (suma !== total) {
+          return {
+            tipo: 'error_porcionado',
+            mensaje: `Pediste *${total} ${_tipoPlural(itemPortionable)}* pero los platos que me indicaste suman *${suma}*. ¿Cómo los divido?`,
+          };
+        }
+        const itemsResult = itemsPrevios.slice(0, -1);
+        let numPlato = 1;
+        for (const tam of tamaños) {
+          itemsResult.push({
+            presentacion: 'plato_separado',
+            numero: numPlato++,
+            items: [_aplicarSurtidoEspecial({ ...itemPortionable, cantidad: tam })],
+          });
+        }
+        return { tipo: 'pedido', items: itemsResult };
+      }
+    }
+  }
+
+  // ── B. Distribución igual (de N en N / de a N / en platos de N) ──────────
+  const RE_IGUAL = /\bde\s+(\d+)\s+en\s+\d+\b|\bde\s+a\s+(\d+)\b|\ben\s+platos?\s+de\s+(\d+)\b/i;
+
+  const partes = dividirEnItems(texto);
+  const items  = [];
+  let numPlato = 1;
+
+  for (const parte of partes) {
+    if (_FILLER_PART.test(normalizar(parte).trim())) continue;
+    const subPartes = _subDividirSiTipoEmbebido(parte);
+    for (const sub of subPartes) {
+      const mIgual = sub.match(RE_IGUAL);
+      if (mIgual) {
+        const porPlato  = parseInt(mIgual[1] || mIgual[2] || mIgual[3]);
+        if (!porPlato || porPlato < 1) return null;
+        const textoBase = sub.replace(mIgual[0], '').replace(/[\s,;:]+$/, '').trim();
+        const itemBase  = parsearItem(textoBase);
+        if (!itemBase || itemBase._sinCorte) return null;
+        const total = itemBase.cantidad;
+        if (!total || total <= 0) return null;
+        if (total % porPlato !== 0) {
+          return {
+            tipo: 'error_porcionado',
+            mensaje: `Pediste *${total} ${_tipoPlural(itemBase)}* pero ${total} no se divide en grupos exactos de ${porPlato}. ¿Cómo los divido?`,
+          };
+        }
+        const nPlatos = total / porPlato;
+        for (let i = 0; i < nPlatos; i++) {
+          items.push({
+            presentacion: 'plato_separado',
+            numero: numPlato++,
+            items: [_aplicarSurtidoEspecial({ ...itemBase, cantidad: porPlato })],
+          });
+        }
+      } else {
+        const item = parsearItem(sub);
+        if (!item || item._sinCorte) return null;
+        items.push(_aplicarSurtidoEspecial(item));
+      }
+    }
+  }
+
+  if (items.length === 0) return null;
+  return { tipo: 'pedido', items };
+}
+
 // ── PARSER PRINCIPAL ──────────────────────────────────────────────────────────
 
 function parsearPedidoSimple(texto) {
@@ -486,6 +608,7 @@ function parsearPedidoSimple(texto) {
   texto = textoANumero(preprocesarCantidades(texto));
   const t = normalizar(texto);
 
+  if (PATRON_PORCIONADO.test(texto)) return _parsearPorcionado(texto);
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 

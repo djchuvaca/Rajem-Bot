@@ -112,12 +112,6 @@ function _tieneNegacionAntes(texto, posicion) {
 function preprocesarCantidades(texto) {
   return texto
     .replace(/\by\s+aparte\b/gi, '')
-    // Frases distributivas — "de uno en uno", "de a uno", "uno por uno", etc.
-    // deben eliminarse antes de que textoANumero convierta "uno" → "1"
-    .replace(/\bde\s+un[ao]?\s+en\s+un[ao]?\b/gi, '')
-    .replace(/\bde\s+a\s+un[ao]?\b/gi, '')
-    .replace(/\bun[ao]?\s+a\s+un[ao]?\b/gi, '')
-    .replace(/\bun[ao]?\s+por\s+un[ao]?\b/gi, '')
     .replace(/\bunos?\s+(?=\d)/gi, '')
     .replace(/\bcomo\s+(?=\d)/gi, '')
     .replace(/\bnada\s+m[aá]s\s+(?=\d)/gi, '')
@@ -211,6 +205,10 @@ function levenshtein(a, b) {
 
 const SEÑALES_COMPLEJO    = /para\s+ella|para\s+[eé]l|separado|otro\s+plato|en\s+pares|en\s+tr[ií]os|platos?\s+de|cada\s+uno|para\s+cada/i;
 const PATRON_DISTRIBUCION = /de\s+\d+\s+en\s+\d+|de\s+a\s+\d+|alternado|uno\s+de\s+cada|intercalado/i;
+
+// Señales de porcionado — se manejan localmente en taqueria/nlu.js ANTES que SEÑALES_COMPLEJO
+// Tras textoANumero: "uno" → "1", "dos" → "2", etc.
+const PATRON_PORCIONADO = /\bde\s+\d+\s+en\s+\d+\b|\bde\s+a\s+\d+\b|\ben\s+platos?\s+de\s+\d+\b|(?:un[ao]?|1|otro[ao]?)\s+(?:plato\s+)?(?:con|de)\s+\d+\s+y\s+(?:un[ao]?|1|otro[ao]?)\s+(?:(?:plato\s+)?(?:con|de)\s+\d+)/i;
 
 const MEDIDAS = [
   { re: /\bun\s+cuarto\b|\b1\s+cuarto\b|\b1\/4\b|\b250\s*g/i,                            gramos: 250  },
@@ -306,6 +304,7 @@ module.exports = {
   // Señales y patrones
   SEÑALES_COMPLEJO,
   PATRON_DISTRIBUCION,
+  PATRON_PORCIONADO,
   MEDIDAS,
   _FILLER_PART,
   PATRON_LO_MISMO,

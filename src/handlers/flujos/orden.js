@@ -1321,7 +1321,12 @@ async function handlePedidoSimple(msg, textoOriginal, clienteNumero, historial) 
   }
   const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
   const jsonSimple = parsearPedidoSimple(textoLimpio);
-  if (!jsonSimple || jsonSimple.tipo !== "pedido") return false;
+  if (!jsonSimple) return false;
+  if (jsonSimple.tipo === 'error_porcionado') {
+    await replyConTyping(msg, jsonSimple.mensaje);
+    return true;
+  }
+  if (jsonSimple.tipo !== "pedido") return false;
 
   const esOrdenDom = tipoEntregaCliente.get(clienteNumero) === "domicilio";
   const esPreventa = clientesPreventa.has(clienteNumero);
