@@ -17,7 +17,8 @@
     "nuevo-tenant": "node scripts/nuevo-tenant.js",
     "actualizar": "node scripts/actualizar-tenants.js",
     "provisionar": "bash scripts/provisionar-tenant.sh",
-    "ngrok": "node scripts/ngrok-start.js"
+    "ngrok": "node scripts/ngrok-start.js",
+    "setup": "bash scripts/setup.sh"
   },
   "dependencies": {
     "@sentry/node": "^10.53.1",
