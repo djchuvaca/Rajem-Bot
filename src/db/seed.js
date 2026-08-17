@@ -272,12 +272,7 @@ async function seedDB() {
     _giro = getGiro(_btSlug);
   } catch (_) {}
 
-  const countProd = db.exec("SELECT COUNT(*) as c FROM productos")[0]?.values[0][0] || 0;
-  if (countProd === 0) {
-    // Instalación nueva — tabla productos vacía intencionalmente.
-    // El Superadmin habilita el catálogo desde Config Tenant.
-    console.log(`ℹ️  Catálogo vacío (${_btSlug}) — pendiente de habilitación por Superadmin`);
-  }
+  // tabla `productos` siempre vacía en instalaciones nuevas — el catálogo real vive en menu_items
 
   // `productos` se conserva temporalmente solo como entrada de migración para
   // bases antiguas. Los tenants nuevos no proyectan ningún catálogo en ella.
