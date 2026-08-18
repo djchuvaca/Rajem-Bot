@@ -20,6 +20,7 @@ const { generarRespuestaAutomatica, aplicarModificacionNeutral } = require("../r
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
 const { crearOperacion } = require('../../giros/modificaciones');
 const { crearPartidaProducto, crearCantidad } = require('../../pedido/modelo');
+const { crearItemPedido, copiarItemConVariante } = require('../../compatibilidad/pedidos-v1');
 const { getContratoGiroActivo } = require('../../giros');
 const { getUltimoPedido } = require("../../db");
 const { MENU_FORMATO } = require("../../config");
@@ -261,7 +262,7 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
   esperandoTipoItem.delete(clienteNumero);
   _resetError(clienteNumero);
   const tipo = tipoDetectado?.slug ?? getContratoGiroActivo().catalogo.presentaciones[0].slug;
-  const json = { tipo: "pedido", items: [{ presentacion: tipo, cantidad: pendiente.cantidad, corte: pendiente.corte }] };
+  const json = { tipo: "pedido", items: [crearItemPedido(tipo, pendiente.cantidad, pendiente.corte)] };
   pedidoJSONActual.set(clienteNumero, json);
   const resultado = jsonALineas(json);
   historial.push({ role: "user",      content: textoOriginal });
@@ -285,7 +286,7 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
     const esPrev   = clientesPreventa.has(clienteNumero);
     await _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, pendiente._refrescosPendientes || [], pendiente._salsasPendientes || [], esOrdDom, esPrev);
   }
-  console.log(`Bot: [SIN TIPO → ${tipo}] corte: ${pendiente.corte}, cantidad: ${pendiente.cantidad}`);
+  console.log(`Bot: [SIN TIPO → ${tipo}] variante: ${pendiente.corte}, cantidad: ${pendiente.cantidad}`);
   return true;
 }
 
@@ -343,7 +344,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     if (corteKey) {
       const corteSlug = cortesValidos[corteKey];
       const { cantidad, tipoSlug } = itemData._pendienteAgregar;
-      const jsonAg = { tipo: "pedido", items: [{ presentacion: tipoSlug, cantidad, corte: corteSlug }] };
+      const jsonAg = { tipo: "pedido", items: [crearItemPedido(tipoSlug, cantidad, corteSlug)] };
       const lineasBase = itemData.lineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
       const { texto: nuevasLineas } = jsonALineas(jsonAg);
       const nuevasFiltradas = nuevasLineas.split("\n").filter(l => l.trim() && !/subtotal/i.test(l)).join("\n");
@@ -499,7 +500,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           const corteNuevoSlug = rawNuevoCort
             ? (cortesMap[rawNuevoCort] || getContratoGiroActivo().buscarVariante(rawNuevoCort) || corteSlug)
             : corteSlug;
-          const jsonNuevo = { tipo: "pedido", items: [{ presentacion: tipoNuevo.slug, cantidad, corte: corteNuevoSlug }] };
+          const jsonNuevo = { tipo: "pedido", items: [crearItemPedido(tipoNuevo.slug, cantidad, corteNuevoSlug)] };
           const { texto: nuevasLineas } = jsonALineas(jsonNuevo);
           const nuevaLinea = nuevasLineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l)).join('\n');
           lineas[lineaViejaIdx] = nuevaLinea;
@@ -550,7 +551,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
             const { l: lineaVieja, i: lineaViejaIdx } = lineasMatch[0];
             const matchCant = lineaVieja.match(/\b(\d+)\b/);
             const cantidad = matchCant ? parseInt(matchCant[1], 10) : 1;
-            const jsonNuevo = { tipo: "pedido", items: [{ presentacion: tipoViejo.slug, cantidad, corte: corteNuevoSlug }] };
+            const jsonNuevo = { tipo: "pedido", items: [crearItemPedido(tipoViejo.slug, cantidad, corteNuevoSlug)] };
             const { texto: nuevasLineas } = jsonALineas(jsonNuevo);
             const nuevaLinea = nuevasLineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l)).join('\n');
             lineas[lineaViejaIdx] = nuevaLinea;
@@ -1384,7 +1385,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
           const cortePrevio = pedParcDist.items[idxDist - 1].corte;
           if (cortePrevio) {
             _resetError(clienteNumero);
-            nuevosItems = [{ ...itemDist, corte: cortePrevio }];
+            nuevosItems = [copiarItemConVariante(itemDist, cortePrevio)];
           }
         }
       }

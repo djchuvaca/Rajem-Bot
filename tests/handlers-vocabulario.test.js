@@ -114,11 +114,11 @@ describe("Ratchet: vocabulario exclusivo de taquería en handlers genéricos", (
     );
   });
 
-  test("campo JSON 'corte:' (estructura taquería) no crece (baseline: ≤6)", () => {
+  test("campo JSON 'corte:' (estructura taquería) no crece (baseline: ≤0)", () => {
     const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_CORTE_FIELD);
-    assert.ok(n <= 6,
-      `Hay ${n} ocurrencias de 'corte:' en handlers genéricos — límite: 6.\n` +
-      "Este campo debe moverse a src/giros/taqueria/ cuando las fases 5-7 estén completas."
+    assert.ok(n <= 0,
+      `Hay ${n} ocurrencias de 'corte:' en handlers genéricos — límite: 0.\n` +
+      "La construcción de ítems v1 debe hacerse únicamente desde src/compatibilidad/pedidos-v1.js."
     );
   });
 

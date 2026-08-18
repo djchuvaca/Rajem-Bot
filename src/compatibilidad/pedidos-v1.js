@@ -21,9 +21,27 @@ const {
   partidaDesdeLegacy,
 } = require('../pedido/modelo');
 
+/**
+ * Crea un ítem en formato v1 ({ presentacion, cantidad, corte }).
+ * Centraliza la mención del campo `corte` para que los handlers no lo
+ * referencien directamente — facilita la migración futura al formato neutral.
+ */
+function crearItemPedido(formatoSlug, cantidad, varianteSlug) {
+  return { presentacion: formatoSlug, cantidad, corte: varianteSlug };
+}
+
+/**
+ * Copia un ítem v1 sobreescribiendo su variante (corte).
+ */
+function copiarItemConVariante(item, varianteSlug) {
+  return { ...item, corte: varianteSlug };
+}
+
 module.exports = {
   pedidoALegacy,
   pedidoDesdeLegacy,
   partidaALegacy,
   partidaDesdeLegacy,
+  crearItemPedido,
+  copiarItemConVariante,
 };
