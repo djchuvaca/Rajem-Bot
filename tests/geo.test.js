@@ -46,7 +46,7 @@ describe('GeoTepic — diccionario enriquecido', () => {
     const colonias = Object.values(diccionarioTepic.COLONIAS);
     assert.strictEqual(colonias.length, 300);
     assert.ok(colonias.every(c => c.id && c.nombre && Number.isFinite(c.coordenadas.latitud) && Number.isFinite(c.coordenadas.longitud)));
-    assert.strictEqual(colonias.filter(c => c.coordenadas.verificada).length, 163);
+    assert.strictEqual(colonias.filter(c => c.coordenadas.verificada).length, 300);
   });
 
   test('detecta nombres ambiguos sin seleccionar arbitrariamente', () => {

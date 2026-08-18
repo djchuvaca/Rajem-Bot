@@ -25,7 +25,7 @@ describe('GeoTepic — migración del catálogo maestro', () => {
       SUM(verificada) verificadas,
       SUM(CASE WHEN codigo_postal IS NULL THEN 1 ELSE 0 END) sin_cp
       FROM geo_tepic_colonias WHERE diccionario_id IS NOT NULL`).get();
-    assert.deepStrictEqual(resumen, { total: 300, verificadas: 163, sin_cp: 2 });
+    assert.deepStrictEqual(resumen, { total: 300, verificadas: 300, sin_cp: 2 });
     const muestra = db.prepare("SELECT * FROM geo_tepic_colonias WHERE diccionario_id='zitacua'").get();
     assert.strictEqual(muestra.nombre, 'Zitácua');
     assert.strictEqual(muestra.codigo_postal, '63174');
