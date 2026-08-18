@@ -18,8 +18,9 @@ const { getRangoHorario } = require("../../horario");
 const mpPagos = require("../../pagos");
 const {
   quitarItemDeOrden, validarHora, palabrasConfirmacion,
-  replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems, listaCortes,
+  replyConTyping, telefonosReales, ultimoPedido, parsearSinCorteItems,
 } = require("./utils");
+const { getContratoGiroActivo } = require('../../giros');
 const trazabilidad = require('../../db/observabilidad');
 const { dividirNombreCompleto } = require('../../clientes/nombre');
 
@@ -299,7 +300,7 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
       resumenPendiente.delete(clienteNumero);
       const primerItem = pedidoParcial.items[0];
       const desc = _descItem(primerItem);
-      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);
@@ -321,7 +322,7 @@ async function handleAgregarDesdeResumen(msg, textoOriginal, clienteNumero) {
       resumenPendiente.delete(clienteNumero);
       const primerItem = pedidoParcial.items[0];
       const desc = _descItem(primerItem);
-      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
       return true;
     }
     resumenPendiente.delete(clienteNumero);

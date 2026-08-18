@@ -9,7 +9,8 @@ const {
 } = require("../../estado");
 const { getWhatsappClient } = require("../../panel/whatsapp-bridge");
 const { getConfig } = require("../../db");
-const { textoANumero, getCortes, buscarCorteFuzzy, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
+const { textoANumero, detectarTipoItemDesdeTexto, listaItemTypes } = require("../pedidoParser");
+const { getContratoGiroActivo } = require('../../giros');
 const trazabilidad = require('../../db/observabilidad');
 
 // ── Mapas de estado local (no persisten entre reinicios) ─────────────────────
@@ -57,12 +58,12 @@ function _textoRecordatorio(numero) {
   if (esperandoCorte.has(numero)) {
     const ped  = esperandoCorte.get(numero);
     const item = ped.items[ped._indiceActual || 0];
-    const listaCortes = _listaCortesDesdeBD();
+    const listaVariantes = getContratoGiroActivo().listaVariantes();
     try {
-      const texto = require('../../giros').getContratoGiroActivo().conversacion.recordarVariante(item, listaCortes);
+      const texto = getContratoGiroActivo().conversacion.recordarVariante(item, listaVariantes);
       return `${saludo} ${texto}`;
     } catch (_) {
-      return `${saludo} Quedamos esperando una opción para completar el producto.\n*¿Cuál prefieres?* ${listaCortes}`;
+      return `${saludo} Quedamos esperando una opción para completar el producto.\n*¿Cuál prefieres?* ${listaVariantes}`;
     }
   }
   if (esperandoTipoItem.has(numero)) {
@@ -182,7 +183,7 @@ function parsearSinCorteItems(texto) {
     .split(/\n+|,\s*(?:y\s+)?|\s+y\s+tambi[eé]n\s+|\s+y\s+(?=\d|\bun\b|\bmedio\b|\btres\b|\b1\/)|\s+(?=\d+\s+(?:de|del|se)\s+)|\s+(?=\d+\s+[a-záéíóúñ])/i)
     .map(p => p.trim().replace(/^y\s+/i, ""))
     .filter(Boolean);
-  const CORTES_ACTIVOS = getCortes(); // { surtido: "surtido", buche: "buche", ... } desde BD
+  const CORTES_ACTIVOS = getContratoGiroActivo().getMapaVariantes();
   const palabrasCorteActivas = Object.keys(CORTES_ACTIVOS).join("|");
   const items = [];
   let ultimoTipo = null;
@@ -196,7 +197,7 @@ function parsearSinCorteItems(texto) {
     if (!corte) {
       for (const palabra of tp.split(/\s+/)) {
         if (palabra.length < 4) continue;
-        const cf = buscarCorteFuzzy(palabra);
+        const cf = getContratoGiroActivo().buscarVariante(palabra);
         if (cf) { corte = cf; break; }
       }
     }
@@ -266,30 +267,6 @@ function validarHora(texto) {
   return require("../../horario").validarHoraPedido(texto);
 }
 
-function _listaCortesDesdeBD() {
-  try {
-    const catalogo = require('../../giros/catalogo-tenant');
-    const cortesItems = catalogo.getMenuItemsActivos('corte');
-    if (cortesItems.length > 0) {
-      const cortesDB   = catalogo.getCortesTenant();
-      const porSlug    = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
-      const slugsUnicos = [...new Set(cortesItems.map(i => i.producto_slug))].filter(s => s !== 'surtido especial');
-      const nombres    = slugsUnicos.map(s => porSlug[s]?.nombre || s).filter(Boolean);
-      if (nombres.length > 0)
-        return nombres.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ');
-    }
-  } catch (_) { /* caída segura */ }
-  // El NLU ya está filtrado por Giro + menú activo.
-  const cortes = getCortes();
-  const unicos = [...new Set(Object.values(cortes))].filter(c => c !== 'surtido especial');
-  if (unicos.length > 0) return unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
-  return 'los cortes disponibles';
-}
-
-function listaCortes() {
-  return _listaCortesDesdeBD();
-}
-
 const palabrasConfirmacion = /^(si|sí|s[ií]\s+por\s+fa(vor)?|ok|okey|va|dale|listo|sale|andale|ándale|adelante|confirmo|confirmado|correcto|asi|así|si\s+porfavor|sí\s+porfavor|si\s+por\s+favor|sí\s+por\s+favor|claro|perfecto|va\s+bien|dale\s+pues|ándale|órale|orale|va\s+que\s+va|de\s+una|eso\s+es|así\s+es|asi\s+es|todo\s+bien|está\s+bien|esta\s+bien|sip|sep|simón|simon|chido|bueno|bien|afirmativo|positivo|exacto|exactamente|procede|proceder|pa\s+delante|p'adelante|con\s+eso|con\s+eso\s+voy|va\s+ese|nel\s+az|ya|ya\s+dale|ya\s+pues|ya\s+va|vamos|vamos\s+pues|le\s+va|le\s+voy|sale\s+y\s+vale|sale\s+pues|andele|ándele|s[ií]\s+se[nñ]or|s[ií]\s+se[nñ]ora|apunta(?:me)?|anota(?:me)?|ch[eé]ca(?:le)?|ch[eé]cale|a\s+toda\s+madre|a\s+toda|si\s+claro|sí\s+claro|claro\s+que\s+si|claro\s+que\s+sí|con\s+gusto|ándale\s+pues|le\s+entramos|le\s+entro|le\s+echamos|ponme|apuntame)$/i;
 
 module.exports = {
@@ -304,5 +281,4 @@ module.exports = {
   quitarItemDeOrden,
   validarHora,
   palabrasConfirmacion,
-  listaCortes,
 };

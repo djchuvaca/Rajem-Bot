@@ -79,8 +79,7 @@ function respuestaPrecio(producto = null) {
         if (!preciosMI[item.producto_slug]) preciosMI[item.producto_slug] = {};
         if (item.formato_slug) preciosMI[item.producto_slug][item.formato_slug] = item.precio || 0;
       }
-      const { getCortesBDObj } = require("../db/cortes");
-      const cortesDB = getCortesBDObj();
+      const cortesDB = require('../giros/catalogo-tenant').getCortesTenant();
       const porSlug  = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
       cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => c.slug !== 'surtido');
     } catch (_) {}

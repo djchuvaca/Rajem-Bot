@@ -10,9 +10,9 @@ const {
 const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumulada } = require("../../pedido/resumen");
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
-  detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
+  detectarRepetirPedido, detectarPreguntaFrecuente,
   detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
-  parsearDistribucionRefrescos, detectarComplementosNoDisponibles, normalizar, buscarCorteFuzzy,
+  parsearDistribucionRefrescos, detectarComplementosNoDisponibles, normalizar,
   detectarTipoItemDesdeTexto, listaItemTypes,
   detectarPlanPorcionado, resolverPorcionadoPendiente,
 } = require("../pedidoParser");
@@ -25,7 +25,7 @@ const { getUltimoPedido } = require("../../db");
 const { MENU_FORMATO } = require("../../config");
 const {
   telefonosReales, ultimoPedido, replyConTyping, parsearSinCorteItems, quitarItemDeOrden,
-  palabrasConfirmacion, listaCortes,
+  palabrasConfirmacion,
 } = require("./utils");
 
 // ── ERRORES CONSECUTIVOS EN PREGUNTAS CRÍTICAS ────────────────────────────────
@@ -243,7 +243,7 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
   const tipoDetectado = detectarTipoItemDesdeTexto(textoOriginal);
 
   // Permitir que el cliente cambie solo el corte mientras espera el tipo
-  const cortesMap     = getCortes ? getCortes() : {};
+  const cortesMap     = getContratoGiroActivo().getMapaVariantes();
   const palabrasCorte = Object.keys(cortesMap).join("|");
   const soloCorteTipoItem = !tipoDetectado && palabrasCorte
     && new RegExp(`\\b(${palabrasCorte})\\b`, "i").test(tNorm)
@@ -335,7 +335,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
   // Si hay un ítem pendiente (cliente eligió tipo pero el corte no estaba disponible),
   // interpretar la respuesta como selección de corte para ese ítem.
   if (itemData._pendienteAgregar) {
-    const cortesValidos = getCortes();
+    const cortesValidos = getContratoGiroActivo().getMapaVariantes();
     const tNorm = normalizar(textoOriginal.trim());
     const corteKey = Object.keys(cortesValidos).find(k =>
       new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm)
@@ -357,7 +357,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       await msg.reply(textoFinal + "\n\n*¿Es correcto?*");
       return true;
     }
-    await msg.reply(`No entendí el corte. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+    await msg.reply(`No entendí el corte. Tenemos: *${getContratoGiroActivo().listaVariantes()}*\n\n¿De cuál quieres?`);
     return true;
   }
 
@@ -407,8 +407,8 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const rawItem    = normalizar(mItemCorte[1] || mItemCorte[3] || '');
       const rawCorte   = normalizar(mItemCorte[2] || mItemCorte[4] || '');
       const tipoItem   = detectarTipoItemDesdeTexto(rawItem);
-      const cortesMap  = getCortes();
-      const corteNuevo = cortesMap[rawCorte] || buscarCorteFuzzy(rawCorte);
+      const cortesMap  = getContratoGiroActivo().getMapaVariantes();
+      const corteNuevo = cortesMap[rawCorte] || getContratoGiroActivo().buscarVariante(rawCorte);
       if (tipoItem && corteNuevo) {
         const _patsTipo = [normalizar(tipoItem.nombre), tipoItem.slug];
         if (tipoItem.nombre_plural) _patsTipo.push(normalizar(tipoItem.nombre_plural));
@@ -452,7 +452,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       const rawNuevoCort = normalizar(mCambioTipo[4] || '');
       const tipoViejo   = detectarTipoItemDesdeTexto(rawOld);
       const tipoNuevo   = detectarTipoItemDesdeTexto(rawNuevo);
-      const cortesMap   = getCortes();
+      const cortesMap   = getContratoGiroActivo().getMapaVariantes();
       const _escReG = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       // Caso A: swap de tipo de ítem (tipoViejo → tipoNuevo)
       if (tipoViejo && tipoNuevo && tipoViejo.slug !== tipoNuevo.slug) {
@@ -489,7 +489,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           const matchCant = lineaVieja.match(/\b(\d+)\b/);
           const cantidad = matchCant ? parseInt(matchCant[1], 10) : 1;
           // Corte: del descriptor "de X" primero, luego buscarlo en la línea vieja
-          let corteSlug = rawOldCort ? (cortesMap[rawOldCort] || buscarCorteFuzzy(rawOldCort)) : null;
+          let corteSlug = rawOldCort ? (cortesMap[rawOldCort] || getContratoGiroActivo().buscarVariante(rawOldCort)) : null;
           if (!corteSlug) {
             const ck = Object.keys(cortesMap).find(k =>
               new RegExp(`\\b${_escRe(k)}\\b`, 'i').test(normalizar(lineaVieja))
@@ -497,7 +497,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
             corteSlug = ck ? cortesMap[ck] : null;
           }
           const corteNuevoSlug = rawNuevoCort
-            ? (cortesMap[rawNuevoCort] || buscarCorteFuzzy(rawNuevoCort) || corteSlug)
+            ? (cortesMap[rawNuevoCort] || getContratoGiroActivo().buscarVariante(rawNuevoCort) || corteSlug)
             : corteSlug;
           const jsonNuevo = { tipo: "pedido", items: [{ presentacion: tipoNuevo.slug, cantidad, corte: corteNuevoSlug }] };
           const { texto: nuevasLineas } = jsonALineas(jsonNuevo);
@@ -516,7 +516,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
       }
       // Caso B: "cambia la [tipo] de [corteViejo] por [corteNuevo]" — swap de corte con tipo especificado
       if (tipoViejo && !tipoNuevo) {
-        const corteNuevoSlug = cortesMap[rawNuevo] || buscarCorteFuzzy(rawNuevo);
+        const corteNuevoSlug = cortesMap[rawNuevo] || getContratoGiroActivo().buscarVariante(rawNuevo);
         if (corteNuevoSlug) {
           const lineas = itemData.lineas.split('\n').filter(l => l.trim() && !/subtotal/i.test(l));
           const _patsViejo = [normalizar(tipoViejo.nombre), tipoViejo.slug];
@@ -528,7 +528,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
               if (!_patsViejo.some(p => new RegExp(`\\b${_escReG(p)}\\b`, 'i').test(lNorm))) return false;
               // Si el cliente especificó el corte viejo ("de buche"), filtrar por él
               if (rawOldCort) {
-                const slugViejoFiltro = cortesMap[rawOldCort] || buscarCorteFuzzy(rawOldCort);
+                const slugViejoFiltro = cortesMap[rawOldCort] || getContratoGiroActivo().buscarVariante(rawOldCort);
                 if (slugViejoFiltro) {
                   const ckL = Object.keys(cortesMap).find(k => new RegExp(`\\b${_escReG(k)}\\b`, 'i').test(lNorm));
                   if (ckL && cortesMap[ckL] !== slugViejoFiltro) return false;
@@ -583,8 +583,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
     let jsonAg = parsearPedidoSimple(textoAg);
     if (!jsonAg) {
       // Distinguir: ¿el cliente mencionó un corte no disponible, o no mencionó ninguno?
-      const { getCortesBDObj } = require('../../db/cortes');
-      const todosCortes  = getCortesBDObj();
+      const todosCortes  = require('../../giros/catalogo-tenant').getCortesTenant();
       const { getGiroActivo } = require('../../giros');
       const fallback     = getGiroActivo()?.fallbackCortes || {};
       const tNorm        = normalizar(textoAg);
@@ -595,7 +594,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         return palabras.some(p => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(tNorm));
       }) || (Object.keys(fallback).find(k => new RegExp(`\\b${k}\\b`, 'i').test(tNorm)) ? {} : null);
 
-      if (corteNoDisp !== null && !getCortes()[normalizar(corteNoDisp.slug || '')]) {
+      if (corteNoDisp !== null && !getContratoGiroActivo().getMapaVariantes()[normalizar(corteNoDisp.slug || '')]) {
         // El cliente pidió un corte que existe pero no está disponible hoy
         // Guardar tipo+cantidad para completar el ítem cuando el cliente elija corte válido
         const tipoDetectado = detectarTipoItemDesdeTexto(textoAg);
@@ -611,12 +610,12 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           ...itemDataBase,
           _pendienteAgregar: { cantidad: cantNum, tipoSlug: tipoDetectado?.slug || 'taco' },
         });
-        await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+        await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${getContratoGiroActivo().listaVariantes()}*\n\n¿De cuál quieres?`);
         return true;
       }
 
       // Sin corte en el mensaje — inferir desde el pedido actual
-      const CORTES_MAP_AG = getCortes();
+      const CORTES_MAP_AG = getContratoGiroActivo().getMapaVariantes();
       const palabrasCAg   = Object.keys(CORTES_MAP_AG).join("|");
       const mCorteAg      = itemData.lineas.match(new RegExp(`\\b(${palabrasCAg})\\b`, "i"));
       const corteInferido = mCorteAg ? CORTES_MAP_AG[mCorteAg[1].toLowerCase()] : null;
@@ -1210,7 +1209,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
       esperandoCorte.set(clienteNumero, pedidoParcial);
       const primerItem = pedidoParcial.items[0];
       const desc = _descItem(primerItem);
-      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
       return true;
     }
   }
@@ -1399,7 +1398,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
           esperandoCorte.set(clienteNumero, pedParcDist);
           const sigItem = pedParcDist.items[siguienteIdx];
           const desc = _descItem(sigItem);
-          await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+          await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
           return true;
         }
         esperandoCorte.delete(clienteNumero);
@@ -1449,13 +1448,13 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
       const itemFaq    = pedParcFaq.items[pedParcFaq._indiceActual || 0];
       const descFaq    = _descItem(itemFaq);
       await msg.reply(respFaqCorte);
-      await msg.reply(`*¿Y ${_preguntaCorte(descFaq).toLowerCase()}*\nTenemos: ${listaCortes()}`);
+      await msg.reply(`*¿Y ${_preguntaCorte(descFaq).toLowerCase()}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
       return true;
     }
   }
 
   const t = textoOriginal.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const CORTES_MAP = getCortes();
+  const CORTES_MAP = getContratoGiroActivo().getMapaVariantes();
   const palabrasCorteEsp = Object.keys(CORTES_MAP).join("|");
   const allMatchesCorte = [...t.matchAll(new RegExp(`\\b(${palabrasCorteEsp})\\b`, "g"))];
   const cortesEncontrados = [...new Set(allMatchesCorte.map(m => CORTES_MAP[m[1].toLowerCase()]).filter(Boolean))];
@@ -1467,14 +1466,14 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const DESCARTAR_FUZZY = /^(taco|tacos|torta|tortas|gramo|gramos|kilo|kilos|cuarto|medio|mitad|todo|todos|menos|excepto|por|para|favor|quiero|dame|ponme|manda|pesos|solo|unos|como|nada|cada)$/;
     for (const palabra of t.split(/\s+/)) {
       if (palabra.length < 4 || DESCARTAR_FUZZY.test(palabra)) continue;
-      const cf = buscarCorteFuzzy(palabra);
+      const cf = getContratoGiroActivo().buscarVariante(palabra);
       if (cf) { corteDetectado = cf; break; }
     }
   }
 
   // "de todos" / "de todo" / "cualquiera" → surtido
   if (!corteDetectado && /\b(?:todos?|de\s+todos?|de\s+todas?|cualquier(?:a)?|de\s+todo)\b/i.test(textoOriginal)) {
-    if (Object.values(getCortes()).includes("surtido")) corteDetectado = "surtido";
+    if (Object.values(getContratoGiroActivo().getMapaVariantes()).includes("surtido")) corteDetectado = "surtido";
   }
 
   if (!corteDetectado) {
@@ -1482,8 +1481,8 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const _itemPend = _pedPend.items[_pedPend._indiceActual || 0];
     const _descPend = _descItem(_itemPend);
     const errores = _sumarError(clienteNumero);
-    const extra = errores >= 2 ? `\n\n_Por ejemplo escríbeme: *${listaCortes().toLowerCase()}*_` : "";
-    await msg.reply(`Necesito el corte para ${_descPend}.\n*${_preguntaCorte(null)}* ${listaCortes()}` + extra);
+    const extra = errores >= 2 ? `\n\n_Por ejemplo escríbeme: *${getContratoGiroActivo().listaVariantes().toLowerCase()}*_` : "";
+    await msg.reply(`Necesito el corte para ${_descPend}.\n*${_preguntaCorte(null)}* ${getContratoGiroActivo().listaVariantes()}` + extra);
     return true;
   }
 
@@ -1498,7 +1497,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const sigItem = pedidoParcial.items[siguienteIdx];
     const desc = _descItem(sigItem);
-    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
     return true;
   }
 
@@ -1558,13 +1557,12 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
   }
 
   // Verificar si el cliente mencionó un corte del catálogo que hoy no está disponible
-  const { getCortesBDObj } = require('../../db/cortes');
   const { getGiroActivo } = require('../../giros');
-  const todosCortes = getCortesBDObj();
+  const todosCortes = require('../../giros/catalogo-tenant').getCortesTenant();
   const fallback    = getGiroActivo()?.fallbackCortes || {};
   const tNorm       = normalizar(textoLimpio);
   // Recopilar TODOS los cortes no disponibles mencionados en el texto
-  const cortesActivos = getCortes();
+  const cortesActivos = getContratoGiroActivo().getMapaVariantes();
   const cortesNoDispNombres = todosCortes
     .filter(c => {
       if (cortesActivos[normalizar(c.slug)]) return false; // está activo, no aplica
@@ -1588,7 +1586,7 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
     const prefijo = cortesNoDispNombres.length === 1
       ? `Ese corte (${listaNoDisp}) no está disponible hoy.`
       : `Esos cortes (${listaNoDisp}) no están disponibles hoy.`;
-    await msg.reply(`${prefijo} Tenemos: *${listaCortes()}*\n\n¿De cuál quieres?`);
+    await msg.reply(`${prefijo} Tenemos: *${getContratoGiroActivo().listaVariantes()}*\n\n¿De cuál quieres?`);
     return true;
   }
 
@@ -1600,9 +1598,9 @@ async function handleSinCorte(msg, textoOriginal, clienteNumero) {
     esperandoCorte.set(clienteNumero, pedidoParcial);
     const primerItem = pedidoParcial.items[pedidoParcial._indiceActual];
     const desc = _descItem(primerItem);
-    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(desc)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
   } else {
-    await msg.reply(`*${_preguntaCorte(null)}*\nTenemos: ${listaCortes()}`);
+    await msg.reply(`*${_preguntaCorte(null)}*\nTenemos: ${getContratoGiroActivo().listaVariantes()}`);
   }
   return true;
 }
@@ -1786,7 +1784,7 @@ async function handleGroqFallback(msg, textoOriginal, clienteNumero, historial) 
   const { interpretarPedidoConGroq } = require('../../groq/nlu');
   const { getItemTypes } = require('../../db');
 
-  const cortes    = getCortes();
+  const cortes    = getContratoGiroActivo().getMapaVariantes();
   const itemTypes = getItemTypes() || [];
   const jsonGroq  = await interpretarPedidoConGroq(textoOriginal, cortes, itemTypes);
   if (!jsonGroq || jsonGroq.tipo !== 'pedido') return false;

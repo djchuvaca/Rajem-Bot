@@ -203,6 +203,28 @@ function crearContratoGiro(giro, cargarNlu) {
     separarComplementos: texto => llamar('separarRefresco', { textoLimpio: texto, refrescos: [], salsas: [] }, texto),
     parsearPorcionado: (texto, _contexto = {}) => llamar('parsearPorcionado', null, texto),
     parsearDistribucionVariantes: texto => llamar('parsearDistribucionCortes', null, texto),
+    // Acceso a variantes/cortes del Giro activo — sin acoplar handlers al NLU directamente.
+    listaVariantes: () => {
+      try {
+        const catalogo = require('./catalogo-tenant');
+        const cortesItems = catalogo.getMenuItemsActivos('corte');
+        if (cortesItems.length > 0) {
+          const cortesDB = catalogo.getCortesTenant();
+          const porSlug = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
+          const excluidos = new Set(giro.comportamiento?.variantesExcluidasLista || []);
+          const slugsUnicos = [...new Set(cortesItems.map(i => i.producto_slug))].filter(s => !excluidos.has(s));
+          const nombres = slugsUnicos.map(s => porSlug[s]?.nombre || s).filter(Boolean);
+          if (nombres.length > 0) return nombres.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ');
+        }
+      } catch (_) {}
+      const nlu = obtenerNlu();
+      const cortes = typeof nlu.getCortes === 'function' ? nlu.getCortes() : {};
+      const unicos = [...new Set(Object.values(cortes))];
+      if (unicos.length === 0) return giro.vocabulario?.sinVariantes || 'las opciones disponibles';
+      return unicos.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+    },
+    buscarVariante: (texto) => llamar('buscarCorteFuzzy', null, texto),
+    getMapaVariantes: () => llamar('getCortes', {}),
     obtenerNlu,
   };
 

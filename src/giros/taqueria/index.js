@@ -188,10 +188,11 @@ module.exports = {
   },
 
   comportamiento: {
-    soportaVentaPorPeso:  true,
-    soportaMitadMitad:    true,
-    soportaTodoMenosX:    true,
-    soportaPorcionado:    true,
-    tarjetaSoloMostrador: true,
+    soportaVentaPorPeso:       true,
+    soportaMitadMitad:         true,
+    soportaTodoMenosX:         true,
+    soportaPorcionado:         true,
+    tarjetaSoloMostrador:      true,
+    variantesExcluidasLista:   ['surtido especial'],
   },
 };
