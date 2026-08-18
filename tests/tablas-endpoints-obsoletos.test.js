@@ -177,20 +177,15 @@ describe("Tabla `cortes` (TRANSFORMAR) — ratchet de precio_base", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Endpoints bajo vigilancia", () => {
-  test("panel/server.js tiene endpoints /api/cortes y /api/menu-items (duplicación temporal)", () => {
+  test("/api/cortes eliminado del panel — el frontend usa exclusivamente /api/menu-items", () => {
     const lineas = leerLineas(p("src/panel/server.js"));
     const nCortes = contarPatron(lineas, /app\.\w+\s*\(\s*["']\/api\/cortes/);
     const nMenuItems = contarPatron(lineas, /app\.\w+\s*\(\s*["']\/api\/menu-items/);
-    // Los dos coexisten mientras la migración está en progreso
-    assert.ok(nCortes > 0,
-      `/api/cortes presente en panel — existe como duplicación temporal con menu-items`
+    assert.strictEqual(nCortes, 0,
+      `Hay ${nCortes} endpoints /api/cortes en panel — deben ser 0 (Versión B completada)`
     );
     assert.ok(nMenuItems > 0,
-      `/api/menu-items presente en panel — fuente nueva (debe ganar sobre /api/cortes)`
-    );
-    // Ratchet: la duplicación no debe crecer más
-    assert.ok(nCortes <= 5,
-      `Hay ${nCortes} endpoints /api/cortes — límite: 5 (candidatos a retiro en Versión B)`
+      `/api/menu-items debe seguir presente en panel`
     );
   });
 
@@ -327,9 +322,11 @@ describe("Estado objetivo — Versión A y Versión B del retiro", () => {
   test.todo(
     "Versión B: productos.precio_taco, precio_torta, precio_100g pueden eliminarse tras exportar respaldo"
   );
-  test.todo(
-    "Versión B: /api/cortes debe eliminarse cuando el frontend use solo /api/menu-items y /api/catalogo/cortes"
-  );
+  test("Versión B: /api/cortes eliminado — frontend usa solo /api/menu-items", () => {
+    const lineas = leerLineas(p("src/panel/server.js"));
+    const n = contarPatron(lineas, /app\.\w+\s*\(\s*["']\/api\/cortes/);
+    assert.strictEqual(n, 0, `/api/cortes debe ser 0 en server.js — encontrados: ${n}`);
+  });
   test.todo(
     "Versión B: tabla `productos` puede renombrarse a `productos_v1_historial` tras confirmar cero accesos"
   );

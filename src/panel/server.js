@@ -919,22 +919,6 @@ app.put("/api/item-types/:id", requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── CORTES ────────────────────────────────────────────────────────────────────
-// GET /api/cortes — todos los cortes del giro (incluye inactivos)
-app.get("/api/cortes", requireAuth, (req, res) => {
-  try { res.json(catalogoTenant.getCortesTenant()); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/cortes — crear nuevo corte
-app.post("/api/cortes", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'Los cortes se definen exclusivamente en el módulo de giro' });
-});
-
-// PUT /api/cortes/:id — editar corte (precio, aliases, activo)
-app.put("/api/cortes/:id", requireAuth, (req, res) => {
-  res.status(403).json({ error: 'La definición pertenece al giro; precios y activación se configuran en el menú' });
-});
-
 // ── MENÚ DEL TENANT (menu_items) ─────────────────────────────────────────────
 
 // GET /api/menu-items?categoria=corte|refresco|salsa
