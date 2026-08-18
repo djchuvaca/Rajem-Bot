@@ -1,4 +1,5 @@
 'use strict';
+process.env.TENANT_ID = '_test';
 
 const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,6 +14,7 @@ before(async () => {
 });
 
 test('el panel solo actualiza los datos permitidos de un cliente existente', () => {
+  run("DELETE FROM clientes WHERE telefono=?", ['3111111111']);
   run(
     `INSERT INTO clientes (nombre, apellido, telefono, calle_numero, colonia, referencia)
      VALUES (?, ?, ?, ?, ?, ?)`,

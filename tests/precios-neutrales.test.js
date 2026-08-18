@@ -1,4 +1,5 @@
 'use strict';
+process.env.TENANT_ID = '_test';
 
 const { test, before } = require('node:test');
 const assert            = require('node:assert/strict');

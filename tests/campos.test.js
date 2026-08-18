@@ -1,4 +1,5 @@
 "use strict";
+process.env.TENANT_ID = '_test';
 // Tests para estado/campos.js — extraerTelefono, extraerTelefonoDeJID, interpretarCampos
 // Usa better-sqlite3 en memoria (sin mocks de BD, sin tocar el archivo de producción).
 
@@ -155,9 +156,14 @@ describe("interpretarCampos — domicilio", () => {
   });
 
   test("domicilio acepta tarjeta como método de pago", () => {
-    _mapa.delete(NUM);
-    const campos = interpretarCampos(NUM, "con tarjeta", true, false);
-    assert.equal(campos.metodo, "tarjeta");
+    setConfig("metodos_domicilio", "efectivo, tarjeta o transferencia");
+    try {
+      _mapa.delete(NUM);
+      const campos = interpretarCampos(NUM, "con tarjeta", true, false);
+      assert.equal(campos.metodo, "tarjeta");
+    } finally {
+      setConfig("metodos_domicilio", "efectivo o transferencia");
+    }
   });
 });
 

@@ -1,4 +1,5 @@
 "use strict";
+process.env.TENANT_ID = '_test';
 // Tests para handlers/respuestas.js — respuestaPrecio, respuestaHorario,
 // respuestaDomicilio, respuestaMenu, respuestaDescripcionCorte.
 // Usa better-sqlite3 en memoria (sin mocks de BD, sin tocar el archivo de producción).
@@ -8,6 +9,7 @@ const assert = require("node:assert/strict");
 
 const { initDB } = require("../src/db/core");
 const { seedDB } = require("../src/db/seed");
+const { setConfig } = require("../src/db");
 const { invalidarCacheCortes } = require("../src/handlers/pedidoParser");
 const {
   respuestaPrecio,
@@ -145,8 +147,13 @@ describe("respuestaMetodosPago", () => {
   });
 
   test("domicilio menciona tarjeta", () => {
-    const r = respuestaMetodosPago(true);
-    assert.match(r, /tarjeta/i);
+    setConfig("metodos_domicilio", "efectivo, tarjeta o transferencia");
+    try {
+      const r = respuestaMetodosPago(true);
+      assert.match(r, /tarjeta/i);
+    } finally {
+      setConfig("metodos_domicilio", "efectivo o transferencia");
+    }
   });
 
   test("ambos modos mencionan efectivo", () => {
