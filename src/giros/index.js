@@ -10,9 +10,16 @@
  */
 
 const _registry = new Map();
+const _contratos = new Map();
+const { validarDefinicionGiro, crearContratoGiro } = require('./contrato');
 
 function _register(giro) {
   if (!giro || !giro.slug) throw new Error(`[giros] Módulo inválido: falta campo "slug"`);
+  const validacion = validarDefinicionGiro(giro);
+  if (!validacion.valido) {
+    throw new Error(`[giros:${giro.slug}] Definición inválida: ${validacion.errores.join('; ')}`);
+  }
+  if (_registry.has(giro.slug)) throw new Error(`[giros] Slug duplicado: "${giro.slug}"`);
   _registry.set(giro.slug, Object.freeze(giro));
 }
 
@@ -55,6 +62,22 @@ function getSlugs() {
 }
 
 /**
+ * Contrato neutral y versionado del Giro. La carga del NLU es lazy para no
+ * abrir la BD durante el registro de módulos ni introducir ciclos.
+ */
+function getContratoGiro(slug) {
+  const giro = getGiro(slug);
+  if (!_contratos.has(giro.slug)) {
+    _contratos.set(giro.slug, crearContratoGiro(giro, () => require(`./${giro.slug}/nlu`)));
+  }
+  return _contratos.get(giro.slug);
+}
+
+function getContratoGiroActivo() {
+  return getContratoGiro(getGiroActivo().slug);
+}
+
+/**
  * Catálogo canónico del giro. Las tablas SQLite son únicamente una proyección
  * configurable por tenant; ninguna otra plantilla debe definir productos.
  */
@@ -67,4 +90,12 @@ function getCatalogo(slug) {
   };
 }
 
-module.exports = { getGiro, getGiroActivo, listGiros, getSlugs, getCatalogo };
+module.exports = {
+  getGiro,
+  getGiroActivo,
+  listGiros,
+  getSlugs,
+  getCatalogo,
+  getContratoGiro,
+  getContratoGiroActivo,
+};

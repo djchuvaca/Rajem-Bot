@@ -36,14 +36,13 @@ function _tieneSeñalesDePedido(texto) {
 
 function _resumirIntentoPedido(texto) {
   const st = detectarSinTipo(texto);
-  if (st) return `${st.cantidad} tacos o tortas de ${st.corte}`;
+  if (st) return `${st.cantidad} de ${st.corte} (presentación pendiente)`;
   const pp = parsearPedidoSimple(texto);
   if (pp && pp.tipo === "pedido" && pp.items?.length) {
     const item = pp.items[0];
-    if (item.presentacion === "pesos")  return `$${item.monto} de ${item.corte}`;
-    if (item.presentacion === "taco")   return `${item.cantidad} taco${item.cantidad !== 1 ? "s" : ""} de ${item.corte}`;
-    if (item.presentacion === "torta")  return `${item.cantidad} torta${item.cantidad !== 1 ? "s" : ""} de ${item.corte}`;
-    if (item.presentacion === "gramos") return `${item.gramos}g de ${item.corte}`;
+    try {
+      return require('../../giros').getContratoGiroActivo().conversacion.describirItem(item, { conProducto: true });
+    } catch (_) {}
   }
   return texto;
 }

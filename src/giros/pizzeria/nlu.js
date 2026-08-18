@@ -367,6 +367,9 @@ function detectarRefresco()            { return null; }
 function separarRefresco(texto)        { return { textoLimpio: texto, refrescos: [], salsas: [] }; }
 function parsearDistribucionCortes()   { return null; }
 function parsearDistribucionRefrescos(){ return null; }
+function detectarPlanPorcionado()      { return null; }
+function resolverPorcionadoPendiente() { return null; }
+function parsearPorcionado()            { return null; }
 
 // ── EXPORTS ───────────────────────────────────────────────────────────────────
 
@@ -393,4 +396,7 @@ module.exports = {
   buscarCorteFuzzy,
   parsearDistribucionCortes,
   parsearDistribucionRefrescos,
+  detectarPlanPorcionado,
+  resolverPorcionadoPendiente,
+  parsearPorcionado,
 };

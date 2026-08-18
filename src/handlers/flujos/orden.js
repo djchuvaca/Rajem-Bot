@@ -14,6 +14,7 @@ const {
   detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
   parsearDistribucionRefrescos, detectarComplementosNoDisponibles, normalizar, buscarCorteFuzzy,
   detectarTipoItemDesdeTexto, listaItemTypes,
+  detectarPlanPorcionado, resolverPorcionadoPendiente,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
@@ -37,23 +38,10 @@ function _resetError(num) { _erroresConsec.delete(num); }
  *     {presentacion:"quesadilla", cantidad:2} → "las 2 quesadillas"
  */
 function _descItem(item) {
-  if (item.presentacion === 'gramos')                             return `los ${item.gramos}g`;
-  if (item.presentacion === 'por_pesos' || item.presentacion === 'pesos') return `los $${item.monto}`;
-  const n = item.cantidad || 1;
   try {
-    const { getItemTypes } = require('../../db');
-    const tipos = getItemTypes() || [];
-    const tipo  = tipos.find(t => t.slug === item.presentacion);
-    if (tipo) {
-      const fem = (tipo.nombre_plural || '').endsWith('as');
-      if (n === 1) return fem ? `la ${tipo.nombre}` : `el ${tipo.nombre}`;
-      return fem ? `las ${n} ${tipo.nombre_plural}` : `los ${n} ${tipo.nombre_plural}`;
-    }
+    return require('../../giros').getContratoGiroActivo().conversacion.describirItem(item);
   } catch (_) {}
-  // Fallback hardcoded para taco/torta
-  if (item.presentacion === 'torta') return n === 1 ? 'la torta'  : `las ${n} tortas`;
-  if (item.presentacion === 'taco')  return n === 1 ? 'el taco'   : `los ${n} tacos`;
-  return n === 1 ? `el ${item.presentacion}` : `los ${n} ${item.presentacion}s`;
+  return item?.cantidad ? `${item.cantidad} ${item.presentacion}` : String(item?.presentacion || 'producto');
 }
 
 /**
@@ -62,13 +50,18 @@ function _descItem(item) {
  */
 function _preguntaCorte(desc) {
   try {
-    const { getGiroActivo } = require('../../giros');
-    const giro = getGiroActivo();
-    const plantilla = giro?.vocabulario?.preguntaCorte || '¿De qué corte quieres %desc%?';
-    if (!desc) return plantilla.replace(' %desc%', '').replace('%desc%', '');
-    return plantilla.replace('%desc%', desc);
+    return require('../../giros').getContratoGiroActivo().conversacion.preguntarVariante(desc);
   } catch (_) {
-    return desc ? `¿De qué corte quieres ${desc}?` : '¿De qué corte lo quieres?';
+    return desc ? `¿Qué opción quieres para ${desc}?` : '¿Qué opción quieres?';
+  }
+}
+
+function _preguntaPresentacion(detalle) {
+  const opciones = listaItemTypes(true);
+  try {
+    return require('../../giros').getContratoGiroActivo().conversacion.preguntarPresentacion(detalle, opciones);
+  } catch (_) {
+    return `¿En qué presentación quieres ${detalle.cantidad} de ${detalle.corte}? Opciones: ${opciones}`;
   }
 }
 
@@ -1220,7 +1213,7 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   const itemSinTipo = detectarSinTipo(textoOriginal);
   if (itemSinTipo) {
     esperandoTipoItem.set(clienteNumero, { ...itemSinTipo, ordenBase: ordenTexto, _fromExtras: ctx });
-    await msg.reply(`*¿Los ${itemSinTipo.cantidad} de ${itemSinTipo.corte} serían tacos o tortas?*`);
+    await msg.reply(`*${_preguntaPresentacion(itemSinTipo)}*`);
     return true;
   }
 
@@ -1367,75 +1360,16 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     if (itemDist && (itemDist.presentacion === "taco" || itemDist.presentacion === "torta")) {
       let nuevosItems = null;
 
-      // Sub-caso A: "todas de carne de 1 en 1" → expande en N ítems individuales con ese corte
-      const PATRON_UNO_EN_UNO = /\bde\s+1\s+en\s+1\b|\bde\s+uno\s+en\s+uno\b|\buno\s+(?:a|por)\s+uno\b|\bde\s+a\s+(?:1|uno)\b/i;
-      if (PATRON_UNO_EN_UNO.test(textoOriginal)) {
-        const CORTES_UNO = getCortes();
-        // Quitar el patrón "de 1 en 1" para leer cantidad y cortes sin interferencia
-        const textoSinPatron = textoOriginal.replace(PATRON_UNO_EN_UNO, "").trim();
-        const tUno = normalizar(textoSinPatron);
-        const palabrasUno = Object.keys(CORTES_UNO).join("|");
-        const matchesUno = [...tUno.matchAll(new RegExp(`\\b(${palabrasUno})\\b`, "g"))];
-        const cortesUno = [...new Set(matchesUno.map(m => CORTES_UNO[m[1]]))];
-        const corteUno = cortesUno.length > 0 ? cortesUno.join(", ") : null;
-        if (corteUno) {
-          // Detectar cantidad explícita ("2 de buche de 1 en 1" → 2)
-          const NUMS_UNO = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4 };
-          const matchCant = tUno.match(/\b(\d+|un[ao]?|dos|tres|cuatro)\b/);
-          const cantExp = matchCant ? (parseInt(matchCant[1]) || NUMS_UNO[matchCant[1].toLowerCase()] || null) : null;
-          const cantUno = (cantExp && cantExp < itemDist.cantidad) ? cantExp : itemDist.cantidad;
-          _resetError(clienteNumero);
-          nuevosItems = Array.from({ length: cantUno }, () => ({ ...itemDist, cantidad: 1, corte: corteUno }));
-          // Si es parcial, agregar el ítem restante sin corte para seguir preguntando
-          if (cantUno < itemDist.cantidad) {
-            nuevosItems.push({ ...itemDist, cantidad: itemDist.cantidad - cantUno });
-          }
-        }
+      // La interpretación de platos y distribución pertenece al Giro activo.
+      const resultadoPorcionado = resolverPorcionadoPendiente(itemDist, textoOriginal);
+      if (resultadoPorcionado?.error) {
+        _sumarError(clienteNumero);
+        await msg.reply(resultadoPorcionado.error);
+        return true;
       }
-
-      // Sub-caso B': "1 de carne y 1 de buche, 2 platos iguales" → N platos con misma composición
-      if (!nuevosItems) {
-        const NUMS_PLATOS = { dos: 2, tres: 3, cuatro: 4 };
-        const matchPlatos = textoOriginal.match(/\b(\d+|dos|tres|cuatro)\s+platos?\s*(?:iguales?|igual)?\b/i);
-        if (matchPlatos) {
-          const nStr = matchPlatos[1].toLowerCase();
-          const n = parseInt(nStr) || NUMS_PLATOS[nStr] || null;
-          if (n && n >= 2) {
-            const textoSinPlatos = textoOriginal.replace(matchPlatos[0], "").trim();
-            const distPorPlato = parsearDistribucionCortes(textoSinPlatos);
-            if (distPorPlato) {
-              const totalPorPlato = distPorPlato.reduce((s, d) => s + d.cantidad, 0);
-              if (n * totalPorPlato === itemDist.cantidad) {
-                _resetError(clienteNumero);
-                nuevosItems = [{
-                  presentacion: "grupo_repetido",
-                  grupos: n,
-                  items_por_grupo: distPorPlato.map(d => ({
-                    presentacion: itemDist.presentacion,
-                    cantidad: d.cantidad,
-                    corte: d.corte,
-                  })),
-                }];
-              }
-            }
-          }
-        }
-      }
-
-      // Sub-caso B: "1 de carne, 2 de surtido, 1 de lengua" → distribución explícita
-      if (!nuevosItems) {
-        const distribucion = parsearDistribucionCortes(textoOriginal);
-        if (distribucion) {
-          const totalDist = distribucion.reduce((s, d) => s + d.cantidad, 0);
-          if (totalDist !== itemDist.cantidad) {
-            _sumarError(clienteNumero);
-            const tipo = itemDist.presentacion === "torta" ? "tortas" : "tacos";
-            await msg.reply(`Quieres *${itemDist.cantidad} ${tipo}* pero lo que me escribiste suma *${totalDist}* 🤔\n¿Cómo los distribuyes? Por ejemplo: _1 de carne, 2 de surtido, 1 de lengua_`);
-            return true;
-          }
-          _resetError(clienteNumero);
-          nuevosItems = distribucion.map(d => ({ ...itemDist, cantidad: d.cantidad, corte: d.corte }));
-        }
+      if (resultadoPorcionado?.items) {
+        _resetError(clienteNumero);
+        nuevosItems = resultadoPorcionado.items;
       }
 
       // Sub-caso C: "igual", "el mismo", "lo mismo" → aplicar corte del ítem anterior
@@ -1602,11 +1536,20 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
 // ── DETECCIÓN SIN CORTE ───────────────────────────────────────────────────────
 async function handleSinCorte(msg, textoOriginal, clienteNumero) {
   const { textoLimpio, refrescos: refrescosPendientes, salsas: salsasPendientes } = separarRefresco(textoOriginal);
-  const pedidoParcial = parsearSinCorteItems(textoLimpio);
+  const planPorcionado = detectarPlanPorcionado(textoLimpio);
+  // Igual que el parser del Giro: retirar primero "de N en N" evita que el
+  // separador genérico convierta el segundo número en una partida fantasma.
+  const textoBase = planPorcionado ? textoLimpio.replace(planPorcionado.expresion, '').trim() : textoLimpio;
+  const pedidoParcial = parsearSinCorteItems(textoBase);
   // En pedidos mixtos detectarSinCorte puede ver primero un producto completo y
   // devolver null aunque otro formato siga sin corte. La estructura parcial es
   // la autoridad: debe existir al menos un artículo pendiente de aclaración.
   if (!pedidoParcial?.items?.some(item => !item.corte)) return false;
+
+  if (planPorcionado && pedidoParcial?.items?.length) {
+    const objetivo = [...pedidoParcial.items].reverse().find(item => item.cantidad && !item.corte);
+    if (objetivo) objetivo._porcionado = planPorcionado;
+  }
 
   // Verificar si el cliente mencionó un corte del catálogo que hoy no está disponible
   const { getCortesBDObj } = require('../../db/cortes');
@@ -1670,7 +1613,7 @@ async function handleSinTipo(msg, textoOriginal, clienteNumero) {
   if (!extrasCtx && ordenBase) esperandoAgregarMas.delete(clienteNumero);
 
   esperandoTipoItem.set(clienteNumero, { ...itemSinTipo, ordenBase, _fromExtras: extrasCtx || false, _refrescosPendientes: refrescosPendientes, _salsasPendientes: salsasPendientes });
-  await msg.reply(`*¿Los ${itemSinTipo.cantidad} de ${itemSinTipo.corte} serían tacos o tortas?*`);
+  await msg.reply(`*${_preguntaPresentacion(itemSinTipo)}*`);
   return true;
 }
 

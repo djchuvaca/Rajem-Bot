@@ -59,6 +59,7 @@ module.exports = {
     corte:         'variante',
     cortes:        'variantes',
     preguntaCorte: '¿Qué variante de hamburguesa quieres? %desc%',
+    preguntaPresentacion: '¿En qué presentación quieres %cantidad% de %producto%? Opciones: %opciones%',
     surtidoSlug:   null,
   },
 
@@ -66,6 +67,7 @@ module.exports = {
     soportaVentaPorPeso:  false,
     soportaMitadMitad:    false,
     soportaTodoMenosX:    false,
+    soportaPorcionado:    false,
     tarjetaSoloMostrador: false,
   },
 

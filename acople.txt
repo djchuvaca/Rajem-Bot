@@ -1,0 +1,1267 @@
+ Propongo desacoplar handlers de Taquería y acoplar cada comportamiento particular al contrato del Giro activo. Debe hacerse
+  gradualmente para no romper el bot que ya está funcionando.
+
+  ## Arquitectura objetivo
+
+  WhatsApp
+     ↓
+  handlers genéricos
+     ↓
+  motor conversacional
+     ↓
+  contrato del Giro activo
+     ├── Taquería
+     ├── Pizzería
+     └── Hamburguesería
+     ↓
+  catálogo efectivo del tenant
+
+  Los handlers conservarían:
+
+  - control de estados;
+  - orden de la conversación;
+  - persistencia;
+  - envío de mensajes;
+  - confirmaciones y cancelaciones;
+  - coordinación con pagos y reparto.
+
+  El Giro controlaría:
+
+  - interpretación de productos;
+  - presentaciones;
+  - variantes o cortes;
+  - combinaciones;
+  - división de platos;
+  - ventas por gramos o por monto;
+  - edición de partidas;
+  - textos y ejemplos propios;
+  - cálculo y presentación específica de productos.
+
+  ## Fase 1: definir un contrato común de Giro
+
+  Crear una interfaz uniforme, por ejemplo:
+
+  {
+    parsearPedido(texto, contexto),
+    parsearRespuestaPendiente(texto, pendiente, contexto),
+    detectarModificacion(texto, pedido),
+    aplicarModificacion(modificacion, pedido),
+    validarPedido(pedido),
+    formatearItem(item, precios),
+    describirItem(item),
+    calcularPrecioItem(item, precios),
+    obtenerPreguntaVariante(item),
+    obtenerOpcionesVariante(),
+    soportaPorcionado(),
+    parsearPorcionado(texto, contexto)
+  }
+
+  Podría implementarse mediante un adaptador nuevo:
+
+  src/giros/contrato.js
+
+  Y ser consumido así:
+
+  const giro = getGiroActivo();
+  const resultado = giro.nlu.parsearPedido(texto, contexto);
+
+  No es necesario usar clases; módulos CommonJS con funciones son suficientes.
+-----------------------------------------------------------------------------------------------
+La fase 1 quedó implementada sin cambiar el comportamiento actual del bot.
+
+  Cambios principales:
+
+  - Creé el contrato común versionado en src/giros/contrato.js.
+  - El registro de giros ahora valida automáticamente su estructura.
+  - Añadí getContratoGiro() y getContratoGiroActivo() en src/giros/index.js.
+  - El contrato ofrece una interfaz neutral:
+
+  parsearPedido()
+  detectarDatoFaltante()
+  detectarModificacion()
+  detectarPregunta()
+  detectarPreguntas()
+  calcularConfianza()
+  separarComplementos()
+  parsearPorcionado()
+  - Pizzería y Hamburguesería declaran esas capacidades como desactivadas.
+  - Se valida que cada Giro tenga nombre, slug, presentaciones, variantes, vocabulario y comportamiento.
+  - Se detectan presentaciones o productos con slugs duplicados.
+  - El NLU se carga de manera diferida para evitar dependencias circulares.
+
+  Validación:
+
+  - Pruebas específicas del contrato: 13 aprobadas, 0 errores.
+  - Resto de la suite, excluyendo GeoTepic: 405 aprobadas, 0 errores.
+  - La suite completa conserva dos fallos independientes: las pruebas GeoTepic esperan 163 colonias verificadas, pero el catálogo
+    actual contiene 300.
+
+  - git diff --check no detectó errores.
+
+  Todavía no migré los handlers al contrato; eso corresponde a las siguientes fases. Actualmente la nueva capa coexiste con la API
+  histórica, por lo que el funcionamiento productivo no cambia.
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------## Fase 2: establecer un modelo neutral de pedido
+
+  Actualmente existen conceptos mezclados como corte, taco, torta, grupo_repetido y plato_separado. Conviene definir una estructura
+  que sirva para cualquier Giro:
+
+  {
+    tipo: "pedido",
+    items: [
+      {
+        producto_slug: "surtido",
+        formato_slug: "taco",
+        cantidad: 4,
+        variante_slug: "surtido",
+        precio_unitario: 30,
+        agrupacion: {
+          tipo: "individual",
+          unidades_por_grupo: 1,
+          grupos: 4
+        },
+        extras: []
+      }
+    ]
+  }
+
+  Correspondencias:
+
+  - Taquería: variante_slug representa el corte.
+  - Pizzería: podría representar tamaño, especialidad o masa.
+  - Hamburguesería: podría representar versión o tipo de hamburguesa.
+  - agrupacion reemplazaría los casos especiales plato_separado y grupo_repetido.
+  - formato_slug reemplazaría condiciones rígidas para taco/torta.
+
+  Durante la migración se pueden mantener adaptadores para leer el formato antiguo.
+---------------------------------------------------------------------------------------------------------------------
+La fase 2 quedó implementada.
+
+  Creé el modelo neutral en src/pedido/modelo.js.
+
+  Ahora una partida ya no necesita interpretarse internamente como “taco de un corte”, sino como:
+
+  {
+    tipo: "producto",
+    formatoSlug: "taco",
+    productoSlug: "surtido",
+    cantidad: {
+      tipo: "unidad",
+      valor: 3
+    },
+    combinacion: [],
+    extras: [],
+    metadata: {}
+  }
+
+  El modelo distingue:
+
+  - unidad: tacos, tortas, pizzas, hamburguesas, quesadillas, etc.
+  - peso: venta por gramos.
+  - importe: venta por una cantidad de dinero.
+  - producto: partida ordinaria.
+  - agrupacion: platos separados o grupos repetidos.
+
+  También representa combinaciones sin depender del concepto “corte”:
+
+  combinacion: ["costilla", "cuero"]
+
+  Los platos separados se convierten en agrupaciones neutrales:
+
+  {
+    tipo: "agrupacion",
+    modo: "separada",
+    numero: 1,
+    grupos: 1,
+    partidas: [...]
+  }
+
+  Y los platos iguales:
+
+  {
+    tipo: "agrupacion",
+    modo: "repetida",
+    grupos: 4,
+    partidas: [...]
+  }
+
+  El contrato de Giro ahora dispone de:
+
+  parsearPedidoNormalizado()
+  normalizarPedido()
+  convertirPedidoLegacy()
+  validarPedido()
+
+  La API histórica continúa funcionando:
+
+
+  - cantidades;
+  - presentaciones;
+  - productos o variantes;
+  - gramos;
+  - importes;
+  - combinaciones;
+  - extras;
+  - platos separados;
+  - grupos repetidos;
+  - metadatos adicionales.
+
+  Validación realizada:
+
+  - Pruebas enfocadas de modelo, Giro, parser, precios y resumen: 200 aprobadas.
+  - Suite funcional sin los dos archivos GeoTepic inconsistentes: 413 aprobadas, 0 errores.
+  - git diff --check aprobado.
+-----------------------------------------------------------------------------------------------------------------------
+
+
+  ## Fase 3: concentrar toda la división de platos en Taquería
+
+  Mover desde handlers/flujos/orden.js al módulo de Taquería:
+
+  - “de uno en uno”;
+  - “de dos en dos”;
+  - “en platos de dos”;
+  - “dos platos iguales”;
+  - distribución por cortes;
+  - validación de suma;
+  - combinaciones;
+  - errores de división.
+
+  El punto único quedaría en:
+
+  src/giros/taqueria/nlu.js
+
+  o, para evitar que el archivo crezca demasiado:
+
+  src/giros/taqueria/
+  ├── index.js
+  ├── nlu.js
+  ├── porcionado.js
+  ├── modificaciones.js
+  ├── presentacion.js
+  └── validacion.js
+
+  orden.js únicamente recibiría algo como:
+
+  {
+    estado: "completo",
+    pedido: {...}
+  }
+
+  o:
+
+  {
+    estado: "dato_faltante",
+    campo: "variante",
+    item_index: 0,
+    pregunta: "¿De qué corte quieres los tacos?"
+  }
+-----------------------------------------------------------------------------------------------------------------
+La fase 2 quedó implementada.
+
+  Creé el modelo neutral en src/pedido/modelo.js.
+
+  Ahora una partida ya no necesita interpretarse internamente como “taco de un corte”, sino como:
+
+  {
+    tipo: "producto",
+    formatoSlug: "taco",
+    productoSlug: "surtido",
+    cantidad: {
+      tipo: "unidad",
+      valor: 3
+    },
+    combinacion: [],
+    extras: [],
+    metadata: {}
+  }
+
+  El modelo distingue:
+
+  - unidad: tacos, tortas, pizzas, hamburguesas, quesadillas, etc.
+  - peso: venta por gramos.
+  - importe: venta por una cantidad de dinero.
+  - producto: partida ordinaria.
+  - agrupacion: platos separados o grupos repetidos.
+
+  También representa combinaciones sin depender del concepto “corte”:
+
+  combinacion: ["costilla", "cuero"]
+
+  Los platos separados se convierten en agrupaciones neutrales:
+
+  {
+    tipo: "agrupacion",
+    modo: "separada",
+    numero: 1,
+    grupos: 1,
+    partidas: [...]
+  }
+
+  Y los platos iguales:
+
+  {
+    tipo: "agrupacion",
+    modo: "repetida",
+    grupos: 4,
+    partidas: [...]
+  }
+
+  El contrato de Giro ahora dispone de:
+
+  parsearPedidoNormalizado()
+  normalizarPedido()
+  convertirPedidoLegacy()
+  validarPedido()
+
+  La API histórica continúa funcionando:
+
+
+  - cantidades;
+  - presentaciones;
+  - productos o variantes;
+  - gramos;
+  - importes;
+  - combinaciones;
+  - extras;
+  - platos separados;
+  - grupos repetidos;
+  - metadatos adicionales.
+
+  Validación realizada:
+
+  - Pruebas enfocadas de modelo, Giro, parser, precios y resumen: 200 aprobadas.
+  - Suite funcional sin los dos archivos GeoTepic inconsistentes: 413 aprobadas, 0 errores.
+  - git diff --check aprobado.
+---------------------------------------------------------------------------------------------------------------
+
+  ## Fase 4: eliminar preguntas rígidas de los handlers
+
+  Reemplazar textos como:
+
+  ¿Serían tacos o tortas?
+  ¿De qué corte los quieres?
+
+  por consultas al Giro:
+
+  giro.conversacion.preguntaFormato(item)
+  giro.conversacion.preguntaVariante(item)
+  giro.conversacion.formateaOpcionesVariantes()
+
+  Para Taquería devolvería cortes. Para Pizzería podría preguntar tamaño o especialidad. Para Hamburguesería, tipo o variante.
+
+  Los mensajes predeterminados continuarían definidos por Giro y el tenant podría superponer únicamente los textos permitidos.
+--------------------------------------------------------------------------------------------------------------------
+La fase 4 quedó aplicada.
+
+  Creé la capa conversacional centralizada:
+
+  src/giros/conversacion.js
+
+  Ahora cada Giro controla:
+
+  describirItem()
+  preguntarVariante()
+  preguntarPresentacion()
+  recordarVariante()
+
+  Los handlers ya no construyen directamente preguntas como:
+
+  ¿Serían tacos o tortas?
+  ¿De qué corte quieres...?
+  Quedamos esperando el tipo de carne...
+
+  En su lugar consultan:
+
+  getContratoGiroActivo().conversacion
+
+  Comportamiento por Giro:
+
+  - Taquería pregunta por corte y por sus presentaciones activas.
+  - Pizzería pregunta por sabor y tamaño.
+  - Hamburguesería pregunta por variante y presentación.
+  - Las opciones de presentación continúan saliendo del catálogo efectivo del tenant, por lo que no aparecen formatos deshabilitados.
+
+  Ejemplos:
+
+  Taquería:
+  ¿Los 3 de surtido serían tacos, tortas o quesadillas?
+  ¿De qué corte quieres los 4 tacos?
+
+  Pizzería:
+  ¿En qué tamaño quieres 2 de hawaiana?
+  Opciones: individual o familiar
+
+  Hamburguesería:
+  - recordatorios de sesiones pendientes;
+  - resumen de pedidos en preventa;
+  - estado administrativo de “eligiendo taco o torta” a “eligiendo presentación”.
+
+  La búsqueda final ya no encontró en handlers las expresiones rígidas principales:
+
+  - tacos o tortas;
+  - serían tacos;
+  - tipo de carne;
+  - eligiendo taco;
+  - preguntas fijas de corte.
+
+  Validación:
+
+  - Pruebas enfocadas de conversación y flujos: 223 aprobadas.
+  - Suite funcional completa, excluyendo las dos expectativas desactualizadas de GeoTepic: 421 aprobadas, 0 errores.
+  - git diff --check aprobado.
+
+  Los cambios de las fases 1 a 4 permanecen locales y todavía no tienen commit ni push.
+--------------------------------------------------------------------------------------------------------------
+
+  ## Fase 5: generalizar las modificaciones
+
+  Crear operaciones neutrales:
+
+  { tipo: "eliminar_partida", selector: {...} }
+  { tipo: "reducir_cantidad", cantidad: 1, selector: {...} }
+  { tipo: "cambiar_variante", de: "...", a: "..." }
+  { tipo: "cambiar_formato", de: "...", a: "..." }
+  { tipo: "agregar_item", item: {...} }
+  { tipo: "cambiar_agrupacion", agrupacion: {...} }
+
+  Esto resolvería correctamente diferencias como:
+
+  quita los 2 tacos
+
+  frente a:
+
+  quítame un taco
+
+  El handler aplicaría la operación estructurada sin interpretar nuevamente las palabras.
+
+ La fase 5 implica:
+
+  - Diseñar operaciones neutrales de modificación.
+  - Migrar eliminación, reducción, cambio de producto, variante y presentación.
+  - Retirar interpretación duplicada de los handlers.
+  - Mantener compatibilidad con pedidos antiguos.
+  - Probar pedidos simples, mixtos, agrupados y ediciones desde el resumen.
+  - Ejecutar la suite completa y corregir regresiones.
+
+  Podría iniciar una implementación parcial, pero existe riesgo de dejar una migración incompleta antes de agotar el límite. Mi
+  recomendación es:
+
+  1. Guardar primero las fases 1–4 con commit y push.
+  2. Iniciar la fase 5 cuando se renueve el límite.
+  3. Ejecutarla como un bloque independiente y verificable.
+
+
+  ## Fase 6: generalizar precios y presentación
+
+  Eliminar de handlers el conocimiento directo de:
+
+  - pTaco;
+  - pTorta;
+  - p100g;
+  - combinaciones cobradas según el corte más caro;
+  - emojis específicos;
+  - nombres taco/torta.
+
+  La resolución debería pasar por:
+
+  catalogoTenant.resolverPrecio(item)
+  giro.precios.calcularItem(item, catalogoEfectivo)
+  giro.presentacion.formatearItem(item, precio)
+
+  La regla “una combinación cuesta lo mismo que el corte más caro” pertenece a Taquería, no al motor general.
+La fase 6 implica generalizar por completo el cálculo de precios y las presentaciones para que el núcleo del bot deje de asumir que
+  opera una taquería.
+
+  Actualmente, parte del sistema todavía entiende conceptos concretos como taco, torta, pieza, gramos y precio por kilo. 
+
+La fase 6
+  trasladaría esas reglas al módulo de cada Giro.
+
+  Incluiría:
+
+  - Definir en cada Giro sus unidades de venta: pieza, porción, gramos, importe, tamaño, paquete, etc.
+  - Centralizar en Giro los precios, formatos y presentaciones habilitados por el superadmin.
+  - Calcular importes mediante una interfaz común:
+      - Taquería: tacos, tortas, órdenes, gramos o “$200 de costilla”.
+      - Pizzería: tamaño, ingredientes y extras.
+      - Hamburguesería: presentación, complementos y extras.
+
+  - Eliminar del código genérico condiciones como taco, torta, precio_kg, gramos o corte.
+  - Hacer que resúmenes, subtotales, validaciones y modificaciones utilicen el mismo motor de precios.
+  - Respetar simultáneamente:
+      - Lo habilitado por el superadmin.
+      - El estado disponible/agotado controlado por el tenant.
+      - Los precios configurados para ese tenant.
+      - Las capacidades definidas por su Giro.
+
+  - Mantener compatibilidad con pedidos y bases de datos actuales mediante adaptadores.
+  - Agregar pruebas de precios por unidad, peso, importe, presentaciones, extras, productos agotados y formatos deshabilitados.
+
+  El resultado sería este flujo:
+
+  mensaje → NLU del Giro → pedido neutral → motor de precios del Giro → validación con catálogo del tenant → resumen
+
+  Es una fase de riesgo medio-alto porque afecta el importe cobrado al cliente. Conviene hacerla después de la fase 5: primero se
+  neutralizan las modificaciones de pedidos y después se reemplaza el cálculo de precios, acompañado de pruebas de regresión
+  exhaustivas. No recomendaría mezclar ambas fases en un solo cambio.
+
+  ## Fase 7: trasladar comandos específicos
+
+  Separar comandos generales y comandos del Giro.
+
+  Generales:
+
+  - !pedidos;
+  - !confirmar;
+  - !listo;
+  - !cliente;
+  - !estado;
+  - !pausar.
+
+  Específicos de Taquería:
+
+  - !cortes;
+  - !precio [corte] ...;
+  - reportes por corte.
+
+  El router podría consultar:
+
+  giro.comandos.procesar(texto, contexto)
+
+  También permitiría que Pizzería tenga comandos por especialidad/tamaño y Hamburguesería por variante.
+
+La fase 7 implica separar los comandos administrativos y operativos según su responsabilidad y Giro, porque actualmente src/
+  handlers/comandos.js concentra demasiadas funciones.
+
+  Se dividiría aproximadamente así:
+
+  - Comandos comunes:
+      - !ayuda
+      - !estado
+      - !pausar
+      - !reanudar
+      - Comandos de diagnóstico y operación general.
+
+  - Comandos del tenant:
+      - !confirmar
+      - Cancelación o consulta de pedidos.
+      - Cambios de disponibilidad.
+      - Acciones que requieren validar administradores del negocio.
+
+  - Comandos de mandaditos:
+      - Aceptar una solicitud respondiendo el mensaje.
+      - Asignación del repartidor.
+      - Confirmación de recolección y entrega.
+      - Liberación, timeout y recuperación de repartidores.
+
+  - Comandos específicos del Giro:
+      - Taquería: comandos relacionados con cortes, presentaciones o existencias propias de ese Giro.
+      - Pizzería y otros giros podrán registrar sus propios comandos sin modificar el núcleo.
+
+  También se introduciría un enrutador central:
+
+  mensaje recibido
+        ↓
+  normalización del comando
+        ↓
+  validación de contexto
+    privado / grupo / grupo de mandaditos
+        ↓
+  validación de permisos
+        ↓
+  módulo responsable
+        ↓
+  ejecución y respuesta
+
+  Cada comando tendría declarados sus requisitos: contexto permitido, permisos necesarios, Giro compatible, argumentos, función
+  ejecutora y mensaje de ayuda.
+
+  El beneficio principal sería evitar los problemas que ya aparecieron con !confirmar y los grupos de mandaditos: la identificación
+  del grupo, la validación del administrador y la ejecución del comando quedarían como etapas independientes y comprobables.
+
+  La fase incluiría pruebas para:
+
+  - Administrador autorizado y usuario sin permisos.
+  - Mensajes privados y grupales.
+  - Diferentes formatos de JID de WhatsApp.
+  - Comandos con mayúsculas, espacios y mensajes citados.
+  - Caídas de getChat(), getContact() o getQuotedMessage().
+  - Duplicados y reintentos.
+  - Convivencia de varios tenants.
+  - Confirmación y asignación de mandaditos.
+
+  Es una fase de riesgo medio-alto porque toca operaciones reales, permisos y despachos. Debe conservar inicialmente una fachada
+  compatible en src/handlers/comandos.js, migrar los comandos por grupos y retirar el código anterior únicamente después de verificar
+  equivalencia.
+
+  ## Fase 8: migrar sin romper compatibilidad
+
+  No recomiendo reescribir todo de una vez. El orden seguro sería:
+
+  1. Crear contrato y pruebas sin cambiar comportamiento.
+  2. Encapsular la lógica actual detrás del adaptador de Taquería.
+  3. Corregir y trasladar el porcionado.
+  4. Migrar preguntas de formato y corte.
+  5. Migrar modificaciones.
+  6. Migrar precios y resúmenes.
+  7. Migrar comandos.
+  8. Eliminar fallbacks rígidos solo cuando ninguna ruta los utilice.
+  9. Ejecutar pruebas completas después de cada bloque.
+
+  Durante la transición:
+
+  const resultado = giro.nlu?.parsearPorcionado?.(texto, contexto)
+    || parserLegacy(texto);
+
+  El fallback se retiraría cuando las pruebas demuestren equivalencia.
+
+La fase 8 es el cierre de la refactorización: eliminar compatibilidad antigua, código duplicado y rutas obsoletas después de
+  comprobar que todos los flujos ya funcionan mediante los módulos Giro.
+
+  Implica:
+
+  - Localizar y eliminar fuentes antiguas de:
+      - Productos.
+      - Cortes.
+      - Salsas.
+      - Bebidas/refrescos.
+      - Presentaciones y formatos.
+      - Precios.
+
+  - Retirar adaptadores temporales creados durante las fases anteriores:
+      - Conversión entre pedido antiguo y pedido neutral.
+      - Campos heredados como tipo, corte, gramos, precio_kg o equivalentes, cuando ya no sean necesarios.
+      - Fachadas antiguas en pedidoParser.js y comandos.js.
+
+  - Eliminar código sin uso:
+      - Funciones que ningún módulo importa.
+      - Ramas exclusivas de taquería dentro de handlers genéricos.
+      - Endpoints antiguos del panel.
+      - Consultas directas a catálogos heredados.
+      - Mensajes duplicados o rígidos.
+      - Scripts de migración ya consumados, si es seguro retirarlos.
+
+  - Consolidar la arquitectura definitiva:
+
+  Giro maestro
+      ↓
+  Configuración habilitada por Superadmin
+      ↓
+  Catálogo particular del tenant
+      ↓
+  Disponibilidad disponible/agotado
+      ↓
+  NLU + conversación + precios del Giro
+      ↓
+  WhatsApp y panel del tenant
+
+  - Endurecer la base de datos:
+      - Restricciones, índices y claves foráneas.
+      - Migraciones idempotentes.
+      - Validación de integridad entre Giro, tenant y menú.
+      - Respaldo y recuperación antes de migrar datos reales.
+
+  - Probar compatibilidad:
+      - Bases nuevas.
+      - Bases antiguas actualizadas.
+      - Pedidos históricos.
+      - Reinicios durante una conversación.
+      - Varios tenants de distintos giros.
+      - Deploy automático sin procesos obsoletos.
+      - Panel del superadmin, panel del tenant, WhatsApp y mandaditos.
+
+  - Actualizar la documentación técnica para que describa únicamente la arquitectura final.
+
+  Es la fase con mayor riesgo de pérdida de compatibilidad, porque elimina las “redes de seguridad” antiguas. Debe hacerse con una
+  migración de prueba sobre copias de bases reales y con posibilidad de regresar a la versión anterior.
+
+  Al terminar, el código común ya no debería conocer tacos, tortas, cortes, pizzas o hamburguesas. Solamente debería trabajar con
+  productos, variantes, presentaciones, cantidades, extras, disponibilidad y operaciones neutrales; cada Giro proporcionaría las
+  reglas concretas.
+
+  ## Pruebas mínimas necesarias
+
+  Antes de mover código se debe construir una matriz de regresión para Taquería:
+
+  - pedidos simples;
+  - pedidos mixtos;
+  - productos sin corte;
+  - formatos dinámicos;
+  - gramos y monto;
+  - bebidas y salsas;
+  - combinaciones de cortes;
+  - producto agotado;
+  - eliminación y reducción;
+  - platos separados;
+  - platos iguales;
+  - división válida e inválida;
+  - edición después del resumen;
+  - persistencia y restauración.
+
+  Casos obligatorios de porcionado:
+
+  4 tacos de surtido de uno en uno
+  4 tacos de uno en uno
+  6 tacos de surtido de 2 en 2
+  4 tacos en 2 platos iguales
+  5 tacos de surtido de 2 en 2
+  3 tacos de carne y 4 de surtido de uno en uno
+
+  Además, debe comprobarse que Pizzería y Hamburguesería no sean interpretadas utilizando reglas de cortes o tacos.
+
+  ## Prioridad recomendada
+
+  Empezaría únicamente con el porcionado:
+
+  1. Crear pruebas con frases reales.
+  2. Corregir _parsearPorcionado().
+  3. trasladar la duplicación de orden.js a taqueria/porcionado.js;
+  4. hacer que orden.js consuma el resultado estructurado;
+  5. validar que no cambien pedidos normales.
+
+  Es la zona que ya presenta una falla comprobada y donde existe la duplicación más evidente. Después continuaría con modificaciones
+  de partidas y, finalmente, precios/comandos. Así el desacoplamiento se realiza con riesgos controlados y resultados verificables en
+  cada etapa.
+
+  # Plan cuidadoso para la fase 8
+
+  La fase 8 debe ejecutarse como una migración controlada, no como una limpieza general. Su objetivo es retirar la arquitectura
+  antigua sin modificar el comportamiento comprobado del sistema ni poner en riesgo bases de datos, tenants o pedidos activos.
+
+  ## Condiciones previas
+
+  No debe comenzar la eliminación definitiva hasta que:
+
+  - Las fases 5, 6 y 7 estén terminadas.
+  - Todos los pedidos trabajen internamente con el modelo neutral.
+  - Los precios se calculen exclusivamente mediante Giro.
+  - Los comandos estén separados y probados.
+  - No existan errores conocidos en los flujos críticos.
+  - Se tenga una copia de bases reales representativas.
+  - Producción y pruebas estén claramente separadas.
+
+  La regla final será:
+
+  > Todo producto, corte, salsa, bebida, presentación, formato y precio proviene del módulo Giro y de la configuración particular del
+  > tenant.
+
+  ———
+
+  ## Etapa 1: congelar el comportamiento esperado
+
+  Antes de eliminar código, se deben convertir los comportamientos actuales correctos en pruebas.
+
+  ### Flujos que deben quedar documentados y probados
+
+  - Inicio y continuación de conversaciones.
+  - Creación y modificación de pedidos.
+  - Productos por pieza.
+  - Productos por peso.
+  - Productos solicitados por importe.
+  - División en platos.
+  - Combinaciones y productos mixtos.
+  - Cortes o variantes pendientes.
+  - Presentaciones pendientes.
+  - Salsas, bebidas y complementos.
+  - Productos disponibles y agotados.
+  - Productos habilitados por el superadmin.
+  - Precios configurados para el tenant.
+  - Servicio inmediato y programado.
+  - Transferencias y comprobantes.
+  - !confirmar.
+  - Solicitud y asignación de mandaditos.
+  - Reinicio del bot con conversaciones o despachos pendientes.
+
+  ### Resultado requerido
+
+  Una matriz de regresión por Giro:
+
+   Área                         Taquería    Pizzería    Hamburguesería
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━  ━━━━━━━━━━  ━━━━━━━━━━━━━━━━
+   Interpretación de pedidos    Completa    Completa          Completa
+  ───────────────────────────  ──────────  ──────────  ────────────────
+   Precios                      Completa    Completa          Completa
+  ───────────────────────────  ──────────  ──────────  ────────────────
+   Modificaciones               Completa    Completa          Completa
+  ───────────────────────────  ──────────  ──────────  ────────────────
+   Disponibilidad               Completa    Completa          Completa
+  ───────────────────────────  ──────────  ──────────  ────────────────
+   Panel                        Completa    Completa          Completa
+  ───────────────────────────  ──────────  ──────────  ────────────────
+   Reinicios                    Completa    Completa          Completa
+
+  Nada se elimina si su comportamiento todavía no está cubierto por pruebas.
+
+  ———
+
+  ## Etapa 2: inventario del código antiguo
+
+  Se debe generar una lista completa de posibles dependencias heredadas.
+
+  ### Buscar referencias a conceptos específicos
+
+  - taco
+  - torta
+  - corte
+  - carne
+  - maciza
+  - costilla
+  - cuero
+  - lengua
+  - surtido
+  - gramos
+  - precio_kg
+  - bebida
+  - refresco
+  - salsa
+  - presentacion
+  - formato
+  - menu_items
+  - tablas o módulos antiguos llamados productos
+
+  Cada coincidencia debe clasificarse:
+
+  1. Pertenece correctamente al Giro.
+  2. Es una dependencia antigua que debe migrarse.
+  3. Es un adaptador temporal.
+  4. Es una migración de base de datos que debe conservarse.
+  5. Es código muerto que puede eliminarse.
+  6. Es documentación o prueba desactualizada.
+
+  No toda referencia a “taco” debe desaparecer: puede existir dentro de src/giros/taqueria, pero no en el núcleo genérico.
+
+  ———
+
+  ## Etapa 3: mapa de fuentes de datos
+
+  Se debe identificar exactamente de dónde obtiene la información cada consumidor.
+
+   Información                    Fuente definitiva
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Productos maestros             Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Tipos de producto              Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Cortes o variantes             Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Presentaciones                 Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Salsas                         Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Bebidas                        Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Precios iniciales              Módulo Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Habilitación para el tenant    Superadmin
+  ─────────────────────────────  ────────────────────────────────────
+   Precio particular              Configuración del tenant
+  ─────────────────────────────  ────────────────────────────────────
+   Disponible/agotado             Tenant
+  ─────────────────────────────  ────────────────────────────────────
+   Menú de WhatsApp               Catálogo Giro proyectado al tenant
+  ─────────────────────────────  ────────────────────────────────────
+   NLU                            Contrato del Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Descripciones y preguntas      Conversación del Giro
+  ─────────────────────────────  ────────────────────────────────────
+   Cálculo de precios             Motor de precios del Giro
+
+  Se debe revisar:
+
+  - Panel del superadmin.
+  - Panel del tenant.
+  - Bot de WhatsApp.
+  - Generación del menú.
+  - Resumen del pedido.
+  - Reportes y ventas.
+  - Seed de nuevas bases.
+  - Migración de bases antiguas.
+  - Scripts de provisionamiento.
+  - Pruebas y simuladores.
+
+  Cualquier consumidor que consulte una fuente diferente se migra antes de retirar esa fuente.
+
+  ———
+
+  ## Etapa 4: instrumentar las rutas antiguas
+
+  Antes de borrarlas conviene saber si todavía se ejecutan.
+
+  Se agregarán temporalmente registros como:
+
+  [LEGACY] Uso de catálogo antiguo: origen=panel ruta=/api/...
+  [LEGACY] Conversión de pedido antiguo: tenant=... pedido=...
+  [LEGACY] Campo heredado leído: campo=precio_kg
+
+  Estos registros no deben incluir contraseñas, tokens, comprobantes ni datos personales completos.
+
+  ### Periodo de observación
+
+  - Ejecutar la suite automática.
+  - Probar manualmente todos los paneles.
+  - Realizar conversaciones completas de WhatsApp.
+  - Observar el entorno de pruebas durante varios ciclos.
+  - Confirmar que los contadores de rutas antiguas estén en cero.
+
+  Si una ruta antigua sigue activa, primero se migra; no se elimina.
+
+  ———
+
+  ## Etapa 5: establecer interruptores de compatibilidad
+
+  La eliminación debe ser reversible durante la transición.
+
+  Ejemplo conceptual:
+
+  GIRO_CATALOGO_UNICO=true
+  PEDIDO_NEUTRAL_UNICO=true
+  PRECIOS_GIRO_UNICO=true
+  COMANDOS_MODULARES=true
+  LEGACY_READ_FALLBACK=false
+
+  Estos interruptores permitirán:
+
+  - Probar la arquitectura nueva sin borrar inmediatamente la anterior.
+  - Detectar dependencias ocultas.
+  - Volver temporalmente a una lectura antigua si aparece un problema.
+  - Separar el despliegue de la activación.
+
+  No deben convertirse en configuración permanente. Se retirarán al finalizar la fase.
+
+  ———
+
+  ## Etapa 6: diseñar la migración de bases de datos
+
+  Esta es la parte más delicada.
+
+  ### Clasificar cada estructura
+
+  Para cada tabla y columna se decidirá:
+
+  - Se conserva como fuente vigente.
+  - Se transforma.
+  - Se conserva únicamente para historial.
+  - Se marca como obsoleta.
+  - Se elimina en una migración posterior.
+
+  ### Principios de seguridad
+
+  - Nunca modificar bases reales sin respaldo.
+  - No borrar columnas en la primera migración.
+  - Las migraciones deben ser idempotentes.
+  - Cada migración debe registrar su versión.
+  - Ejecutarlas dentro de transacciones cuando SQLite lo permita.
+  - Validar antes y después el número de registros.
+  - Ejecutar PRAGMA integrity_check.
+  - Conservar identificadores de pedidos, clientes y ventas.
+  - No reinterpretar precios históricos con reglas nuevas.
+
+  Los pedidos y ventas históricas deben conservar los importes que tuvieron al crearse, aunque después cambie el catálogo del Giro.
+
+  ———
+
+  ## Etapa 7: migración no destructiva
+
+  La primera migración debe copiar o proyectar información, no destruirla.
+
+  Proceso:
+
+  1. Abrir la base.
+  2. Verificar su versión.
+  3. Crear las estructuras nuevas que falten.
+  4. Resolver el Giro del tenant.
+  5. Sincronizar el catálogo maestro del Giro.
+  6. Aplicar habilitaciones del superadmin.
+  7. Incorporar precios particulares.
+  8. Preservar estados disponible/agotado.
+  9. Convertir configuraciones antiguas.
+  10. Registrar inconsistencias.
+  11. Verificar integridad.
+  12. Marcar la migración como aplicada.
+
+  Si un registro antiguo no puede mapearse con seguridad, debe quedar registrado para revisión y conservarse; no debe descartarse
+  automáticamente.
+
+  ———
+
+  ## Etapa 8: doble lectura y comparación
+
+  Temporalmente, el entorno de pruebas puede ejecutar:
+
+  - Lectura oficial desde Giro.
+  - Lectura de comparación desde la fuente antigua.
+  - Comparación sin mostrar el resultado antiguo al usuario.
+
+  Se comparará:
+
+  - Productos visibles.
+  - Presentaciones.
+  - Variantes y cortes.
+  - Precios.
+  - Disponibilidad.
+  - Totales calculados.
+  - Texto del menú.
+  - Resultado de interpretar pedidos.
+
+  Las diferencias deben clasificarse como:
+
+  - Diferencia esperada.
+  - Datos antiguos inválidos.
+  - Error de migración.
+  - Error del módulo Giro.
+  - Configuración particular faltante.
+
+  El sistema nuevo no avanza a producción mientras existan diferencias monetarias inexplicables.
+
+  ———
+
+  ## Etapa 9: retirar las escrituras antiguas
+
+  Primero se eliminan las escrituras hacia fuentes heredadas, manteniendo temporalmente su lectura para diagnóstico.
+
+  Orden recomendado:
+
+  1. Panel del superadmin.
+  2. Panel del tenant.
+  3. Provisionamiento y seed.
+  4. Bot de WhatsApp.
+  5. Scripts administrativos.
+  6. Pruebas y utilidades.
+
+  Después de este paso, toda modificación debe pasar exclusivamente por:
+
+  Giro → habilitación del superadmin → configuración del tenant
+
+  Se debe verificar que reiniciar el sistema no regenere datos antiguos ni sobrescriba precios o estados.
+
+  ———
+
+  ## Etapa 10: retirar las lecturas antiguas
+
+  Cuando no haya escrituras antiguas y las comparaciones sean correctas:
+
+  - Eliminar consultas heredadas.
+  - Desactivar los fallbacks.
+  - Convertir el acceso a fuentes antiguas en error explícito.
+  - Ejecutar todas las pruebas.
+  - Repetir pruebas con bases nuevas y migradas.
+
+  Es preferible producir un error claro como:
+
+  Fuente de productos antigua no permitida
+
+  en lugar de regresar silenciosamente a datos heredados.
+
+  ———
+
+  ## Etapa 11: limpiar los handlers genéricos
+
+  El núcleo común debe dejar de conocer negocios específicos.
+
+  ### Permitido en el núcleo
+
+  - Producto.
+  - Variante.
+  - Presentación.
+  - Cantidad.
+  - Unidad.
+  - Peso.
+  - Importe.
+  - Extra.
+  - Complemento.
+  - Disponibilidad.
+  - Operación de modificación.
+
+  ### Exclusivo de src/giros/taqueria
+
+  - Taco.
+  - Torta.
+  - Corte.
+  - Carne/maciza.
+  - Costilla.
+  - Cuero.
+  - Lengua.
+  - Surtido.
+  - División particular de platos.
+  - Interpretaciones propias de carnitas.
+
+  La misma regla se aplica a pizzas, tamaños, hamburguesas y demás vocabulario especializado.
+
+  ———
+
+  ## Etapa 12: retirar adaptadores temporales
+
+  Los adaptadores de compatibilidad se eliminarán uno por uno:
+
+  - Pedido antiguo a neutral.
+  - Pedido neutral a antiguo.
+  - Campos duplicados.
+  - Funciones proxy en pedidoParser.js.
+  - Fachada antigua de comandos.
+  - Respuestas rígidas reemplazadas por conversación del Giro.
+
+  Antes de retirar cada adaptador se hará una búsqueda completa de imports, llamadas dinámicas y uso en pruebas.
+
+  Algunos adaptadores pueden conservarse únicamente para leer pedidos históricos. Si ocurre, deben moverse a un módulo claramente
+  identificado, por ejemplo:
+
+  src/compatibilidad/pedidos-v1.js
+
+  No deben seguir mezclados con el flujo operativo actual.
+
+  ———
+
+  ## Etapa 13: retirar tablas y endpoints obsoletos
+
+  No se deben borrar inmediatamente las tablas antiguas.
+
+  ### Estrategia en dos versiones
+
+  Versión A
+
+  - Detener lecturas y escrituras.
+  - Renombrar conceptualmente como obsoletas.
+  - Mantenerlas para recuperación.
+  - Registrar cualquier acceso inesperado.
+
+  Versión B
+
+  - Confirmar que no hubo accesos.
+  - Exportar un respaldo.
+  - Eliminar tablas o columnas realmente innecesarias.
+  - Ejecutar compactación solo después de validar la copia.
+
+  También se eliminarán:
+
+  - Endpoints sin consumidores.
+  - Botones que llamen rutas antiguas.
+  - Scripts de depuración.
+  - Seeds duplicados.
+  - Funciones sin referencias.
+  - Pruebas que validen comportamientos ya retirados.
+
+  ———
+
+  ## Etapa 14: pruebas de migración
+
+  Se necesitan por lo menos cuatro bases de prueba:
+
+  1. Tenant nuevo de taquería.
+  2. Tenant antiguo de taquería con ventas y pedidos.
+  3. Tenant nuevo de otro Giro.
+  4. Base con datos incompletos o inconsistentes.
+
+  ### Verificaciones
+
+  - Conteos antes y después.
+  - Totales históricos intactos.
+  - Productos correctos.
+  - Precios correctos.
+  - Estados agotado/disponible correctos.
+  - Habilitaciones del superadmin correctas.
+  - Usuarios y contraseñas intactos.
+  - Clientes, domicilios y colonias intactos.
+  - Pedidos programados intactos.
+  - Despachos de mandaditos intactos.
+  - Sesiones y conversaciones recuperables.
+  - Reinicio de PM2 sin duplicar procesos o tareas.
+
+  La migración debe probarse también dos veces sobre la misma base para demostrar que es idempotente.
+
+  ———
+
+  ## Etapa 15: validación integral
+
+  La validación final debe incluir:
+
+  - Pruebas unitarias.
+  - Pruebas de integración.
+  - Pruebas de migración.
+  - Pruebas de paneles.
+  - Simulación de WhatsApp.
+  - Pruebas reales controladas.
+  - Reinicios limpios.
+  - Deploy mediante webhook.
+  - Varios tenants simultáneos.
+  - Dos tenants del mismo Giro con configuraciones diferentes.
+  - Tenants de giros distintos.
+  - Fallos de WhatsApp y recuperación.
+  - Fallos durante una migración.
+  - Restauración desde respaldo.
+
+  Debe existir una prueba crítica que asegure que un tenant no puede leer ni modificar el catálogo particular de otro.
+
+  ———
+
+  ## Etapa 16: despliegue gradual
+
+  Orden recomendado:
+
+  1. Copiar una base real anonimizada al entorno de pruebas.
+  2. Ejecutar migración y pruebas.
+  3. Desplegar código con compatibilidad, pero sin activarlo.
+  4. Activar catálogo Giro único en pruebas.
+  5. Observar registros.
+  6. Activar pedido neutral único.
+  7. Activar precios Giro.
+  8. Activar comandos modulares.
+  9. Probar un tenant piloto.
+  10. Ampliar gradualmente a otros tenants.
+  11. Mantener respaldos anteriores al despliegue.
+  12. Retirar compatibilidad solo después del periodo de estabilidad.
+
+  No conviene activar simultáneamente catálogo, precios, comandos y eliminación física de tablas.
+
+  ———
+
+  ## Plan de reversión
+
+  Cada despliegue debe tener una salida clara:
+
+  - Commit anterior identificado.
+  - Respaldo de cada base con fecha y tenant.
+  - Lista de migraciones aplicadas.
+  - Capacidad de desactivar las funciones nuevas.
+  - Procedimiento para restaurar la base.
+  - Procedimiento para reiniciar únicamente el tenant afectado.
+
+  Si el problema afecta importes, pérdida de pedidos, aislamiento entre tenants o asignaciones de mandaditos, se revierte
+  inmediatamente.
+
+  ———
+
+  ## Criterios para declarar terminada la fase 8
+
+  La fase estará completa solamente cuando:
+
+  - No haya catálogos operativos fuera de Giro.
+  - El núcleo no contenga reglas específicas de taquería.
+  - No existan escrituras hacia fuentes antiguas.
+  - No existan lecturas silenciosas de respaldo.
+  - Todos los precios provengan del Giro y configuración del tenant.
+  - WhatsApp y ambos paneles muestren la misma información.
+  - Los pedidos históricos permanezcan intactos.
+  - Las migraciones funcionen sobre bases nuevas y antiguas.
+  - Las pruebas completas sean satisfactorias.
+  - No existan accesos antiguos registrados durante el periodo de observación.
+  - La documentación refleje la arquitectura definitiva.
+
+  ## Secuencia recomendada de commits
+
+  Conviene dividirla en cambios pequeños y reversibles:
+
+  1. Agrega inventario y telemetría de compatibilidad
+  2. Agrega validación de fuentes únicas de catálogo
+  3. Implementa migración no destructiva de tenants
+  4. Elimina escrituras hacia catálogos antiguos
+  5. Elimina lecturas antiguas y fallbacks
+  6. Retira reglas de giros desde handlers comunes
+  7. Aísla compatibilidad de pedidos históricos
+  8. Elimina endpoints y código muerto
+  9. Agrega pruebas completas de migración
+  10. Retira interruptores temporales y actualiza documentación
+
+  La clave es no confundir “código que parece viejo” con “código que ya es seguro eliminar”. Primero se demuestra que no tiene
+  consumidores, después se desactiva, se observa y finalmente se retira.

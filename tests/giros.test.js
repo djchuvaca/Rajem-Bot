@@ -1,13 +1,65 @@
 const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { getCatalogo, getGiro } = require('../src/giros');
+const { getCatalogo, getGiro, getContratoGiro, listGiros } = require('../src/giros');
+const { VERSION_CONTRATO_GIRO, validarDefinicionGiro, validarNluGiro } = require('../src/giros/contrato');
 const { initDB } = require('../src/db');
 const { run } = require('../src/db/core');
 const { getPrecios, calcularPrecioItem } = require('../src/pedido/precios');
 const parser = require('../src/handlers/pedidoParser');
 
 before(async () => { await initDB(); });
+
+test('todos los giros registrados cumplen el contrato estructural', () => {
+  for (const giro of listGiros()) {
+    assert.deepEqual(validarDefinicionGiro(giro), { valido: true, errores: [] }, giro.slug);
+  }
+});
+
+test('todos los giros exponen un contrato NLU común y versionado', () => {
+  for (const giro of listGiros()) {
+    const contrato = getContratoGiro(giro.slug);
+    assert.equal(contrato.version, VERSION_CONTRATO_GIRO);
+    assert.equal(contrato.slug, giro.slug);
+    assert.equal(typeof contrato.parsearPedido, 'function');
+    assert.equal(typeof contrato.detectarDatoFaltante, 'function');
+    assert.equal(typeof contrato.detectarModificacion, 'function');
+    assert.equal(typeof contrato.separarComplementos, 'function');
+    assert.deepEqual(validarNluGiro(contrato.obtenerNlu()), { valido: true, errores: [] }, giro.slug);
+  }
+});
+
+test('las capacidades particulares quedan declaradas por Giro', () => {
+  assert.equal(getContratoGiro('taqueria').capacidades.porcionado, true);
+  assert.equal(getContratoGiro('taqueria').capacidades.ventaPorPeso, true);
+  assert.equal(getContratoGiro('pizzeria').capacidades.porcionado, false);
+  assert.equal(getContratoGiro('hamburgueseria').capacidades.ventaPorPeso, false);
+});
+
+test('el contrato normaliza datos faltantes sin vocabulario de taquería en handlers', () => {
+  assert.deepEqual(getContratoGiro('taqueria').detectarDatoFaltante('3 tacos'), {
+    estado: 'dato_faltante',
+    campo: 'variante',
+    presentacion: 'taco',
+  });
+});
+
+test('el contrato puede entregar un pedido neutral sin cambiar su API legacy', () => {
+  const contrato = getContratoGiro('taqueria');
+  const legacy = contrato.parsearPedido('3 tacos de surtido');
+  const neutral = contrato.parsearPedidoNormalizado('3 tacos de surtido');
+  assert.equal(legacy.items[0].presentacion, 'taco');
+  assert.equal(neutral.partidas[0].formatoSlug, 'taco');
+  assert.equal(neutral.partidas[0].productoSlug, 'surtido');
+  assert.deepEqual(contrato.convertirPedidoLegacy(neutral), legacy);
+});
+
+test('rechaza definiciones de Giro incompletas antes de registrarlas', () => {
+  const resultado = validarDefinicionGiro({ slug: 'incompleto', nombre: 'Incompleto' });
+  assert.equal(resultado.valido, false);
+  assert.ok(resultado.errores.some(error => error.includes('itemTypes')));
+  assert.ok(resultado.errores.some(error => error.includes('comportamiento')));
+});
 
 test('taquería expone todo su catálogo desde el módulo de giro', () => {
   const catalogo = getCatalogo('taqueria');

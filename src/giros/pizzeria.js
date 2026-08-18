@@ -62,6 +62,7 @@ module.exports = {
     corte:         'sabor',
     cortes:        'sabores',
     preguntaCorte: '¿Qué sabor de pizza quieres? %desc%',
+    preguntaPresentacion: '¿En qué tamaño quieres %cantidad% de %producto%? Opciones: %opciones%',
     surtidoSlug:   null,
   },
 
@@ -69,6 +70,7 @@ module.exports = {
     soportaVentaPorPeso:  false,
     soportaMitadMitad:    false,
     soportaTodoMenosX:    false,
+    soportaPorcionado:    false,
     tarjetaSoloMostrador: false,
   },
 

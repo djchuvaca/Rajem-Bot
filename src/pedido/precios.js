@@ -2,9 +2,16 @@
  * pedido/precios.js
  * Funciones puras de cálculo de precios — sin estado, sin BD directa.
  * Lee precios desde la BD solo cuando se llama getPrecios().
+ *
+ * [LEGACY] Este módulo es la API heredada de precios.
+ * La ruta migrada es: getContratoGiroActivo().calcularPrecioPartida(partida).
+ * Ver: src/migration/legacy-tracker.js y plan/acople.txt Etapa 4.
  */
 
+const { registrar: _legacyRegistrar } = require("../migration/legacy-tracker");
+
 function getPrecios() {
+  _legacyRegistrar("getPrecios");
   const { getConfig } = require("../db");
   const catalogoTenant = require("../giros/catalogo-tenant");
   const pTaco  = parseInt(getConfig("precio_taco")  || "30");
@@ -77,6 +84,7 @@ function _precioFormatoDinamico(item, precios) {
 }
 
 function calcularPrecioItem(item, precios) {
+  _legacyRegistrar("calcularPrecioItem");
   // Ítem mixto con combinacion (mecanismo _aplicarSurtidoEspecial)
   if (item.corte === 'surtido especial' && item.combinacion) {
     // Si el producto 'surtido especial' tiene precio propio (> 0 en BD), usarlo directamente

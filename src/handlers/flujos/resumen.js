@@ -26,25 +26,17 @@ const { dividirNombreCompleto } = require('../../clientes/nombre');
 // ── HELPERS GIRO-AWARE ────────────────────────────────────────────────────────
 
 function _descItem(item) {
-  if (item.presentacion === 'gramos') return `los ${item.gramos}g`;
   try {
-    const { getGiroActivo } = require('../../giros');
-    const it = (getGiroActivo()?.itemTypes || []).find(t => t.slug === item.presentacion);
-    if (it) {
-      const art = /as$/i.test(it.nombre_plural) ? 'las' : 'los';
-      return `${art} ${item.cantidad} ${it.nombre_plural}`;
-    }
+    return require('../../giros').getContratoGiroActivo().conversacion.describirItem(item);
   } catch (_) {}
-  return `los $${item.monto}`;
+  return String(item?.presentacion || 'producto');
 }
 
 function _preguntaCorte(desc) {
   try {
-    const { getGiroActivo } = require('../../giros');
-    const giro = getGiroActivo();
-    return (giro?.vocabulario?.preguntaCorte || '¿De qué corte quieres %desc%?').replace('%desc%', desc);
+    return require('../../giros').getContratoGiroActivo().conversacion.preguntarVariante(desc);
   } catch (_) {
-    return `¿De qué corte quieres ${desc}?`;
+    return `¿Qué opción quieres para ${desc}?`;
   }
 }
 

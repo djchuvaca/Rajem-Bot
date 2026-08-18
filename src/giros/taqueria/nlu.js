@@ -14,6 +14,8 @@
  */
 
 const core = require('../../nlu/core');
+const porcionado = require('./porcionado');
+const taqModificaciones = require('./modificaciones');
 const { getConfig } = require('../../db');
 
 const {
@@ -331,6 +333,16 @@ function detectarModificacion(texto) {
   return null;
 }
 
+function detectarModificacionNeutral(texto) {
+  return taqModificaciones.detectarModificacionNeutral(texto, {
+    normalizar,
+    textoANumero,
+    getCortes,
+    buscarCorteFuzzy,
+    detectarTipoItemDesdeTexto,
+  });
+}
+
 // ── SURTIDO ESPECIAL ──────────────────────────────────────────────────────────
 
 function _aplicarSurtidoEspecial(item) {
@@ -591,6 +603,20 @@ function _parsearPorcionado(texto) {
   return { tipo: 'pedido', items };
 }
 
+function parsearPorcionado(texto) {
+  texto = textoANumero(preprocesarCantidades(texto));
+  if (!PATRON_PORCIONADO.test(texto)) return null;
+  const igual = porcionado.parsearPorcionadoIgual(texto, {
+    parsearPedidoBase: parsearPedidoSimple,
+    dividirEnItems,
+    subDividir: _subDividirSiTipoEmbebido,
+    esRelleno: parte => _FILLER_PART.test(normalizar(parte).trim()),
+    parsearItem,
+    aplicarSurtidoEspecial: _aplicarSurtidoEspecial,
+  });
+  return igual || _parsearPorcionado(texto);
+}
+
 // ── PARSER PRINCIPAL ──────────────────────────────────────────────────────────
 
 function parsearPedidoSimple(texto) {
@@ -608,7 +634,7 @@ function parsearPedidoSimple(texto) {
   texto = textoANumero(preprocesarCantidades(texto));
   const t = normalizar(texto);
 
-  if (PATRON_PORCIONADO.test(texto)) return _parsearPorcionado(texto);
+  if (PATRON_PORCIONADO.test(texto)) return parsearPorcionado(texto);
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 
@@ -749,6 +775,20 @@ function parsearDistribucionCortes(texto) {
     items.push({ cantidad, corte: corte2 ? `${corte1}, ${corte2}` : corte1 });
   }
   return items.length >= 2 ? items : null;
+}
+
+function detectarPlanPorcionado(texto) {
+  // Conservar la expresión original para que el handler pueda retirarla antes
+  // de pasar el texto al separador genérico de partidas.
+  return porcionado.detectarPlanPorcionado(preprocesarCantidades(texto));
+}
+
+function resolverPorcionadoPendiente(item, texto) {
+  return porcionado.resolverPorcionadoPendiente(item, textoANumero(texto), {
+    extraerCorte,
+    parsearDistribucion: parsearDistribucionCortes,
+    aplicarSurtidoEspecial: _aplicarSurtidoEspecial,
+  });
 }
 
 // ── DISTRIBUCIÓN DE REFRESCOS ─────────────────────────────────────────────────
@@ -946,6 +986,7 @@ module.exports = {
   detectarPreguntaFrecuente,
   detectarTodasPreguntasFrecuentes,
   detectarModificacion,
+  detectarModificacionNeutral,
   detectarRepetirPedido,
   calcularScore,
   // Catálogo
@@ -966,4 +1007,7 @@ module.exports = {
   buscarCorteFuzzy,
   parsearDistribucionCortes,
   parsearDistribucionRefrescos,
+  detectarPlanPorcionado,
+  resolverPorcionadoPendiente,
+  parsearPorcionado,
 };

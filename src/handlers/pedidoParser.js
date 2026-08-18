@@ -63,6 +63,11 @@ module.exports = {
   detectarPreguntaFrecuente:        _p('detectarPreguntaFrecuente'),
   detectarTodasPreguntasFrecuentes: _p('detectarTodasPreguntasFrecuentes'),
   detectarModificacion:             _p('detectarModificacion'),
+  // Fase 5 — proxy seguro: null si el giro no lo implementa todavía
+  detectarModificacionNeutral: (...args) => {
+    const fn = _getNlu()['detectarModificacionNeutral'];
+    return typeof fn === 'function' ? fn(...args) : null;
+  },
   calcularScore:                    _p('calcularScore'),
   // ── Catálogo (giro-específico) ────────────────────────────────────────────
   getCortes:                        _p('getCortes'),
@@ -75,6 +80,8 @@ module.exports = {
   buscarCorteFuzzy:                 _p('buscarCorteFuzzy'),
   parsearDistribucionCortes:        _p('parsearDistribucionCortes'),
   parsearDistribucionRefrescos:     _p('parsearDistribucionRefrescos'),
+  detectarPlanPorcionado:           _p('detectarPlanPorcionado'),
+  resolverPorcionadoPendiente:      _p('resolverPorcionadoPendiente'),
   // ── Cache ─────────────────────────────────────────────────────────────────
   invalidarCacheCortes,
   // ── Utilidades genéricas (core — giro-independiente) ─────────────────────

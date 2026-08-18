@@ -166,6 +166,7 @@ module.exports = {
     corte:         'corte',
     cortes:        'cortes',
     preguntaCorte: '¿De qué corte quieres %desc%?',
+    preguntaPresentacion: '¿Los %cantidad% de %producto% serían %opciones%?',
     surtidoSlug:   'surtido',
   },
 
@@ -190,6 +191,7 @@ module.exports = {
     soportaVentaPorPeso:  true,
     soportaMitadMitad:    true,
     soportaTodoMenosX:    true,
+    soportaPorcionado:    true,
     tarjetaSoloMostrador: true,
   },
 };

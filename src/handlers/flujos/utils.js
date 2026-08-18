@@ -57,16 +57,22 @@ function _textoRecordatorio(numero) {
   if (esperandoCorte.has(numero)) {
     const ped  = esperandoCorte.get(numero);
     const item = ped.items[ped._indiceActual || 0];
-    const desc = item.presentacion === "taco"   ? `los ${item.cantidad} tacos`
-               : item.presentacion === "torta"  ? `las ${item.cantidad} tortas`
-               : item.presentacion === "gramos" ? `los ${item.gramos}g`
-               : `los $${item.monto}`;
     const listaCortes = _listaCortesDesdeBD();
-    return `${saludo} Quedamos esperando el tipo de carne para ${desc}.\n*¿Cuál prefieres?* ${listaCortes}`;
+    try {
+      const texto = require('../../giros').getContratoGiroActivo().conversacion.recordarVariante(item, listaCortes);
+      return `${saludo} ${texto}`;
+    } catch (_) {
+      return `${saludo} Quedamos esperando una opción para completar el producto.\n*¿Cuál prefieres?* ${listaCortes}`;
+    }
   }
   if (esperandoTipoItem.has(numero)) {
     const d = esperandoTipoItem.get(numero);
-    return `${saludo} Quedamos pendientes aquí. Los ${d.cantidad} de ${d.corte}... *¿serían ${listaItemTypes(true)}?*`;
+    try {
+      const pregunta = require('../../giros').getContratoGiroActivo().conversacion.preguntarPresentacion(d, listaItemTypes(true));
+      return `${saludo} Quedamos pendientes aquí. *${pregunta}*`;
+    } catch (_) {
+      return `${saludo} Quedamos pendientes de elegir la presentación.`;
+    }
   }
   if (datosCampos.has(numero)) {
     return `${saludo} Estabas en proceso de hacer tu pedido. *¿Deseas continuar?*`;
