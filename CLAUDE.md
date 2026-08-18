@@ -400,8 +400,8 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 | 5 | Hamburguesería como segundo giro | Implementada; validación funcional pendiente |
 | 6 | Drivers Stripe + Conekta, webhooks, `_notificarPagoConfirmado()` helper compartido | ✅ completa |
 | 7 | Mandaditos/reparto — despacho con delay configurable, historial de entregas, reporte de desempeño | ✅ completa |
-| 8 | Mejoras al diccionario de colonias — aliases ampliados para reducir fallos de matching | Pendiente |
-| 9 | Tarifas de reparto por distancia — el superadmin fija tarifas fijas por zona (NO dinámica) | Pendiente |
+| 8 | Mejoras al diccionario de colonias — `normalizarTexto()` amplía: palabras numéricas (doce→12), ordinals 4-6, "ampl." | ✅ completa |
+| 9 | Tarifas de reparto por distancia — tabla `tarifas_zonas`, `calcularTarifaDomicilio()` Haversine, UI superadmin + solicitudes tenant | ✅ completa |
 | 10 | Corrección de variables de provisionamiento | ✅ completa |
 
 ---

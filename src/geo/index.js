@@ -55,9 +55,25 @@ function invalidarCacheConfig() {
 
 // ── Normalización ─────────────────────────────────────────────────────────────
 function normalizar(texto) {
-  return (texto || '')
+  let s = (texto || '')
     .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Números cardinales → dígito (cubre colonias con nombres de fecha)
+  s = s
+    .replace(/\btreinta\s+y\s+un[ao]?\b/g, '31')
+    .replace(/\buno\b/g, '1').replace(/\bdos\b/g, '2').replace(/\btres\b/g, '3')
+    .replace(/\bcuatro\b/g, '4').replace(/\bcinco\b/g, '5').replace(/\bseis\b/g, '6')
+    .replace(/\bsiete\b/g, '7').replace(/\bocho\b/g, '8').replace(/\bnueve\b/g, '9')
+    .replace(/\bdiez\b/g, '10').replace(/\bonce\b/g, '11').replace(/\bdoce\b/g, '12')
+    .replace(/\btrece\b/g, '13').replace(/\bcatorce\b/g, '14').replace(/\bquince\b/g, '15')
+    .replace(/\bdieciseis\b/g, '16').replace(/\bdiecisiete\b/g, '17').replace(/\bdieciocho\b/g, '18')
+    .replace(/\bdiecinueve\b/g, '19').replace(/\bveinte\b/g, '20')
+    .replace(/\bveintiuno\b|\bveintiun\b/g, '21').replace(/\bveintidos\b/g, '22')
+    .replace(/\bveintitres\b/g, '23').replace(/\bveinticuatro\b/g, '24')
+    .replace(/\bveinticinco\b/g, '25').replace(/\bveintiseis\b/g, '26')
+    .replace(/\bveintisiete\b/g, '27').replace(/\bveintiocho\b/g, '28')
+    .replace(/\bveintinueve\b/g, '29').replace(/\btreinta\b/g, '30');
+  return s
     // Artículo opcional ANTES de prefijo de colonia: "la colonia X" → "X"
     .replace(/^(?:la|el|los|las)\s+(?=col(?:onia)?[\s.]|fracc(?:ionamiento)?[\s.]|residencial\s|unidad\s|privada\s|ampl(?:iacion)?[\s.])/i, '')
     // Prefijos de colonia (incluyendo "col " sin punto)

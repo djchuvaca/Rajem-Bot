@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Diccionario urbano de colonias y asentamientos de Tepic, Nayarit.
  * Generado: 2026-08-12.
  *
@@ -9918,18 +9918,40 @@ function normalizarTexto(texto = "") {
   return String(texto)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
+    // Abreviaturas de tipo de asentamiento
     .replace(/\bcol[.]?(?=\s)/g, "colonia")
     .replace(/\bfracc[.]?(?=\s)/g, "fraccionamiento")
     .replace(/\bu[.]?h[.]?(?=\s)/g, "unidad habitacional")
+    .replace(/\bampl[.]?(?=\s)/g, "ampliacion")
+    // Correcciones ortógraficas frecuentes
     .replace(/\bfovis{1,3}te\b/g, "fovissste")
+    // Ordinales de sección (primera–sexta y sus abreviaturas)
     .replace(/\bprimera\b|\b1(?:ra|era|a)\b/g, "1")
     .replace(/\bsegunda\b|\b2(?:da|nda|a)\b/g, "2")
     .replace(/\btercera\b|\b3(?:ra|era|a)\b/g, "3")
+    .replace(/\bcuarta\b|\b4(?:ta|a)\b/g, "4")
+    .replace(/\bquinta\b|\b5(?:ta|a)\b/g, "5")
+    .replace(/\bsexta\b|\b6(?:ta|a)\b/g, "6")
     .replace(/\bsecc[.]?\b/g, "seccion")
+    // Números cardinales → dígito (cubre colonias con nombres de fecha, ej. "doce de diciembre" → "12 de diciembre")
+    .replace(/\btreinta\s+y\s+un[ao]?\b/g, "31")
+    .replace(/\buno\b/g, "1").replace(/\bdos\b/g, "2").replace(/\btres\b/g, "3")
+    .replace(/\bcuatro\b/g, "4").replace(/\bcinco\b/g, "5").replace(/\bseis\b/g, "6")
+    .replace(/\bsiete\b/g, "7").replace(/\bocho\b/g, "8").replace(/\bnueve\b/g, "9")
+    .replace(/\bdiez\b/g, "10").replace(/\bonce\b/g, "11").replace(/\bdoce\b/g, "12")
+    .replace(/\btrece\b/g, "13").replace(/\bcatorce\b/g, "14").replace(/\bquince\b/g, "15")
+    .replace(/\bdieciseis\b/g, "16").replace(/\bdiecisiete\b/g, "17").replace(/\bdieciocho\b/g, "18")
+    .replace(/\bdiecinueve\b/g, "19").replace(/\bveinte\b/g, "20")
+    .replace(/\bveintiuno\b|\bveintiun\b/g, "21").replace(/\bveintidos\b/g, "22")
+    .replace(/\bveintitres\b/g, "23").replace(/\bveinticuatro\b/g, "24")
+    .replace(/\bveinticinco\b/g, "25").replace(/\bveintiseis\b/g, "26")
+    .replace(/\bveintisiete\b/g, "27").replace(/\bveintiocho\b/g, "28")
+    .replace(/\bveintinueve\b/g, "29").replace(/\btreinta\b/g, "30")
+    // Limpieza final
     .replace(/[^a-z0-9ñ\s]/g, " ")
     .replace(/\s+/g, " ")
-    .replace(/^(?:colonia|fraccionamiento|unidad habitacional)\s+/, "")
+    .replace(/^(?:colonia|fraccionamiento|unidad habitacional|ampliacion)\s+/, "")
     .trim();
 }
 

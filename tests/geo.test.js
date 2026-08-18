@@ -157,6 +157,18 @@ describe('normalizar', () => {
   test('colapsa espacios múltiples', () => {
     assert.strictEqual(normalizar('Lomas   del  Valle'), 'lomas del valle');
   });
+
+  test('convierte número cardinal a dígito (doce → 12)', () => {
+    assert.strictEqual(normalizar('doce de diciembre'), '12 de diciembre');
+  });
+
+  test('convierte número cardinal a dígito (quince → 15)', () => {
+    assert.strictEqual(normalizar('quince de mayo'), '15 de mayo');
+  });
+
+  test('convierte número cardinal a dígito (dieciocho → 18)', () => {
+    assert.strictEqual(normalizar('dieciocho de agosto'), '18 de agosto');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -566,5 +578,64 @@ describe('diccionarioTepic — entradas que no deben producir colonia', () => {
     // "zapata" solo no debe encontrar Emiliano Zapata (demasiado corto / ambiguo)
     const r = diccionarioTepic.buscarColonia('zapata');
     assert.ok(r.estado !== 'encontrada' || r.confianza < 0.92, 'palabra sola no debe resolverse con alta confianza');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fase 8 — palabras numéricas y abreviaturas ampliadas
+// ═══════════════════════════════════════════════════════════════════════════
+describe('diccionarioTepic — normalizarTexto: palabras numéricas (Fase 8)', () => {
+  test('"doce de diciembre" normaliza igual que "12 de diciembre"', () => {
+    const a = diccionarioTepic.normalizarTexto('doce de diciembre');
+    const b = diccionarioTepic.normalizarTexto('12 de diciembre');
+    assert.strictEqual(a, b);
+    assert.strictEqual(a, '12 de diciembre');
+  });
+
+  test('"quince de mayo" normaliza igual que "15 de mayo"', () => {
+    const a = diccionarioTepic.normalizarTexto('quince de mayo');
+    const b = diccionarioTepic.normalizarTexto('15 de mayo');
+    assert.strictEqual(a, b);
+  });
+
+  test('"dieciocho de agosto" normaliza igual que "18 de agosto"', () => {
+    const a = diccionarioTepic.normalizarTexto('dieciocho de agosto');
+    const b = diccionarioTepic.normalizarTexto('18 de agosto');
+    assert.strictEqual(a, b);
+  });
+
+  test('"ampl. norte" expande y elimina prefijo dejando "norte"', () => {
+    assert.strictEqual(diccionarioTepic.normalizarTexto('ampl. norte'), 'norte');
+  });
+
+  test('"ampliacion norte" también normaliza a "norte"', () => {
+    assert.strictEqual(diccionarioTepic.normalizarTexto('ampliacion norte'), 'norte');
+    assert.strictEqual(diccionarioTepic.normalizarTexto('Ampliación Norte'), 'norte');
+  });
+});
+
+describe('diccionarioTepic — búsqueda con palabras numéricas (Fase 8)', () => {
+  test('"doce de diciembre" encuentra la colonia 12 de Diciembre', () => {
+    const r = diccionarioTepic.buscarColonia('doce de diciembre');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '12 de Diciembre');
+  });
+
+  test('"quince de mayo" encuentra la colonia 15 de Mayo', () => {
+    const r = diccionarioTepic.buscarColonia('quince de mayo');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '15 de Mayo');
+  });
+
+  test('"dieciocho de agosto" encuentra la colonia 18 de Agosto', () => {
+    const r = diccionarioTepic.buscarColonia('dieciocho de agosto');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '18 de Agosto');
+  });
+
+  test('"15 de mayo" sigue funcionando con dígitos directos', () => {
+    const r = diccionarioTepic.buscarColonia('15 de mayo');
+    assert.strictEqual(r.estado, 'encontrada');
+    assert.strictEqual(r.colonia.nombre, '15 de Mayo');
   });
 });
