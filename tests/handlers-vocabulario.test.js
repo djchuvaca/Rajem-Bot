@@ -229,23 +229,46 @@ describe("Módulos genéricos de Giro — sin vocabulario taquería", () => {
 // SECCIÓN 4 — Estado objetivo — post fases 5-7 (especificaciones)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Estado objetivo — post fases 5-7 (especificaciones)", () => {
-  test.todo(
-    "orden.js no debe usar 'taco'/'torta' hardcodeados — el tipo de ítem lo provee el Giro"
-  );
-  test.todo(
-    "el campo JSON 'corte:' en orden.js debe reemplazarse por 'productoSlug:' (formato neutral)"
-  );
-  test.todo(
-    "listaCortes() debe eliminarse de orden.js — reemplazar por contrato.getProductosDisponibles()"
-  );
-  test.todo(
-    "getCortesBDObj() no debe llamarse desde handlers genéricos — solo desde src/giros/taqueria/"
-  );
-  test.todo(
-    "respuestas.js no debe llamar directamente a getCortesBDObj() ni generar mensajes de 'cortes'"
-  );
-  test.todo(
-    "comandos.js no debe llamar a nombresCortesActivos() directamente — delegar al Giro"
-  );
+describe("Estado objetivo — post fases 5-7", () => {
+  test("orden.js no usa 'taco'/'torta' hardcodeados — el tipo de ítem lo provee el Giro", () => {
+    const n = contarPatron(leerLineas(p("src/handlers/flujos/orden.js")), PAT_ITEM_TYPES_HW);
+    assert.equal(n, 0,
+      `orden.js tiene ${n} strings 'taco'/'torta' hardcodeados — el Giro activo debe proveerlos`
+    );
+  });
+
+  test("el campo JSON 'corte:' no existe en orden.js — usa 'productoSlug:' del formato neutral", () => {
+    const n = contarPatron(leerLineas(p("src/handlers/flujos/orden.js")), PAT_CORTE_FIELD);
+    assert.equal(n, 0,
+      `orden.js tiene ${n} campos 'corte:' — la construcción de ítems debe usar productoSlug`
+    );
+  });
+
+  test("listaCortes() no existe en orden.js — el contrato del Giro provee los productos disponibles", () => {
+    const n = contarPatron(leerLineas(p("src/handlers/flujos/orden.js")), PAT_FN_TAQUERIA);
+    assert.equal(n, 0,
+      `orden.js tiene ${n} llamadas a listaCortes/getCortesBDObj/nombresCortesActivos — solo en src/giros/taqueria/`
+    );
+  });
+
+  test("getCortesBDObj() ausente de todos los handlers genéricos — solo en src/giros/taqueria/", () => {
+    const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_FN_TAQUERIA);
+    assert.equal(n, 0,
+      `${n} handlers genéricos llaman a funciones NLU de taquería — deben estar solo en src/giros/taqueria/`
+    );
+  });
+
+  test("respuestas.js no llama a getCortesBDObj() ni genera mensajes de 'cortes' directamente", () => {
+    const n = contarPatron(leerLineas(p("src/handlers/respuestas.js")), PAT_FN_TAQUERIA);
+    assert.equal(n, 0,
+      `respuestas.js tiene ${n} llamadas a funciones NLU de taquería — delegar al Giro activo`
+    );
+  });
+
+  test("comandos.js no llama a nombresCortesActivos() directamente — delega al Giro", () => {
+    const n = contarPatron(leerLineas(p("src/handlers/comandos.js")), PAT_FN_TAQUERIA);
+    assert.equal(n, 0,
+      `comandos.js tiene ${n} llamadas a nombresCortesActivos u otras funciones NLU de taquería`
+    );
+  });
 });
