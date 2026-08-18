@@ -162,7 +162,6 @@ function crearContratoGiro(giro, cargarNlu) {
       return resultado?.tipo === 'pedido' ? modeloPedido.pedidoDesdeLegacy(resultado) : resultado;
     },
     normalizarPedido: modeloPedido.pedidoDesdeLegacy,
-    convertirPedidoLegacy: modeloPedido.pedidoALegacy,
     validarPedido: modeloPedido.validarPedido,
     detectarDatoFaltante: (texto, _contexto = {}) => {
       const variante = llamar('detectarSinCorte', null, texto);

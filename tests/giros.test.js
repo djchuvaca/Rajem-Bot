@@ -46,13 +46,14 @@ test('el contrato normaliza datos faltantes sin vocabulario de taquería en hand
 });
 
 test('el contrato puede entregar un pedido neutral sin cambiar su API legacy', () => {
+  const { pedidoALegacy } = require('../src/pedido/modelo');
   const contrato = getContratoGiro('taqueria');
   const legacy = contrato.parsearPedido('3 tacos de surtido');
   const neutral = contrato.parsearPedidoNormalizado('3 tacos de surtido');
   assert.equal(legacy.items[0].presentacion, 'taco');
   assert.equal(neutral.partidas[0].formatoSlug, 'taco');
   assert.equal(neutral.partidas[0].productoSlug, 'surtido');
-  assert.deepEqual(contrato.convertirPedidoLegacy(neutral), legacy);
+  assert.deepEqual(pedidoALegacy(neutral), legacy);
 });
 
 test('rechaza definiciones de Giro incompletas antes de registrarlas', () => {

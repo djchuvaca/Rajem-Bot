@@ -439,7 +439,7 @@ describe("Verificaciones de código: el módulo real implementa el contrato del 
     const contrato = getContratoGiro("taqueria");
     assert.equal(typeof contrato.parsearPedido, "function", "parsearPedido debe ser función");
     assert.equal(typeof contrato.calcularPrecioPartida, "function", "calcularPrecioPartida debe ser función");
-    assert.equal(typeof contrato.convertirPedidoLegacy, "function", "convertirPedidoLegacy debe ser función");
+    assert.equal(typeof contrato.convertirPedidoLegacy, "undefined", "convertirPedidoLegacy retirado del contrato público — usar src/pedido/modelo directamente");
   });
 
   test("catalogo del contrato devuelve presentaciones no vacías", () => {

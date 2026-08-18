@@ -246,11 +246,11 @@ describe("Verificación funcional: adaptadores legacy↔neutral bidireccionales"
     assert.equal(vuelta.items[1].cantidad, 1, "segundo ítem: cantidad 1");
   });
 
-  test("contrato expone convertirPedidoLegacy como alias de pedidoALegacy", () => {
+  test("contrato ya no expone convertirPedidoLegacy — retirado del contrato público", () => {
     const { getContratoGiro } = require("../src/giros");
     const contrato = getContratoGiro("taqueria");
-    assert.equal(typeof contrato.convertirPedidoLegacy, "function",
-      "contrato.convertirPedidoLegacy debe ser una función (adaptador de salida)"
+    assert.equal(typeof contrato.convertirPedidoLegacy, "undefined",
+      "contrato.convertirPedidoLegacy debe ser undefined — usar src/pedido/modelo o compatibilidad/ directamente"
     );
   });
 });
@@ -259,20 +259,55 @@ describe("Verificación funcional: adaptadores legacy↔neutral bidireccionales"
 // SECCIÓN 5 — Estado objetivo (especificaciones)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Estado objetivo — post fases 5-7 (especificaciones)", () => {
-  test.todo(
-    "contrato.js no debe exponer convertirPedidoLegacy — los handlers usan solo el formato neutral"
-  );
-  test.todo(
-    "pedidoALegacy / pedidoDesdeLegacy deben moverse a src/compatibilidad/pedidos-v1.js si se conservan para pedidos históricos"
-  );
-  test.todo(
-    "msg.reply + listaCortes() deben reemplazarse por contrato.getTextoProductosDisponibles() o similar"
-  );
-  test.todo(
-    "orden.js no debe importar directamente getCortesBDObj ni listaCortes (obtenerlos vía Giro)"
-  );
-  test.todo(
-    "no debe existir ningún ref a pedidoALegacy en el flujo operativo activo (solo en compatibilidad/)"
-  );
+describe("Estado objetivo — post fases 5-7", () => {
+  test("contrato.js no expone convertirPedidoLegacy — los handlers usan solo el formato neutral", () => {
+    const { getContratoGiro } = require("../src/giros");
+    const contrato = getContratoGiro("taqueria");
+    assert.equal(typeof contrato.convertirPedidoLegacy, "undefined",
+      "contrato.convertirPedidoLegacy retirado — usar src/pedido/modelo o src/compatibilidad/pedidos-v1.js"
+    );
+  });
+
+  test("pedidoALegacy y pedidoDesdeLegacy disponibles desde src/compatibilidad/pedidos-v1.js", () => {
+    const compat = require("../src/compatibilidad/pedidos-v1");
+    assert.equal(typeof compat.pedidoALegacy, "function",
+      "pedidoALegacy debe exportarse desde compatibilidad/"
+    );
+    assert.equal(typeof compat.pedidoDesdeLegacy, "function",
+      "pedidoDesdeLegacy debe exportarse desde compatibilidad/"
+    );
+  });
+
+  test("msg.reply + listaCortes() ausente de handlers — reemplazado por contrato del Giro", () => {
+    const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_REPLY_LISTA_CORTES);
+    assert.equal(n, 0,
+      `${n} handlers tienen msg.reply + listaCortes() — usar el contrato del Giro para texto de productos`
+    );
+  });
+
+  test("orden.js no importa getCortesBDObj ni listaCortes directamente — los obtiene vía Giro", () => {
+    const PAT_FN_TAQUERIA_LOCAL = /\b(?:listaCortes|getCortesBDObj|nombresCortesActivos|buscarCorteFuzzy)\s*\(/;
+    const n = contarPatron(leerLineas(p("src/handlers/flujos/orden.js")), PAT_FN_TAQUERIA_LOCAL);
+    assert.equal(n, 0,
+      `orden.js tiene ${n} llamadas directas a listaCortes/getCortesBDObj — obtenerlas vía contrato del Giro`
+    );
+  });
+
+  test("pedidoALegacy ausente del flujo operativo activo — solo en src/compatibilidad/", () => {
+    const FLUJO_OPERATIVO = [
+      ...HANDLERS_GENERICOS,
+      p("src/giros/contrato.js"),
+      p("src/giros/conversacion.js"),
+      p("src/giros/modificaciones.js"),
+      p("src/giros/precios.js"),
+      p("src/giros/catalogo-tenant.js"),
+      p("index.js"),
+      p("src/panel/server.js"),
+    ];
+    const PAT_PEDIDO_A_LEGACY = /\bpedidoALegacy\b/;
+    const n = contarEnArchivos(FLUJO_OPERATIVO, PAT_PEDIDO_A_LEGACY);
+    assert.equal(n, 0,
+      `${n} archivos del flujo operativo referencian pedidoALegacy — debe estar solo en src/compatibilidad/`
+    );
+  });
 });
