@@ -380,9 +380,27 @@ function aplicarModificacion(modificacion, ordenTexto) {
   }
 }
 
+/**
+ * Aplica una operación neutral (src/giros/modificaciones.js) sobre el texto
+ * de la orden acumulada. Bridge de migración: traduce neutral→texto hasta que
+ * los handlers operen sobre el modelo neutral completo (Fase 8).
+ */
+function aplicarModificacionNeutral(op, ordenTexto) {
+  if (!op || !ordenTexto) return null;
+  switch (op.tipo) {
+    case 'reducir_cantidad':
+      return aplicarQuitarUno(ordenTexto, op.selector?.productoSlug || null);
+    case 'cambiar_variante':
+      return aplicarCambiarCorte(ordenTexto, op.de, op.a);
+    default:
+      return null;
+  }
+}
+
 module.exports = {
   generarRespuestaAutomatica,
   aplicarModificacion,
+  aplicarModificacionNeutral,
   respuestaPrecio,
   respuestaHorario,
   respuestaDomicilio,

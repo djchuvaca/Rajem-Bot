@@ -10,14 +10,17 @@ const {
 const { generarResumen, jsonALineas, extraerOrdenDeResumen, formatearListaAcumulada } = require("../../pedido/resumen");
 const {
   parsearPedidoSimple, detectarSinCorte, detectarSinTipo,
-  detectarModificacion, detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
+  detectarRepetirPedido, getCortes, detectarPreguntaFrecuente,
   detectarRefresco, getSalsas, detectarSalsa, separarRefresco, parsearDistribucionCortes,
   parsearDistribucionRefrescos, detectarComplementosNoDisponibles, normalizar, buscarCorteFuzzy,
   detectarTipoItemDesdeTexto, listaItemTypes,
   detectarPlanPorcionado, resolverPorcionadoPendiente,
 } = require("../pedidoParser");
-const { generarRespuestaAutomatica, aplicarModificacion } = require("../respuestas");
+const { generarRespuestaAutomatica, aplicarModificacionNeutral } = require("../respuestas");
 const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
+const { crearOperacion } = require('../../giros/modificaciones');
+const { crearPartidaProducto, crearCantidad } = require('../../pedido/modelo');
+const { getContratoGiroActivo } = require('../../giros');
 const { getUltimoPedido } = require("../../db");
 const { MENU_FORMATO } = require("../../config");
 const {
@@ -381,9 +384,9 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         return true;
       }
     }
-    const modLocal = detectarModificacion(textoOriginal);
+    const modLocal = getContratoGiroActivo().detectarModificacionNeutral(textoOriginal);
     if (modLocal) {
-      const textoMod = aplicarModificacion(modLocal, itemData.lineas);
+      const textoMod = aplicarModificacionNeutral(modLocal, itemData.lineas);
       if (textoMod) {
         const subtotalMod = calcularSubtotal(textoMod);
         const textoFinalMod = textoMod + "\n💰 Subtotal: $" + subtotalMod;
@@ -392,7 +395,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         historial.push({ role: "user",      content: textoOriginal });
         historial.push({ role: "assistant", content: textoFinalMod });
         await msg.reply(textoFinalMod + "\n\n*¿Es correcto?*");
-        console.log(`Bot: [MOD LOCAL confirmación] tipo: ${modLocal.tipo}`);
+        console.log(`Bot: [MOD NEUTRAL confirmación] tipo: ${modLocal.tipo}`);
         return true;
       }
     }
@@ -420,7 +423,10 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
           );
           const slugActual = corteActualKey ? cortesMap[corteActualKey] : null;
           if (slugActual) {
-            const textoMod = aplicarModificacion({ tipo: "cambiar_corte", de: slugActual, por: corteNuevo }, itemData.lineas);
+            const textoMod = aplicarModificacionNeutral(
+              crearOperacion('cambiar_variante', { de: slugActual, a: corteNuevo }),
+              itemData.lineas
+            );
             if (textoMod) {
               const subtotalMod = calcularSubtotal(textoMod);
               const textoFinalMod = textoMod + "\n💰 Subtotal: $" + subtotalMod;
@@ -1621,11 +1627,11 @@ async function handleSinTipo(msg, textoOriginal, clienteNumero) {
 async function handleModificacionAgregarMas(msg, textoOriginal, clienteNumero) {
   if (!esperandoAgregarMas.has(clienteNumero)) return false;
 
-  const modificacion = detectarModificacion(textoOriginal);
+  const modificacion = getContratoGiroActivo().detectarModificacionNeutral(textoOriginal);
   if (!modificacion) return false;
 
   const ordenActual     = esperandoAgregarMas.get(clienteNumero);
-  const ordenModificada = aplicarModificacion(modificacion, ordenActual);
+  const ordenModificada = aplicarModificacionNeutral(modificacion, ordenActual);
   if (!ordenModificada) return false;
 
   esperandoAgregarMas.set(clienteNumero, ordenModificada);
@@ -1736,12 +1742,26 @@ async function handlePresupuestoInverso(msg, textoOriginal) {
   if (!monto || monto <= 0) return false;
 
   try {
-    const prs    = getPrecios();
-    const tacos  = Math.floor(monto / prs.pTaco);
-    const tortas = Math.floor(monto / prs.pTorta);
+    const { getItemTypes } = require('../../db');
+    const giro     = getContratoGiroActivo();
+    // Formatos activos por unidad — el giro decide qué se vende y a qué precio
+    const activos  = (getItemTypes() || []).filter(it => !it.soporta_gramos && !it.soporta_pesos);
+    if (!activos.length) return false;
+    const EMOJIS = { taco: '🌮', torta: '🥖', quesadilla: '🧀', burrito: '🌯', vampiro: '🌮', tostada: '🫓' };
     let rPres = `💰 Con *$${monto}* puedes llevarte:\n\n`;
-    if (tacos  > 0) rPres += `🌮 *${tacos} tacos* ($${prs.pTaco} c/u)\n`;
-    if (tortas > 0) rPres += `🥖 *${tortas} tortas* ($${prs.pTorta} c/u)\n`;
+    let tieneOpciones = false;
+    for (const it of activos) {
+      const precio = giro.calcularPrecioPartida(
+        crearPartidaProducto({ formatoSlug: it.slug, cantidad: crearCantidad('unidad', 1) })
+      );
+      if (!precio || precio <= 0) continue;
+      const cant = Math.floor(monto / precio);
+      if (cant <= 0) continue;
+      const nombre = it.nombre_plural || it.nombre;
+      rPres += `${EMOJIS[it.slug] || '🍽️'} *${cant} ${nombre}* ($${precio} c/u)\n`;
+      tieneOpciones = true;
+    }
+    if (!tieneOpciones) return false;
     rPres += `\n_¿Qué te preparamos?_ 😊`;
     await msg.reply(rPres);
     return true;
