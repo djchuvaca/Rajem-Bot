@@ -225,6 +225,11 @@ function crearContratoGiro(giro, cargarNlu) {
     },
     buscarVariante: (texto) => llamar('buscarCorteFuzzy', null, texto),
     getMapaVariantes: () => llamar('getCortes', {}),
+    esFormatoContable: (slug) => {
+      const noContables = new Set(giro.comportamiento?.tiposNoContables || []);
+      return !noContables.has(slug);
+    },
+    variantesExcluidas: Object.freeze(new Set(giro.comportamiento?.variantesExcluidasLista || [])),
     obtenerNlu,
   };
 

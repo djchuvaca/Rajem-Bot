@@ -106,11 +106,11 @@ const PAT_VOCAB_LIBRE = /\b(?:taco|torta|surtido|buche|cuero|cueritos|lengua|cos
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Ratchet: vocabulario exclusivo de taquería en handlers genéricos", () => {
-  test("item_types hardcodeados ('taco','torta') no crecen (baseline: ≤5)", () => {
+  test("item_types hardcodeados ('taco','torta') no crecen (baseline: ≤0)", () => {
     const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_ITEM_TYPES_HW);
-    assert.ok(n <= 5,
-      `Hay ${n} ocurrencias de "taco"/"torta" hardcodeados en handlers genéricos — límite: 5.\n` +
-      "Al completar la fase 5-7 del acople este número debe llegar a 0."
+    assert.ok(n <= 0,
+      `Hay ${n} ocurrencias de "taco"/"torta" hardcodeados en handlers genéricos — límite: 0.\n` +
+      "El tipo de ítem debe proveerlo el Giro activo."
     );
   });
 
@@ -122,19 +122,19 @@ describe("Ratchet: vocabulario exclusivo de taquería en handlers genéricos", (
     );
   });
 
-  test("slugs de cortes hardcodeados no crecen (baseline: ≤2)", () => {
+  test("slugs de cortes hardcodeados no crecen (baseline: ≤0)", () => {
     const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_SLUGS_CORTE);
-    assert.ok(n <= 2,
-      `Hay ${n} slugs de cortes específicos ('surtido', 'buche', etc.) hardcodeados — límite: 2.\n` +
+    assert.ok(n <= 0,
+      `Hay ${n} slugs de cortes específicos ('surtido', 'buche', etc.) hardcodeados — límite: 0.\n` +
       "Estos slugs deben vivir únicamente en src/giros/taqueria/."
     );
   });
 
-  test("llamadas a funciones NLU taquería en handlers no crecen (baseline: ≤25)", () => {
+  test("llamadas a funciones NLU taquería en handlers no crecen (baseline: ≤0)", () => {
     const n = contarEnArchivos(HANDLERS_GENERICOS, PAT_FN_TAQUERIA);
-    assert.ok(n <= 25,
-      `Hay ${n} llamadas a listaCortes/getCortesBDObj/nombresCortesActivos en handlers — límite: 25.\n` +
-      "Estas funciones deben ser abstraídas por el contrato del Giro."
+    assert.ok(n <= 0,
+      `Hay ${n} llamadas a listaCortes/getCortesBDObj/nombresCortesActivos en handlers — límite: 0.\n` +
+      "Estas funciones deben abstraerse por el contrato del Giro."
     );
   });
 });

@@ -194,5 +194,6 @@ module.exports = {
     soportaPorcionado:         true,
     tarjetaSoloMostrador:      true,
     variantesExcluidasLista:   ['surtido especial'],
+    tiposNoContables:          ['gramos', 'por_pesos'],
   },
 };

@@ -81,7 +81,9 @@ function respuestaPrecio(producto = null) {
       }
       const cortesDB = require('../giros/catalogo-tenant').getCortesTenant();
       const porSlug  = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
-      cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => c.slug !== 'surtido');
+      const { getContratoGiroActivo: _getContrato } = require('../giros');
+      const _excluidos = _getContrato().variantesExcluidas;
+      cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => !_excluidos.has(c.slug));
     } catch (_) {}
 
     // Precio para un corte en un formato específico

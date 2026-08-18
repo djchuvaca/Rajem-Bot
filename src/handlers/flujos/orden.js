@@ -260,7 +260,7 @@ async function handleEsperandoTipoItem(msg, textoOriginal, clienteNumero, histor
 
   esperandoTipoItem.delete(clienteNumero);
   _resetError(clienteNumero);
-  const tipo = tipoDetectado ? tipoDetectado.slug : "taco";
+  const tipo = tipoDetectado?.slug ?? getContratoGiroActivo().catalogo.presentaciones[0].slug;
   const json = { tipo: "pedido", items: [{ presentacion: tipo, cantidad: pendiente.cantidad, corte: pendiente.corte }] };
   pedidoJSONActual.set(clienteNumero, json);
   const resultado = jsonALineas(json);
@@ -608,7 +608,7 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
         const { _pendienteAgregar: _pa, ...itemDataBase } = itemData;
         esperandoConfirmacionItem.set(clienteNumero, {
           ...itemDataBase,
-          _pendienteAgregar: { cantidad: cantNum, tipoSlug: tipoDetectado?.slug || 'taco' },
+          _pendienteAgregar: { cantidad: cantNum, tipoSlug: tipoDetectado?.slug ?? getContratoGiroActivo().catalogo.presentaciones[0].slug },
         });
         await msg.reply(`Ese corte no está disponible hoy. Tenemos: *${getContratoGiroActivo().listaVariantes()}*\n\n¿De cuál quieres?`);
         return true;
@@ -1341,7 +1341,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
   // Pedido completo enviado en lugar de solo el corte
   const jsonGreedy = parsearPedidoSimple(textoOriginal);
   if (jsonGreedy && jsonGreedy.tipo === "pedido" && Array.isArray(jsonGreedy.items) && jsonGreedy.items.length > 0
-      && jsonGreedy.items.every(i => i.presentacion === "taco" || i.presentacion === "torta")) {
+      && jsonGreedy.items.every(i => getContratoGiroActivo().esFormatoContable(i.presentacion))) {
     const _corteGreedy = esperandoCorte.get(clienteNumero);
     const refrescosPendientesGreedy = _corteGreedy?._refrescosPendientes || [];
     const salsasPendientesGreedy      = _corteGreedy?._salsasPendientes      || [];
@@ -1362,7 +1362,7 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
     const pedParcDist = esperandoCorte.get(clienteNumero);
     const idxDist = pedParcDist._indiceActual || 0;
     const itemDist = pedParcDist.items[idxDist];
-    if (itemDist && (itemDist.presentacion === "taco" || itemDist.presentacion === "torta")) {
+    if (itemDist && getContratoGiroActivo().esFormatoContable(itemDist.presentacion)) {
       let nuevosItems = null;
 
       // La interpretación de platos y distribución pertenece al Giro activo.
@@ -1473,7 +1473,8 @@ async function handleEsperandoCorte(msg, textoOriginal, clienteNumero, historial
 
   // "de todos" / "de todo" / "cualquiera" → surtido
   if (!corteDetectado && /\b(?:todos?|de\s+todos?|de\s+todas?|cualquier(?:a)?|de\s+todo)\b/i.test(textoOriginal)) {
-    if (Object.values(getContratoGiroActivo().getMapaVariantes()).includes("surtido")) corteDetectado = "surtido";
+    const _surtidoSlug = getContratoGiroActivo().vocabulario?.surtidoSlug;
+    if (_surtidoSlug && Object.values(getContratoGiroActivo().getMapaVariantes()).includes(_surtidoSlug)) corteDetectado = _surtidoSlug;
   }
 
   if (!corteDetectado) {
