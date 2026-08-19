@@ -1863,6 +1863,20 @@ async function loadHistorialReparto() {
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Helper REST ────────────────────────────────────────────────────────────────
+async function api(url, opts = {}) {
+  const { method = 'GET', body } = opts;
+  const init = { method, headers: {} };
+  if (body !== undefined) {
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  const r = await fetch(url, init);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || data.mensaje || `HTTP ${r.status}`);
+  return data;
+}
+
 // ── CATÁLOGO DE GIROS ──────────────────────────────────────────────────────────
 let _catGiro   = null;
 let _catTipo   = 'cortes';
