@@ -101,24 +101,28 @@ async function resolverEsAdmin(msg, client) {
     }
   }
 
-  // Intento 4: acceso directo al store interno de WhatsApp Web vía Puppeteer
-  if (!participantes && client?.pupPage) {
+  // Intento 4: diagnóstico y búsqueda exhaustiva en el store de WhatsApp Web
+  console.log('[DEBUG admin] msg.from:', msg.from);
+  if (client?.pupPage) {
     try {
-      const raw = await client.pupPage.evaluate((groupId) => {
-        const chat = window.Store?.Chat?.get(groupId);
-        if (!chat) return null;
-        const pts = chat.groupMetadata?.participants?.getModelsArray?.() || [];
-        return pts.map(p => ({
-          id: p.id?._serialized || '',
-          isAdmin: !!p.isAdmin,
-          isSuperAdmin: !!p.isSuperAdmin,
-        }));
+      const diag = await client.pupPage.evaluate((groupId) => {
+        try {
+          const col = window.Store?.Chat;
+          if (!col) return { error: 'no window.Store.Chat' };
+          const todos = col.getModelsArray?.() || [];
+          const ids = todos.map(c => c.id?._serialized || '');
+          const chat = todos.find(c => (c.id?._serialized || '') === groupId);
+          if (!chat) return { totalChats: ids.length, primerosIds: ids.slice(0, 5), buscado: groupId };
+          const pts = chat.groupMetadata?.participants?.getModelsArray?.() || [];
+          return {
+            found: true,
+            participants: pts.map(p => ({ id: p.id?._serialized || '', isAdmin: !!p.isAdmin, isSuperAdmin: !!p.isSuperAdmin })),
+          };
+        } catch (e) { return { error: e.message }; }
       }, msg.from);
-      if (raw) {
-        participantes = raw;
-        console.log('[DEBUG admin] pupPage.evaluate OK, participantes:', raw.length);
-      } else {
-        console.log('[DEBUG admin] pupPage.evaluate: chat no encontrado en Store');
+      console.log('[DEBUG admin] pupPage diag:', JSON.stringify(diag));
+      if (diag?.found && diag.participants) {
+        participantes = diag.participants;
       }
     } catch (e4) {
       console.log('[DEBUG admin] pupPage.evaluate falló:', e4.message);
