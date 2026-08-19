@@ -87,7 +87,8 @@ git fetch origin main --quiet
 OLD_COMMIT="$(git rev-parse HEAD)"
 TARGET="$(git rev-parse origin/main)"
 if [[ "$OLD_COMMIT" == "$TARGET" ]]; then
-  log "Repositorio ya actualizado en ${TARGET:0:8}; completando sincronización y reinicios"
+  log "Repositorio ya actualizado en ${TARGET:0:8}; sin cambios nuevos, omitiendo reinicios"
+  exit 0
 else
   log "Respaldando bases antes de ${OLD_COMMIT:0:8} → ${TARGET:0:8}"
   node scripts/backup-all-db.js
