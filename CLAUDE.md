@@ -1,6 +1,6 @@
 # Rajem's Technology — Bot SaaS de WhatsApp para negocios de comida
 
-> Estado de referencia: 2026-08-13. Este documento describe el código actual; los pendientes se identifican explícitamente.
+> Estado de referencia: 2026-08-18. Este documento describe el código actual; los pendientes se identifican explícitamente.
 
 ## Descripción del sistema
 
@@ -161,13 +161,13 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 ### Giros (módulos de negocio)
 - **`src/giros/taqueria.js`** — fuente única de verdad del giro taquería. Define `itemTypes[]`, `cortes[]`, `refrescos[]`, `salsas[]`, `configDefaults`, `vocabulario`, `mensajesDefaults` y `comportamiento`. El NLU toma nombre, alias y descripción de aquí; SQLite solo superpone activación y precio por tenant.
 - **`src/giros/index.js`** — `getGiroActivo()`, `getGiro(slug)`, `listGiros()`.
-- **`src/giros/catalogo-tenant.js`** — única fachada del catálogo operativo del tenant. Combina definiciones inmutables del Giro con el overlay permitido de SQLite: `menu_items` para cortes, bebidas y salsas; `item_types` para presentaciones. Panel, NLU, respuestas, comandos y cobro deben pasar por esta fachada.
+- **`src/giros/catalogo-tenant.js`** — única fachada del catálogo operativo del tenant. Combina definiciones inmutables del Giro con el overlay permitido de SQLite: `menu_items` para cortes, bebidas y salsas; `item_types` para presentaciones. Panel, NLU, respuestas, comandos y cobro deben pasar por esta fachada. `getAliasMapCortes()` es la fuente única de aliases para el NLU — `db/cortes.js::getCortesBD()` delega a ella.
 - **`src/giros/hamburgueseria.js`** y **`src/giros/hamburgueseria/nlu.js`** — implementación del giro hamburguesería: formatos, variantes, catálogo, mensajes y NLU. Está registrado en `src/giros/index.js`; debe validarse funcionalmente antes de ofrecerlo a producción.
 
 ### Base de datos
 - **`src/db/core.js`** — `initDB()` abre `data/{TENANT_ID || 'tacos_javier'}.db`. Usa `journal_mode = DELETE` y `busy_timeout = 5000`. `guardarDB()` es no-op (better-sqlite3 persiste automáticamente, el shim existe para compatibilidad legacy).
 - **`src/db/seed.js`** — crea tablas, proyecta las definiciones del Giro y migra una sola vez los valores de `productos` antiguos hacia `menu_items`. `productos` queda únicamente como almacenamiento heredado de migración y no participa en panel, NLU, respuestas ni cobro.
-- **`src/db/cortes.js`** — proyecta los cortes definidos por el Giro y cruza obligatoriamente su disponibilidad con `menu_items`. Un menú vacío permanece vacío; nunca reactiva automáticamente el catálogo completo. Los precios efectivos se resuelven desde `menu_items`.
+- **`src/db/cortes.js`** — `getCortesBD()` delega a `catalogo-tenant.getAliasMapCortes()` (fuente única de aliases). `getPrecioCorteFormato()` delega a `catalogo-tenant.getPrecioMenu()`. `calcularPrecioMixto()` aplica estrategia `mas_caro`/`promedio`. Los precios efectivos siempre vienen de `menu_items`.
 - **`src/db/modelos.js`** — CRUD de clientes y pedidos. `actualizarEstadoPedido()` por teléfono, `actualizarEstadoPorId()` por ID (webhooks de pago). No expone CRUD operativo de la tabla histórica `productos`.
 - **`src/db/config.js`** — `getConfig()`, `setConfig()`, horarios, banco, mensajes_bot, JIDs reales.
 - **`src/db/repartidores.js`** — CRUD repartidores + historial de entregas. `registrarEntregaConfirmada()` (actualiza promedio, escribe a `entregas_historial`), `registrarEntregaTimeout()` (escribe con `confirmado=0, minutos=NULL`), `getHistorialTenant()`, `getReporteDesempeno()`, `resetEntregasHoy()`.
@@ -199,7 +199,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/prompts/base.js`** — prompt de sistema para Groq.
 - **`src/horario.js`** — lógica de horario de atención.
 - **`src/config.js`** — helpers de configuración del negocio.
-- **`src/pedido/precios.js`** — cálculo de precios desde BD.
+- **`src/pedido/precios.js`** — API legacy de precios (`getPrecios()`, `calcularPrecioItem()`). Ambas funciones registran telemetría via `legacy-tracker`. Soporta flags de interruptor: `PRECIOS_GIRO_UNICO=true` lanza error explícito en ambas (fuerza migración a `calcularPrecioPartida()`); `LEGACY_READ_FALLBACK=false` hace lo mismo. La ruta migrada es `getContratoGiroActivo().calcularPrecioPartida(partida)`.
 - **`src/nlu/core.js`** — utilidades NLU genéricas reutilizables por todos los giros.
 
 ---
@@ -403,6 +403,10 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 | 8 | Mejoras al diccionario de colonias — `normalizarTexto()` amplía: palabras numéricas (doce→12), ordinals 4-6, "ampl." | ✅ completa |
 | 9 | Tarifas de reparto por distancia — tabla `tarifas_zonas`, `calcularTarifaDomicilio()` Haversine, UI superadmin + solicitudes tenant | ✅ completa |
 | 10 | Corrección de variables de provisionamiento | ✅ completa |
+| 11 | Retiro vocabulario legacy — `convertirPedidoLegacy` fuera del contrato; tests handlers-vocabulario | ✅ `924d14a` |
+| 12 | Retiro adaptadores legacy — `convertirPedidoLegacy` eliminado del contrato público | ✅ `12aa6b2` |
+| 13 | Retiro legado de precios y aliases — `pTaco/pTorta` fuera de handlers; `getCortesBD()` delega a `catalogo-tenant`; flags `PRECIOS_GIRO_UNICO` / `LEGACY_READ_FALLBACK` | ✅ `100085c` |
+| 14–16 | Migración BD, validación integral (VPS+WA) y deploy gradual | Pendiente — requiere entorno real |
 
 ---
 

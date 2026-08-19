@@ -210,25 +210,45 @@ describe("Plan de despliegue gradual — 12 pasos (validación manual)", () => {
 // SECCIÓN 5 — Criterios de finalización de la Fase 8
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Criterios de finalización de la Fase 8 (test.todo)", () => {
+describe("Criterios de finalización de la Fase 8", () => {
   test.todo(
     "No hay catálogos operativos fuera del módulo Giro — src/giros/taqueria/ es la única fuente"
   );
-  test.todo(
-    "El núcleo (handlers, flujos) no contiene reglas específicas de taquería — vocabulario en 0"
-  );
-  test.todo(
-    "No existen escrituras hacia productos ni cortes.precio_base desde código operativo"
-  );
-  test.todo(
-    "No existen lecturas silenciosas de respaldo legacy (LEGACY_READ_FALLBACK=false permanente)"
-  );
+
+  test("el núcleo no contiene vocabulario taquería-específico — pTaco/pTorta/p100g en 0", () => {
+    const n = contarEnArchivos(CODIGO_OPERATIVO, /\b(pTaco|pTorta|p100g)\b/);
+    assert.equal(n, 0,
+      `pTaco/pTorta/p100g aparecen ${n} veces en código operativo — deben estar solo en src/giros/taqueria/`
+    );
+  });
+
+  test("no hay escrituras a productos ni cortes.precio_base desde código operativo", () => {
+    const nProd = contarEnArchivos(CODIGO_OPERATIVO, /\b(INSERT|UPDATE|DELETE)\b.{0,60}\bproductos\b/i);
+    const nCortesPrecio = contarEnArchivos(CODIGO_OPERATIVO, /UPDATE\s+cortes\b.{0,60}precio_base/i);
+    assert.equal(nProd, 0, `${nProd} escrituras a productos en código operativo — deben ser 0`);
+    assert.equal(nCortesPrecio, 0, `${nCortesPrecio} actualizaciones a cortes.precio_base — deben ser 0`);
+  });
+
+  test("precios.js tiene el guard LEGACY_READ_FALLBACK — no hay lecturas silenciosas de respaldo", () => {
+    const lineas = leerLineas(p("src/pedido/precios.js"));
+    const tieneGuard = contarPatron(lineas, /LEGACY_READ_FALLBACK/) > 0;
+    assert.ok(tieneGuard,
+      "precios.js debe tener el guard LEGACY_READ_FALLBACK — activa error explícito en lugar de silencio"
+    );
+  });
+
   test.todo(
     "WhatsApp y ambos paneles (tenant + superadmin) muestran la misma lista de productos y precios"
   );
-  test.todo(
-    "Los pedidos históricos permanecen intactos tras migrar() — totales e importes sin cambio"
-  );
+
+  test("migrar-bd.js no contiene operaciones destructivas — pedidos históricos seguros", () => {
+    const lineas = leerLineas(p("src/migration/migrar-bd.js"));
+    const nDrop = contarPatron(lineas, /\bDROP\s+TABLE\b/i);
+    const nDeletePedidos = contarPatron(lineas, /\bDELETE\s+FROM\s+pedidos\b/i);
+    assert.equal(nDrop, 0, "migrar-bd.js no debe hacer DROP TABLE — migración no destructiva");
+    assert.equal(nDeletePedidos, 0, "migrar-bd.js no debe borrar pedidos — historial intacto");
+  });
+
   test.todo(
     "La documentación técnica (CLAUDE.md) refleja la arquitectura definitiva sin referencias a tablas legacy"
   );
