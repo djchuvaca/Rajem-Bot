@@ -41,11 +41,19 @@ async function resolverEsAdmin(msg, client) {
 
   const candidatos = new Set([autorOriginal]);
 
-  if (autorOriginal.endsWith('@lid') && typeof client?.getContactLidAndPhone === 'function') {
+  if (autorOriginal.endsWith('@lid')) {
+    if (typeof client?.getContactLidAndPhone === 'function') {
+      try {
+        const resultados = await client.getContactLidAndPhone([autorOriginal]);
+        const telefono   = _jid(resultados?.[0]?.pn);
+        if (telefono) candidatos.add(telefono);
+      } catch (_) {}
+    }
+    // Fallback: getContact() devuelve el JID canónico (@c.us) cuando getContactLidAndPhone falla
     try {
-      const resultados = await client.getContactLidAndPhone([autorOriginal]);
-      const telefono   = _jid(resultados?.[0]?.pn);
-      if (telefono) candidatos.add(telefono);
+      const contacto = await msg.getContact();
+      const canonico = _jid(contacto?.id);
+      if (canonico && !canonico.endsWith('@lid')) candidatos.add(canonico);
     } catch (_) {}
   }
 
