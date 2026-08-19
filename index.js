@@ -8,11 +8,7 @@ if (process.env.SENTRY_DSN) {
 
 // ── VALIDACIÓN DE VARIABLES DE ENTORNO ───────────────────────────────────────
 (function validarEnv() {
-  // GROQ_API_KEY ya no es requerida en .env — puede configurarse desde el super-admin (admin.db)
-  if (!process.env.GROQ_API_KEY) {
-    console.warn("⚠️  GROQ_API_KEY no está en .env. Configúrala desde el super-admin si este tenant tiene IA activa.");
-  }
-  if (process.env.NODE_ENV === "production" && (!process.env.PANEL_SECRET || process.env.PANEL_SECRET.length < 32)) {
+if (process.env.NODE_ENV === "production" && (!process.env.PANEL_SECRET || process.env.PANEL_SECRET.length < 32)) {
     throw new Error("PANEL_SECRET es obligatorio en producción y debe tener al menos 32 caracteres.");
   } else if (!process.env.PANEL_SECRET) {
     console.warn("⚠️  PANEL_SECRET no está definido. Se usará un secreto local de desarrollo.");
