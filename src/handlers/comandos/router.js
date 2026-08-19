@@ -44,6 +44,7 @@ function _normalizeLid(jid) {
  */
 async function resolverEsAdmin(msg, client) {
   const autorOriginal = _jid(msg.author) || (msg.fromMe ? _jid(client?.info?.wid) : '');
+  console.log('[DEBUG admin] autorOriginal:', autorOriginal, '| fromMe:', msg.fromMe);
   if (!autorOriginal) return false;
 
   const candidatos = new Set([autorOriginal, _normalizeLid(autorOriginal)]);
@@ -53,15 +54,17 @@ async function resolverEsAdmin(msg, client) {
       try {
         const resultados = await client.getContactLidAndPhone([autorOriginal]);
         const telefono   = _jid(resultados?.[0]?.pn);
+        console.log('[DEBUG admin] getContactLidAndPhone resultado:', telefono);
         if (telefono) candidatos.add(telefono);
-      } catch (_) {}
+      } catch (e) { console.log('[DEBUG admin] getContactLidAndPhone error:', e.message); }
     }
     // Fallback: getContact() devuelve el JID canónico (@c.us) cuando getContactLidAndPhone falla
     try {
       const contacto = await msg.getContact();
       const canonico = _jid(contacto?.id);
+      console.log('[DEBUG admin] getContact canonico:', canonico);
       if (canonico) { candidatos.add(canonico); candidatos.add(_normalizeLid(canonico)); }
-    } catch (_) {}
+    } catch (e) { console.log('[DEBUG admin] getContact error:', e.message); }
   }
 
   let chat;
@@ -72,10 +75,10 @@ async function resolverEsAdmin(msg, client) {
     return false;
   }
 
-  return (chat?.participants || []).some(p => {
-    const id = _jid(p.id || p);
-    return (candidatos.has(id) || candidatos.has(_normalizeLid(id))) && (p.isAdmin || p.isSuperAdmin);
-  });
+  const admins = (chat?.participants || []).filter(p => p.isAdmin || p.isSuperAdmin).map(p => _jid(p.id || p));
+  console.log('[DEBUG admin] candidatos:', [...candidatos], '| admins en grupo:', admins);
+
+  return admins.some(id => candidatos.has(id) || candidatos.has(_normalizeLid(id)));
 }
 
 // ── Router principal ──────────────────────────────────────────────────────────
