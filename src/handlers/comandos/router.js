@@ -107,17 +107,18 @@ async function resolverEsAdmin(msg, client) {
     try {
       const diag = await client.pupPage.evaluate((groupId) => {
         try {
-          const col = window.Store?.Chat;
-          if (!col) return { error: 'no window.Store.Chat' };
-          const todos = col.getModelsArray?.() || [];
-          const ids = todos.map(c => c.id?._serialized || '');
-          const chat = todos.find(c => (c.id?._serialized || '') === groupId);
-          if (!chat) return { totalChats: ids.length, primerosIds: ids.slice(0, 5), buscado: groupId };
-          const pts = chat.groupMetadata?.participants?.getModelsArray?.() || [];
-          return {
-            found: true,
-            participants: pts.map(p => ({ id: p.id?._serialized || '', isAdmin: !!p.isAdmin, isSuperAdmin: !!p.isSuperAdmin })),
-          };
+          // Qué hay en window.Store
+          const storeKeys = window.Store ? Object.keys(window.Store).slice(0, 20) : null;
+          // Qué hay en window.WWebJS
+          const wwebjsKeys = window.WWebJS ? Object.keys(window.WWebJS).slice(0, 20) : null;
+          // Intentar rutas alternativas
+          const altChat = window.Store?.GroupMetadata || window.WWebJS?.GroupMetadata;
+          const altChatKeys = altChat ? Object.keys(altChat).slice(0, 10) : null;
+          // Buscar en todos los módulos inyectados
+          const moduleKeys = typeof window.require === 'function'
+            ? (() => { try { return Object.keys(window.require.m || {}).slice(0, 10); } catch(_) { return null; } })()
+            : null;
+          return { storeKeys, wwebjsKeys, altChatKeys, moduleKeys, groupId };
         } catch (e) { return { error: e.message }; }
       }, msg.from);
       console.log('[DEBUG admin] pupPage diag:', JSON.stringify(diag));
