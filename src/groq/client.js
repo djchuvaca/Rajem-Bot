@@ -1,7 +1,6 @@
 'use strict';
 
 // Cliente Groq mínimo — solo para NLU de soporte, no genera texto al cliente.
-// Modelo: llama-3.1-8b-instant (10x más barato que 70b, suficiente para parseo estructurado).
 
 const GROQ_TIMEOUT_MS = parseInt(process.env.GROQ_TIMEOUT_MS || '8000', 10);
 const GROQ_MODEL = 'openai/gpt-oss-20b';
@@ -10,9 +9,7 @@ let _groqClient = null;
 let _intentadoInit = false;
 
 function _getApiKey() {
-  // 1. Variable de entorno del tenant (máxima prioridad)
   if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
-  // 2. Config global del superadmin (compartida entre todos los tenants)
   try {
     const { getGroqApiKeyGlobal } = require('../db/admin');
     const keyGlobal = getGroqApiKeyGlobal();
@@ -38,9 +35,20 @@ function _getGroq() {
   }
 }
 
+// Extrae el primer objeto JSON del texto, ignorando bloques <think>...</think>
+// que producen modelos de razonamiento como Qwen3.
+function _extractJson(text) {
+  if (!text) return null;
+  const sin = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const start = sin.indexOf('{');
+  const end   = sin.lastIndexOf('}');
+  if (start === -1 || end < start) return null;
+  try { return JSON.parse(sin.slice(start, end + 1)); } catch (_) { return null; }
+}
+
 /**
  * Llama a Groq con systemPrompt + userMessage.
- * Fuerza salida JSON. Devuelve el objeto parseado o null ante cualquier error.
+ * Devuelve el objeto JSON parseado o null ante cualquier error.
  */
 async function groqJSON(systemPrompt, userMessage) {
   const groq = _getGroq();
@@ -56,14 +64,12 @@ async function groqJSON(systemPrompt, userMessage) {
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: userMessage  },
       ],
-      response_format: { type: 'json_object' },
       temperature: 0,
-      max_tokens: 200,
+      max_tokens: 400,
     }, { signal: controller.signal });
 
     const raw = completion.choices[0]?.message?.content;
-    if (!raw) return null;
-    return JSON.parse(raw);
+    return _extractJson(raw);
   } catch (_) {
     return null;
   } finally {
