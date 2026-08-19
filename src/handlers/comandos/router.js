@@ -35,8 +35,11 @@ function _normalizeLid(jid) {
 
 /**
  * Determina si el autor del mensaje es administrador del grupo.
- * Maneja los JIDs @lid que WhatsApp Web puede enviar en lugar del teléfono real.
- * Si msg.getChat() lanza el error interno 'r', retorna false.
+ *
+ * Estrategia en cascada:
+ *   1. Obtener participantes vía msg.getChat() / getChatById() / getChats()
+ *   2. Si el Store de WA está roto (error "r"), caer en whitelist de BD:
+ *      configuracion.operadores_jids = JIDs o teléfonos separados por coma
  *
  * @param {object} msg    — mensaje de WhatsApp
  * @param {object} client — cliente de WhatsApp
@@ -44,98 +47,69 @@ function _normalizeLid(jid) {
  */
 async function resolverEsAdmin(msg, client) {
   const autorOriginal = _jid(msg.author) || (msg.fromMe ? _jid(client?.info?.wid) : '');
-  console.log('[DEBUG admin] autorOriginal:', autorOriginal, '| fromMe:', msg.fromMe);
   if (!autorOriginal) return false;
 
   const candidatos = new Set([autorOriginal, _normalizeLid(autorOriginal)]);
 
+  // Resolver @lid → JID canónico (@c.us)
   if (autorOriginal.endsWith('@lid')) {
     if (typeof client?.getContactLidAndPhone === 'function') {
       try {
         const resultados = await client.getContactLidAndPhone([autorOriginal]);
-        const telefono   = _jid(resultados?.[0]?.pn);
-        console.log('[DEBUG admin] getContactLidAndPhone resultado:', telefono);
-        if (telefono) candidatos.add(telefono);
-      } catch (e) { console.log('[DEBUG admin] getContactLidAndPhone error:', e.message); }
+        const tel = _jid(resultados?.[0]?.pn);
+        if (tel) candidatos.add(tel);
+      } catch (_) {}
     }
-    // Fallback: getContact() devuelve el JID canónico (@c.us) cuando getContactLidAndPhone falla
     try {
       const contacto = await msg.getContact();
       const canonico = _jid(contacto?.id);
-      console.log('[DEBUG admin] getContact canonico:', canonico);
       if (canonico) { candidatos.add(canonico); candidatos.add(_normalizeLid(canonico)); }
-    } catch (e) { console.log('[DEBUG admin] getContact error:', e.message); }
+    } catch (_) {}
   }
 
+  // ── Intento 1-3: obtener participantes desde WhatsApp ────────────────────────
   let participantes = null;
 
-  // Intento 1: msg.getChat()
   try {
     const chat = await msg.getChat();
     participantes = chat?.participants || [];
-    console.log('[DEBUG admin] msg.getChat() OK, participantes:', participantes.length);
-  } catch (e1) {
-    console.log('[DEBUG admin] msg.getChat() falló:', e1.message);
-  }
+  } catch (_) {}
 
-  // Intento 2: client.getChatById()
   if (!participantes) {
     try {
       const chat = await client.getChatById(msg.from);
       participantes = chat?.participants || [];
-      console.log('[DEBUG admin] getChatById OK, participantes:', participantes.length);
-    } catch (e2) {
-      console.log('[DEBUG admin] getChatById falló:', e2.message);
-    }
+    } catch (_) {}
   }
 
-  // Intento 3: client.getChats() (ruta interna diferente)
   if (!participantes) {
     try {
       const todos = await client.getChats();
       const chat  = todos.find(c => (_jid(c.id) === msg.from) || c.id?._serialized === msg.from);
       participantes = chat?.participants || [];
-      console.log('[DEBUG admin] getChats() encontró chat:', !!chat, 'participantes:', participantes.length);
-    } catch (e3) {
-      console.log('[DEBUG admin] getChats() falló:', e3.message);
-    }
+    } catch (_) {}
   }
 
-  // Intento 4: diagnóstico y búsqueda exhaustiva en el store de WhatsApp Web
-  console.log('[DEBUG admin] msg.from:', msg.from);
-  if (client?.pupPage) {
-    try {
-      const diag = await client.pupPage.evaluate((groupId) => {
-        try {
-          // Qué hay en window.Store
-          const storeKeys = window.Store ? Object.keys(window.Store).slice(0, 20) : null;
-          // Qué hay en window.WWebJS
-          const wwebjsKeys = window.WWebJS ? Object.keys(window.WWebJS).slice(0, 20) : null;
-          // Intentar rutas alternativas
-          const altChat = window.Store?.GroupMetadata || window.WWebJS?.GroupMetadata;
-          const altChatKeys = altChat ? Object.keys(altChat).slice(0, 10) : null;
-          // Buscar en todos los módulos inyectados
-          const moduleKeys = typeof window.require === 'function'
-            ? (() => { try { return Object.keys(window.require.m || {}).slice(0, 10); } catch(_) { return null; } })()
-            : null;
-          return { storeKeys, wwebjsKeys, altChatKeys, moduleKeys, groupId };
-        } catch (e) { return { error: e.message }; }
-      }, msg.from);
-      console.log('[DEBUG admin] pupPage diag:', JSON.stringify(diag));
-      if (diag?.found && diag.participants) {
-        participantes = diag.participants;
-      }
-    } catch (e4) {
-      console.log('[DEBUG admin] pupPage.evaluate falló:', e4.message);
-    }
+  if (participantes) {
+    const admins = participantes
+      .filter(p => p.isAdmin || p.isSuperAdmin)
+      .map(p => _jid(p.id || p));
+    return admins.some(id => candidatos.has(id) || candidatos.has(_normalizeLid(id)));
   }
 
-  if (!participantes) return false;
+  // ── Fallback: whitelist de operadores en BD ──────────────────────────────────
+  // Úsalo cuando el Store de WA está roto (error "r" en todos los métodos anteriores).
+  // Configura: setConfig('operadores_jids', '5213113676885@c.us,521XXXXXXXXXX@c.us')
+  try {
+    const { getConfig } = require('../../db');
+    const raw = getConfig('operadores_jids') || '';
+    const whitelist = raw.split(',').map(j => j.trim()).filter(Boolean);
+    if (whitelist.length > 0) {
+      return whitelist.some(j => candidatos.has(j) || candidatos.has(_normalizeLid(j)));
+    }
+  } catch (_) {}
 
-  const admins = participantes.filter(p => p.isAdmin || p.isSuperAdmin).map(p => _jid(p.id || p));
-  console.log('[DEBUG admin] candidatos:', [...candidatos], '| admins en grupo:', admins);
-
-  return admins.some(id => candidatos.has(id) || candidatos.has(_normalizeLid(id)));
+  return false;
 }
 
 // ── Router principal ──────────────────────────────────────────────────────────
