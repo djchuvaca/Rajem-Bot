@@ -83,7 +83,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   exit 1
 fi
 
-git fetch origin main --quiet
+git fetch origin --quiet
 OLD_COMMIT="$(git rev-parse HEAD)"
 TARGET="$(git rev-parse origin/main)"
 if [[ "$OLD_COMMIT" == "$TARGET" ]]; then
