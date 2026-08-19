@@ -217,6 +217,7 @@ async function seedDB() {
   try { db.run("ALTER TABLE productos ADD COLUMN categoria TEXT DEFAULT 'corte'"); } catch (_) {}
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_slug TEXT DEFAULT NULL"); } catch (_) {}
   try { db.run("ALTER TABLE item_types ADD COLUMN precio_base INTEGER DEFAULT 0"); } catch (_) {}
+  try { db.run("ALTER TABLE item_types ADD COLUMN disponible INTEGER DEFAULT 1"); } catch (_) {}
   try { db.run("ALTER TABLE cortes ADD COLUMN seccion TEXT DEFAULT 'carnitas'"); } catch (_) {}
   try { db.run("ALTER TABLE menu_items ADD COLUMN disponible INTEGER DEFAULT 1"); } catch (_) {}
 

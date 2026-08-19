@@ -54,7 +54,7 @@ function getItemTypes(businessTypeSlug) {
       _cache = _defaultItemTypes();
     } else {
       const tipos = queryAll(
-        'SELECT * FROM item_types WHERE business_type_id = ? AND activo = 1 ORDER BY id',
+        'SELECT * FROM item_types WHERE business_type_id = ? AND activo = 1 AND COALESCE(disponible,1) = 1 ORDER BY id',
         [bt.id]
       );
       _cache = tipos && tipos.length ? tipos : _defaultItemTypes();

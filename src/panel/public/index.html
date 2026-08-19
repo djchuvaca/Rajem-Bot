@@ -591,7 +591,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
       </div>
 
       <!-- Salsas -->
-      <div class="card">
+      <div class="card" style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
           <div>
             <div class="card-title" style="margin:0">🌶️ Salsas</div>
@@ -609,6 +609,29 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
             <div class="empty-state-icon">🌶️</div>
             <div class="empty-state-title">Sin salsas en el menú</div>
             <div class="empty-state-sub">Solicita al Superadmin que habilite las salsas.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Presentaciones -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="card-title" style="margin:0">🍽️ Presentaciones</div>
+            <p style="font-size:12px;color:var(--muted);margin-top:4px">Tipos de servicio habilitados. Márcalos agotados si no puedes ofrecerlos temporalmente.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="menu-formatos-table" style="display:none">
+            <thead><tr><th>Presentación</th><th>Estado</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="menu-formatos-empty">
+          <div class="empty-state" style="padding:28px 24px">
+            <div class="empty-state-icon">🍽️</div>
+            <div class="empty-state-title">Sin presentaciones configuradas</div>
+            <div class="empty-state-sub">Solicita al Superadmin que habilite las presentaciones.</div>
           </div>
         </div>
       </div>
@@ -1700,6 +1723,42 @@ async function loadProductos() {
   _renderMenuCortes(formatosCorte);
   _renderMenuSimples('refresco', 'menu-bebidas-table', 'menu-bebidas-empty', 'Precio');
   _renderMenuSimples('salsa',    'menu-salsas-table',  'menu-salsas-empty',  'Precio extra');
+  _renderMenuFormatos(formatos || []);
+}
+
+function _renderMenuFormatos(formatos) {
+  const activos = formatos.filter(f => f.activo);
+  const table   = document.getElementById('menu-formatos-table');
+  const emptyEl = document.getElementById('menu-formatos-empty');
+  if (!table) return;
+
+  if (!activos.length) {
+    table.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  table.querySelector('tbody').innerHTML = activos.map(f => {
+    const disp = f.disponible !== 0;
+    return `<tr style="${disp ? '' : 'opacity:.55'}">
+      <td>
+        <div class="prod-cell">
+          <div class="prod-avatar">${f.emoji || '🍽️'}</div>
+          <div>
+            <div class="prod-name">${_esc(_ucfirst(f.nombre_plural || f.nombre))}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span class="badge ${disp ? 'badge-green' : 'badge-gray'}" style="cursor:pointer;white-space:nowrap"
+          onclick="toggleFormatoDisponible(${f.id},${disp ? 0 : 1})">
+          ${disp ? '✓ Disponible' : '○ Agotado'}
+        </span>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function _renderMenuCortes(formatos) {
@@ -1840,6 +1899,13 @@ async function toggleMenuItemDisponible(id, disponible) {
 async function toggleCorteDisponible(slug, disponible) {
   const r = await api('/api/menu-items/toggle-corte', 'POST', { producto_slug: slug, disponible });
   if (r.ok) toast(disponible ? `${slug} disponible en WhatsApp` : `${slug} marcado como agotado`);
+  else toast(r.error || 'No se pudo cambiar la disponibilidad', false);
+  loadProductos();
+}
+
+async function toggleFormatoDisponible(id, disponible) {
+  const r = await api(`/api/formatos/${id}`, 'PUT', { disponible });
+  if (r.ok) toast(disponible ? 'Presentación disponible en WhatsApp' : 'Presentación marcada como agotada');
   else toast(r.error || 'No se pudo cambiar la disponibilidad', false);
   loadProductos();
 }

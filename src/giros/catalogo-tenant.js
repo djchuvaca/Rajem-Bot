@@ -15,7 +15,8 @@ function getFormatosTenant({ todos = false } = {}) {
   return (giro.itemTypes || []).map(def => {
     const fila = porSlug.get(def.slug);
     return { ...def, id: fila?.id, business_type_id: fila?.business_type_id,
-      activo: fila?.activo ?? 0, precio_base: fila?.precio_base ?? def.precio_base ?? 0,
+      activo: fila?.activo ?? 0, disponible: fila?.disponible ?? 1,
+      precio_base: fila?.precio_base ?? def.precio_base ?? 0,
       aliases_json: JSON.stringify(def.aliases || []) };
   }).filter(f => todos || f.activo);
 }
@@ -130,6 +131,15 @@ function getAliasMapCortes() {
   return mapa;
 }
 
+function setFormatoDisponibilidad(id, disponible) {
+  const { getBsdb } = require('../db/core');
+  const db = getBsdb();
+  if (!db) return 0;
+  return db.prepare(
+    'UPDATE item_types SET disponible=? WHERE id=? AND activo=1'
+  ).run(disponible ? 1 : 0, id).changes;
+}
+
 function setPreciosCorte(productoSlug, precios = {}) {
   if (!esProductoValido('corte', productoSlug)) return 0;
   let cambios = 0;
@@ -146,6 +156,6 @@ function setPreciosCorte(productoSlug, precios = {}) {
 module.exports = {
   getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant,
   getMenuItemsTenant, getMenuItemsActivos, getDefinicionProducto, getPrecioMenu,
-  setMenuItemDisponibilidad, setPreciosCorte, esProductoValido, esFormatoIdValido,
+  setMenuItemDisponibilidad, setFormatoDisponibilidad, setPreciosCorte, esProductoValido, esFormatoIdValido,
   getAliasMapCortes,
 };

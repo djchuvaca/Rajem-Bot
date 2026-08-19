@@ -962,6 +962,19 @@ app.post("/api/menu-items/toggle-corte", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Disponibilidad de presentaciones (item_types) — solo disponible, no activo
+app.put("/api/formatos/:id", requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { disponible } = req.body;
+  if (isNaN(id) || disponible === undefined) return res.status(400).json({ error: 'id y disponible requeridos' });
+  if (!catalogoTenant.esFormatoIdValido(id)) return res.status(404).json({ error: 'Formato no encontrado o no activo' });
+  const cambios = catalogoTenant.setFormatoDisponibilidad(id, disponible);
+  if (!cambios) return res.status(404).json({ error: 'No se pudo actualizar' });
+  invalidarCacheItemTypes();
+  invalidarCacheCortes();
+  res.json({ ok: true });
+});
+
 // ── CATÁLOGO DEL GIRO (para selección en modales) ────────────────────────────
 
 // GET /api/catalogo/cortes — cortes del giro agrupados por sección, filtrados por seccion_taqueria
