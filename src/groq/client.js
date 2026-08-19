@@ -4,7 +4,7 @@
 // Modelo: llama-3.1-8b-instant (10x más barato que 70b, suficiente para parseo estructurado).
 
 const GROQ_TIMEOUT_MS = parseInt(process.env.GROQ_TIMEOUT_MS || '8000', 10);
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-20b';
 
 let _groqClient = null;
 let _intentadoInit = false;
