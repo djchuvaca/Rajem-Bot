@@ -29,6 +29,8 @@ const {
   getTenantMandaditosConfig, setTenantMandaditosConfig,
   getTenantEntregasHistorial, getTenantReporteReparto,
   propagarCorteATenants, propagarItemTypeATenants,
+  getTenantObservabilidadResumen, getTenantAlertas, getTenantConversaciones,
+  getTenantConversacion, resolverTenantAlerta,
 } = require('./tenant-reader');
 
 const {
@@ -637,6 +639,43 @@ app.get('/api/tenants/:id/reporte-reparto', requireAuth, (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
   const { desde, hasta } = req.query;
   res.json(getTenantReporteReparto(tenant, { desde: desde || null, hasta: hasta || null }));
+});
+
+// ── OBSERVABILIDAD POR TENANT ─────────────────────────────────────────────────
+app.get('/api/tenants/:id/observabilidad/resumen', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json(getTenantObservabilidadResumen(tenant));
+});
+
+app.get('/api/tenants/:id/observabilidad/alertas', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json(getTenantAlertas(tenant, { estado: req.query.estado || 'abierta', limite: req.query.limite }));
+});
+
+app.put('/api/tenants/:id/observabilidad/alertas/:alertaId/resolver', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const alertaId = Number(req.params.alertaId);
+  if (!Number.isInteger(alertaId) || alertaId < 1) return res.status(400).json({ error: 'ID inválido' });
+  const ok = resolverTenantAlerta(tenant, alertaId, req.session.usuario, req.body.nota || '');
+  if (!ok) return res.status(404).json({ error: 'Alerta abierta no encontrada' });
+  res.json({ ok: true });
+});
+
+app.get('/api/tenants/:id/observabilidad/conversaciones', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  res.json(getTenantConversaciones(tenant, req.query.limite));
+});
+
+app.get('/api/tenants/:id/observabilidad/conversaciones/:traceId', requireAuth, (req, res) => {
+  const tenant = getTenant(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+  const resultado = getTenantConversacion(tenant, req.params.traceId);
+  if (!resultado) return res.status(404).json({ error: 'Conversación no encontrada' });
+  res.json(resultado);
 });
 
 // ── CATÁLOGO DE GIROS ─────────────────────────────────────────────────────────

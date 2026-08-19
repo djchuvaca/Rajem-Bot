@@ -572,6 +572,69 @@ function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
 // Cuando se agrega/edita/elimina un ítem en el JS del giro, se propaga
 // inmediatamente a las BDs de los tenants que usen ese giro.
 
+// ── Observabilidad por tenant ─────────────────────────────────────────────────
+function getTenantObservabilidadResumen(tenant) {
+  const db = _getTenantDB(tenant);
+  if (!db) return { alertas_abiertas: 0, alertas_prioritarias: 0, conversaciones_activas: 0 };
+  try {
+    const abiertas = db.prepare("SELECT COUNT(*) total FROM alertas_operativas WHERE estado='abierta'").get()?.total || 0;
+    const criticas = db.prepare("SELECT COUNT(*) total FROM alertas_operativas WHERE estado='abierta' AND severidad IN ('critica','alta')").get()?.total || 0;
+    const activas  = db.prepare("SELECT COUNT(*) total FROM conversaciones_trace WHERE estado='activa' AND actualizada_en >= datetime('now','-48 hours')").get()?.total || 0;
+    return { alertas_abiertas: abiertas, alertas_prioritarias: criticas, conversaciones_activas: activas };
+  } catch (_) { return { alertas_abiertas: 0, alertas_prioritarias: 0, conversaciones_activas: 0 }; }
+}
+
+function getTenantAlertas(tenant, { estado = 'abierta', limite = 100 } = {}) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    const filtro = estado === 'todas' ? '' : 'WHERE a.estado=?';
+    const params = estado === 'todas' ? [] : [estado];
+    const lim = Math.min(Math.max(Number(limite) || 100, 1), 500);
+    return db.prepare(`SELECT a.*, c.jid, c.etapa_actual FROM alertas_operativas a
+      LEFT JOIN conversaciones_trace c ON c.id=a.trace_id ${filtro}
+      ORDER BY CASE a.severidad WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 ELSE 4 END,
+      a.actualizada_en DESC LIMIT ?`).all(...params, lim);
+  } catch (_) { return []; }
+}
+
+function getTenantConversaciones(tenant, limite = 100) {
+  const db = _getTenantDB(tenant);
+  if (!db) return [];
+  try {
+    const lim = Math.min(Math.max(Number(limite) || 100, 1), 500);
+    return db.prepare(`SELECT c.*,
+      (SELECT COUNT(*) FROM conversacion_eventos e WHERE e.trace_id=c.id) eventos,
+      (SELECT COUNT(*) FROM alertas_operativas a WHERE a.trace_id=c.id AND a.estado='abierta') alertas_abiertas
+      FROM conversaciones_trace c ORDER BY c.actualizada_en DESC LIMIT ?`).all(lim);
+  } catch (_) { return []; }
+}
+
+function getTenantConversacion(tenant, id) {
+  const db = _getTenantDB(tenant);
+  if (!db) return null;
+  try {
+    const conversacion = db.prepare('SELECT * FROM conversaciones_trace WHERE id=?').get(id);
+    if (!conversacion) return null;
+    return {
+      ...conversacion,
+      eventos: db.prepare('SELECT * FROM conversacion_eventos WHERE trace_id=? ORDER BY id').all(id),
+      alertas: db.prepare('SELECT * FROM alertas_operativas WHERE trace_id=? ORDER BY id DESC').all(id),
+    };
+  } catch (_) { return null; }
+}
+
+function resolverTenantAlerta(tenant, id, usuario, nota = '') {
+  const db = _openWritable(tenant);
+  if (!db) return false;
+  try {
+    const r = db.prepare(`UPDATE alertas_operativas SET estado='resuelta', resuelta_por=?, nota_resolucion=?,
+      resuelta_en=datetime('now','localtime'), actualizada_en=datetime('now','localtime') WHERE id=? AND estado='abierta'`)
+      .run(String(usuario || '').substring(0, 80), String(nota || '').substring(0, 500), id);
+    return r.changes > 0;
+  } catch (_) { return false; } finally { db.close(); }
+}
+
 function propagarCorteATenants(giroSlug, corte, operacion) {
   const tenants = getTenants().filter(t => (t.business_type || 'taqueria') === giroSlug);
   const resultados = [];
@@ -660,4 +723,6 @@ module.exports = {
   getTenantMandaditosConfig, setTenantMandaditosConfig,
   getTenantEntregasHistorial, getTenantReporteReparto,
   propagarCorteATenants, propagarItemTypeATenants,
+  getTenantObservabilidadResumen, getTenantAlertas, getTenantConversaciones,
+  getTenantConversacion, resolverTenantAlerta,
 };

@@ -370,8 +370,7 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
     <div class="nav-group-label">Operación</div>
     <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
     <div class="nav-item" onclick="showSection('pedidos')" data-s="pedidos"><span class="icon">📋</span> Pedidos <span id="nav-badge-pendientes" style="display:none;background:var(--red);color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px"></span></div>
-    <div class="nav-item" onclick="showSection('atencion')" data-s="atencion"><span class="icon">🚨</span> Atención <span id="nav-badge-alertas" style="display:none;background:var(--red);color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px"></span></div>
-    <div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
+<div class="nav-item" onclick="showSection('clientes')" data-s="clientes"><span class="icon">👥</span> Clientes</div>
     <div class="nav-item" onclick="showSection('reportes')" data-s="reportes"><span class="icon">📈</span> Reportes</div>
     <div class="nav-group-label" style="margin-top:8px">Configuración</div>
     <div class="nav-item" onclick="showSection('productos')" data-s="productos"><span class="icon">🥩</span> Productos / Negocio</div>
@@ -484,26 +483,6 @@ td.num,th.num{text-align:right;white-space:nowrap;padding-right:14px}
           <th style="width:32px"><input type="checkbox" id="chk-todos-h" onchange="seleccionarTodos(this.checked)"></th>
           <th>#</th><th>Cliente</th><th>Tipo</th><th>Orden</th><th>Total</th><th>Pago</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
         </tr></thead><tbody></tbody></table></div>
-      </div>
-    </div>
-
-    <!-- TRAZABILIDAD Y ATENCIÓN -->
-    <div class="section" id="s-atencion">
-      <div class="stats-grid" id="obs-stats"></div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-          <div><div class="card-title" style="margin:0">Alertas que requieren atención</div><div class="hint">Ambigüedades, direcciones sin verificar y errores operativos.</div></div>
-          <select class="form-select" id="obs-filtro-alertas" style="width:150px" onchange="loadAtencion()"><option value="abierta">Abiertas</option><option value="resuelta">Resueltas</option><option value="todas">Todas</option></select>
-        </div>
-        <div class="table-wrap"><table id="obs-alertas-table"><thead><tr><th>Prioridad</th><th>Alerta</th><th>Detalle</th><th>Etapa</th><th>Fecha</th><th></th></tr></thead><tbody></tbody></table></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Conversaciones recientes</div>
-        <div class="table-wrap"><table id="obs-conversaciones-table"><thead><tr><th>Cliente/JID</th><th>Etapa</th><th>Pedido</th><th>Eventos</th><th>Alertas</th><th>Actualizada</th><th></th></tr></thead><tbody></tbody></table></div>
-      </div>
-      <div class="card" id="obs-detalle" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div class="card-title" style="margin:0">Línea de tiempo</div><button class="btn btn-secondary btn-sm" onclick="document.getElementById('obs-detalle').style.display='none'">Cerrar</button></div>
-        <div id="obs-timeline"></div>
       </div>
     </div>
 
@@ -1011,71 +990,11 @@ function _restoreSection() {
 
 const loaders = {
   dashboard: loadDashboard, pedidos: loadPedidos, clientes: loadClientes,
-  atencion: loadAtencion,
   productos: async () => { await loadProductos(); await loadTipoDeNegocio(); },
   reportes: loadReportes, horarios: loadHorarios,
   banco: loadBanco, mensajes: loadMensajes, config: loadConfig,
   envios: loadEnvios,
 };
-
-// ── TRAZABILIDAD Y ATENCIÓN ──────────────────────────────────────────────────
-const escObs = valor => String(valor ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-const fechaObs = valor => valor ? new Date(String(valor).replace(' ', 'T')).toLocaleString('es-MX') : '—';
-
-async function loadAtencion() {
-  const estado = document.getElementById('obs-filtro-alertas')?.value || 'abierta';
-  const [resumen, alertas, conversaciones] = await Promise.all([
-    api('/api/observabilidad/resumen'),
-    api('/api/observabilidad/alertas?estado=' + encodeURIComponent(estado)),
-    api('/api/observabilidad/conversaciones?limite=100'),
-  ]);
-  document.getElementById('obs-stats').innerHTML = `
-    <div class="stat-card red"><div class="stat-num">${Number(resumen.alertas_abiertas)||0}</div><div class="stat-label">Alertas abiertas</div></div>
-    <div class="stat-card yellow"><div class="stat-num">${Number(resumen.alertas_prioritarias)||0}</div><div class="stat-label">Prioridad alta</div></div>
-    <div class="stat-card blue"><div class="stat-num">${Number(resumen.conversaciones_activas)||0}</div><div class="stat-label">Conversaciones activas</div></div>`;
-  const badge = document.getElementById('nav-badge-alertas');
-  badge.textContent = resumen.alertas_abiertas || '';
-  badge.style.display = resumen.alertas_abiertas ? 'inline-block' : 'none';
-
-  const tbA = document.querySelector('#obs-alertas-table tbody');
-  tbA.innerHTML = (alertas || []).length ? alertas.map(a => {
-    const color = a.severidad === 'critica' || a.severidad === 'alta' ? 'red' : a.severidad === 'media' ? 'yellow' : 'gray';
-    return `<tr><td><span class="badge badge-${color}">${escObs(a.severidad)}</span></td><td><b>${escObs(a.titulo)}</b><div class="hint">${escObs(a.tipo)} · ${Number(a.ocurrencias)||1} vez/veces</div></td><td>${escObs(a.detalle)}</td><td>${escObs(a.etapa_actual)}</td><td>${fechaObs(a.actualizada_en)}</td><td>${a.estado==='abierta'?`<button class="btn btn-primary btn-sm" onclick="resolverAlerta(${Number(a.id)})">Resolver</button>`:''}<button class="btn btn-secondary btn-sm" onclick="verConversacion('${escObs(a.trace_id)}')">Ver</button></td></tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">No hay alertas en este estado.</td></tr>';
-
-  const tbC = document.querySelector('#obs-conversaciones-table tbody');
-  tbC.innerHTML = (conversaciones || []).length ? conversaciones.map(c => `<tr><td>${escObs(c.jid)}</td><td>${escObs(c.etapa_actual)}</td><td>${c.pedido_id ? '#'+Number(c.pedido_id) : '—'}</td><td>${Number(c.eventos)||0}</td><td>${Number(c.alertas_abiertas)||0}</td><td>${fechaObs(c.actualizada_en)}</td><td><button class="btn btn-secondary btn-sm" onclick="verConversacion('${escObs(c.id)}')">Ver línea</button></td></tr>`).join('') : '<tr><td colspan="7" class="empty">Todavía no hay conversaciones registradas.</td></tr>';
-}
-
-async function actualizarBadgeAlertas() {
-  try {
-    const resumen = await api('/api/observabilidad/resumen');
-    const badge = document.getElementById('nav-badge-alertas');
-    badge.textContent = resumen.alertas_abiertas || '';
-    badge.style.display = resumen.alertas_abiertas ? 'inline-block' : 'none';
-  } catch (_) {}
-}
-
-async function resolverAlerta(id) {
-  const nota = prompt('Nota de resolución (opcional):') ?? null;
-  if (nota === null) return;
-  const r = await api(`/api/observabilidad/alertas/${id}/resolver`, 'PUT', { nota });
-  if (!r.ok) return toast(r.error || 'No se pudo resolver', false);
-  toast('Alerta resuelta');
-  loadAtencion();
-}
-
-async function verConversacion(id) {
-  const c = await api('/api/observabilidad/conversaciones/' + encodeURIComponent(id));
-  if (c.error) return toast(c.error, false);
-  const detalle = document.getElementById('obs-detalle');
-  document.getElementById('obs-timeline').innerHTML = (c.eventos || []).map(e => {
-    const color = e.direccion === 'cliente' ? 'blue' : e.direccion === 'bot' ? 'green' : 'gray';
-    return `<div style="border-left:2px solid var(--border2);padding:4px 0 14px 14px;margin-left:6px"><div><span class="badge badge-${color}">${escObs(e.direccion)}</span> <b>${escObs(e.tipo)}</b> <span class="hint">${fechaObs(e.fecha)} · ${escObs(e.etapa)}</span></div><div style="white-space:pre-wrap;margin-top:6px;font-size:13px">${escObs(e.contenido)}</div></div>`;
-  }).join('') || '<div class="empty">Sin eventos.</div>';
-  detalle.style.display = 'block';
-  detalle.scrollIntoView({ behavior:'smooth', block:'start' });
-}
 
 // ── CONTROL DEL NEGOCIO ───────────────────────────────────────────────────────
 async function loadNegocioEstado() {
@@ -1368,7 +1287,6 @@ async function confirmarRapido(id, event) {
   await api(`/api/pedidos/${id}/estado`, 'PUT', { estado: 'confirmado' });
   toast('✅ Pedido #' + id + ' confirmado — cliente notificado');
   loadDashboard();
-  actualizarBadgeAlertas();
 }
 
 // ── MODAL DETALLE PEDIDO ──────────────────────────────────────────────────────
@@ -2635,7 +2553,6 @@ async function initApp() {
 setInterval(async () => {
   const enDash = document.querySelector('[data-s="dashboard"]').classList.contains('active');
   const enPed  = document.querySelector('[data-s="pedidos"]').classList.contains('active');
-  actualizarBadgeAlertas();
   if (enDash) { loadDashboard(); return; }
   if (enPed)  { loadPedidos();  return; }
   // En cualquier otra sección: verificar nuevos pendientes silenciosamente
