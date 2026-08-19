@@ -67,20 +67,67 @@ async function resolverEsAdmin(msg, client) {
     } catch (e) { console.log('[DEBUG admin] getContact error:', e.message); }
   }
 
-  let chat;
+  let participantes = null;
+
+  // Intento 1: msg.getChat()
   try {
-    chat = await msg.getChat();
+    const chat = await msg.getChat();
+    participantes = chat?.participants || [];
+    console.log('[DEBUG admin] msg.getChat() OK, participantes:', participantes.length);
   } catch (e1) {
-    console.log('[DEBUG admin] msg.getChat() falló:', e1.message, '— intentando getChatById');
+    console.log('[DEBUG admin] msg.getChat() falló:', e1.message);
+  }
+
+  // Intento 2: client.getChatById()
+  if (!participantes) {
     try {
-      chat = await client.getChatById(msg.from);
+      const chat = await client.getChatById(msg.from);
+      participantes = chat?.participants || [];
+      console.log('[DEBUG admin] getChatById OK, participantes:', participantes.length);
     } catch (e2) {
-      console.log('[DEBUG admin] getChatById también falló:', e2.message);
-      return false;
+      console.log('[DEBUG admin] getChatById falló:', e2.message);
     }
   }
 
-  const admins = (chat?.participants || []).filter(p => p.isAdmin || p.isSuperAdmin).map(p => _jid(p.id || p));
+  // Intento 3: client.getChats() (ruta interna diferente)
+  if (!participantes) {
+    try {
+      const todos = await client.getChats();
+      const chat  = todos.find(c => (_jid(c.id) === msg.from) || c.id?._serialized === msg.from);
+      participantes = chat?.participants || [];
+      console.log('[DEBUG admin] getChats() encontró chat:', !!chat, 'participantes:', participantes.length);
+    } catch (e3) {
+      console.log('[DEBUG admin] getChats() falló:', e3.message);
+    }
+  }
+
+  // Intento 4: acceso directo al store interno de WhatsApp Web vía Puppeteer
+  if (!participantes && client?.pupPage) {
+    try {
+      const raw = await client.pupPage.evaluate((groupId) => {
+        const chat = window.Store?.Chat?.get(groupId);
+        if (!chat) return null;
+        const pts = chat.groupMetadata?.participants?.getModelsArray?.() || [];
+        return pts.map(p => ({
+          id: p.id?._serialized || '',
+          isAdmin: !!p.isAdmin,
+          isSuperAdmin: !!p.isSuperAdmin,
+        }));
+      }, msg.from);
+      if (raw) {
+        participantes = raw;
+        console.log('[DEBUG admin] pupPage.evaluate OK, participantes:', raw.length);
+      } else {
+        console.log('[DEBUG admin] pupPage.evaluate: chat no encontrado en Store');
+      }
+    } catch (e4) {
+      console.log('[DEBUG admin] pupPage.evaluate falló:', e4.message);
+    }
+  }
+
+  if (!participantes) return false;
+
+  const admins = participantes.filter(p => p.isAdmin || p.isSuperAdmin).map(p => _jid(p.id || p));
   console.log('[DEBUG admin] candidatos:', [...candidatos], '| admins en grupo:', admins);
 
   return admins.some(id => candidatos.has(id) || candidatos.has(_normalizeLid(id)));
