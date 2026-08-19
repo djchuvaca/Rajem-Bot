@@ -8,6 +8,73 @@
  * El archivo raíz src/giros/taqueria.js re-exporta este módulo para compatibilidad.
  */
 
+// Genera el mapa alias→slug de emergencia directamente desde el array de cortes,
+// eliminando la necesidad de mantenerlo sincronizado a mano al agregar cortes nuevos.
+function _buildFallbackCortes(cortes) {
+  const map = {};
+  for (const c of cortes) {
+    map[c.slug] = c.slug;
+    for (const parte of c.nombre.toLowerCase().split('/').map(s => s.trim()).filter(Boolean)) {
+      map[parte] = c.slug;
+    }
+    for (const alias of (c.aliases || [])) map[alias.toLowerCase()] = c.slug;
+  }
+  return map;
+}
+
+const _cortes = [
+    // ── Tacos de asada ────────────────────────────────────────────────────────
+    { slug: 'asada',      nombre: 'Asada',       precio_base: 35, seccion: 'asada',    subclase: 'res',
+      aliases: ['carne asada', 'res', 'bistek', 'bistec', 'bistec asado'],
+      descripcion: 'Carne de res a las brasas, jugosa y con sabor intenso.' },
+    { slug: 'suadero',    nombre: 'Suadero',      precio_base: 35, seccion: 'asada',    subclase: 'res',
+      aliases: ['suaderito'],
+      descripcion: 'Corte de res entre la piel y la costilla, muy suave y jugoso.' },
+    { slug: 'tripa',      nombre: 'Tripa',        precio_base: 32, seccion: 'asada',    subclase: 'res',
+      aliases: ['tripas', 'tripita', 'tripitas', 'tripas de res'],
+      descripcion: 'Intestino de res frito, crujiente por fuera y tierno por dentro.' },
+    { slug: 'pastor',     nombre: 'Al Pastor',    precio_base: 32, seccion: 'asada',    subclase: 'cerdo_adobado',
+      aliases: ['al pastor', 'adobada', 'adobado'],
+      descripcion: 'Carne de cerdo marinada en achiote y especias, asada en trompo.' },
+    { slug: 'longaniza',  nombre: 'Longaniza',    precio_base: 32, seccion: 'asada',    subclase: 'cerdo',
+      aliases: ['longanitas', 'longanisa'],
+      descripcion: 'Embutido de cerdo especiado, frito a la perfección.' },
+    { slug: 'chicharron', nombre: 'Chicharrón',   precio_base: 30, seccion: 'asada',    subclase: 'cerdo',
+      aliases: ['chicharrón', 'chicharrones', 'chicharron prensado'],
+      descripcion: 'Piel y carne de cerdo frita, crujiente y sabrosa.' },
+    { slug: 'chorizo',    nombre: 'Chorizo',      precio_base: 32, seccion: 'asada',    subclase: 'cerdo',
+      aliases: ['chorizito', 'chorizo mexicano'],
+      descripcion: 'Chorizo mexicano frito, con chile y especias.' },
+    { slug: 'campechano', nombre: 'Campechano',   precio_base: 35, seccion: 'asada',    subclase: 'mixto',
+      aliases: ['campechana', 'mixto campechano'],
+      descripcion: 'Combinación de asada y longaniza, el favorito de los indecisos.' },
+    // ── Carnitas ──────────────────────────────────────────────────────────────
+    { slug: 'carne',      nombre: 'Carne/Maciza', precio_base: 30, seccion: 'carnitas', subclase: 'magra',
+      aliases: ['carnitas', 'carnita', 'carne', 'maciza', 'masiza', 'maciza de puerco'],
+      descripcion: 'Espaldilla, pierna y aldilla de cerdo. Fibra pura, bajo porcentaje de grasa.' },
+    { slug: 'buche',      nombre: 'Buche',        precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
+      aliases: ['buchito', 'buchon', 'buchones'],
+      descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
+    { slug: 'cuero',      nombre: 'Cuero',        precio_base: 30, seccion: 'carnitas', subclase: 'piel',
+      aliases: ['cueros', 'cueritos', 'cuerito'],
+      descripcion: 'Piel del puerco, textura muy suave y delicada.' },
+    { slug: 'lengua',     nombre: 'Lengua',       precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
+      aliases: ['lenguita', 'lenguitas'],
+      descripcion: 'Textura cremosa, sabor intenso y limpio.' },
+    { slug: 'cabeza',     nombre: 'Cabeza',       precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
+      aliases: ['cabezita', 'carnitas de cabeza'],
+      descripcion: 'Carne de cabeza de cerdo, muy tierna y jugosa.' },
+    { slug: 'costilla',   nombre: 'Costilla',     precio_base: 35, seccion: 'carnitas', subclase: 'hueso',
+      aliases: ['costillas', 'costillita', 'costillitas', 'costilla de puerco', 'costillas de puerco', 'costilla de cerdo'],
+      descripcion: 'Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.' },
+    { slug: 'surtido',    nombre: 'Surtido',      precio_base: 30, seccion: 'carnitas', subclase: 'mixto',
+      aliases: ['surtida', 'mixto', 'la combinacion', 'de todo', 'todos los cortes'],
+      descripcion: 'Combinación de los cortes de carnitas que el local maneja. El chef decide la mezcla.' },
+    { slug: 'surtido especial', nombre: 'Surtido Especial', precio_base: 30, seccion: 'carnitas', subclase: 'mixto',
+      aliases: ['especial', 'surtido a tu gusto', 'surtido personalizado', 'mi surtido', 'combinacion especial'],
+      descripcion: 'Combinación personalizada de cortes a elección del cliente.' },
+];
+
 module.exports = {
   slug:        'taqueria',
   nombre:      'Taquería',
@@ -61,61 +128,8 @@ module.exports = {
     },
   ],
 
-  // Cortes/ingredientes del menú (tabla cortes en BD)
-  // seccion: 'asada' | 'carnitas'
-  // subclase: res | cerdo | cerdo_adobado | viscera | piel | hueso | magra | mixto
-  cortes: [
-    // ── Tacos de asada ────────────────────────────────────────────────────────
-    { slug: 'asada',      nombre: 'Asada',       precio_base: 35, seccion: 'asada',    subclase: 'res',
-      aliases: ['carne asada', 'res', 'bistek', 'bistec', 'bistec asado'],
-      descripcion: 'Carne de res a las brasas, jugosa y con sabor intenso.' },
-    { slug: 'suadero',    nombre: 'Suadero',      precio_base: 35, seccion: 'asada',    subclase: 'res',
-      aliases: ['suaderito'],
-      descripcion: 'Corte de res entre la piel y la costilla, muy suave y jugoso.' },
-    { slug: 'tripa',      nombre: 'Tripa',        precio_base: 32, seccion: 'asada',    subclase: 'res',
-      aliases: ['tripas', 'tripita', 'tripitas', 'tripas de res'],
-      descripcion: 'Intestino de res frito, crujiente por fuera y tierno por dentro.' },
-    { slug: 'pastor',     nombre: 'Al Pastor',    precio_base: 32, seccion: 'asada',    subclase: 'cerdo_adobado',
-      aliases: ['al pastor', 'adobada', 'adobado'],
-      descripcion: 'Carne de cerdo marinada en achiote y especias, asada en trompo.' },
-    { slug: 'longaniza',  nombre: 'Longaniza',    precio_base: 32, seccion: 'asada',    subclase: 'cerdo',
-      aliases: ['longanitas', 'longanisa'],
-      descripcion: 'Embutido de cerdo especiado, frito a la perfección.' },
-    { slug: 'chicharron', nombre: 'Chicharrón',   precio_base: 30, seccion: 'asada',    subclase: 'cerdo',
-      aliases: ['chicharrón', 'chicharrones', 'chicharron prensado'],
-      descripcion: 'Piel y carne de cerdo frita, crujiente y sabrosa.' },
-    { slug: 'chorizo',    nombre: 'Chorizo',      precio_base: 32, seccion: 'asada',    subclase: 'cerdo',
-      aliases: ['chorizito', 'chorizo mexicano'],
-      descripcion: 'Chorizo mexicano frito, con chile y especias.' },
-    { slug: 'campechano', nombre: 'Campechano',   precio_base: 35, seccion: 'asada',    subclase: 'mixto',
-      aliases: ['campechana', 'mixto campechano'],
-      descripcion: 'Combinación de asada y longaniza, el favorito de los indecisos.' },
-    // ── Carnitas ──────────────────────────────────────────────────────────────
-    { slug: 'carne',      nombre: 'Carne/Maciza', precio_base: 30, seccion: 'carnitas', subclase: 'magra',
-      aliases: ['carnitas', 'carnita', 'carne', 'maciza', 'masiza', 'maciza de puerco'],
-      descripcion: 'Espaldilla, pierna y aldilla de cerdo. Fibra pura, bajo porcentaje de grasa.' },
-    { slug: 'buche',      nombre: 'Buche',        precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
-      aliases: ['buchito', 'buchon', 'buchones'],
-      descripcion: 'Estómago del puerco. Textura consistente, sabor profundo.' },
-    { slug: 'cuero',      nombre: 'Cuero',        precio_base: 30, seccion: 'carnitas', subclase: 'piel',
-      aliases: ['cueros', 'cueritos', 'cuerito'],
-      descripcion: 'Piel del puerco, textura muy suave y delicada.' },
-    { slug: 'lengua',     nombre: 'Lengua',       precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
-      aliases: ['lenguita', 'lenguitas'],
-      descripcion: 'Textura cremosa, sabor intenso y limpio.' },
-    { slug: 'cabeza',     nombre: 'Cabeza',       precio_base: 30, seccion: 'carnitas', subclase: 'viscera',
-      aliases: ['cabezita', 'carnitas de cabeza'],
-      descripcion: 'Carne de cabeza de cerdo, muy tierna y jugosa.' },
-    { slug: 'costilla',   nombre: 'Costilla',     precio_base: 35, seccion: 'carnitas', subclase: 'hueso',
-      aliases: ['costillas', 'costillita', 'costillitas', 'costilla de puerco', 'costillas de puerco', 'costilla de cerdo'],
-      descripcion: 'Costilla de cerdo carnosa, dorada y jugosa, con sabor ahumado.' },
-    { slug: 'surtido',    nombre: 'Surtido',      precio_base: 30, seccion: 'carnitas', subclase: 'mixto',
-      aliases: ['surtida', 'mixto', 'la combinacion', 'de todo', 'todos los cortes'],
-      descripcion: 'Combinación de los cortes de carnitas que el local maneja. El chef decide la mezcla.' },
-    { slug: 'surtido especial', nombre: 'Surtido Especial', precio_base: 30, seccion: 'carnitas', subclase: 'mixto',
-      aliases: ['especial', 'surtido a tu gusto', 'surtido personalizado', 'mi surtido', 'combinacion especial'],
-      descripcion: 'Combinación personalizada de cortes a elección del cliente.' },
-  ],
+  // Cortes/ingredientes del menú — seccion: 'asada'|'carnitas', subclase: res|cerdo|cerdo_adobado|viscera|piel|hueso|magra|mixto
+  cortes: _cortes,
 
   refrescos: [
     { nombre: 'coca cola', precio: 20, sinonimos: 'coca,coke,cola,coca-cola',
@@ -139,28 +153,8 @@ module.exports = {
       descripcion: 'Limones frescos para acompañar 🍋' },
   ],
 
-  // Mapa alias→slug de emergencia para NLU sin BD
-  fallbackCortes: {
-    asada: 'asada', 'carne asada': 'asada', res: 'asada', bistek: 'asada', bistec: 'asada',
-    tripa: 'tripa', tripas: 'tripa', tripita: 'tripa', tripitas: 'tripa',
-    suadero: 'suadero', suaderito: 'suadero',
-    pastor: 'pastor', 'al pastor': 'pastor', adobada: 'pastor',
-    longaniza: 'longaniza', longanitas: 'longaniza',
-    chicharron: 'chicharron', chicharrón: 'chicharron', chicharrones: 'chicharron',
-    chorizo: 'chorizo', chorizito: 'chorizo',
-    campechano: 'campechano', campechana: 'campechano',
-    carne: 'carne', carnes: 'carne', carner: 'carne', carnita: 'carne', carnitas: 'carne',
-    maciza: 'carne', masiza: 'carne',
-    buche: 'buche', buches: 'buche', buchito: 'buche', buchon: 'buche', buchones: 'buche',
-    cuero: 'cuero', cueros: 'cuero', cueritos: 'cuero', cuerito: 'cuero',
-    lengua: 'lengua', lenguas: 'lengua', lenguita: 'lengua', lenguitas: 'lengua',
-    cabeza: 'cabeza', cabezita: 'cabeza',
-    costilla: 'costilla', costillas: 'costilla', costillita: 'costilla', costillitas: 'costilla',
-    'costilla de puerco': 'costilla', 'costilla de cerdo': 'costilla',
-    surtido: 'surtido', surtida: 'surtido', surtidos: 'surtido', mixto: 'surtido', mixta: 'surtido',
-    'surtido especial': 'surtido especial', especial: 'surtido especial',
-    'surtido personalizado': 'surtido especial', 'mi surtido': 'surtido especial',
-  },
+  // Mapa alias→slug generado automáticamente desde _cortes — no editar a mano
+  fallbackCortes: _buildFallbackCortes(_cortes),
 
   vocabulario: {
     corte:         'corte',
