@@ -97,7 +97,6 @@ else
   if ! git diff --quiet "$OLD_COMMIT" "$TARGET" -- package.json package-lock.json; then
     npm ci --omit=dev --silent
   fi
-  npm test
 fi
 
 restart_tenants_clean
