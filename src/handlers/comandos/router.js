@@ -70,9 +70,14 @@ async function resolverEsAdmin(msg, client) {
   let chat;
   try {
     chat = await msg.getChat();
-  } catch (_) {
-    // WhatsApp Web puede lanzar el error interno 'r' — tratamos como no admin.
-    return false;
+  } catch (e1) {
+    console.log('[DEBUG admin] msg.getChat() falló:', e1.message, '— intentando getChatById');
+    try {
+      chat = await client.getChatById(msg.from);
+    } catch (e2) {
+      console.log('[DEBUG admin] getChatById también falló:', e2.message);
+      return false;
+    }
   }
 
   const admins = (chat?.participants || []).filter(p => p.isAdmin || p.isSuperAdmin).map(p => _jid(p.id || p));
