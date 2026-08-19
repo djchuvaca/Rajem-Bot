@@ -46,6 +46,9 @@ async function initDB() {
   _bsdb.pragma("journal_mode = DELETE");
   _bsdb.pragma("busy_timeout = 5000");
   db = _makeCompatDB(_bsdb);
+  // Require diferido para evitar dependencia circular (seed.js → core.js)
+  const { seedDB } = require('./seed');
+  await seedDB();
   return _bsdb;
 }
 
