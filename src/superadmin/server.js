@@ -28,7 +28,14 @@ const {
   getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
   getTenantMandaditosConfig, setTenantMandaditosConfig,
   getTenantEntregasHistorial, getTenantReporteReparto,
+  propagarCorteATenants, propagarItemTypeATenants,
 } = require('./tenant-reader');
+
+const {
+  leerCatalogGiro, escribirCatalogGiro,
+  slugDesdeNombre, validarSlugDisponible,
+  GIROS_SOPORTADOS,
+} = require('./giro-catalog');
 
 const _loginAttempts = new Map();
 
@@ -631,6 +638,203 @@ app.get('/api/tenants/:id/reporte-reparto', requireAuth, (req, res) => {
   const { desde, hasta } = req.query;
   res.json(getTenantReporteReparto(tenant, { desde: desde || null, hasta: hasta || null }));
 });
+
+// ── CATÁLOGO DE GIROS ─────────────────────────────────────────────────────────
+
+app.get('/api/giros', requireAuth, (_req, res) => {
+  try {
+    const lista = GIROS_SOPORTADOS.map(slug => {
+      try {
+        const c = leerCatalogGiro(slug);
+        return { slug: c.slug, nombre: c.nombre, emoji: c.emoji, soporta: c.soporta };
+      } catch (_) {
+        return { slug, nombre: slug, emoji: '🍽️', soporta: {} };
+      }
+    });
+    res.json(lista);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/giros/:giro/catalogo', requireAuth, (req, res) => {
+  try {
+    res.json(leerCatalogGiro(req.params.giro));
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ── POST /api/giros/:giro/catalogo/:tipo  — crear ítem ────────────────────────
+app.post('/api/giros/:giro/catalogo/:tipo', requireAuth, (req, res) => {
+  const { giro, tipo } = req.params;
+  if (!['cortes', 'itemTypes', 'refrescos', 'salsas'].includes(tipo))
+    return res.status(400).json({ error: 'Tipo inválido' });
+
+  try {
+    const catalogo = leerCatalogGiro(giro);
+    if (!catalogo.soporta[tipo]) return res.status(400).json({ error: `El giro "${giro}" no soporta "${tipo}"` });
+
+    const body    = req.body;
+    const campoId = (tipo === 'refrescos' || tipo === 'salsas') ? 'nombre' : 'slug';
+    const id      = body[campoId] || (campoId === 'slug' ? slugDesdeNombre(body.nombre) : '');
+
+    if (!id) return res.status(400).json({ error: `Falta el campo identificador (${campoId})` });
+    if (!validarSlugDisponible(catalogo, tipo, id))
+      return res.status(409).json({ error: `Ya existe un "${tipo}" con ${campoId}="${id}"` });
+
+    const arr = [...catalogo[tipo]];
+
+    if (tipo === 'cortes') {
+      const item = {
+        slug:        slugDesdeNombre(body.nombre),
+        nombre:      String(body.nombre || '').trim(),
+        precio_base: Number(body.precio_base) || 0,
+        aliases:     _parsearAliases(body.aliases),
+        descripcion: String(body.descripcion || '').trim(),
+      };
+      if (body.seccion  !== undefined) item.seccion  = String(body.seccion  || '');
+      if (body.subclase !== undefined) item.subclase = String(body.subclase || '');
+      arr.push(item);
+      escribirCatalogGiro(giro, { cortes: arr });
+      propagarCorteATenants(giro, item, 'crear');
+    } else if (tipo === 'itemTypes') {
+      const item = {
+        slug:          slugDesdeNombre(body.nombre),
+        nombre:        String(body.nombre || '').trim(),
+        nombre_plural: String(body.nombre_plural || body.nombre || '').trim(),
+        emoji:         String(body.emoji || '🍽️').trim(),
+        aliases:       _parsearAliases(body.aliases),
+        soporta_gramos: !!body.soporta_gramos,
+        soporta_pesos:  !!body.soporta_pesos,
+        precio_campo:  ['precio_taco','precio_torta','precio_100g'].includes(body.precio_campo) ? body.precio_campo : 'precio_taco',
+        precio_base:   Number(body.precio_base) || 0,
+      };
+      arr.push(item);
+      escribirCatalogGiro(giro, { itemTypes: arr });
+      propagarItemTypeATenants(giro, item, 'crear');
+    } else if (tipo === 'refrescos') {
+      arr.push({
+        nombre:      String(body.nombre || '').trim(),
+        precio:      Number(body.precio) || 0,
+        sinonimos:   String(body.sinonimos || '').trim(),
+        descripcion: String(body.descripcion || '').trim(),
+      });
+      escribirCatalogGiro(giro, { refrescos: arr });
+    } else {
+      arr.push({
+        nombre:      String(body.nombre || '').trim(),
+        emoji:       String(body.emoji || '').trim(),
+        precio:      Number(body.precio) || 0,
+        sinonimos:   String(body.sinonimos || '').trim(),
+        descripcion: String(body.descripcion || '').trim(),
+      });
+      escribirCatalogGiro(giro, { salsas: arr });
+    }
+
+    registrarAuditoria({ usuario: req.session.usuario, accion: `giro.catalogo.crear.${tipo}`, entidad: 'giro', entidadId: giro, detalles: { id }, ip: req.ip });
+    res.json({ ok: true, id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PUT /api/giros/:giro/catalogo/:tipo/:id  — editar ítem ───────────────────
+app.put('/api/giros/:giro/catalogo/:tipo/:id', requireAuth, (req, res) => {
+  const { giro, tipo, id } = req.params;
+  if (!['cortes', 'itemTypes', 'refrescos', 'salsas'].includes(tipo))
+    return res.status(400).json({ error: 'Tipo inválido' });
+
+  try {
+    const catalogo = leerCatalogGiro(giro);
+    if (!catalogo.soporta[tipo]) return res.status(400).json({ error: `El giro "${giro}" no soporta "${tipo}"` });
+
+    const campoId = (tipo === 'refrescos' || tipo === 'salsas') ? 'nombre' : 'slug';
+    const idx = catalogo[tipo].findIndex(it => it[campoId] === id);
+    if (idx === -1) return res.status(404).json({ error: 'Ítem no encontrado' });
+
+    const body   = req.body;
+    const actual = catalogo[tipo][idx];
+    const arr    = [...catalogo[tipo]];
+
+    if (tipo === 'cortes') {
+      const item = {
+        ...actual,
+        nombre:      String(body.nombre    ?? actual.nombre).trim(),
+        precio_base: body.precio_base !== undefined ? Number(body.precio_base) : actual.precio_base,
+        aliases:     body.aliases !== undefined ? _parsearAliases(body.aliases) : actual.aliases,
+        descripcion: String(body.descripcion ?? actual.descripcion ?? '').trim(),
+      };
+      if (body.seccion  !== undefined) item.seccion  = String(body.seccion);
+      if (body.subclase !== undefined) item.subclase = String(body.subclase);
+      arr[idx] = item;
+      escribirCatalogGiro(giro, { cortes: arr });
+      propagarCorteATenants(giro, item, 'editar');
+    } else if (tipo === 'itemTypes') {
+      const item = {
+        ...actual,
+        nombre:         String(body.nombre         ?? actual.nombre).trim(),
+        nombre_plural:  String(body.nombre_plural  ?? actual.nombre_plural).trim(),
+        emoji:          String(body.emoji          ?? actual.emoji  ?? '🍽️').trim(),
+        aliases:        body.aliases !== undefined ? _parsearAliases(body.aliases) : actual.aliases,
+        soporta_gramos: body.soporta_gramos !== undefined ? !!body.soporta_gramos : actual.soporta_gramos,
+        soporta_pesos:  body.soporta_pesos  !== undefined ? !!body.soporta_pesos  : actual.soporta_pesos,
+        precio_campo:   ['precio_taco','precio_torta','precio_100g'].includes(body.precio_campo) ? body.precio_campo : actual.precio_campo,
+        precio_base:    body.precio_base !== undefined ? Number(body.precio_base) : actual.precio_base,
+      };
+      arr[idx] = item;
+      escribirCatalogGiro(giro, { itemTypes: arr });
+      propagarItemTypeATenants(giro, item, 'editar');
+    } else if (tipo === 'refrescos') {
+      arr[idx] = {
+        ...actual,
+        nombre:      String(body.nombre      ?? actual.nombre).trim(),
+        precio:      body.precio !== undefined ? Number(body.precio) : actual.precio,
+        sinonimos:   String(body.sinonimos   ?? actual.sinonimos   ?? '').trim(),
+        descripcion: String(body.descripcion ?? actual.descripcion ?? '').trim(),
+      };
+      escribirCatalogGiro(giro, { refrescos: arr });
+    } else {
+      arr[idx] = {
+        ...actual,
+        nombre:      String(body.nombre      ?? actual.nombre).trim(),
+        emoji:       String(body.emoji       ?? actual.emoji       ?? '').trim(),
+        precio:      body.precio !== undefined ? Number(body.precio) : actual.precio,
+        sinonimos:   String(body.sinonimos   ?? actual.sinonimos   ?? '').trim(),
+        descripcion: String(body.descripcion ?? actual.descripcion ?? '').trim(),
+      };
+      escribirCatalogGiro(giro, { salsas: arr });
+    }
+
+    registrarAuditoria({ usuario: req.session.usuario, accion: `giro.catalogo.editar.${tipo}`, entidad: 'giro', entidadId: giro, detalles: { id }, ip: req.ip });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DELETE /api/giros/:giro/catalogo/:tipo/:id  — eliminar ítem ──────────────
+app.delete('/api/giros/:giro/catalogo/:tipo/:id', requireAuth, (req, res) => {
+  const { giro, tipo, id } = req.params;
+  if (!['cortes', 'itemTypes', 'refrescos', 'salsas'].includes(tipo))
+    return res.status(400).json({ error: 'Tipo inválido' });
+
+  try {
+    const catalogo = leerCatalogGiro(giro);
+    if (!catalogo.soporta[tipo]) return res.status(400).json({ error: `El giro "${giro}" no soporta "${tipo}"` });
+
+    const campoId = (tipo === 'refrescos' || tipo === 'salsas') ? 'nombre' : 'slug';
+    const item    = catalogo[tipo].find(it => it[campoId] === id);
+    if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
+
+    const arr = catalogo[tipo].filter(it => it[campoId] !== id);
+    escribirCatalogGiro(giro, { [tipo]: arr });
+
+    if (tipo === 'cortes')    propagarCorteATenants(giro, item, 'eliminar');
+    if (tipo === 'itemTypes') propagarItemTypeATenants(giro, item, 'eliminar');
+
+    registrarAuditoria({ usuario: req.session.usuario, accion: `giro.catalogo.eliminar.${tipo}`, entidad: 'giro', entidadId: giro, detalles: { id }, ip: req.ip });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+function _parsearAliases(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.map(a => String(a).trim().toLowerCase()).filter(Boolean);
+  return String(val).split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
+}
 
 function startSuperAdmin(port = 3001) {
   // Inicializar admin.db al arrancar

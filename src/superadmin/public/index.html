@@ -140,6 +140,7 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
     <div class="nav-item" onclick="showSection('tenants')" data-s="tenants"><span class="icon">🏪</span> Negocios</div>
     <div class="nav-item" onclick="showSection('geo')" data-s="geo"><span class="icon">🗺️</span> Geo & Colonias</div>
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
+    <div class="nav-item" onclick="showSection('catalogo-giros');loadCatalogoGiros()" data-s="catalogo-giros"><span class="icon">📦</span> Catálogo Giros</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
     <div class="nav-item" onclick="showSection('mandaditos')" data-s="mandaditos"><span class="icon">🛵</span> Mandaditos</div>
     <div class="nav-item" onclick="showSection('auditoria');loadAuditoria()" data-s="auditoria"><span class="icon">🧾</span> Auditoría</div>
@@ -557,8 +558,49 @@ input:checked~.toggle-slider:before{transform:translateX(18px)}
       </div>
     </div>
 
+    <!-- ── CATÁLOGO DE GIROS ── -->
+    <div id="sec-catalogo-giros" class="section">
+      <h1>Catálogo de Giros</h1>
+      <p class="subtitle">Agrega, edita o elimina cortes, formatos, bebidas y salsas por giro. Los cambios se escriben en el archivo del giro y se propagan a los tenants activos.</p>
+
+      <!-- Selector de giro -->
+      <div id="cat-giro-tabs" class="tabs" style="margin-bottom:16px"></div>
+
+      <!-- Sub-tabs por tipo -->
+      <div class="tabs" id="cat-tipo-tabs">
+        <div class="tab active" data-tipo="cortes"    onclick="setCatTipo('cortes')">Cortes / Variantes</div>
+        <div class="tab"        data-tipo="itemTypes" onclick="setCatTipo('itemTypes')">Formatos</div>
+        <div class="tab"        data-tipo="refrescos" onclick="setCatTipo('refrescos')">Bebidas</div>
+        <div class="tab"        data-tipo="salsas"    onclick="setCatTipo('salsas')">Salsas</div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="abrirCatModal()">+ Agregar</button>
+        <span id="cat-seccion-info" style="color:var(--muted);font-size:12px"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="cat-thead"></thead>
+          <tbody id="cat-tbody"><tr><td colspan="6" class="empty">Selecciona un giro para ver su catálogo.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
+
+<!-- Modal catálogo de giros -->
+<div class="modal-bg" id="modal-cat">
+  <div class="modal" style="max-width:580px">
+    <h2 id="modal-cat-titulo">Agregar ítem</h2>
+    <div id="modal-cat-form"></div>
+    <div id="modal-cat-error" class="alert alert-error" style="display:none;margin-top:10px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarCatModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarCatItem()">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modales -->
 <div class="modal-bg" id="modal-tenant">
@@ -1820,6 +1862,312 @@ async function loadHistorialReparto() {
 
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── CATÁLOGO DE GIROS ──────────────────────────────────────────────────────────
+let _catGiro   = null;
+let _catTipo   = 'cortes';
+let _catDatos  = null;
+let _catEdit   = null;
+
+function _slugDesdeNombre(n) {
+  return (n||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').replace(/_+/g,'_').replace(/^_|_$/g,'');
+}
+
+async function loadCatalogoGiros() {
+  try {
+    const giros = await api('/api/giros');
+    const tabs  = document.getElementById('cat-giro-tabs');
+    tabs.innerHTML = giros.map(g =>
+      `<div class="tab${!_catGiro || _catGiro===g.slug?' active':''}" onclick="setCatGiro('${g.slug}')">${g.emoji} ${g.nombre}</div>`
+    ).join('');
+    if (!_catGiro && giros.length) await setCatGiro(giros[0].slug);
+    else if (_catGiro)             await setCatGiro(_catGiro);
+  } catch(e) { showToast('Error al cargar giros: '+e.message,true); }
+}
+
+async function setCatGiro(slug) {
+  _catGiro = slug;
+  document.querySelectorAll('#cat-giro-tabs .tab').forEach(t =>
+    t.classList.toggle('active', t.textContent.includes(slug) || t.getAttribute('onclick')?.includes(slug)));
+  try {
+    _catDatos = await api(`/api/giros/${slug}/catalogo`);
+    _actualizarTabsTipo();
+    renderCatTabla();
+  } catch(e) { showToast('Error al cargar catálogo: '+e.message,true); }
+}
+
+function setCatTipo(tipo) {
+  _catTipo = tipo;
+  document.querySelectorAll('#cat-tipo-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tipo===tipo));
+  renderCatTabla();
+}
+
+function _actualizarTabsTipo() {
+  if (!_catDatos) return;
+  const s = _catDatos.soporta || {};
+  document.querySelector('[data-tipo="refrescos"]').style.opacity = s.refrescos ? '1' : '.35';
+  document.querySelector('[data-tipo="salsas"]').style.opacity    = s.salsas    ? '1' : '.35';
+  const info = document.getElementById('cat-seccion-info');
+  info.textContent = `${_catDatos.emoji || ''} ${_catDatos.nombre || ''} — ${(_catDatos.cortes||[]).length} cortes · ${(_catDatos.itemTypes||[]).length} formatos`;
+}
+
+function renderCatTabla() {
+  if (!_catDatos) return;
+  const items = _catDatos[_catTipo] || [];
+  const thead = document.getElementById('cat-thead');
+  const tbody = document.getElementById('cat-tbody');
+
+  if (_catTipo === 'cortes') {
+    const tieneSec = items.some(i => i.seccion !== undefined);
+    thead.innerHTML = `<tr><th>Slug</th><th>Nombre</th><th>Precio base</th>${tieneSec?'<th>Sección</th>':''}<th>Aliases</th><th>Acciones</th></tr>`;
+    tbody.innerHTML = items.length ? items.map((it,i) => `
+      <tr>
+        <td><code style="font-size:11px;color:var(--muted)">${esc(it.slug)}</code></td>
+        <td><strong>${esc(it.nombre)}</strong><div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(it.descripcion||'')}</div></td>
+        <td>$${it.precio_base}</td>
+        ${tieneSec?`<td><span class="badge badge-gray">${esc(it.seccion||'')}</span></td>`:''}
+        <td style="font-size:11px;color:var(--muted)">${(it.aliases||[]).join(', ')}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="abrirCatModal(${i})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarCatItem('${esc(it.slug)}')">Eliminar</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin ítems registrados.</td></tr>';
+
+  } else if (_catTipo === 'itemTypes') {
+    thead.innerHTML = '<tr><th>Slug</th><th>Nombre</th><th>Plural</th><th>Precio base</th><th>Precio campo</th><th>Acciones</th></tr>';
+    tbody.innerHTML = items.length ? items.map((it,i) => `
+      <tr>
+        <td><code style="font-size:11px;color:var(--muted)">${esc(it.slug)}</code></td>
+        <td>${esc(it.emoji||'')} ${esc(it.nombre)}</td>
+        <td>${esc(it.nombre_plural)}</td>
+        <td>$${it.precio_base}</td>
+        <td><code style="font-size:11px">${esc(it.precio_campo)}</code></td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="abrirCatModal(${i})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarCatItem('${esc(it.slug)}')">Eliminar</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin formatos registrados.</td></tr>';
+
+  } else if (_catTipo === 'refrescos') {
+    thead.innerHTML = '<tr><th>Nombre</th><th>Precio</th><th>Sinónimos</th><th>Acciones</th></tr>';
+    tbody.innerHTML = items.length ? items.map((it,i) => `
+      <tr>
+        <td><strong>${esc(it.nombre)}</strong><div style="font-size:11px;color:var(--muted)">${esc(it.descripcion||'')}</div></td>
+        <td>$${it.precio}</td>
+        <td style="font-size:11px;color:var(--muted)">${esc(it.sinonimos||'')}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="abrirCatModal(${i})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarCatItem('${esc(it.nombre)}')">Eliminar</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty">Sin bebidas registradas.</td></tr>';
+
+  } else {
+    thead.innerHTML = '<tr><th>Nombre</th><th>Emoji</th><th>Precio</th><th>Sinónimos</th><th>Acciones</th></tr>';
+    tbody.innerHTML = items.length ? items.map((it,i) => `
+      <tr>
+        <td><strong>${esc(it.nombre)}</strong><div style="font-size:11px;color:var(--muted)">${esc(it.descripcion||'')}</div></td>
+        <td>${esc(it.emoji||'')}</td>
+        <td>$${it.precio}</td>
+        <td style="font-size:11px;color:var(--muted)">${esc(it.sinonimos||'')}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="abrirCatModal(${i})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarCatItem('${esc(it.nombre)}')">Eliminar</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin salsas registradas.</td></tr>';
+  }
+}
+
+function abrirCatModal(idx = null) {
+  _catEdit = idx !== null ? _catDatos[_catTipo][idx] : null;
+  const es     = !!_catEdit;
+  const item   = _catEdit || {};
+  const soporta = _catDatos?.soporta || {};
+  let form = '';
+
+  if (_catTipo === 'cortes') {
+    const tieneSec = es ? item.seccion !== undefined : _catGiro === 'taqueria';
+    form = `
+      <div class="form-group"><label>Nombre</label>
+        <input id="cf-nombre" type="text" value="${esc(item.nombre||'')}" oninput="if(!${es}){document.getElementById('cf-slug').value=_slugDesdeNombre(this.value)}">
+      </div>
+      <div class="form-group"><label>Slug <span style="color:var(--muted);font-size:11px">(auto-generado, solo lectura)</span></label>
+        <input id="cf-slug" type="text" value="${esc(item.slug||'')}" readonly style="opacity:.6;cursor:not-allowed">
+      </div>
+      <div class="grid2">
+        <div class="form-group"><label>Precio base ($)</label><input id="cf-precio" type="number" value="${item.precio_base??0}" min="0"></div>
+        ${tieneSec ? `
+        <div class="form-group"><label>Sección</label>
+          <select id="cf-seccion">
+            <option value="asada" ${item.seccion==='asada'?'selected':''}>Asada</option>
+            <option value="carnitas" ${item.seccion==='carnitas'||!item.seccion?'selected':''}>Carnitas</option>
+          </select>
+        </div>` : '<div></div>'}
+      </div>
+      ${tieneSec ? `
+      <div class="form-group"><label>Subclase</label>
+        <select id="cf-subclase">
+          ${['res','cerdo','cerdo_adobado','viscera','piel','hueso','magra','mixto'].map(v =>
+            `<option value="${v}" ${item.subclase===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>` : ''}
+      <div class="form-group"><label>Aliases NLU <span style="color:var(--muted);font-size:11px">(separados por coma)</span></label>
+        <input id="cf-aliases" type="text" value="${esc((item.aliases||[]).join(', '))}">
+      </div>
+      <div class="form-group"><label>Descripción</label>
+        <textarea id="cf-desc" rows="2">${esc(item.descripcion||'')}</textarea>
+      </div>`;
+
+  } else if (_catTipo === 'itemTypes') {
+    form = `
+      <div class="grid2">
+        <div class="form-group"><label>Nombre (singular)</label>
+          <input id="cf-nombre" type="text" value="${esc(item.nombre||'')}" oninput="if(!${es}){document.getElementById('cf-slug').value=_slugDesdeNombre(this.value)}">
+        </div>
+        <div class="form-group"><label>Nombre plural</label><input id="cf-plural" type="text" value="${esc(item.nombre_plural||'')}"></div>
+      </div>
+      <div class="form-group"><label>Slug <span style="color:var(--muted);font-size:11px">(auto-generado, solo lectura)</span></label>
+        <input id="cf-slug" type="text" value="${esc(item.slug||'')}" readonly style="opacity:.6;cursor:not-allowed">
+      </div>
+      <div class="grid2">
+        <div class="form-group"><label>Emoji</label><input id="cf-emoji" type="text" value="${esc(item.emoji||'🍽️')}"></div>
+        <div class="form-group"><label>Precio base ($)</label><input id="cf-precio" type="number" value="${item.precio_base??0}" min="0"></div>
+      </div>
+      <div class="form-group"><label>Precio campo <span style="color:var(--muted);font-size:11px">(config de tarifa base)</span></label>
+        <select id="cf-precio-campo">
+          <option value="precio_taco"  ${item.precio_campo==='precio_taco'||!item.precio_campo?'selected':''}>precio_taco — igual que tacos</option>
+          <option value="precio_torta" ${item.precio_campo==='precio_torta'?'selected':''}>precio_torta — igual que tortas</option>
+          <option value="precio_100g"  ${item.precio_campo==='precio_100g'?'selected':''}>precio_100g — por peso / por pesos</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Aliases NLU <span style="color:var(--muted);font-size:11px">(separados por coma)</span></label>
+        <input id="cf-aliases" type="text" value="${esc((item.aliases||[]).join(', '))}">
+      </div>
+      <div class="grid2">
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:20px">
+          <input id="cf-gramos" type="checkbox" style="width:auto" ${item.soporta_gramos?'checked':''}>
+          <label style="margin:0">Soporta gramos</label>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:20px">
+          <input id="cf-pesos" type="checkbox" style="width:auto" ${item.soporta_pesos?'checked':''}>
+          <label style="margin:0">Soporta por pesos</label>
+        </div>
+      </div>`;
+
+  } else if (_catTipo === 'refrescos') {
+    form = `
+      <div class="form-group"><label>Nombre</label><input id="cf-nombre" type="text" value="${esc(item.nombre||'')}"></div>
+      <div class="form-group"><label>Precio ($)</label><input id="cf-precio" type="number" value="${item.precio??0}" min="0"></div>
+      <div class="form-group"><label>Sinónimos NLU <span style="color:var(--muted);font-size:11px">(separados por coma)</span></label>
+        <input id="cf-sin" type="text" value="${esc(item.sinonimos||'')}">
+      </div>
+      <div class="form-group"><label>Descripción</label><input id="cf-desc" type="text" value="${esc(item.descripcion||'')}"></div>`;
+
+  } else {
+    form = `
+      <div class="grid2">
+        <div class="form-group"><label>Nombre</label><input id="cf-nombre" type="text" value="${esc(item.nombre||'')}"></div>
+        <div class="form-group"><label>Emoji</label><input id="cf-emoji" type="text" value="${esc(item.emoji||'')}"></div>
+      </div>
+      <div class="form-group"><label>Precio ($) <span style="color:var(--muted);font-size:11px">(0 = gratis)</span></label>
+        <input id="cf-precio" type="number" value="${item.precio??0}" min="0">
+      </div>
+      <div class="form-group"><label>Sinónimos NLU <span style="color:var(--muted);font-size:11px">(separados por coma)</span></label>
+        <input id="cf-sin" type="text" value="${esc(item.sinonimos||'')}">
+      </div>
+      <div class="form-group"><label>Descripción</label><input id="cf-desc" type="text" value="${esc(item.descripcion||'')}"></div>`;
+  }
+
+  document.getElementById('modal-cat-titulo').textContent = (es ? 'Editar' : 'Agregar') + ' — ' + {
+    cortes:'Corte/Variante', itemTypes:'Formato', refrescos:'Bebida', salsas:'Salsa'
+  }[_catTipo];
+  document.getElementById('modal-cat-form').innerHTML = form;
+  document.getElementById('modal-cat-error').style.display = 'none';
+  document.getElementById('modal-cat').classList.add('open');
+}
+
+function cerrarCatModal() {
+  document.getElementById('modal-cat').classList.remove('open');
+  _catEdit = null;
+}
+
+async function guardarCatItem() {
+  const err = document.getElementById('modal-cat-error');
+  err.style.display = 'none';
+
+  const v = id => document.getElementById(id)?.value?.trim() || '';
+  const ch = id => document.getElementById(id)?.checked || false;
+  let body = {};
+
+  if (_catTipo === 'cortes') {
+    const nombre = v('cf-nombre');
+    if (!nombre) { err.textContent='El nombre es obligatorio'; err.style.display='block'; return; }
+    body = {
+      nombre,
+      precio_base: parseFloat(v('cf-precio')) || 0,
+      aliases: v('cf-aliases'),
+      descripcion: v('cf-desc'),
+    };
+    const secEl = document.getElementById('cf-seccion');
+    if (secEl) body.seccion = secEl.value;
+    const subEl = document.getElementById('cf-subclase');
+    if (subEl) body.subclase = subEl.value;
+    if (!_catEdit) body.slug = _slugDesdeNombre(nombre);
+
+  } else if (_catTipo === 'itemTypes') {
+    const nombre = v('cf-nombre');
+    if (!nombre) { err.textContent='El nombre es obligatorio'; err.style.display='block'; return; }
+    body = {
+      nombre,
+      nombre_plural: v('cf-plural') || nombre,
+      emoji: v('cf-emoji') || '🍽️',
+      precio_base: parseFloat(v('cf-precio')) || 0,
+      precio_campo: document.getElementById('cf-precio-campo')?.value || 'precio_taco',
+      aliases: v('cf-aliases'),
+      soporta_gramos: ch('cf-gramos'),
+      soporta_pesos:  ch('cf-pesos'),
+    };
+    if (!_catEdit) body.slug = _slugDesdeNombre(nombre);
+
+  } else if (_catTipo === 'refrescos') {
+    const nombre = v('cf-nombre');
+    if (!nombre) { err.textContent='El nombre es obligatorio'; err.style.display='block'; return; }
+    body = { nombre, precio: parseFloat(v('cf-precio')) || 0, sinonimos: v('cf-sin'), descripcion: v('cf-desc') };
+
+  } else {
+    const nombre = v('cf-nombre');
+    if (!nombre) { err.textContent='El nombre es obligatorio'; err.style.display='block'; return; }
+    body = { nombre, emoji: v('cf-emoji'), precio: parseFloat(v('cf-precio')) || 0, sinonimos: v('cf-sin'), descripcion: v('cf-desc') };
+  }
+
+  try {
+    const campoId = (_catTipo==='refrescos'||_catTipo==='salsas') ? 'nombre' : 'slug';
+    const id = _catEdit?.[campoId] || body.slug || body.nombre;
+    const url = _catEdit
+      ? `/api/giros/${_catGiro}/catalogo/${_catTipo}/${encodeURIComponent(id)}`
+      : `/api/giros/${_catGiro}/catalogo/${_catTipo}`;
+    await api(url, { method: _catEdit ? 'PUT' : 'POST', body });
+    cerrarCatModal();
+    _catDatos = await api(`/api/giros/${_catGiro}/catalogo`);
+    _actualizarTabsTipo();
+    renderCatTabla();
+    showToast(_catEdit ? 'Ítem actualizado' : 'Ítem agregado y propagado a tenants');
+  } catch(e) {
+    err.textContent = e.message || 'Error al guardar';
+    err.style.display = 'block';
+  }
+}
+
+async function eliminarCatItem(id) {
+  if (!confirm(`¿Eliminar "${id}"? Los tenants que lo tengan activo lo perderán.`)) return;
+  try {
+    await api(`/api/giros/${_catGiro}/catalogo/${_catTipo}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    _catDatos = await api(`/api/giros/${_catGiro}/catalogo`);
+    _actualizarTabsTipo();
+    renderCatTabla();
+    showToast('Ítem eliminado');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
 </script>
 </body>
 </html>

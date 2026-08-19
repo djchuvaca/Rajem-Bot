@@ -5,6 +5,37 @@
  * Fuente de verdad para item types, variantes, productos y NLU de hamburguesería.
  */
 
+function _buildFallbackCortes(cortes) {
+  const map = {};
+  for (const c of cortes) {
+    map[c.slug] = c.slug;
+    for (const parte of c.nombre.toLowerCase().split('/').map(s => s.trim()).filter(Boolean)) map[parte] = c.slug;
+    for (const alias of (c.aliases || [])) map[alias.toLowerCase()] = c.slug;
+  }
+  return map;
+}
+
+const _cortes = [
+    { slug: 'clasica',  nombre: 'Clásica',  precio_base: 90,
+      aliases: ['clasica', 'original', 'normal', 'la clasica', 'la clásica', 'hamburguesa normal'],
+      descripcion: 'Carne de res, queso americano, lechuga, jitomate y catsup.' },
+    { slug: 'bbq',      nombre: 'BBQ',      precio_base: 100,
+      aliases: ['barbecue', 'barbeque', 'a la parrilla', 'con bbq', 'salsa bbq'],
+      descripcion: 'Carne de res, salsa BBQ casera, cebolla caramelizada y tocino.' },
+    { slug: 'chipotle', nombre: 'Chipotle', precio_base: 100,
+      aliases: ['chipotl', 'chipot', 'con chipotle', 'de chipotle'],
+      descripcion: 'Carne de res, salsa chipotle, jalapeños y queso manchego.' },
+    { slug: 'crispy',   nombre: 'Crispy',   precio_base: 95,
+      aliases: ['crujiente', 'crunchy', 'pollo crujiente', 'pollo crispy', 'de pollo', 'pollo'],
+      descripcion: 'Pechuga de pollo empanizada crujiente con mayonesa de ajo.' },
+    { slug: 'especial', nombre: 'Especial', precio_base: 110,
+      aliases: ['la especial', 'la de la casa', 'de la casa', 'especial de la casa', 'signature'],
+      descripcion: 'Doble carne, tocino, queso derretido y salsa secreta.' },
+    { slug: 'hawaiana_burger', nombre: 'Hawaiana', precio_base: 100,
+      aliases: ['hawaiana burger', 'con piña', 'piña y jamon burger', 'hawaiana hamburguesa'],
+      descripcion: 'Carne de res, piña a la plancha, jamón y queso manchego.' },
+];
+
 module.exports = {
   slug:        'hamburgueseria',
   nombre:      'Hamburguesería',
@@ -34,26 +65,7 @@ module.exports = {
   ],
 
   // Variantes de hamburguesa (equivalen a "cortes" en taquería)
-  cortes: [
-    { slug: 'clasica',  nombre: 'Clásica',  precio_base: 90,
-      aliases: ['clasica', 'original', 'normal', 'la clasica', 'la clásica', 'hamburguesa normal'],
-      descripcion: 'Carne de res, queso americano, lechuga, jitomate y catsup.' },
-    { slug: 'bbq',      nombre: 'BBQ',      precio_base: 100,
-      aliases: ['barbecue', 'barbeque', 'a la parrilla', 'con bbq', 'salsa bbq'],
-      descripcion: 'Carne de res, salsa BBQ casera, cebolla caramelizada y tocino.' },
-    { slug: 'chipotle', nombre: 'Chipotle', precio_base: 100,
-      aliases: ['chipotl', 'chipot', 'con chipotle', 'de chipotle'],
-      descripcion: 'Carne de res, salsa chipotle, jalapeños y queso manchego.' },
-    { slug: 'crispy',   nombre: 'Crispy',   precio_base: 95,
-      aliases: ['crujiente', 'crunchy', 'pollo crujiente', 'pollo crispy', 'de pollo', 'pollo'],
-      descripcion: 'Pechuga de pollo empanizada crujiente con mayonesa de ajo.' },
-    { slug: 'especial', nombre: 'Especial', precio_base: 110,
-      aliases: ['la especial', 'la de la casa', 'de la casa', 'especial de la casa', 'signature'],
-      descripcion: 'Doble carne, tocino, queso derretido y salsa secreta.' },
-    { slug: 'hawaiana_burger', nombre: 'Hawaiana', precio_base: 100,
-      aliases: ['hawaiana burger', 'con piña', 'piña y jamon burger', 'hawaiana hamburguesa'],
-      descripcion: 'Carne de res, piña a la plancha, jamón y queso manchego.' },
-  ],
+  cortes: _cortes,
 
   vocabulario: {
     corte:         'variante',
@@ -71,14 +83,7 @@ module.exports = {
     tarjetaSoloMostrador: false,
   },
 
-  // Mapa alias→slug de emergencia para NLU sin BD
-  fallbackCortes: {
-    clasica: 'clasica', clásica: 'clasica', original: 'clasica', normal: 'clasica',
-    bbq: 'bbq', barbecue: 'bbq', barbeque: 'bbq', 'a la parrilla': 'bbq',
-    chipotle: 'chipotle', chipotl: 'chipotle',
-    crispy: 'crispy', crujiente: 'crispy', 'pollo crispy': 'crispy', pollo: 'crispy',
-    especial: 'especial', 'de la casa': 'especial', 'la especial': 'especial',
-    hawaiana: 'hawaiana_burger', 'con piña': 'hawaiana_burger',
-  },
+  // Mapa alias→slug generado automáticamente desde _cortes — no editar a mano
+  fallbackCortes: _buildFallbackCortes(_cortes),
 
 };

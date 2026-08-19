@@ -557,6 +557,85 @@ function getTenantReporteReparto(tenant, { desde = null, hasta = null } = {}) {
   } catch (_) { return []; }
 }
 
+// ── PROPAGACIÓN DE CATÁLOGO DE GIRO A TENANTS ────────────────────────────────
+// Cuando se agrega/edita/elimina un ítem en el JS del giro, se propaga
+// inmediatamente a las BDs de los tenants que usen ese giro.
+
+function propagarCorteATenants(giroSlug, corte, operacion) {
+  const tenants = getTenants().filter(t => (t.business_type || 'taqueria') === giroSlug);
+  const resultados = [];
+  for (const tenant of tenants) {
+    const db = _openWritable(tenant);
+    if (!db) { resultados.push({ id: tenant.id, ok: false, error: 'BD no disponible' }); continue; }
+    try {
+      const bt = db.prepare('SELECT id FROM business_types WHERE slug=?').get(giroSlug);
+      if (!bt) { resultados.push({ id: tenant.id, ok: false, error: 'business_type no encontrado' }); continue; }
+      if (operacion === 'eliminar') {
+        db.prepare('UPDATE cortes SET activo=0 WHERE giro_id=? AND slug=?').run(bt.id, corte.slug);
+        db.prepare('UPDATE menu_items SET eliminado=1 WHERE producto_slug=? AND categoria=?').run(corte.slug, 'corte');
+      } else if (operacion === 'crear') {
+        db.prepare(`INSERT OR IGNORE INTO cortes (giro_id,slug,nombre,aliases_json,descripcion,precio_base,precios_json,activo,seccion)
+          VALUES (?,?,?,?,?,?,?,1,?)`).run(
+          bt.id, corte.slug, corte.nombre,
+          JSON.stringify(corte.aliases || []),
+          corte.descripcion || '', Number(corte.precio_base) || 0, '{}',
+          corte.seccion || 'carnitas'
+        );
+      } else {
+        // editar — sincroniza NLU (aliases, descripcion, seccion)
+        db.prepare('UPDATE cortes SET nombre=?,aliases_json=?,descripcion=?,precio_base=?,seccion=? WHERE giro_id=? AND slug=?').run(
+          corte.nombre, JSON.stringify(corte.aliases || []),
+          corte.descripcion || '', Number(corte.precio_base) || 0,
+          corte.seccion || 'carnitas', bt.id, corte.slug
+        );
+      }
+      _invalidateTenant(tenant);
+      resultados.push({ id: tenant.id, ok: true });
+    } catch (e) {
+      resultados.push({ id: tenant.id, ok: false, error: e.message });
+    } finally { db.close(); }
+  }
+  return resultados;
+}
+
+function propagarItemTypeATenants(giroSlug, itemType, operacion) {
+  const tenants = getTenants().filter(t => (t.business_type || 'taqueria') === giroSlug);
+  const resultados = [];
+  for (const tenant of tenants) {
+    const db = _openWritable(tenant);
+    if (!db) { resultados.push({ id: tenant.id, ok: false, error: 'BD no disponible' }); continue; }
+    try {
+      const bt = db.prepare('SELECT id FROM business_types WHERE slug=?').get(giroSlug);
+      if (!bt) { resultados.push({ id: tenant.id, ok: false, error: 'business_type no encontrado' }); continue; }
+      if (operacion === 'eliminar') {
+        db.prepare('UPDATE item_types SET activo=0 WHERE business_type_id=? AND slug=?').run(bt.id, itemType.slug);
+      } else if (operacion === 'crear') {
+        db.prepare(`INSERT OR IGNORE INTO item_types
+          (business_type_id,slug,nombre,nombre_plural,emoji,aliases_json,soporta_gramos,soporta_pesos,precio_campo,precio_base,activo)
+          VALUES (?,?,?,?,?,?,?,?,?,?,0)`).run(
+          bt.id, itemType.slug, itemType.nombre, itemType.nombre_plural,
+          itemType.emoji || '🍽️', JSON.stringify(itemType.aliases || []),
+          itemType.soporta_gramos ? 1 : 0, itemType.soporta_pesos ? 1 : 0,
+          itemType.precio_campo || 'precio_taco', Number(itemType.precio_base) || 0
+        );
+      } else {
+        db.prepare(`UPDATE item_types SET nombre=?,nombre_plural=?,emoji=?,aliases_json=?,
+          soporta_gramos=?,soporta_pesos=?,precio_campo=? WHERE business_type_id=? AND slug=?`).run(
+          itemType.nombre, itemType.nombre_plural, itemType.emoji || '🍽️',
+          JSON.stringify(itemType.aliases || []),
+          itemType.soporta_gramos ? 1 : 0, itemType.soporta_pesos ? 1 : 0,
+          itemType.precio_campo || 'precio_taco', bt.id, itemType.slug
+        );
+      }
+      _invalidateTenant(tenant);
+      resultados.push({ id: tenant.id, ok: true });
+    } catch (e) {
+      resultados.push({ id: tenant.id, ok: false, error: e.message });
+    } finally { db.close(); }
+  }
+  return resultados;
+}
+
 module.exports = {
   getTenants, saveTenants, getTenant, upsertTenant, deleteTenant,
   getTenantStats, getTenantConfig, setTenantConfig, setTenantConfigBulk,
@@ -569,4 +648,5 @@ module.exports = {
   getTenantRepartidores, updateTenantRepartidor, deleteTenantRepartidor,
   getTenantMandaditosConfig, setTenantMandaditosConfig,
   getTenantEntregasHistorial, getTenantReporteReparto,
+  propagarCorteATenants, propagarItemTypeATenants,
 };
