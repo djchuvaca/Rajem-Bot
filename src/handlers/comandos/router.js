@@ -24,6 +24,13 @@ function _jid(valor) {
     || (valor.id?.user && valor.id?.server ? `${valor.id.user}@${valor.id.server}` : '');
 }
 
+// WhatsApp envía @lid con sufijo de dispositivo ("user:15@lid"); la lista de
+// participantes los almacena sin él ("user@lid"). Hay que normalizar ambos lados.
+function _normalizeLid(jid) {
+  if (!jid || !jid.endsWith('@lid')) return jid;
+  return jid.replace(/:\d+@lid$/, '@lid');
+}
+
 // ── Resolución de permisos de administrador ───────────────────────────────────
 
 /**
@@ -39,7 +46,7 @@ async function resolverEsAdmin(msg, client) {
   const autorOriginal = _jid(msg.author) || (msg.fromMe ? _jid(client?.info?.wid) : '');
   if (!autorOriginal) return false;
 
-  const candidatos = new Set([autorOriginal]);
+  const candidatos = new Set([autorOriginal, _normalizeLid(autorOriginal)]);
 
   if (autorOriginal.endsWith('@lid')) {
     if (typeof client?.getContactLidAndPhone === 'function') {
@@ -53,7 +60,7 @@ async function resolverEsAdmin(msg, client) {
     try {
       const contacto = await msg.getContact();
       const canonico = _jid(contacto?.id);
-      if (canonico && !canonico.endsWith('@lid')) candidatos.add(canonico);
+      if (canonico) { candidatos.add(canonico); candidatos.add(_normalizeLid(canonico)); }
     } catch (_) {}
   }
 
@@ -67,7 +74,7 @@ async function resolverEsAdmin(msg, client) {
 
   return (chat?.participants || []).some(p => {
     const id = _jid(p.id || p);
-    return candidatos.has(id) && (p.isAdmin || p.isSuperAdmin);
+    return (candidatos.has(id) || candidatos.has(_normalizeLid(id))) && (p.isAdmin || p.isSuperAdmin);
   });
 }
 
