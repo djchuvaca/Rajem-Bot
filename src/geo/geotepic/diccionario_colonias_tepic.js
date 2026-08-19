@@ -470,8 +470,8 @@ const COLONIAS = Object.freeze({
     "ciudad": "Tepic",
     "zona": "urbana",
     "coordenadas": {
-      "latitud": 21.51936056311773,
-      "longitud": -104.89257898448878,
+      "latitud": 21.5225399,
+      "longitud": -104.8914369,
       "fuente": "usuario_verificada",
       "precision": "punto_referencia_verificado",
       "confianza": "alta",
@@ -503,8 +503,8 @@ const COLONIAS = Object.freeze({
     "ciudad": "Tepic",
     "zona": "urbana",
     "coordenadas": {
-      "latitud": 21.5225399,
-      "longitud": -104.8914369,
+      "latitud": 21.51936056311773,
+      "longitud": -104.89257898448878,
       "referencia": "resultado_cartografico_con_tipo_y_cp",
       "fuente": "google_maps_search",
       "precision": "centro_aproximado",

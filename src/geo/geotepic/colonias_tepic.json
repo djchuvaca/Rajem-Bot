@@ -1,0 +1,1502 @@
+[
+  {
+    "nombre": "12 de Diciembre",
+    "lat": 21.489774911653697,
+    "lng": -104.87658950490167
+  },
+  {
+    "nombre": "15 de Mayo",
+    "lat": 21.47828556679425,
+    "lng": -104.89005078290481
+  },
+  {
+    "nombre": "18 de Agosto",
+    "lat": 21.502739921116525,
+    "lng": -104.87804988964112
+  },
+  {
+    "nombre": "2 de Agosto",
+    "lat": 21.48077906026589,
+    "lng": -104.87111848445387
+  },
+  {
+    "nombre": "20 de Noviembre",
+    "lat": 21.51618455937892,
+    "lng": -104.91094930753725
+  },
+  {
+    "nombre": "26 de Septiembre",
+    "lat": 21.4720236423838,
+    "lng": -104.88212671858568
+  },
+  {
+    "nombre": "3 de Julio",
+    "lat": 21.494760610590323,
+    "lng": -104.79063087682329
+  },
+  {
+    "nombre": "4 Milpas",
+    "lat": 21.491692448537023,
+    "lng": -104.87536510832986
+  },
+  {
+    "nombre": "5 de Febrero",
+    "lat": 21.468095194296012,
+    "lng": -104.87073957710953
+  },
+  {
+    "nombre": "Acayapan",
+    "lat": 21.519660215786132,
+    "lng": -104.89514252134343
+  },
+  {
+    "nombre": "Adolfo López Mateos",
+    "lat": 21.526478841562863,
+    "lng": -104.90680942548025
+  },
+  {
+    "nombre": "AGEUAN Los Limones",
+    "lat": 21.49859234480051,
+    "lng": -104.87597471289902
+  },
+  {
+    "nombre": "Alaska",
+    "lat": 21.52351717743389,
+    "lng": -104.9238464115534
+  },
+  {
+    "nombre": "Amado Nervo (Colonia)",
+    "lat": 21.5225399,
+    "lng": -104.8914369
+  },
+  {
+    "nombre": "Amado Nervo (Fraccionamiento)",
+    "lat": 21.51936056311773,
+    "lng": -104.89257898448878
+  },
+  {
+    "nombre": "América Manríquez",
+    "lat": 21.525020767867538,
+    "lng": -104.91368148534733
+  },
+  {
+    "nombre": "Ampliación El Paraíso",
+    "lat": 21.536738782046857,
+    "lng": -104.86930496486958
+  },
+  {
+    "nombre": "Ampliación Santa Teresita",
+    "lat": 21.522678812881992,
+    "lng": -104.8951016835117
+  },
+  {
+    "nombre": "Ampliación Tierra y Libertad",
+    "lat": 21.504496354562985,
+    "lng": -104.87676722921434
+  },
+  {
+    "nombre": "Antonio Echevarría Domínguez",
+    "lat": 21.490741607168793,
+    "lng": -104.85032788945848
+  },
+  {
+    "nombre": "Antonio R Laureles",
+    "lat": 21.4521624,
+    "lng": -104.89794459999999
+  },
+  {
+    "nombre": "Aramara",
+    "lat": 21.496444356137797,
+    "lng": -104.82132676024855
+  },
+  {
+    "nombre": "Arboledas",
+    "lat": 21.53389340896135,
+    "lng": -104.8773722339332
+  },
+  {
+    "nombre": "Aurora",
+    "lat": 21.49532612585795,
+    "lng": -104.80990898903956
+  },
+  {
+    "nombre": "Aves del Paraíso",
+    "lat": 21.505807739784622,
+    "lng": -104.91514143963101
+  },
+  {
+    "nombre": "Aviación",
+    "lat": 21.47413757848202,
+    "lng": -104.88132119320032
+  },
+  {
+    "nombre": "Aztlán El Verde",
+    "lat": 21.519364244811214,
+    "lng": -104.86798335472783
+  },
+  {
+    "nombre": "Aztlán Solidaridad",
+    "lat": 21.52490942794132,
+    "lng": -104.93272647904094
+  },
+  {
+    "nombre": "Benito Juárez",
+    "lat": 21.497670005950738,
+    "lng": -104.90767969479212
+  },
+  {
+    "nombre": "Benito Juárez Oriente",
+    "lat": 21.48848025468946,
+    "lng": -104.8635879523683
+  },
+  {
+    "nombre": "Bethel",
+    "lat": 21.479062097156625,
+    "lng": -104.91058346162717
+  },
+  {
+    "nombre": "Biosfera Residencial",
+    "lat": 21.494315921167335,
+    "lng": -104.90685394965114
+  },
+  {
+    "nombre": "Bonaterra",
+    "lat": 21.46569420132228,
+    "lng": -104.8432806525549
+  },
+  {
+    "nombre": "Brisas de San Juan",
+    "lat": 21.51450580432022,
+    "lng": -104.92733851802282
+  },
+  {
+    "nombre": "Buenos Aires",
+    "lat": 21.534018176355428,
+    "lng": -104.90519307245624
+  },
+  {
+    "nombre": "Bugambilias",
+    "lat": 21.478510784867755,
+    "lng": -104.87853340722658
+  },
+  {
+    "nombre": "Burócrata Estatal",
+    "lat": 21.484128317138907,
+    "lng": -104.87921544746395
+  },
+  {
+    "nombre": "Burócrata Federal",
+    "lat": 21.48404691438413,
+    "lng": -104.87913356495005
+  },
+  {
+    "nombre": "Caja de Agua",
+    "lat": 21.495949200989884,
+    "lng": -104.89585865244058
+  },
+  {
+    "nombre": "Caminera",
+    "lat": 21.471971363956047,
+    "lng": -104.8858414209668
+  },
+  {
+    "nombre": "Camino Real",
+    "lat": 21.517528054553456,
+    "lng": -104.87192403107173
+  },
+  {
+    "nombre": "Cantera del Nayar",
+    "lat": 21.485374504024985,
+    "lng": -104.8348430869083
+  },
+  {
+    "nombre": "Capitán Orozco",
+    "lat": 21.496638784950854,
+    "lng": -104.88275114679436
+  },
+  {
+    "nombre": "Castilla",
+    "lat": 21.468256961829848,
+    "lng": -104.88202074688095
+  },
+  {
+    "nombre": "Chapultepec",
+    "lat": 21.520190389255607,
+    "lng": -104.8808542119398
+  },
+  {
+    "nombre": "Ciudad del Valle",
+    "lat": 21.490458810678255,
+    "lng": -104.885434748645
+  },
+  {
+    "nombre": "Ciudad Industrial",
+    "lat": 21.478814997339605,
+    "lng": -104.84633817145053
+  },
+  {
+    "nombre": "Ciudad Industrial Microindustria",
+    "lat": 21.4735933,
+    "lng": -104.8554505
+  },
+  {
+    "nombre": "Colinas del Nayar",
+    "lat": 21.52278655561747,
+    "lng": -104.93640012167788
+  },
+  {
+    "nombre": "Colinas del Rey",
+    "lat": 21.487657925437848,
+    "lng": -104.90781622968203
+  },
+  {
+    "nombre": "Colinas del Valle",
+    "lat": 21.4900428878948,
+    "lng": -104.84659518390457
+  },
+  {
+    "nombre": "Colonial",
+    "lat": 21.478069539619206,
+    "lng": -104.87215605967286
+  },
+  {
+    "nombre": "Comerciantes",
+    "lat": 21.484367394584467,
+    "lng": -104.8672050542759
+  },
+  {
+    "nombre": "Conasupo",
+    "lat": 21.4764094,
+    "lng": -104.8710019
+  },
+  {
+    "nombre": "Cora",
+    "lat": 21.502930926796214,
+    "lng": -104.91816096953514
+  },
+  {
+    "nombre": "Corralón",
+    "lat": 21.462673941766337,
+    "lng": -104.87221596827958
+  },
+  {
+    "nombre": "Cuauhtémoc",
+    "lat": 21.484881758689603,
+    "lng": -104.90657273246448
+  },
+  {
+    "nombre": "Cuba",
+    "lat": 21.518622298689163,
+    "lng": -104.86666063555612
+  },
+  {
+    "nombre": "Cuitlahuac",
+    "lat": 21.51621997966642,
+    "lng": -104.88121004172919
+  },
+  {
+    "nombre": "Del Bosque",
+    "lat": 21.49263427787895,
+    "lng": -104.90427121377225
+  },
+  {
+    "nombre": "Del Sol",
+    "lat": 21.504652937409507,
+    "lng": -104.8697349314376
+  },
+  {
+    "nombre": "Dieciséis de Septiembre",
+    "lat": 21.5327777,
+    "lng": -104.9324999
+  },
+  {
+    "nombre": "Dr. Ignacio Cuesta Barrios",
+    "lat": 21.48994632401204,
+    "lng": -104.8729804158211
+  },
+  {
+    "nombre": "Dr. Lucas Vallarta",
+    "lat": 21.4924848,
+    "lng": -104.8761653
+  },
+  {
+    "nombre": "Ecologistas",
+    "lat": 21.5208706,
+    "lng": -104.9377902
+  },
+  {
+    "nombre": "Ejidal",
+    "lat": 21.49027232793564,
+    "lng": -104.83062864492258
+  },
+  {
+    "nombre": "El Aguacate",
+    "lat": 21.506926591948574,
+    "lng": -104.92067132216697
+  },
+  {
+    "nombre": "El Armadillo",
+    "lat": 21.46139821045422,
+    "lng": -104.84960763857204
+  },
+  {
+    "nombre": "El Capomo",
+    "lat": 21.4986166,
+    "lng": -104.8806717
+  },
+  {
+    "nombre": "El Faisán",
+    "lat": 21.529957827689223,
+    "lng": -104.89109084562004
+  },
+  {
+    "nombre": "El Limón",
+    "lat": 21.5117028,
+    "lng": -104.8786647
+  },
+  {
+    "nombre": "El Mirador INFONAVIT",
+    "lat": 21.525959585935215,
+    "lng": -104.88545416071835
+  },
+  {
+    "nombre": "El Naranjal",
+    "lat": 21.521612884741412,
+    "lng": -104.89853442640404
+  },
+  {
+    "nombre": "El Ocho",
+    "lat": 21.4792509,
+    "lng": -104.8998306
+  },
+  {
+    "nombre": "El Palomar",
+    "lat": 21.526500500224056,
+    "lng": -104.92786953597798
+  },
+  {
+    "nombre": "El Paraíso",
+    "lat": 21.538068726599995,
+    "lng": -104.87261176099412
+  },
+  {
+    "nombre": "El Parían",
+    "lat": 21.514604143148627,
+    "lng": -104.88341771367098
+  },
+  {
+    "nombre": "El Pedregal",
+    "lat": 21.498480285198234,
+    "lng": -104.91785190029789
+  },
+  {
+    "nombre": "El Puerto",
+    "lat": 21.471117347830653,
+    "lng": -104.85272875256689
+  },
+  {
+    "nombre": "El Punto",
+    "lat": 21.536483253020485,
+    "lng": -104.89430827951031
+  },
+  {
+    "nombre": "El Rodeo",
+    "lat": 21.521543057110872,
+    "lng": -104.91816524280651
+  },
+  {
+    "nombre": "El Rubí",
+    "lat": 21.4866034977113,
+    "lng": -104.84112073143119
+  },
+  {
+    "nombre": "El Tecolote",
+    "lat": 21.500543186971093,
+    "lng": -104.9086679926038
+  },
+  {
+    "nombre": "El Tecolote INFONAVIT",
+    "lat": 21.500936353125407,
+    "lng": -104.90522416619409
+  },
+  {
+    "nombre": "Electricistas",
+    "lat": 21.50011198210533,
+    "lng": -104.90274198607756
+  },
+  {
+    "nombre": "Emiliano Zapata",
+    "lat": 21.516935786873848,
+    "lng": -104.90649156973524
+  },
+  {
+    "nombre": "Emilio M. González",
+    "lat": 21.5368179,
+    "lng": -104.8782998
+  },
+  {
+    "nombre": "Estadios",
+    "lat": 21.512570414857464,
+    "lng": -104.90456223210765
+  },
+  {
+    "nombre": "Esteban Baca Calderón (Fraccionamiento)",
+    "lat": 21.494415,
+    "lng": -104.8231603
+  },
+  {
+    "nombre": "Esteban Baca Calderón (Unidad Habitacional)",
+    "lat": 21.502248334736198,
+    "lng": -104.88655489433012
+  },
+  {
+    "nombre": "Extamex",
+    "lat": 21.4664951,
+    "lng": -104.8680829
+  },
+  {
+    "nombre": "Félix Peña",
+    "lat": 21.478903743713452,
+    "lng": -104.89789289429088
+  },
+  {
+    "nombre": "Ferrocarrilero 1a Sección",
+    "lat": 21.49916820631686,
+    "lng": -104.8888349533081
+  },
+  {
+    "nombre": "Ferrocarrilero 2a Sección",
+    "lat": 21.501265733461356,
+    "lng": -104.87582087516783
+  },
+  {
+    "nombre": "Flamingos",
+    "lat": 21.49527270266536,
+    "lng": -104.87381542160864
+  },
+  {
+    "nombre": "Florencia",
+    "lat": 21.52678301555258,
+    "lng": -104.92238938808443
+  },
+  {
+    "nombre": "Flores Magón",
+    "lat": 21.501473551762814,
+    "lng": -104.87225358484572
+  },
+  {
+    "nombre": "FOVISSSTE 1a Etapa",
+    "lat": 21.515917846191225,
+    "lng": -104.91723960791154
+  },
+  {
+    "nombre": "FOVISSSTE 2a Etapa",
+    "lat": 21.51742995799435,
+    "lng": -104.92700214472366
+  },
+  {
+    "nombre": "Francisco Villa",
+    "lat": 21.52864454531759,
+    "lng": -104.88729985591642
+  },
+  {
+    "nombre": "Fray Junipero Serra",
+    "lat": 21.500751055009523,
+    "lng": -104.899644457813
+  },
+  {
+    "nombre": "Gardenias",
+    "lat": 21.471779488580182,
+    "lng": -104.89101344135196
+  },
+  {
+    "nombre": "Genaro Vázquez",
+    "lat": 21.50649438290829,
+    "lng": -104.86973250155556
+  },
+  {
+    "nombre": "Gilberto Flores Muñoz",
+    "lat": 21.50616296255626,
+    "lng": -104.8838192458357
+  },
+  {
+    "nombre": "Gobernadores",
+    "lat": 21.4865662155212,
+    "lng": -104.87239249389923
+  },
+  {
+    "nombre": "Gobierno del Cambio I",
+    "lat": 21.4948825,
+    "lng": -104.8737386
+  },
+  {
+    "nombre": "Guadalupe",
+    "lat": 21.526336157133283,
+    "lng": -104.93058414778532
+  },
+  {
+    "nombre": "Gustavo Díaz Ordaz",
+    "lat": 21.48173098102303,
+    "lng": -104.87500208039948
+  },
+  {
+    "nombre": "Heriberto Casas",
+    "lat": 21.516108317841304,
+    "lng": -104.90194863611411
+  },
+  {
+    "nombre": "Heriberto Jara",
+    "lat": 21.50264123327722,
+    "lng": -104.8756983710847
+  },
+  {
+    "nombre": "Hermosa Provincia",
+    "lat": 21.48006955148632,
+    "lng": -104.88003215096278
+  },
+  {
+    "nombre": "IMSS (Fraccionamiento)",
+    "lat": 21.4783924,
+    "lng": -104.8932616
+  },
+  {
+    "nombre": "IMSS (Unidad Habitacional)",
+    "lat": 21.514667231722164,
+    "lng": -104.91170875743342
+  },
+  {
+    "nombre": "INDECO",
+    "lat": 21.528328635354143,
+    "lng": -104.90347815416159
+  },
+  {
+    "nombre": "Independencia",
+    "lat": 21.50316430133397,
+    "lng": -104.90759736086106
+  },
+  {
+    "nombre": "Ingeniero Agrónomo",
+    "lat": 21.523281074614847,
+    "lng": -104.87831692668453
+  },
+  {
+    "nombre": "Ingeniero Aguayo",
+    "lat": 21.528322199999998,
+    "lng": -104.89380899999999
+  },
+  {
+    "nombre": "Insurgentes",
+    "lat": 21.47287306251885,
+    "lng": -104.89473016846294
+  },
+  {
+    "nombre": "Islas del Paraíso",
+    "lat": 21.535659094665807,
+    "lng": -104.86725340568792
+  },
+  {
+    "nombre": "Jacarandas",
+    "lat": 21.482243238511575,
+    "lng": -104.85428227362954
+  },
+  {
+    "nombre": "Jagüey",
+    "lat": 21.5034332,
+    "lng": -104.9197218
+  },
+  {
+    "nombre": "Jardines de La Cruz",
+    "lat": 21.496057244211197,
+    "lng": -104.89813056068235
+  },
+  {
+    "nombre": "Jardines del Paraíso",
+    "lat": 21.53777926977656,
+    "lng": -104.86546664247663
+  },
+  {
+    "nombre": "Jardines del Parque",
+    "lat": 21.487823609668823,
+    "lng": -104.85546962428886
+  },
+  {
+    "nombre": "Jardines del Valle",
+    "lat": 21.531116470886893,
+    "lng": -104.87400561543735
+  },
+  {
+    "nombre": "Jazmines",
+    "lat": 21.485993822045177,
+    "lng": -104.83277960337708
+  },
+  {
+    "nombre": "Jesús García",
+    "lat": 21.485210426425226,
+    "lng": -104.83883313389097
+  },
+  {
+    "nombre": "Jesús Salas",
+    "lat": 21.53798976313995,
+    "lng": -104.89731617759153
+  },
+  {
+    "nombre": "José María Martínez (El Molino)",
+    "lat": 21.484908961797082,
+    "lng": -104.8863270878792
+  },
+  {
+    "nombre": "Juan Escutia",
+    "lat": 21.472753177142096,
+    "lng": -104.8886648905005
+  },
+  {
+    "nombre": "Justino Ávila Arce",
+    "lat": 21.4874425,
+    "lng": -104.8434554
+  },
+  {
+    "nombre": "Juventud",
+    "lat": 21.49364226145953,
+    "lng": -104.87721246597144
+  },
+  {
+    "nombre": "La Esperanza",
+    "lat": 21.506765479765726,
+    "lng": -104.8713409974782
+  },
+  {
+    "nombre": "La Floresta",
+    "lat": 21.494627455690978,
+    "lng": -104.82914143026076
+  },
+  {
+    "nombre": "La Huerta",
+    "lat": 21.518938879017657,
+    "lng": -104.91299997918517
+  },
+  {
+    "nombre": "La Joya",
+    "lat": 21.475709407126473,
+    "lng": -104.8707959375292
+  },
+  {
+    "nombre": "La Loma",
+    "lat": 21.50384179053414,
+    "lng": -104.90466886370884
+  },
+  {
+    "nombre": "La Lomita",
+    "lat": 21.523433201656655,
+    "lng": -104.87458188706125
+  },
+  {
+    "nombre": "Labores de Godínez",
+    "lat": 21.490123015110917,
+    "lng": -104.90103855161753
+  },
+  {
+    "nombre": "Ladrilleras",
+    "lat": 21.469719340386188,
+    "lng": -104.8491464272754
+  },
+  {
+    "nombre": "Lagos de Aztlán",
+    "lat": 21.495755050881694,
+    "lng": -104.87529233870514
+  },
+  {
+    "nombre": "Lagos del Country",
+    "lat": 21.48014033210326,
+    "lng": -104.86231219214804
+  },
+  {
+    "nombre": "Las Aves",
+    "lat": 21.494926571082814,
+    "lng": -104.88068432498017
+  },
+  {
+    "nombre": "Las Brisas",
+    "lat": 21.516862082687737,
+    "lng": -104.92250278932708
+  },
+  {
+    "nombre": "Las Brisas FOVISSSTE",
+    "lat": 21.5168454,
+    "lng": -104.9261094
+  },
+  {
+    "nombre": "Las Conchas",
+    "lat": 21.54072706866849,
+    "lng": -104.87379913571543
+  },
+  {
+    "nombre": "Las Cumbres",
+    "lat": 21.48020568401701,
+    "lng": -104.89932599350439
+  },
+  {
+    "nombre": "Las Fincas",
+    "lat": 21.497397575386767,
+    "lng": -104.85787153244019
+  },
+  {
+    "nombre": "Las Flores",
+    "lat": 21.526056424691784,
+    "lng": -104.918796799223
+  },
+  {
+    "nombre": "Las Islas",
+    "lat": 21.472369428508806,
+    "lng": -104.86417268608027
+  },
+  {
+    "nombre": "Las Palomas",
+    "lat": 21.459335964388917,
+    "lng": -104.85567723478
+  },
+  {
+    "nombre": "Las Pares",
+    "lat": 21.5287539,
+    "lng": -104.8830436
+  },
+  {
+    "nombre": "Lázaro Cárdenas",
+    "lat": 21.479417501346305,
+    "lng": -104.88704285277828
+  },
+  {
+    "nombre": "Leonardo Rodríguez Alcaine",
+    "lat": 21.51,
+    "lng": -104.905
+  },
+  {
+    "nombre": "Leyva Medina",
+    "lat": 21.476870675373984,
+    "lng": -104.89264541171104
+  },
+  {
+    "nombre": "Lindavista",
+    "lat": 21.51058948784751,
+    "lng": -104.92002638029078
+  },
+  {
+    "nombre": "Lirios",
+    "lat": 21.504988400896895,
+    "lng": -104.87906558696561
+  },
+  {
+    "nombre": "Loma Hermosa",
+    "lat": 21.534611655521097,
+    "lng": -104.89052591670048
+  },
+  {
+    "nombre": "Lomas Altas",
+    "lat": 21.522561424661387,
+    "lng": -104.9110039687957
+  },
+  {
+    "nombre": "Lomas Bonitas",
+    "lat": 21.526794488676327,
+    "lng": -104.92410319527124
+  },
+  {
+    "nombre": "Lomas de Cortez",
+    "lat": 21.51516462451541,
+    "lng": -104.88155805828656
+  },
+  {
+    "nombre": "Lomas de La Cruz",
+    "lat": 21.52332974266508,
+    "lng": -104.88300616946546
+  },
+  {
+    "nombre": "Lomas de La Cruz Sutse",
+    "lat": 21.520720416078838,
+    "lng": -104.87855420327266
+  },
+  {
+    "nombre": "Lomas de La Laguna",
+    "lat": 21.5139969602791,
+    "lng": -104.873258769452
+  },
+  {
+    "nombre": "Lomas de Lindavista",
+    "lat": 21.514329824509094,
+    "lng": -104.91657418224919
+  },
+  {
+    "nombre": "Lomas de San Juan",
+    "lat": 21.50244901907581,
+    "lng": -104.9213109410473
+  },
+  {
+    "nombre": "Lomas del Encanto",
+    "lat": 21.492727335013697,
+    "lng": -104.85687820261249
+  },
+  {
+    "nombre": "Lomas del Valle",
+    "lat": 21.528843571935614,
+    "lng": -104.9225386143343
+  },
+  {
+    "nombre": "Los Álamos",
+    "lat": 21.49193705846296,
+    "lng": -104.81129497289659
+  },
+  {
+    "nombre": "Los Arcos",
+    "lat": 21.527896369657533,
+    "lng": -104.87591854219889
+  },
+  {
+    "nombre": "Los Ciruelos",
+    "lat": 21.4827107,
+    "lng": -104.8694933
+  },
+  {
+    "nombre": "Los Colomos",
+    "lat": 21.500368028154323,
+    "lng": -104.87968093776288
+  },
+  {
+    "nombre": "Los Fresnos",
+    "lat": 21.485025353505407,
+    "lng": -104.89148305964078
+  },
+  {
+    "nombre": "Los Fresnos Oriente",
+    "lat": 21.4840762,
+    "lng": -104.890707
+  },
+  {
+    "nombre": "Los Fresnos Poniente",
+    "lat": 21.481167660469346,
+    "lng": -104.89557527382607
+  },
+  {
+    "nombre": "Los Llanitos",
+    "lat": 21.492085494726453,
+    "lng": -104.87884997755795
+  },
+  {
+    "nombre": "Los Manantiales",
+    "lat": 21.5058351,
+    "lng": -104.87971329999999
+  },
+  {
+    "nombre": "Los Pinos",
+    "lat": 21.530801943133746,
+    "lng": -104.89318164591468
+  },
+  {
+    "nombre": "Los Sauces",
+    "lat": 21.470041096034024,
+    "lng": -104.87683008278944
+  },
+  {
+    "nombre": "Los Sauces INFONAVIT",
+    "lat": 21.470912418896997,
+    "lng": -104.87539987489824
+  },
+  {
+    "nombre": "Los Viveros",
+    "lat": 21.52662298370076,
+    "lng": -104.87866977371887
+  },
+  {
+    "nombre": "Luis Donaldo Colosio",
+    "lat": 21.50977023270726,
+    "lng": -104.88147903638739
+  },
+  {
+    "nombre": "Luis Donaldo Colosio Murrieta",
+    "lat": 21.48693383678135,
+    "lng": -104.86080169951099
+  },
+  {
+    "nombre": "Luis Echeverría A.",
+    "lat": 21.5290088,
+    "lng": -104.9162543
+  },
+  {
+    "nombre": "Magisterial",
+    "lat": 21.517897494360348,
+    "lng": -104.88310475772754
+  },
+  {
+    "nombre": "Marco Antonio Fernández",
+    "lat": 21.469334129534502,
+    "lng": -104.86940771341324
+  },
+  {
+    "nombre": "Menchaca",
+    "lat": 21.4979549,
+    "lng": -104.8899772
+  },
+  {
+    "nombre": "México",
+    "lat": 21.49103618106805,
+    "lng": -104.87434886108339
+  },
+  {
+    "nombre": "Miguel Ángel Paredes",
+    "lat": 21.51927041033871,
+    "lng": -104.89067615771462
+  },
+  {
+    "nombre": "Miguel Hidalgo",
+    "lat": 21.471574025693833,
+    "lng": -104.86100264678299
+  },
+  {
+    "nombre": "Miravalles",
+    "lat": 21.47452702735179,
+    "lng": -104.89150957393237
+  },
+  {
+    "nombre": "Moctezuma",
+    "lat": 21.48721919230847,
+    "lng": -104.89727081193003
+  },
+  {
+    "nombre": "Molinos del Rey",
+    "lat": 21.49087145714268,
+    "lng": -104.84816891077922
+  },
+  {
+    "nombre": "Mololoa",
+    "lat": 21.51709947837223,
+    "lng": -104.88724134751007
+  },
+  {
+    "nombre": "Morelos",
+    "lat": 21.49623046148686,
+    "lng": -104.90240662865816
+  },
+  {
+    "nombre": "Nayarabastos",
+    "lat": 21.47511063017659,
+    "lng": -104.85856360112172
+  },
+  {
+    "nombre": "Niños Héroes",
+    "lat": 21.468599477347947,
+    "lng": -104.87235641273283
+  },
+  {
+    "nombre": "Nueva Alemania",
+    "lat": 21.49770651437621,
+    "lng": -104.91063593045368
+  },
+  {
+    "nombre": "Nueva Aviación",
+    "lat": 21.475732380470532,
+    "lng": -104.88293585069464
+  },
+  {
+    "nombre": "Nuevas Delicias",
+    "lat": 21.523012691647654,
+    "lng": -104.9382125066764
+  },
+  {
+    "nombre": "Nuevas Palomas",
+    "lat": 21.468124924824476,
+    "lng": -104.8577526677122
+  },
+  {
+    "nombre": "Nuevo Progreso",
+    "lat": 21.5428144,
+    "lng": -104.8638718
+  },
+  {
+    "nombre": "Obrera CTM",
+    "lat": 21.51208647955168,
+    "lng": -104.91121688866859
+  },
+  {
+    "nombre": "Ojo de Agua",
+    "lat": 21.53176726503445,
+    "lng": -104.90183024193759
+  },
+  {
+    "nombre": "Olimpo",
+    "lat": 21.49060933324888,
+    "lng": -104.83369946479797
+  },
+  {
+    "nombre": "Oriental",
+    "lat": 21.488530557835222,
+    "lng": -104.87007958251759
+  },
+  {
+    "nombre": "Paraíso Residencial",
+    "lat": 21.4608773,
+    "lng": -104.8547139
+  },
+  {
+    "nombre": "Parque Ecológico",
+    "lat": 21.481833032801358,
+    "lng": -104.85798647816473
+  },
+  {
+    "nombre": "Paseo de La Constitución",
+    "lat": 21.518349904374936,
+    "lng": -104.89126294690506
+  },
+  {
+    "nombre": "Paseo del Valle Real",
+    "lat": 21.462716155168742,
+    "lng": -104.86232075868647
+  },
+  {
+    "nombre": "Pedregal de San Juan",
+    "lat": 21.496956267774245,
+    "lng": -104.91784693329087
+  },
+  {
+    "nombre": "Peñita",
+    "lat": 21.492554059755353,
+    "lng": -104.89865596160428
+  },
+  {
+    "nombre": "Periodistas",
+    "lat": 21.475116324349845,
+    "lng": -104.88626108300578
+  },
+  {
+    "nombre": "Plan de Ayala",
+    "lat": 21.466375688898914,
+    "lng": -104.87693721400674
+  },
+  {
+    "nombre": "Porta Alta",
+    "lat": 21.495011234785217,
+    "lng": -104.85194744751695
+  },
+  {
+    "nombre": "Prieto Crispín",
+    "lat": 21.4792613,
+    "lng": -104.8703993
+  },
+  {
+    "nombre": "Primero de Mayo",
+    "lat": 21.5299049,
+    "lng": -104.9222958
+  },
+  {
+    "nombre": "Puente de San Cayetano",
+    "lat": 21.46989961820942,
+    "lng": -104.8543539811257
+  },
+  {
+    "nombre": "Puerta de La Laguna",
+    "lat": 21.517731490002472,
+    "lng": -104.87698122447618
+  },
+  {
+    "nombre": "Puerta Encanto",
+    "lat": 21.48656650726913,
+    "lng": -104.8441383901154
+  },
+  {
+    "nombre": "Puerta Jardín",
+    "lat": 21.494124812080823,
+    "lng": -104.84169019535327
+  },
+  {
+    "nombre": "Puerta Paraíso",
+    "lat": 21.495128485579958,
+    "lng": -104.83360635769687
+  },
+  {
+    "nombre": "Puesta del Sol",
+    "lat": 21.48451162488018,
+    "lng": -104.83676361978726
+  },
+  {
+    "nombre": "Quinta Los Lirios",
+    "lat": 21.4835468,
+    "lng": -104.8644341
+  },
+  {
+    "nombre": "Rancho las Cruces",
+    "lat": 21.53499746411789,
+    "lng": -104.87687187046194
+  },
+  {
+    "nombre": "Real de la Noria",
+    "lat": 21.49393209332918,
+    "lng": -104.86022234444393
+  },
+  {
+    "nombre": "Real de Lozada",
+    "lat": 21.494672135244194,
+    "lng": -104.8404730344587
+  },
+  {
+    "nombre": "Real Montecarlo",
+    "lat": 21.51317478778482,
+    "lng": -104.86651061957946
+  },
+  {
+    "nombre": "Reforma",
+    "lat": 21.531995896994154,
+    "lng": -104.87867279986888
+  },
+  {
+    "nombre": "Residencial La Esmeralda",
+    "lat": 21.525790814250602,
+    "lng": -104.87823218107225
+  },
+  {
+    "nombre": "Residencial La Loma",
+    "lat": 21.503963713790064,
+    "lng": -104.90462010833275
+  },
+  {
+    "nombre": "Residencial los Olivos",
+    "lat": 21.525782974725207,
+    "lng": -104.93297270202139
+  },
+  {
+    "nombre": "Responsabilidad Social Comunitaria",
+    "lat": 21.49275720781831,
+    "lng": -104.83594680849644
+  },
+  {
+    "nombre": "Revolución",
+    "lat": 21.488538838704798,
+    "lng": -104.82193820823036
+  },
+  {
+    "nombre": "Rey Nayar",
+    "lat": 21.505530949063772,
+    "lng": -104.9194874481267
+  },
+  {
+    "nombre": "Rincón de San Juan",
+    "lat": 21.502218389058914,
+    "lng": -104.91336655954443
+  },
+  {
+    "nombre": "Rinconada Residencial",
+    "lat": 21.523403790875054,
+    "lng": -104.91497536976699
+  },
+  {
+    "nombre": "Rivas Allende",
+    "lat": 21.512532296968768,
+    "lng": -104.88313080280402
+  },
+  {
+    "nombre": "Riveras de La Laguna",
+    "lat": 21.51695449038747,
+    "lng": -104.8708386333562
+  },
+  {
+    "nombre": "Rodeo de La Punta",
+    "lat": 21.519558968051314,
+    "lng": -104.9251612493746
+  },
+  {
+    "nombre": "Ruinas de Jauja",
+    "lat": 21.526739527215007,
+    "lng": -104.89150000563639
+  },
+  {
+    "nombre": "Sacristán",
+    "lat": 21.520454484746505,
+    "lng": -104.89234645930529
+  },
+  {
+    "nombre": "San Ángel",
+    "lat": 21.5163729,
+    "lng": -104.9133196
+  },
+  {
+    "nombre": "San Antonio",
+    "lat": 21.501317751012532,
+    "lng": -104.89381632478442
+  },
+  {
+    "nombre": "San José",
+    "lat": 21.52161373755133,
+    "lng": -104.88787311216846
+  },
+  {
+    "nombre": "San Juan",
+    "lat": 21.50954780675665,
+    "lng": -104.90763138487331
+  },
+  {
+    "nombre": "San Juanito",
+    "lat": 21.51342106187347,
+    "lng": -104.86856037550825
+  },
+  {
+    "nombre": "San Martín",
+    "lat": 21.480011599999997,
+    "lng": -104.893444
+  },
+  {
+    "nombre": "Sánchez Ibarra",
+    "lat": 21.513407025360486,
+    "lng": -104.88565761829608
+  },
+  {
+    "nombre": "Sandino",
+    "lat": 21.510502504707397,
+    "lng": -104.88367643576079
+  },
+  {
+    "nombre": "Santa Cecilia",
+    "lat": 21.530023994117872,
+    "lng": -104.89650120122444
+  },
+  {
+    "nombre": "Santa Fe",
+    "lat": 21.5372768,
+    "lng": -104.8952687
+  },
+  {
+    "nombre": "Santa Teresita",
+    "lat": 21.523723878522574,
+    "lng": -104.89981046369124
+  },
+  {
+    "nombre": "Senderos del Monte",
+    "lat": 21.53625397655864,
+    "lng": -104.90103121913326
+  },
+  {
+    "nombre": "Severiano Ocegueda",
+    "lat": 21.4772066167296,
+    "lng": -104.85149592161179
+  },
+  {
+    "nombre": "Simancas",
+    "lat": 21.5018797954511,
+    "lng": -104.88210479214368
+  },
+  {
+    "nombre": "Sindicalistas",
+    "lat": 21.524034200142832,
+    "lng": -104.88008848570516
+  },
+  {
+    "nombre": "Solidaridad INFONAVIT",
+    "lat": 21.5217969,
+    "lng": -104.9356
+  },
+  {
+    "nombre": "Solidaridad Primavera",
+    "lat": 21.52431261544407,
+    "lng": -104.93046920675118
+  },
+  {
+    "nombre": "SPAUAN",
+    "lat": 21.5131492,
+    "lng": -104.9147944
+  },
+  {
+    "nombre": "SUTSEM 21 de Mayo",
+    "lat": 21.49009954449309,
+    "lng": -104.852328243036
+  },
+  {
+    "nombre": "Tepic Centro",
+    "lat": 21.51043411892842,
+    "lng": -104.89224137779881
+  },
+  {
+    "nombre": "Tierra y Libertad",
+    "lat": 21.506718358666085,
+    "lng": -104.88054217053076
+  },
+  {
+    "nombre": "Tío Baltazar",
+    "lat": 21.50839040499176,
+    "lng": -104.91170368689812
+  },
+  {
+    "nombre": "Tulipanes",
+    "lat": 21.529663499999998,
+    "lng": -104.8713092
+  },
+  {
+    "nombre": "Unidad Deportiva Santa Teresita",
+    "lat": 21.52686891533514,
+    "lng": -104.89738484495763
+  },
+  {
+    "nombre": "Unidad Obrera",
+    "lat": 21.52929349435482,
+    "lng": -104.91976969513286
+  },
+  {
+    "nombre": "Unidos por tu Tranquilidad",
+    "lat": 21.495429491965744,
+    "lng": -104.81084517196325
+  },
+  {
+    "nombre": "Unión Popular",
+    "lat": 21.4677518,
+    "lng": -104.8762929
+  },
+  {
+    "nombre": "Valle de La Cruz",
+    "lat": 21.533072107058725,
+    "lng": -104.86742047625856
+  },
+  {
+    "nombre": "Valle de Matatipac",
+    "lat": 21.473727653753553,
+    "lng": -104.86832550673317
+  },
+  {
+    "nombre": "Valle de Nayarit",
+    "lat": 21.47854072239635,
+    "lng": -104.90863666114467
+  },
+  {
+    "nombre": "Valle de Zaragoza",
+    "lat": 21.53431806820959,
+    "lng": -104.86802377593462
+  },
+  {
+    "nombre": "Valle del Country",
+    "lat": 21.48417806346254,
+    "lng": -104.86358131304719
+  },
+  {
+    "nombre": "Valle Dorado",
+    "lat": 21.48469049998398,
+    "lng": -104.90350032338661
+  },
+  {
+    "nombre": "Valle Magno",
+    "lat": 21.4601395162676,
+    "lng": -104.8537609655313
+  },
+  {
+    "nombre": "Valle Verde Conalep",
+    "lat": 21.525695176614278,
+    "lng": -104.87599871949843
+  },
+  {
+    "nombre": "Valle Verde de Matatipac",
+    "lat": 21.5307119398551,
+    "lng": -104.86904078893252
+  },
+  {
+    "nombre": "Venceremos",
+    "lat": 21.508542139714702,
+    "lng": -104.8739979768291
+  },
+  {
+    "nombre": "Versalles",
+    "lat": 21.506984179979288,
+    "lng": -104.90509450435638
+  },
+  {
+    "nombre": "Versalles Sur",
+    "lat": 21.504983609737376,
+    "lng": -104.91062186466269
+  },
+  {
+    "nombre": "Villa las Rosas",
+    "lat": 21.508754830189698,
+    "lng": -104.8781441589492
+  },
+  {
+    "nombre": "Villa San Ángel",
+    "lat": 21.5132831,
+    "lng": -104.90931959999999
+  },
+  {
+    "nombre": "Villas Arana",
+    "lat": 21.526528932843085,
+    "lng": -104.86951563338644
+  },
+  {
+    "nombre": "Villas de Aztlan",
+    "lat": 21.5248680142332,
+    "lng": -104.86881353815507
+  },
+  {
+    "nombre": "Villas de La Cantera",
+    "lat": 21.489341837128023,
+    "lng": -104.84047709752696
+  },
+  {
+    "nombre": "Villas de la Cruz",
+    "lat": 21.52327442067352,
+    "lng": -104.87697358930296
+  },
+  {
+    "nombre": "Villas de la Laguna",
+    "lat": 21.52313115521472,
+    "lng": -104.87032906820838
+  },
+  {
+    "nombre": "Villas de La Paz",
+    "lat": 21.48169176835435,
+    "lng": -104.8904018305404
+  },
+  {
+    "nombre": "Villas de Matatipac",
+    "lat": 21.51438360997122,
+    "lng": -104.87891122390442
+  },
+  {
+    "nombre": "Villas de San Juan",
+    "lat": 21.50301555798608,
+    "lng": -104.91894276364866
+  },
+  {
+    "nombre": "Villas de Zapopan",
+    "lat": 21.526485340322008,
+    "lng": -104.87602997183679
+  },
+  {
+    "nombre": "Villas del Molino",
+    "lat": 21.488578339027256,
+    "lng": -104.84518549649354
+  },
+  {
+    "nombre": "Villas del Nayar",
+    "lat": 21.49559963548577,
+    "lng": -104.87671143702345
+  },
+  {
+    "nombre": "Villas del Paraíso",
+    "lat": 21.54101092943648,
+    "lng": -104.86418901185331
+  },
+  {
+    "nombre": "Villas del Parque",
+    "lat": 21.4911759003916,
+    "lng": -104.85532862707649
+  },
+  {
+    "nombre": "Villas del Prado",
+    "lat": 21.49282268287497,
+    "lng": -104.81660579148136
+  },
+  {
+    "nombre": "Villas del Roble",
+    "lat": 21.49327581759747,
+    "lng": -104.82166737760318
+  },
+  {
+    "nombre": "Vistas de La Cantera",
+    "lat": 21.49149344976705,
+    "lng": -104.82998260825234
+  },
+  {
+    "nombre": "Zitácua",
+    "lat": 21.50523744811259,
+    "lng": -104.8698264860915
+  }
+]

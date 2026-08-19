@@ -107,7 +107,7 @@ app.post('/api/login', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
+app.post('/api/logout', (req, res) => { req.session.destroy(() => res.json({ ok: true })); });
 app.get('/api/me', requireAuth, (req, res) => res.json({ usuario: req.session.usuario }));
 
 app.post('/api/cambiar-password', requireAuth, (req, res) => {
