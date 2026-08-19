@@ -2562,7 +2562,7 @@ async function initApp() {
     const arr = await api('/api/config');
     const cfg = Object.fromEntries((arr || []).map(c => [c.clave, c.valor]));
     const nombre = (cfg.nombre_negocio || '').trim();
-    if (!nombre || nombre === 'Mi Negocio') wizardOpen();
+    if ((!nombre || nombre === 'Mi Negocio') && !localStorage.getItem('setup_done')) wizardOpen();
   } catch(_) {}
 }
 
@@ -2748,6 +2748,7 @@ async function _wzSavePaso(n) {
 }
 
 function wizardClose() {
+  localStorage.setItem('setup_done', '1');
   document.getElementById('wizard-overlay').style.display = 'none';
   loadDashboard();
   loadNegocioEstado();
