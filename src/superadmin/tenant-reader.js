@@ -8,6 +8,17 @@ const Database = require('better-sqlite3');
 const { encrypt, decrypt } = require('../security/secrets');
 const { getGiro } = require('../giros');
 
+// Lee el giro directo del archivo JS (sin registry en memoria) para que los
+// cambios de Catálogo Giros sean visibles sin reiniciar el superadmin.
+function _getGiroFresh(slug) {
+  try {
+    const { leerCatalogGiro } = require('./giro-catalog');
+    return leerCatalogGiro(slug);
+  } catch (_) {
+    return getGiro(slug);
+  }
+}
+
 const TENANTS_PATH = path.join(__dirname, '../../data/tenants.json');
 const ROOT_PATH    = path.join(__dirname, '../../');
 
@@ -190,7 +201,7 @@ function getTenantCatalogoAdmin(tenant) {
   if (!db) return null;
   try {
     const cfg = Object.fromEntries(db.prepare('SELECT clave,valor FROM configuracion').all().map(r => [r.clave, r.valor]));
-    const giro = getGiro(cfg.business_type_slug || tenant.business_type || 'taqueria');
+    const giro = _getGiroFresh(cfg.business_type_slug || tenant.business_type || 'taqueria');
     const formatosDb = db.prepare(`SELECT it.* FROM item_types it
       JOIN business_types bt ON bt.id=it.business_type_id WHERE bt.slug=? ORDER BY it.id`).all(giro.slug);
     const menu = db.prepare('SELECT * FROM menu_items WHERE eliminado=0').all();
@@ -210,7 +221,7 @@ function setTenantFormatoActivo(tenant, formatoId, activo) {
   if (!db) return false;
   try {
     const cfg = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get();
-    const giro = getGiro(cfg?.valor || tenant.business_type || 'taqueria');
+    const giro = _getGiroFresh(cfg?.valor || tenant.business_type || 'taqueria');
     const formato = db.prepare(`SELECT it.id FROM item_types it JOIN business_types bt ON bt.id=it.business_type_id
       WHERE it.id=? AND bt.slug=?`).get(formatoId, giro.slug);
     if (!formato) return false;
@@ -227,7 +238,7 @@ function setTenantProductoActivo(tenant, categoria, productoSlug, activo) {
   if (!db) return false;
   try {
     const cfg = db.prepare("SELECT valor FROM configuracion WHERE clave='business_type_slug'").get();
-    const giro = getGiro(cfg?.valor || tenant.business_type || 'taqueria');
+    const giro = _getGiroFresh(cfg?.valor || tenant.business_type || 'taqueria');
     const definiciones = categoria === 'corte' ? (giro.cortes || [])
       : categoria === 'refresco' ? (giro.refrescos || []) : (giro.salsas || []);
     const definicion = definiciones.find(p => (p.slug || p.nombre) === productoSlug);
