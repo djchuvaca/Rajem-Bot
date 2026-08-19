@@ -225,9 +225,35 @@ describe("Escrituras de catálogo → menu_items como destino exclusivo", () => 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Estado objetivo — post fases 5-7 (especificaciones)", () => {
-  test.todo("getPrecios() no debe usarse en orden.js (migrar a calcularPrecioPartida)");
-  test.todo("calcularPrecioItem() no debe usarse en resumen.js (migrar a motor neutral)");
-  test.todo("pTaco/pTorta no deben aparecer en handlers genéricos (solo en src/giros/taqueria/)");
-  test.todo("el panel debe escribir disponibilidad/precio SOLO en menu_items (ya cumplido parcialmente)");
-  test.todo("el seed no debe repoblar productos tras catalogo_giro_migrado_v2=1 (ya cumplido)");
+  test("getPrecios() no debe usarse en orden.js (migrado a calcularPrecioPartida)", () => {
+    const lineas = leerLineas(p("src/handlers/flujos/orden.js"));
+    const n = contarPatron(lineas, /\bgetPrecios\s*\(\s*\)/);
+    assert.equal(n, 0, `getPrecios() aparece ${n} veces en orden.js — debe ser 0`);
+  });
+
+  test("calcularPrecioItem() no debe usarse en resumen.js", () => {
+    const lineas = leerLineas(p("src/handlers/flujos/resumen.js"));
+    const n = contarPatron(lineas, /\bcalcularPrecioItem\s*\(/);
+    assert.equal(n, 0, `calcularPrecioItem() aparece ${n} veces en resumen.js — debe ser 0`);
+  });
+
+  test("pTaco/pTorta/p100g no aparecen en handlers genéricos (solo en src/giros/taqueria/)", () => {
+    const n = contarEnArchivos(HANDLERS_BOT, /\b(pTaco|pTorta|p100g)\b/);
+    assert.equal(n, 0,
+      `pTaco/pTorta/p100g aparecen ${n} veces en handlers — deben estar solo en src/giros/taqueria/`);
+  });
+
+  test("el panel escribe disponibilidad/precio solo en menu_items (no en productos ni cortes)", () => {
+    const lineas = leerLineas(p("src/panel/server.js"));
+    const nProd = contarPatron(lineas, /\b(UPDATE|INSERT)\b.{0,60}\bproductos\b/i);
+    const nCortesPrecio = contarPatron(lineas, /UPDATE\s+cortes\b.{0,60}precio/i);
+    assert.equal(nProd, 0, "panel no debe escribir en productos");
+    assert.equal(nCortesPrecio, 0, "panel no debe actualizar precios en tabla cortes directamente");
+  });
+
+  test("seed no inserta datos operativos en productos tras catalogo_giro_migrado_v2=1 (ya cumplido)", () => {
+    const lineas = leerLineas(p("src/db/seed.js"));
+    const n = contarPatron(lineas, /INSERT\s+INTO\s+productos\b.{0,200}(?:precio_taco|precio_torta)/i);
+    assert.equal(n, 0, "seed no debe insertar con columnas precio_taco/torta operativos");
+  });
 });

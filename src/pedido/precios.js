@@ -11,6 +11,10 @@
 const { registrar: _legacyRegistrar } = require("../migration/legacy-tracker");
 
 function getPrecios() {
+  if (process.env.PRECIOS_GIRO_UNICO === 'true')
+    throw new Error('[LEGACY] getPrecios() deshabilitado — usar calcularPrecioPartida()');
+  if (process.env.LEGACY_READ_FALLBACK === 'false')
+    throw new Error('[LEGACY] getPrecios() deshabilitado por LEGACY_READ_FALLBACK');
   _legacyRegistrar("getPrecios");
   const { getConfig } = require("../db");
   const catalogoTenant = require("../giros/catalogo-tenant");
@@ -84,6 +88,10 @@ function _precioFormatoDinamico(item, precios) {
 }
 
 function calcularPrecioItem(item, precios) {
+  if (process.env.PRECIOS_GIRO_UNICO === 'true')
+    throw new Error('[LEGACY] calcularPrecioItem() deshabilitado — usar calcularPrecioPartida()');
+  if (process.env.LEGACY_READ_FALLBACK === 'false')
+    throw new Error('[LEGACY] calcularPrecioItem() deshabilitado por LEGACY_READ_FALLBACK');
   _legacyRegistrar("calcularPrecioItem");
   // Ítem mixto con combinacion (mecanismo _aplicarSurtidoEspecial)
   if (item.corte === 'surtido especial' && item.combinacion) {

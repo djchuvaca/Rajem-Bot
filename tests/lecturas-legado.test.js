@@ -242,9 +242,64 @@ describe("Ratchet: lecturas legacy en código operativo (baseline actual)", () =
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Estado objetivo — post fases 5-7 (especificaciones)", () => {
-  test.todo("getPrecios() debe fallar explícitamente en producción cuando PRECIOS_GIRO_UNICO=true");
-  test.todo("calcularPrecioItem() debe fallar explícitamente cuando PRECIOS_GIRO_UNICO=true");
-  test.todo("LEGACY_READ_FALLBACK=false debe hacer que toda lectura antigua lance error explícito");
-  test.todo("db/cortes.js debe ser reemplazado por catalogo-tenant.js como única fuente de aliases");
-  test.todo("el panel del tenant no debe leer cortes.precio_base directamente en ninguna ruta");
+  test("getPrecios() lanza error cuando PRECIOS_GIRO_UNICO=true", () => {
+    const prev = process.env.PRECIOS_GIRO_UNICO;
+    process.env.PRECIOS_GIRO_UNICO = 'true';
+    try {
+      const { getPrecios } = require('../src/pedido/precios');
+      assert.throws(() => getPrecios(), /deshabilitado/i);
+    } finally {
+      if (prev === undefined) delete process.env.PRECIOS_GIRO_UNICO;
+      else process.env.PRECIOS_GIRO_UNICO = prev;
+    }
+  });
+
+  test("calcularPrecioItem() lanza error cuando PRECIOS_GIRO_UNICO=true", () => {
+    const prev = process.env.PRECIOS_GIRO_UNICO;
+    process.env.PRECIOS_GIRO_UNICO = 'true';
+    try {
+      const { calcularPrecioItem } = require('../src/pedido/precios');
+      assert.throws(() => calcularPrecioItem({}, {}), /deshabilitado/i);
+    } finally {
+      if (prev === undefined) delete process.env.PRECIOS_GIRO_UNICO;
+      else process.env.PRECIOS_GIRO_UNICO = prev;
+    }
+  });
+
+  test("LEGACY_READ_FALLBACK=false hace que getPrecios() y calcularPrecioItem() lancen error", () => {
+    const prev = process.env.LEGACY_READ_FALLBACK;
+    process.env.LEGACY_READ_FALLBACK = 'false';
+    try {
+      const { getPrecios, calcularPrecioItem } = require('../src/pedido/precios');
+      assert.throws(() => getPrecios(), /deshabilitado/i);
+      assert.throws(() => calcularPrecioItem({}, {}), /deshabilitado/i);
+    } finally {
+      if (prev === undefined) delete process.env.LEGACY_READ_FALLBACK;
+      else process.env.LEGACY_READ_FALLBACK = prev;
+    }
+  });
+
+  test("getCortesBD() delega a catalogo-tenant como única fuente de aliases", () => {
+    const { getAliasMapCortes } = require('../src/giros/catalogo-tenant');
+    const { getCortesBD, invalidarCacheCortesBD } = require('../src/db/cortes');
+    invalidarCacheCortesBD();
+    const mapaCatalogo = getAliasMapCortes();
+    const mapaCortes   = getCortesBD();
+    const slugsCatalogo = new Set(Object.values(mapaCatalogo));
+    const slugsCortes   = new Set(Object.values(mapaCortes));
+    for (const s of slugsCatalogo) {
+      assert.ok(slugsCortes.has(s), `slug ${s} de catalogo-tenant debe estar en getCortesBD()`);
+    }
+    assert.equal(
+      JSON.stringify([...slugsCortes].sort()),
+      JSON.stringify([...slugsCatalogo].sort()),
+      "getCortesBD() y getAliasMapCortes() deben devolver los mismos slugs"
+    );
+  });
+
+  test("el panel del tenant no lee cortes.precio_base directamente", () => {
+    const lineas = leerLineas(p("src/panel/server.js"));
+    const n = contarPatron(lineas, /cortes\.precio_base|FROM\s+cortes\b.*precio_base|precio_base.*FROM.*cortes/i);
+    assert.equal(n, 0, "panel no debe leer cortes.precio_base — usar menu_items o catalogo-tenant");
+  });
 });

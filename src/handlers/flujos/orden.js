@@ -17,7 +17,7 @@ const {
   detectarPlanPorcionado, resolverPorcionadoPendiente,
 } = require("../pedidoParser");
 const { generarRespuestaAutomatica, aplicarModificacionNeutral } = require("../respuestas");
-const { calcularSubtotal, getPrecios } = require("../../pedido/precios");
+const { calcularSubtotal } = require("../../pedido/precios");
 const { crearOperacion } = require('../../giros/modificaciones');
 const { crearPartidaProducto, crearCantidad } = require('../../pedido/modelo');
 const { crearItemPedido, copiarItemConVariante } = require('../../compatibilidad/pedidos-v1');
@@ -82,13 +82,19 @@ function _listaNombresSalsas() {
 
 // Calcula el precio total de salsas usando el precio individual de cada una desde la BD.
 // items: array de strings (nombres) o array de {nombre, cantidad}.
-// Cae al precio global (precios.pSalsa) si la salsa no tiene precio configurado.
-function _calcularPrecioSalsas(items, cantTotal, precios) {
+// Cae al precio global de config si la salsa no tiene precio configurado.
+function _calcularPrecioSalsas(items, cantTotal) {
   const salsasDB = getSalsas();
+  let _pSalsaDefault = null;
   const getPrecio = nombre => {
     const sal = salsasDB.find(s => s.nombre === nombre.toLowerCase());
     // Cero es un precio explícito válido (complemento gratuito), no un dato faltante.
-    return sal && sal.precio_taco != null ? Number(sal.precio_taco) : precios.pSalsa;
+    if (sal && sal.precio_taco != null) return Number(sal.precio_taco);
+    if (_pSalsaDefault === null) {
+      const { getConfig } = require('../../db');
+      _pSalsaDefault = parseInt(getConfig('precio_salsa') || '15');
+    }
+    return _pSalsaDefault;
   };
   if (items.length > 0 && typeof items[0] === "object") {
     return items.reduce((acc, s) => acc + (s.cantidad || 1) * getPrecio(s.nombre), 0);
@@ -118,7 +124,6 @@ async function _mostrarConfirmacionFinal(msg, clienteNumero, historial, ordenTex
 }
 
 async function _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, refrescos, salsas, esOrdenDom, esPreventa) {
-  const precios = getPrecios();
   const { texto: itemsTexto } = jsonALineas(json);
   let ordenAcum = itemsTexto.split("\n")
     .filter(l => l.trim() && !/subtotal/i.test(l))
@@ -132,7 +137,7 @@ async function _avanzarExtrasOConfirmar(msg, clienteNumero, historial, json, ref
   if (salsasEsp.length > 0) {
     const nombres   = salsasEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
     const cantTotal = salsasEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
-    ordenAcum += "\n" + _formatearSalsaExtra(nombres, cantTotal, _calcularPrecioSalsas(salsasEsp, cantTotal, precios));
+    ordenAcum += "\n" + _formatearSalsaExtra(nombres, cantTotal, _calcularPrecioSalsas(salsasEsp, cantTotal));
   }
 
   const refGen = refrescos.find(r => r.esGenerico);
@@ -836,10 +841,9 @@ async function handleConfirmacionItem(msg, textoOriginal, clienteNumero, histori
 
       for (const ref of refEsp) nuevaBase += "\n" + _formatearRefresco(ref);
       if (salEsp.length > 0) {
-        const precios  = getPrecios();
         const nombres  = salEsp.map(s => s.nombre.charAt(0).toUpperCase() + s.nombre.slice(1)).join(", ");
         const cant     = salEsp.reduce((acc, s) => acc + (s.cantidad || 1), 0);
-        nuevaBase += "\n" + _formatearSalsaExtra(nombres, cant, _calcularPrecioSalsas(salEsp, cant, precios));
+        nuevaBase += "\n" + _formatearSalsaExtra(nombres, cant, _calcularPrecioSalsas(salEsp, cant));
       }
 
       esperandoConfirmacionItem.delete(clienteNumero);
@@ -1040,10 +1044,9 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
   // ── FASE: CONFIRMACIÓN DE SALSA ──────────────────────────────────────────────
   if (fase === "confirmSalsa") {
     const pendSalsa = ctx.pendienteSalsas;
-    const precios = getPrecios();
     const cantSal = ctx._cantidadSalPendiente || pendSalsa.length;
     const nombres = pendSalsa.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(pendSalsa, cantSal, precios));
+    const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(pendSalsa, cantSal));
     const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
     if (!tieneRefresco && !ctx._flujoUnificado) {
       const listaRef = _listaNombresRefrescos();
@@ -1071,10 +1074,9 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
     }
     const salsas = detectarSalsa(textoNorm);
     if (salsas && salsas.length > 0) {
-      const precios = getPrecios();
       const cantSal = ctx._cantidadSalPendiente || salsas.length;
       const nombres = salsas.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-      const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(salsas, cantSal, precios));
+      const lineaSalsa = _formatearSalsaExtra(nombres, cantSal, _calcularPrecioSalsas(salsas, cantSal));
       const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
       if (!tieneRefresco && !ctx._flujoUnificado) {
         const listaRef = _listaNombresRefrescos();
@@ -1149,10 +1151,9 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
 
   // Refresco + salsa en el mismo mensaje: "una coca y salsa picada"
   if (refrescoPregunta && salsasPregunta && salsasPregunta.length > 0) {
-    const precios    = getPrecios();
     const lineaRef   = _formatearRefresco(refrescoPregunta);
     const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length, precios));
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length));
     const nuevaOrden = ordenTexto + "\n" + lineaRef + "\n" + lineaSalsa;
     await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;
@@ -1168,9 +1169,8 @@ async function handleExtras(msg, textoOriginal, clienteNumero, historial, esOrde
 
   // Salsa detectada
   if (salsasPregunta && salsasPregunta.length > 0) {
-    const precios    = getPrecios();
     const salNombres = salsasPregunta.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
-    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length, precios));
+    const lineaSalsa = _formatearSalsaExtra(salNombres, salsasPregunta.length, _calcularPrecioSalsas(salsasPregunta, salsasPregunta.length));
     const nuevaOrden = ordenTexto + "\n" + lineaSalsa;
     await _mostrarConfirmacionFinal(msg, clienteNumero, historial, nuevaOrden, ctx.esOrdenDom, ctx.esPreventa);
     return true;

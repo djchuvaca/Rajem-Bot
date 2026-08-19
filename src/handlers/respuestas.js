@@ -3,7 +3,7 @@
 // Compatible con cualquier negocio configurado en la BD
 
 const { getConfig, getMensaje, getHorarios, getBanco, getItemTypes, getMenuItems, getTipoServicio } = require("../db");
-const { getPrecios } = require("../pedido/precios");
+const { getPrecioMenu } = require("../giros/catalogo-tenant");
 const { estaEnHorario } = require("../horario");
 const { MENU_FORMATO } = require("../config");
 
@@ -56,10 +56,14 @@ function formatearHorario() {
 // ── RESPUESTA: PRECIO ─────────────────────────────────────────────────────────
 function respuestaPrecio(producto = null) {
   try {
-    const precios     = getPrecios();
     const negocio     = getNegocio();
     const _giroR = (() => { try { const { getGiroActivo } = require('../giros'); return getGiroActivo(); } catch(_) { return null; } })();
     const notaPrecios = (getMensaje("menu_nota_precios") ?? _giroR?.mensajesDefaults?.menu_nota_precios ?? '').replace(/{negocio}/g, negocio);
+
+    // Precios globales de config — fallback cuando no hay precio por corte en menu_items
+    const pTacoDefault  = parseInt(getConfig('precio_taco')  || '30');
+    const pTortaDefault = parseInt(getConfig('precio_torta') || '40');
+    const p100gDefault  = parseInt(getConfig('precio_100g')  || '32');
 
     // Obtener item_types activos — separar formatos de precio por unidad de gramos/pesos
     let itemTypes = [];
@@ -69,16 +73,11 @@ function respuestaPrecio(producto = null) {
     const tieneGramos    = itemTypes.some(t => t.soporta_gramos);
     const itGramos       = tieneGramos ? itemTypes.find(t => t.soporta_gramos) : null;
 
-    // Obtener cortes y precios desde menu_items del tenant (fuente de verdad del panel)
+    // Obtener cortes desde menu_items del tenant (fuente de verdad del panel)
     let cortes = [];
-    let preciosMI = {}; // { slug: { formatoSlug: precio } }
     try {
       const miCortes = getMenuItems('corte');
       const slugsUnicos = [...new Set(miCortes.map(i => i.producto_slug))];
-      for (const item of miCortes) {
-        if (!preciosMI[item.producto_slug]) preciosMI[item.producto_slug] = {};
-        if (item.formato_slug) preciosMI[item.producto_slug][item.formato_slug] = item.precio || 0;
-      }
       const cortesDB = require('../giros/catalogo-tenant').getCortesTenant();
       const porSlug  = Object.fromEntries(cortesDB.map(c => [c.slug, c]));
       const { getContratoGiroActivo: _getContrato } = require('../giros');
@@ -86,32 +85,26 @@ function respuestaPrecio(producto = null) {
       cortes = slugsUnicos.map(s => porSlug[s]).filter(Boolean).filter(c => !_excluidos.has(c.slug));
     } catch (_) {}
 
-    // Precio para un corte en un formato específico
+    // Precio para un corte en un formato específico — fuente única: menu_items via getPrecioMenu
     const precioCorteFormato = (corteId, formatoSlug) => {
       const it = itemTypes.find(t => t.slug === formatoSlug);
-      // 1. Desde menu_items — solo si el precio está configurado (> 0)
-      const miPrice = preciosMI[corteId]?.[formatoSlug];
-      if (miPrice !== undefined && miPrice > 0) return miPrice;
-      // 2. Fallback: catálogo de cortes o precio global del item_type
-      const pc = precios.porCorte[corteId] || precios;
-      const precioCatalogo = Number(pc.precios?.[formatoSlug] || 0);
-      if (precioCatalogo > 0) return precioCatalogo;
-      const precioCorte = it?.precio_campo === 'precio_torta' ? Number(pc.pTorta || 0)
-        : it?.precio_campo === 'precio_taco' ? Number(pc.pTaco || 0) : 0;
-      if (precioCorte > 0) return precioCorte;
+      const miPrice = getPrecioMenu(corteId, formatoSlug, 'corte');
+      if (miPrice !== null && miPrice > 0) return miPrice;
       if (Number(it?.precio_base || 0) > 0) return Number(it.precio_base);
-      return it?.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+      return it?.precio_campo === 'precio_torta' ? pTortaDefault : pTacoDefault;
     };
 
     if (producto) {
       const slugProducto = producto.toLowerCase();
-      const pc = precios.porCorte[slugProducto] || precios;
       let resp = `💰 *Precios en ${negocio}:*\n\n🥩 *${producto.charAt(0).toUpperCase() + producto.slice(1)}*\n`;
       for (const it of formatosPrecio) {
         const p = precioCorteFormato(slugProducto, it.slug);
         resp += `   ${it.emoji} ${it.nombre_plural}: *$${p}*\n`;
       }
-      if (tieneGramos) resp += `   ⚖️ Por 100g: *$${itGramos?.precio_base || (pc.p100g ?? precios.p100g)}*\n`;
+      if (tieneGramos) {
+        const p100gCorte = getPrecioMenu(slugProducto, 'gramos', 'corte') ?? p100gDefault;
+        resp += `   ⚖️ Por 100g: *$${itGramos?.precio_base || p100gCorte}*\n`;
+      }
       return resp + `\n` + notaPrecios;
     }
 
@@ -120,7 +113,7 @@ function respuestaPrecio(producto = null) {
       const key = c.slug || c.nombre?.toLowerCase();
       return formatosPrecio.every(it => {
         const p  = precioCorteFormato(key, it.slug);
-        const pb = it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco;
+        const pb = it.precio_campo === 'precio_torta' ? pTortaDefault : pTacoDefault;
         return p === pb;
       });
     });
@@ -131,10 +124,10 @@ function respuestaPrecio(producto = null) {
         : 'Ninguno activo';
       let lineasPrecios = "";
       for (const it of formatosPrecio) {
-        const p = it.precio_base || (it.precio_campo === 'precio_torta' ? precios.pTorta : precios.pTaco);
+        const p = it.precio_base || (it.precio_campo === 'precio_torta' ? pTortaDefault : pTacoDefault);
         lineasPrecios += `${it.emoji} *${(it.nombre_plural || it.nombre).charAt(0).toUpperCase() + (it.nombre_plural || it.nombre).slice(1)}* — $${p} c/u\n`;
       }
-      if (tieneGramos) lineasPrecios += `⚖️ *Por gramos* — $${itGramos?.precio_base || precios.p100g} / 100g\n`;
+      if (tieneGramos) lineasPrecios += `⚖️ *Por gramos* — $${itGramos?.precio_base || p100gDefault} / 100g\n`;
       return `💰 *Precios en ${negocio}:*\n\n` + lineasPrecios + `\n🥩 Cortes disponibles: ${nombres}\n\n*(Las combinaciones "X con Y" tienen el precio del corte más caro)*\n\n` + notaPrecios;
     }
 
@@ -143,10 +136,12 @@ function respuestaPrecio(producto = null) {
     for (const c of cortes) {
       const key    = c.slug || c.nombre?.toLowerCase();
       const nombre = (c.nombre || c.slug).charAt(0).toUpperCase() + (c.nombre || c.slug).slice(1);
-      const pc     = precios.porCorte[key] || precios;
       resp += `🥩 *${nombre}*\n`;
       const partes = formatosPrecio.map(it => `${it.emoji} $${precioCorteFormato(key, it.slug)}`);
-      if (tieneGramos) partes.push(`⚖️ $${itGramos?.precio_base || (pc.p100g ?? precios.p100g)}/100g`);
+      if (tieneGramos) {
+        const p100gCorte = getPrecioMenu(key, 'gramos', 'corte') ?? p100gDefault;
+        partes.push(`⚖️ $${itGramos?.precio_base || p100gCorte}/100g`);
+      }
       resp += `   ${partes.join(' · ')}\n\n`;
     }
     resp += `*(Combina cualquier corte al gusto — precio del más caro)*\n\n` + notaPrecios;

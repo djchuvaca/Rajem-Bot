@@ -139,12 +139,12 @@ describe("Tabla `cortes` (TRANSFORMAR) — ratchet de precio_base", () => {
     );
   });
 
-  test("cortes.aliases_json sigue siendo leído por el NLU (lectura legítima mientras es TRANSFORMAR)", () => {
-    // aliases_json es la fuente del NLU — lectura legítima aún
-    const lineas = leerLineas(p("src/db/cortes.js"));
+  test("aliases_json es leído por catalogo-tenant.js (fuente única de aliases tras migración)", () => {
+    // aliases_json es la fuente del NLU — ahora centralizado en catalogo-tenant.getAliasMapCortes()
+    const lineas = leerLineas(p("src/giros/catalogo-tenant.js"));
     const n = contarPatron(lineas, /aliases_json/);
     assert.ok(n > 0,
-      "cortes.js debe leer aliases_json — fuente legítima del NLU mientras tabla es TRANSFORMAR"
+      "catalogo-tenant.js debe leer aliases_json — es la nueva fuente única de aliases para el NLU"
     );
   });
 

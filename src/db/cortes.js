@@ -33,36 +33,16 @@ function _getGiroId() {
 
 /**
  * Devuelve mapa { alias|nombre → slug } para NLU.
- * Compatible con el shape de getCortes() clásico (Map string→string).
+ * Delegado a catalogo-tenant.getAliasMapCortes() — fuente única de aliases.
  */
 function getCortesBD() {
   const ahora = Date.now();
   if (_cache && ahora - _cacheTs < _TTL) return _cache;
   try {
-    const giroId = _getGiroId();
-    if (!giroId) { _cache = {}; _cacheTs = ahora; return {}; }
-    // Si menu_items tiene cortes activos, solo incluir los disponibles en el NLU.
-    // Fallback al catálogo completo si menu_items aún no está configurado.
-    const rows = queryAll(
-      `SELECT DISTINCT c.* FROM cortes c
-       INNER JOIN menu_items mi ON mi.producto_slug = c.slug
-         AND mi.activo = 1 AND mi.disponible = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
-       WHERE c.giro_id = ? AND c.activo = 1 ORDER BY c.id`,
-      [giroId]
-    ) || [];
-    const mapa = {};
-    for (const c of rows) {
-      const slug = c.slug;
-      const nom  = c.nombre.toLowerCase().trim();
-      mapa[nom]  = slug;
-      const plural = /[aeiouáéíóú]$/i.test(nom) ? nom + 's' : nom + 'es';
-      mapa[plural] = slug;
-      let aliases = [];
-      try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
-      for (const a of aliases) { if (a) mapa[a.toLowerCase().trim()] = slug; }
-    }
-    _cache = mapa; _cacheTs = ahora;
-    return mapa;
+    const { getAliasMapCortes } = require('../giros/catalogo-tenant');
+    _cache = getAliasMapCortes();
+    _cacheTs = ahora;
+    return _cache;
   } catch (_) { _cache = {}; _cacheTs = Date.now(); return {}; }
 }
 

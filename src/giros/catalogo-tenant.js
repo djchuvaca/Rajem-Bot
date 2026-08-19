@@ -102,6 +102,34 @@ function setMenuItemDisponibilidad(productoSlug, categoria, disponible) {
   ).run(disponible ? 1 : 0, productoSlug, categoria).changes;
 }
 
+/**
+ * Mapa { alias|nombre → slug } para NLU.
+ * Fuente única de verdad para aliases de cortes — reemplaza getCortesBD() de db/cortes.js.
+ * Solo incluye cortes con fila activa+disponible en menu_items.
+ */
+function getAliasMapCortes() {
+  const giro = getGiroActivo();
+  const rows = queryAll(
+    `SELECT DISTINCT c.* FROM cortes c
+     INNER JOIN menu_items mi ON mi.producto_slug = c.slug
+       AND mi.activo = 1 AND mi.disponible = 1 AND mi.eliminado = 0 AND mi.categoria = 'corte'
+     JOIN business_types bt ON bt.id = c.giro_id WHERE bt.slug = ?`,
+    [giro.slug]
+  ) || [];
+  const mapa = {};
+  for (const c of rows) {
+    const slug = c.slug;
+    const nom  = c.nombre.toLowerCase().trim();
+    mapa[nom]  = slug;
+    const plural = /[aeiouáéíóú]$/i.test(nom) ? nom + 's' : nom + 'es';
+    mapa[plural] = slug;
+    let aliases = [];
+    try { aliases = JSON.parse(c.aliases_json || '[]'); } catch (_) {}
+    for (const a of aliases) { if (a) mapa[a.toLowerCase().trim()] = slug; }
+  }
+  return mapa;
+}
+
 function setPreciosCorte(productoSlug, precios = {}) {
   if (!esProductoValido('corte', productoSlug)) return 0;
   let cambios = 0;
@@ -119,4 +147,5 @@ module.exports = {
   getFormatosTenant, getCortesTenant, getBebidasTenant, getSalsasTenant,
   getMenuItemsTenant, getMenuItemsActivos, getDefinicionProducto, getPrecioMenu,
   setMenuItemDisponibilidad, setPreciosCorte, esProductoValido, esFormatoIdValido,
+  getAliasMapCortes,
 };
