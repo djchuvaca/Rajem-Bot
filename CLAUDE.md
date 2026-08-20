@@ -1,6 +1,6 @@
 # Rajem's Technology — Bot SaaS de WhatsApp para negocios de comida
 
-> Estado de referencia: 2026-08-18. Este documento describe el código actual; los pendientes se identifican explícitamente.
+> Estado de referencia: 2026-08-19. Este documento describe el código actual; los pendientes se identifican explícitamente.
 
 ## Descripción del sistema
 
@@ -201,6 +201,136 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/config.js`** — helpers de configuración del negocio.
 - **`src/pedido/precios.js`** — API legacy de precios (`getPrecios()`, `calcularPrecioItem()`). Ambas funciones registran telemetría via `legacy-tracker`. Soporta flags de interruptor: `PRECIOS_GIRO_UNICO=true` lanza error explícito en ambas (fuerza migración a `calcularPrecioPartida()`); `LEGACY_READ_FALLBACK=false` hace lo mismo. La ruta migrada es `getContratoGiroActivo().calcularPrecioPartida(partida)`.
 - **`src/nlu/core.js`** — utilidades NLU genéricas reutilizables por todos los giros.
+
+---
+
+## Módulo GeoTepic
+
+Infraestructura geográfica compartida para todos los tenants. El superadmin la administra; cualquier módulo (Mandaditos, NLU, tarifas) puede consumirla directamente.
+
+### Estructura de archivos
+
+```
+src/geo/geotepic/
+├── colonias_tepic.json            — 300 colonias con { nombre, lat, lng } (coordenadas WGS84)
+├── diccionario_colonias_tepic.js  — definiciones maestras del diccionario
+├── index.js                       — CRUD Node.js: colonias + cuadrantes; Haversine; sync
+└── routes.js                      — Express Router con todos los endpoints /api/geo/tepic/*
+                                     (factory: crearRouterGeoTepic({ getTenants }))
+
+src/geo/geotepic/public/           — código cliente (browser/Leaflet — no puede moverse a geo/)
+├── geotepic.css                   — todos los estilos del módulo GeoTepic
+├── geotepic-mapa.js               — init Leaflet, layer groups, _capaParaNivel(), toggle functions
+├── geotepic-colonias.js           — fetch colonias, coloniasMap (Map keyed por nombre), _popupColonia
+├── geotepic-cuadrantes.js         — CRUD cuadrantes: async POST/PUT/DELETE, panel detalle, árbol
+├── geotepic-turf.js               — Turf.js: análisis espacial, estilos markers, validación geométrica
+├── geotepic-jerarquia.js          — obtenerHijos/Padre/Ancestros/Descendientes, _renderNodoArbol
+├── geotepic-busqueda.js           — búsqueda colonias + cuadrantes con popup de ruta geográfica
+├── geotepic-conflictos.js         — actualizarConflictos(), stats, solapamientos polígonos, conflictos colonias
+└── geotepic.js                    — coordinador: loadMapaGeoTepic(), recargarMapaGeoTepic()
+```
+
+**Orden de carga de scripts en index.html** (importante — los globales deben estar disponibles antes de usarse):
+`geotepic-mapa.js` → `geotepic-colonias.js` → `geotepic-cuadrantes.js` → `geotepic-turf.js` → `geotepic-jerarquia.js` → `geotepic-busqueda.js` → `geotepic-conflictos.js` → `geotepic.js`
+
+### Montaje en server.js
+
+```javascript
+const crearRouterGeoTepic = require('../geo/geotepic/routes');
+app.use('/geo/geotepic', express.static(path.join(__dirname, '../geo/geotepic/public')));
+app.use('/api/geo/tepic', requireAuth, crearRouterGeoTepic({ getTenants }));
+```
+
+`getTenants` se inyecta como dependencia para no crear acoplamiento `geo/geotepic → superadmin`.
+
+### Endpoints (`routes.js`)
+
+| Método | Ruta | Función |
+|---|---|---|
+| `GET` | `/api/geo/tepic/colonias` | Lista catálogo maestro (admin.db) |
+| `POST` | `/api/geo/tepic/colonias` | Crea colonia manualmente |
+| `PUT` | `/api/geo/tepic/colonias/:colId` | Edita colonia |
+| `DELETE` | `/api/geo/tepic/colonias/:colId` | Excluye/elimina colonia |
+| `POST` | `/api/geo/tepic/colonias/:colId/restaurar` | Restaura colonia excluida |
+| `GET` | `/api/geo/tepic/auditoria` | Log de cambios |
+| `GET` | `/api/geo/tepic/mapa-colonias` | Sirve `colonias_tepic.json` para Leaflet |
+| `GET` | `/api/geo/tepic/cuadrantes` | Lista todos los cuadrantes (admin.db) |
+| `POST` | `/api/geo/tepic/cuadrantes` | Crea cuadrante; backend genera `codigo` |
+| `PUT` | `/api/geo/tepic/cuadrantes/:cId` | Edita nombre y/o geometría |
+| `DELETE` | `/api/geo/tepic/cuadrantes/:cId` | Elimina (rechaza si tiene hijos) |
+| `GET` | `/api/geo/tepic/ubicacion?lat=&lng=` | Resuelve cuadrantes por coordenadas |
+| `GET` | `/api/geo/tepic/colonia?nombre=` | Resuelve cuadrantes y ruta de una colonia |
+| `GET` | `/api/geo/tepic/ruta?nombre=` | Devuelve la ruta geográfica de una colonia |
+| `GET` | `/api/geo/tepic/misma-zona?colonia_a=&colonia_b=&nivel=` | Compara colonias por nivel |
+| `GET` | `/api/geo/tepic/cuadrantes/:cId/colonias` | Lista colonias contenidas |
+| `GET` | `/api/geo/tepic/status` | Diagnóstico del servicio espacial |
+
+### Modelo de datos — cuadrantes
+
+Tabla `geo_tepic_cuadrantes` en `admin.db` (creada en `_init()` de `src/db/admin.js`, migración aditiva):
+
+```sql
+id         INTEGER PRIMARY KEY AUTOINCREMENT
+codigo     TEXT NOT NULL          -- generado por backend: Q-001 / Q-001-S01 / Q-001-S01-A
+nombre     TEXT NOT NULL DEFAULT ''
+nivel      INTEGER NOT NULL DEFAULT 1
+parent_id  INTEGER REFERENCES geo_tepic_cuadrantes(id)
+geometry   TEXT NOT NULL          -- GeoJSON Polygon/MultiPolygon serializado
+created_at / updated_at TEXT
+```
+
+### Estado del mapa Leaflet (Pasos 1–8 completos)
+
+Globales en `geotepic-mapa.js`:
+- `_gtMap` — instancia del mapa
+- `capaColonias = L.layerGroup()` — 300 markers `L.circleMarker`
+- `capaCuadrantes = L.featureGroup()` — cuadrantes de **nivel 1**
+- `capaSubcuadrantes = L.featureGroup()` — cuadrantes de **nivel 2+**
+- `_capaParaNivel(nivel)` — devuelve `capaCuadrantes` (nivel 1) o `capaSubcuadrantes` (nivel 2+)
+- Toggles: `_toggleCapaColonias`, `_toggleNombresColonias`, `_toggleCapaCuadrantes`, `_toggleCapaSubcuadrantes`, `_toggleSoloSeleccion`, `_toggleMostrarConflictos` (última en `geotepic-conflictos.js`)
+- Sin `L.control.layers` de Leaflet — los checkboxes del panel lateral lo reemplazan
+
+`cuadrantesMap` en `geotepic-cuadrantes.js`:
+```
+Map: key = String(db_id), value = { id, codigo, nombre, tipo, parentId, nivel, layer, colonias[] }
+```
+`coloniasMap` en `geotepic-colonias.js`: `Map: key = nombre, value = { data: {nombre, lat, lng}, marker }`
+
+### Flujo de carga al abrir GeoTepic
+
+1. `initMapaGeoTepic()` — mapa + layer groups
+2. `initCuadrantesGeoTepic()` — registra `pm:create` y `pm:drawend`
+3. `_cargarColoniasGeoTepic()` — GET mapa-colonias → markers + `coloniasGeoJSON` (Turf FeatureCollection)
+4. `_cargarCuadrantesGeoTepic()` — GET cuadrantes → `L.geoJSON()` + `cuadrantesMap` + análisis Turf
+5. `actualizarConflictos()` — stats + conflictos + solapamientos (solo una vez al cargar todo)
+
+### Reglas de rendimiento (Paso 9)
+
+- `actualizarConflictos()` es el único punto de entrada para recalcular stats y conflictos. Se llama: tras `pm:create` exitoso, tras `terminarEdicionCuadrante` exitoso, tras `eliminarCuadrante` exitoso, y una vez al cargar todo.
+- **No** se llama en `seleccionarCuadrante()` ni durante eventos de mouse.
+- `analizarCuadrante(id)` (Turf, por zona) sí se llama en `seleccionarCuadrante()` para actualizar `colonias[]` en tiempo real.
+- `obtenerColoniasSinCuadrante()` solo considera cuadrantes de **nivel 1** — una colonia no se considera "sin asignar" solo por no pertenecer a un subcuadrante.
+
+### Convenciones de coordenadas
+
+- Almacenamiento: `{ nombre, lat, lng }` — nunca intercambiar `lat`/`lng`
+- Leaflet recibe `[lat, lng]`
+- GeoJSON/Turf: `[lng, lat]` — ya manejado internamente; no expuesto al código externo
+- Todo texto de colonias: `textContent` (nunca `innerHTML`)
+
+### Hoja de ruta GeoTepic (9 pasos)
+
+| Paso | Qué se construye | Estado |
+|:----:|---|---|
+| 1 | Mapa base: colonias, tooltip, popup DOM, contador, fitBounds | ✅ |
+| 2 | Crear cuadrantes visualmente con Geoman | ✅ |
+| 3 | Panel lateral: lista árbol, selección, nombre, centrar | ✅ |
+| 4 | Turf.js: detectar colonias por cuadrante, resaltar, sin-cuadrante | ✅ |
+| 5 | Editar geometría con Geoman, eliminar con confirmación | ✅ |
+| 6 | Subcuadrantes jerárquicos: parentId, árbol, validación de contención | ✅ |
+| 7 | Persistencia: tabla BD, CRUD backend, load/save frontend | ✅ |
+| 8 | Herramientas administrativas: búsqueda, stats, conflictos, toggles capas | ✅ |
+| 9 | Servicio espacial reutilizable + API de consultas para otros módulos | ✅ |
 
 ---
 
@@ -423,3 +553,58 @@ El contador de errores vive en `_erroresConsec` (Map local en `orden.js`), se re
 - Publicar los paneles únicamente mediante un proxy inverso con HTTPS y configurar `COOKIE_SECURE=1`.
 - Restringir los puertos 3001 y 4000 a localhost o mediante firewall. El webhook debe validar su firma con `WEBHOOK_SECRET`.
 - `journal_mode=DELETE` simplifica backups, pero serializa escrituras. `busy_timeout=5000` absorbe contención breve; si aparecen bloqueos sostenidos, revisar transacciones y concurrencia antes de migrar a WAL.
+
+---
+
+## Contexto de trabajo para IA — estado al 2026-08-19
+
+Esta sección concentra decisiones, convenciones y estado de proyectos en curso para que cualquier IA pueda continuar sin romper lo existente.
+
+### Convenciones de colaboración
+
+- **Comandos de terminal:** siempre en una sola línea continua, sin saltos de línea ni `\`. El usuario los copia directamente al terminal.
+- **Tests:** siempre `npm test`, NUNCA `node --test` directo. Sin `tests/setup.js` las variables de entorno no se cargan y se producen decenas de fallos falsos. Para un solo archivo: `node --require ./tests/setup.js --test tests/nombre.test.js`. Para scripts NLU: `node scripts/check-nuevos-tipos.js` directamente.
+- **"Analiza la última captura":** buscar el archivo más reciente en `analisis/capturas/` sin preguntar dónde está.
+
+### Estado del VPS (verificar antes de tocar deploy)
+
+- **VPS en `/opt/Rajem-Bot`:** puede estar atrasado respecto a `origin/main`. Verificar con `git -C /opt/Rajem-Bot log --oneline -3` antes de asumir que tiene el código más reciente.
+- **Procesos PM2 en VPS:** superadmin (0), webhook-deploy (1), tacos-javier (2).
+- **Fix crítico tenant tacos-javier:** `configuracion.operadores_jids = 5213113676885@c.us` en BD. Si se resetea la BD, restaurar con: `node -e "process.env.TENANT_ID='tacos-javier'; const {initDB,setConfig}=require('./src/db'); initDB(); setConfig('operadores_jids','5213113676885@c.us'); console.log('ok')"`
+- **CI con GitHub Actions** (`.github/workflows/ci.yml`): activa en push a main, corre 988 tests, luego llama webhook VPS. Para activarlo requiere secrets en GitHub: `WEBHOOK_SECRET` y `VPS_WEBHOOK_URL`.
+
+### Estado del acople multi-giro
+
+Código local en etapa 13 (completo). Commits clave:
+- `924d14a` — Etapa 11: vocabulario separado de handlers
+- `12aa6b2` — Etapa 12: retira `convertirPedidoLegacy` del contrato público
+- `100085c` — Etapa 13: retira legado de precios y aliases; `getCortesBD()` delega a `catalogo-tenant.getAliasMapCortes()`
+
+`npm test` → 955 pass, 1 fail (horario.test.js — sensible a la hora del día, falla fuera del horario de negocio), 32 todo. El fallo es pre-existente, no indica código roto.
+
+Etapas 14–16 (migración BD, validación VPS+WA, deploy gradual) pendientes de entorno real.
+
+### Estado GeoTepic
+
+Pasos 1–9 completos. El Paso 9 añadió `services/geo-service.js`, consultas espaciales backend con Turf, índice normalizado de colonias, rutas jerárquicas, comparación por zona, colonias por cuadrante y estado diagnóstico. El servicio se consume desde Node.js sin Leaflet; HTTP está disponible bajo `/api/geo/tepic/*` y el alias `/api/geotepic/*`, ambos protegidos por autenticación del superadmin.
+
+Archivos activos del módulo en `src/geo/geotepic/public/` (8 archivos JS + 1 CSS). Los archivos `superadmin-geotepic-*.js` en `src/superadmin/public/` son vestigios sin usar — el módulo migró a `src/geo/geotepic/public/` en versiones anteriores.
+
+Punto de entrada del lado del browser: `geotepic.js::loadMapaGeoTepic()`. Punto de entrada para recalcular stats/conflictos: `actualizarConflictos()` en `geotepic-conflictos.js`. No llamar `actualizarConflictos()` desde `seleccionarCuadrante()` ni eventos de mouse — solo tras mutaciones reales (POST/PUT/DELETE exitosos y carga inicial).
+
+### Refactor de paneles SPA
+
+**Superadmin** (`src/superadmin/public/`) — ✅ completo en commit `9a0c22b`. `index.html` reducido a 728 líneas (4 vars globales + 9 `<script src>`). Archivos extraídos: `superadmin.css`, `superadmin-utils.js`, `superadmin-auth.js`, `superadmin-config.js`, `superadmin-geo.js`, `superadmin-mandaditos.js`, `superadmin-atencion.js`, `superadmin-dashboard.js`, `superadmin-tenant-config.js`, `superadmin-tenants.js`, `superadmin-catalogo.js`.
+
+**Panel tenant** (`src/panel/public/index.html`, ~2765 líneas) — ⬜ pendiente. Mismo proceso: Paso 1 CSS → `panel.css`, Paso 2 utils, Paso 3 auth/nav, Paso 4 secciones (9 subsecciones), Paso 5 limpieza HTML. Regla: un paso = un commit, subir archivo nuevo antes que el `index.html` que lo referencia.
+
+### Variables globales del inline script de superadmin (no mover a archivos externos)
+
+```javascript
+let _token = null;
+let _mapTcMini = null, _markerTcMini = null;
+let _tcTenant = null;
+let _jidResuelto = null;
+```
+
+Estas cuatro variables deben permanecer en el `<script>` inline de `index.html` porque son referenciadas por múltiples archivos externos y deben estar disponibles antes que cualquier script.

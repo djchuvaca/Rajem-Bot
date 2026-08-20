@@ -1,0 +1,462 @@
+/* ── GeoTepic ────────────────────────────────────────────────────────────────── */
+
+.geotepic-cuadrante-label {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-weight: 700;
+  font-size: 12px;
+  color: #92400e;
+  pointer-events: none;
+}
+
+/* ── Layout mapa + panel ─────────────────────────────────────────────────────── */
+
+.geotepic-layout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.geotepic-layout #geotepic-mapa {
+  flex: 1;
+  min-width: 0;
+}
+
+#geotepic-mapa {
+  height: calc(100vh - 190px);
+  min-height: 420px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* ── Panel lateral ───────────────────────────────────────────────────────────── */
+
+.geotepic-panel {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  height: calc(100vh - 190px);
+  min-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.geotepic-panel-titulo {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.geotepic-panel-vacio {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 0;
+  line-height: 1.6;
+}
+
+/* ── Lista de cuadrantes ─────────────────────────────────────────────────────── */
+
+.geotepic-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.geotepic-lista-item {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.geotepic-lista-item:hover {
+  background: var(--bg);
+}
+
+.geotepic-lista-item.activo {
+  background: #1c1500;
+  border-color: #f59e0b;
+}
+
+.geotepic-lista-item .item-id {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.geotepic-lista-item.activo .item-id {
+  color: #f59e0b99;
+}
+
+.geotepic-lista-item .item-nombre {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geotepic-lista-item.activo .item-nombre {
+  color: #f59e0b;
+}
+
+/* ── Detalle del cuadrante ───────────────────────────────────────────────────── */
+
+.geotepic-detalle {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.geotepic-detalle-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.geotepic-detalle-label {
+  color: var(--muted);
+}
+
+.geotepic-detalle-valor {
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.geotepic-muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.geotepic-detalle-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* ── Colonias dentro del cuadrante ───────────────────────────────────────────── */
+
+.geotepic-colonias-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  background: var(--bg);
+}
+
+.geotepic-colonia-item {
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.geotepic-colonia-item:hover {
+  background: var(--bg-alt);
+}
+
+/* ── Estado badge ────────────────────────────────────────────────────────────── */
+
+.geotepic-estado-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.geotepic-estado-normal {
+  background: #0f2a0f;
+  color: #4ade80;
+  border: 1px solid #166534;
+}
+
+.geotepic-estado-editando {
+  background: #1c1500;
+  color: #fbbf24;
+  border: 1px solid #92400e;
+}
+
+.geotepic-estado-creando {
+  background: #0c1a2e;
+  color: #60a5fa;
+  border: 1px solid #1e40af;
+}
+
+/* ── Confirmación de eliminación ─────────────────────────────────────────────── */
+
+.geotepic-confirm-eliminar {
+  flex-direction: column;
+  gap: 6px;
+  background: #1a0a0a;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.geotepic-confirm-texto {
+  font-size: 13px;
+  margin: 0;
+}
+
+.geotepic-confirm-aviso {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.geotepic-confirm-acciones {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.geotepic-confirm-bloqueado {
+  flex-direction: column;
+  gap: 6px;
+  background: #12100a;
+  border: 1px solid #92400e;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+/* ── Árbol ───────────────────────────────────────────────────────────────────── */
+
+.geotepic-tree-conn {
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Ruta jerárquica ─────────────────────────────────────────────────────────── */
+
+.geotepic-ruta {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: monospace;
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Mensajes de creación / error ────────────────────────────────────────────── */
+
+.geotepic-crear-hint {
+  font-size: 12px;
+  color: #60a5fa;
+  background: #0c1a2e;
+  border: 1px solid #1e40af;
+  border-radius: 5px;
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+
+.geotepic-error-msg {
+  font-size: 12px;
+  color: #fca5a5;
+  background: #1a0808;
+  border: 1px solid #991b1b;
+  border-radius: 5px;
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+
+/* ── Búsqueda ────────────────────────────────────────────────────────────────── */
+
+.geotepic-busqueda-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.geotepic-busqueda-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  outline: none;
+}
+
+.geotepic-busqueda-wrap input:focus {
+  border-color: #f59e0b;
+}
+
+.geotepic-busqueda-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.geotepic-busqueda-result {
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.geotepic-busqueda-result:hover {
+  background: var(--bg);
+  color: #f59e0b;
+}
+
+/* ── Toggles de capas ────────────────────────────────────────────────────────── */
+
+.geotepic-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  flex-shrink: 0;
+}
+
+.geotepic-toggles label {
+  font-size: 12px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Estadísticas ────────────────────────────────────────────────────────────── */
+
+.geotepic-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+
+.geotepic-stat-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.geotepic-stat-fila > span:first-child {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.geotepic-stat-fila strong {
+  font-family: monospace;
+}
+
+.geotepic-stat-alerta > span:first-child,
+.geotepic-stat-alerta strong {
+  color: #fbbf24;
+}
+
+/* ── Panel colapsable ────────────────────────────────────────────────────────── */
+
+.geotepic-panel-colapso {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Conflictos ──────────────────────────────────────────────────────────────── */
+
+.geotepic-conflicto-item {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.geotepic-conflicto-warning {
+  border-color: #92400e;
+  background: #12100a;
+  color: #fbbf24;
+}
+
+.geotepic-conflicto-sub {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Colonia clickable ───────────────────────────────────────────────────────── */
+
+.geotepic-colonia-clickable {
+  cursor: pointer;
+}
+
+.geotepic-colonia-clickable:hover {
+  background: #0c1a2e;
+  color: #60a5fa;
+}
+
+/* ── Botón extra-small ───────────────────────────────────────────────────────── */
+
+.btn-xs {
+  padding: 1px 6px !important;
+  font-size: 11px !important;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1.4;
+}

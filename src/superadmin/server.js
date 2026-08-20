@@ -15,6 +15,7 @@ const {
 } = require('../db/admin');
 const SqliteSessionStore = require('../db/session-store');
 const geoTepic = require('../geo/geotepic');
+const crearRouterGeoTepic = require('../geo/geotepic/routes');
 
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
@@ -66,6 +67,7 @@ app.use(session({
   cookie:            { maxAge: 8 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE === '1' },
 }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/geo/geotepic', express.static(path.join(__dirname, '../geo/geotepic/public')));
 
 app.use((req, res, next) => {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
@@ -342,37 +344,9 @@ app.put('/api/tenants/:id/panel-credentials', requireAuth, (req, res) => {
 app.get('/api/auditoria', requireAuth, (req, res) => res.json(listarAuditoriaAdmin(req.query.limit)));
 
 // ── GEOTEPIC — diccionario maestro administrado exclusivamente aquí ──────────
-app.get('/api/geo/tepic/colonias', requireAuth, (_req, res) => {
-  try {
-    geoTepic.inicializarDesdeTenants(getTenants());
-    res.json(geoTepic.listarColonias({ incluirExcluidas: _req.query.incluir_excluidas === '1' }));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/geo/tepic/colonias', requireAuth, (req, res) => {
-  try { res.json({ ok: true, id: geoTepic.guardarColonia(req.body) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.put('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
-  try { res.json({ ok: true, id: geoTepic.guardarColonia({ ...req.body, id: req.params.colId }) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.delete('/api/geo/tepic/colonias/:colId', requireAuth, (req, res) => {
-  try { res.json({ ok: geoTepic.eliminarColonia(req.params.colId) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.post('/api/geo/tepic/colonias/:colId/restaurar', requireAuth, (req, res) => {
-  try { res.json({ ok: geoTepic.restaurarColonia(req.params.colId) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.get('/api/geo/tepic/auditoria', requireAuth, (req, res) => {
-  try { res.json(geoTepic.listarAuditoria(req.query.limite)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
+app.use('/api/geo/tepic', requireAuth, crearRouterGeoTepic({ getTenants }));
+// Alias estable para consumidores del servicio; conserva la ruta histórica del editor.
+app.use('/api/geotepic', requireAuth, crearRouterGeoTepic({ getTenants }));
 
 // Vista de soporte: definición maestra + activación particular del tenant Tepic.
 app.get('/api/tenants/:id/colonias', requireAuth, (req, res) => {

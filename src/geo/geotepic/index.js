@@ -6,6 +6,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { getAdminDB } = require('../../db/admin');
 const DICCIONARIO = require('./diccionario_colonias_tepic');
+const geoService = require('./services/geo-service');
 
 const ROOT_PATH = path.join(__dirname, '../../..');
 
@@ -102,6 +103,7 @@ function sincronizarCatalogoMaestro() {
       else { insertar.run(fila); cambios++; }
     }
   })();
+  geoService.invalidarIndiceColonias();
   return cambios;
 }
 
@@ -159,6 +161,7 @@ function guardarColonia({ id, nombre, nombre_oficial = null, tipo = 'colonia', c
         grupo_ambiguedad, origen, Number(id));
     if (!result.changes) throw new Error('Colonia maestra no encontrada');
     _auditar(db, Number(id), 'actualizar', antes, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id)), usuario);
+    geoService.invalidarIndiceColonias();
     return Number(id);
   }
   const nuevoId = db.prepare(`INSERT INTO geo_tepic_colonias (nombre,nombre_oficial,slug,tipo,codigo_postal,municipio,ciudad,zona,lat,lon,aliases,activo,fuente_coordenadas,precision_coordenadas,confianza,verificada,palabras_clave,grupo_ambiguedad,origen,administrada) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`)
@@ -167,6 +170,7 @@ function guardarColonia({ id, nombre, nombre_oficial = null, tipo = 'colonia', c
       precision_coordenadas, confianza, verificada ? 1 : 0, _normalizarAliases(palabras_clave),
       grupo_ambiguedad, origen).lastInsertRowid;
   _auditar(db, nuevoId, 'crear', null, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(nuevoId), usuario);
+  geoService.invalidarIndiceColonias();
   return nuevoId;
 }
 
@@ -178,6 +182,7 @@ function eliminarColonia(id, usuario = 'superadmin') {
     ? db.prepare("UPDATE geo_tepic_colonias SET excluida=1,activo=0,administrada=1,updated_at=datetime('now','localtime') WHERE id=?").run(Number(id))
     : db.prepare('DELETE FROM geo_tepic_colonias WHERE id=?').run(Number(id));
   if (result.changes) _auditar(db, Number(id), antes.diccionario_id ? 'excluir' : 'eliminar', antes, null, usuario);
+  if (result.changes) geoService.invalidarIndiceColonias();
   return result.changes > 0;
 }
 
@@ -188,6 +193,7 @@ function restaurarColonia(id, usuario = 'superadmin') {
   const result = db.prepare("UPDATE geo_tepic_colonias SET excluida=0,activo=1,administrada=0,updated_at=datetime('now','localtime') WHERE id=?").run(Number(id));
   sincronizarCatalogoMaestro();
   _auditar(db, Number(id), 'restaurar', antes, db.prepare('SELECT * FROM geo_tepic_colonias WHERE id=?').get(Number(id)), usuario);
+  geoService.invalidarIndiceColonias();
   return result.changes > 0;
 }
 
@@ -308,4 +314,132 @@ function activarEnTenant(tenant, geoTepicId, activo) {
   finally { db.close(); }
 }
 
-module.exports = { esTenantTepic, resolverTenant, inicializarDesdeTenants, sincronizarCatalogoMaestro, respaldarCatalogoMaestro, listarColonias, guardarColonia, eliminarColonia, restaurarColonia, listarAuditoria, sincronizarTenant, listarParaTenant, activarEnTenant, aplicarRadioCobertura };
+// ── Cuadrantes ────────────────────────────────────────────────────────────────
+
+function _generarCodigo(db, parentId) {
+  if (!parentId) {
+    const n = db.prepare('SELECT COUNT(*) n FROM geo_tepic_cuadrantes WHERE parent_id IS NULL').get().n;
+    return `Q-${String(n + 1).padStart(3, '0')}`;
+  }
+  const padre = db.prepare('SELECT codigo, nivel FROM geo_tepic_cuadrantes WHERE id=?').get(parentId);
+  if (!padre) throw new Error('Cuadrante padre no encontrado');
+  const count = db.prepare('SELECT COUNT(*) n FROM geo_tepic_cuadrantes WHERE parent_id=?').get(parentId).n;
+  if (padre.nivel + 1 === 2) return `${padre.codigo}-S${String(count + 1).padStart(2, '0')}`;
+  return `${padre.codigo}-${String.fromCharCode(65 + count)}`; // A, B, C…
+}
+
+function _validarGeometry(geometry) {
+  if (!geometry || typeof geometry !== 'object') throw new Error('geometry requerida');
+  if (!['Polygon', 'MultiPolygon'].includes(geometry.type))
+    throw new Error('geometry.type debe ser Polygon o MultiPolygon');
+  if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length === 0)
+    throw new Error('geometry.coordinates inválido');
+  const ring = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates[0][0];
+  if (!Array.isArray(ring) || ring.length < 4) throw new Error('Polígono debe tener al menos 4 puntos');
+  for (const pt of ring) {
+    if (!Array.isArray(pt) || pt.length < 2 || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1]))
+      throw new Error('Coordenadas inválidas en el polígono');
+  }
+}
+
+function _detectarCiclo(db, id, parentId) {
+  if (id !== null && id === parentId) return true;
+  let current = parentId;
+  while (current) {
+    const row = db.prepare('SELECT parent_id FROM geo_tepic_cuadrantes WHERE id=?').get(current);
+    if (!row) break;
+    if (row.parent_id !== null && row.parent_id === id) return true;
+    current = row.parent_id;
+  }
+  return false;
+}
+
+function _filaAObjeto(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    geometry: typeof row.geometry === 'string' ? JSON.parse(row.geometry) : row.geometry,
+  };
+}
+
+function listarCuadrantes() {
+  return getAdminDB().prepare(
+    'SELECT id, codigo, nombre, nivel, parent_id, geometry, created_at, updated_at FROM geo_tepic_cuadrantes ORDER BY nivel, codigo COLLATE NOCASE'
+  ).all().map(_filaAObjeto);
+}
+
+function crearCuadrante({ nombre = '', parentId = null, geometry } = {}) {
+  _validarGeometry(geometry);
+  const db = getAdminDB();
+
+  let nivelFinal = 1;
+  if (parentId !== null && parentId !== undefined) {
+    parentId = Number(parentId);
+    if (!Number.isFinite(parentId)) throw new Error('parentId inválido');
+    const padre = db.prepare('SELECT id, nivel FROM geo_tepic_cuadrantes WHERE id=?').get(parentId);
+    if (!padre) throw new Error('Cuadrante padre no encontrado');
+    if (_detectarCiclo(db, null, parentId)) throw new Error('Ciclo jerárquico detectado');
+    nivelFinal = padre.nivel + 1;
+  } else {
+    parentId = null;
+  }
+
+  const codigo      = _generarCodigo(db, parentId);
+  const nombreFinal = (String(nombre || '').trim()) || (parentId ? `Subcuadrante ${codigo}` : `Cuadrante ${codigo}`);
+  const { lastInsertRowid } = db.prepare(
+    'INSERT INTO geo_tepic_cuadrantes (codigo, nombre, nivel, parent_id, geometry) VALUES (?,?,?,?,?)'
+  ).run(codigo, nombreFinal, nivelFinal, parentId, JSON.stringify(geometry));
+
+  return _filaAObjeto(
+    db.prepare('SELECT id, codigo, nombre, nivel, parent_id, geometry, created_at, updated_at FROM geo_tepic_cuadrantes WHERE id=?').get(lastInsertRowid)
+  );
+}
+
+function actualizarCuadrante(id, { nombre, geometry } = {}) {
+  id = Number(id);
+  if (!Number.isFinite(id)) throw new Error('ID inválido');
+  const db = getAdminDB();
+  const zona = db.prepare('SELECT * FROM geo_tepic_cuadrantes WHERE id=?').get(id);
+  if (!zona) throw new Error('Cuadrante no encontrado');
+
+  const nuevoNombre = nombre !== undefined ? (String(nombre).trim() || zona.nombre) : zona.nombre;
+  let nuevoGeom = zona.geometry;
+  if (geometry !== undefined) {
+    _validarGeometry(geometry);
+    nuevoGeom = JSON.stringify(geometry);
+  }
+
+  db.prepare(
+    "UPDATE geo_tepic_cuadrantes SET nombre=?, geometry=?, updated_at=datetime('now','localtime') WHERE id=?"
+  ).run(nuevoNombre, nuevoGeom, id);
+
+  return _filaAObjeto(
+    db.prepare('SELECT id, codigo, nombre, nivel, parent_id, geometry, created_at, updated_at FROM geo_tepic_cuadrantes WHERE id=?').get(id)
+  );
+}
+
+function eliminarCuadrante(id) {
+  id = Number(id);
+  if (!Number.isFinite(id)) throw new Error('ID inválido');
+  const db = getAdminDB();
+  if (!db.prepare('SELECT id FROM geo_tepic_cuadrantes WHERE id=?').get(id)) throw new Error('Cuadrante no encontrado');
+  const hijos = db.prepare('SELECT COUNT(*) n FROM geo_tepic_cuadrantes WHERE parent_id=?').get(id).n;
+  if (hijos > 0) throw new Error(`No se puede eliminar: tiene ${hijos} subcuadrante(s)`);
+  db.prepare('DELETE FROM geo_tepic_cuadrantes WHERE id=?').run(id);
+  return true;
+}
+
+module.exports = {
+  esTenantTepic, resolverTenant, inicializarDesdeTenants, sincronizarCatalogoMaestro,
+  respaldarCatalogoMaestro, listarColonias, guardarColonia, eliminarColonia,
+  restaurarColonia, listarAuditoria, sincronizarTenant, listarParaTenant,
+  activarEnTenant, aplicarRadioCobertura, listarCuadrantes, crearCuadrante,
+  actualizarCuadrante, eliminarCuadrante,
+  obtenerZonaDeColonia: geoService.obtenerZonaDeColonia,
+  obtenerZonaPorCoordenadas: geoService.obtenerZonaPorCoordenadas,
+  obtenerColoniasPorCuadrante: geoService.obtenerColoniasPorCuadrante,
+  sonColoniasMismaZona: geoService.sonColoniasMismaZona,
+  obtenerRutaGeograficaPorColonia: geoService.obtenerRutaGeograficaPorColonia,
+  obtenerEstado: geoService.obtenerEstado,
+  GeoTepicError: geoService.GeoTepicError,
+};

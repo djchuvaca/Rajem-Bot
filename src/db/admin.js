@@ -76,6 +76,17 @@ function _init() {
     id INTEGER PRIMARY KEY AUTOINCREMENT, colonia_id INTEGER, accion TEXT NOT NULL,
     datos_antes TEXT, datos_despues TEXT, usuario TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
   )`);
+  _db.exec(`CREATE TABLE IF NOT EXISTS geo_tepic_cuadrantes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo     TEXT NOT NULL,
+    nombre     TEXT NOT NULL DEFAULT '',
+    nivel      INTEGER NOT NULL DEFAULT 1,
+    parent_id  INTEGER REFERENCES geo_tepic_cuadrantes(id),
+    geometry   TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  )`);
+  _db.exec('CREATE INDEX IF NOT EXISTS idx_geo_tepic_cuadrantes_parent ON geo_tepic_cuadrantes(parent_id)');
   _db.prepare('INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)').run('2026-08-14-geotepic-security');
 
   // Defaults de global_config — solo inserta si no existe

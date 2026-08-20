@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rajem's Technology — Super Admin</title>
 <link rel="stylesheet" href="superadmin.css">
+<link rel="stylesheet" href="/geo/geotepic/geotepic.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.16.0/dist/leaflet-geoman.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.16.0/dist/leaflet-geoman.min.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="superadmin-utils.js"></script>
 </head>
@@ -34,6 +38,7 @@
     <div class="nav-item active" onclick="showSection('dashboard')" data-s="dashboard"><span class="icon">📊</span> Dashboard</div>
     <div class="nav-item" onclick="showSection('tenants')" data-s="tenants"><span class="icon">🏪</span> Negocios</div>
     <div class="nav-item" onclick="showSection('geo')" data-s="geo"><span class="icon">🗺️</span> Geo & Colonias</div>
+    <div class="nav-item" onclick="showSection('geotepic');loadMapaGeoTepic()" data-s="geotepic"><span class="icon">📍</span> Mapa GeoTepic</div>
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
     <div class="nav-item" onclick="showSection('catalogo-giros');loadCatalogoGiros()" data-s="catalogo-giros"><span class="icon">📦</span> Catálogo Giros</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
@@ -112,6 +117,170 @@
           <div id="zonas-form"></div>
           <button class="btn btn-secondary btn-sm" onclick="addZonaRow()">+ Zona</button>
           <button class="btn btn-primary" style="margin-left:8px" onclick="saveZonas()">Guardar zonas</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MAPA GEOTEPIC ── -->
+    <div id="sec-geotepic" class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <h1>Mapa GeoTepic</h1>
+          <p class="subtitle">Colonias de Tepic, Nayarit</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="font-size:13px;color:var(--muted)">
+            Colonias cargadas: <strong id="contadorColonias">—</strong>
+          </span>
+          <button class="btn btn-secondary btn-sm" onclick="recargarMapaGeoTepic()">🔄 Recargar colonias</button>
+        </div>
+      </div>
+      <div class="geotepic-layout">
+        <div id="geotepic-mapa"></div>
+        <div id="geotepic-panel" class="geotepic-panel">
+
+          <!-- ── Buscar ── -->
+          <div class="geotepic-panel-titulo">Buscar</div>
+          <div class="geotepic-busqueda-wrap">
+            <input id="gc-buscar-colonia" type="text" placeholder="Buscar colonia…"
+              oninput="_buscarColonia(this.value)" autocomplete="off">
+            <div id="gc-buscar-colonia-results" class="geotepic-busqueda-dropdown" style="display:none"></div>
+          </div>
+          <div class="geotepic-busqueda-wrap">
+            <input id="gc-buscar-cuadrante" type="text" placeholder="Buscar cuadrante…"
+              oninput="_buscarCuadrante(this.value)" autocomplete="off">
+            <div id="gc-buscar-cuadrante-results" class="geotepic-busqueda-dropdown" style="display:none"></div>
+          </div>
+
+          <!-- ── Capas ── -->
+          <div class="geotepic-panel-titulo" style="margin-top:4px">Capas</div>
+          <div class="geotepic-toggles">
+            <label><input type="checkbox" id="gt-colonias" checked onchange="_toggleCapaColonias(this.checked)"> Colonias</label>
+            <label><input type="checkbox" id="gt-nombres" checked onchange="_toggleNombresColonias(this.checked)"> Nombres</label>
+            <label><input type="checkbox" id="gt-cuadrantes" checked onchange="_toggleCapaCuadrantes(this.checked)"> Cuadrantes</label>
+            <label><input type="checkbox" id="gt-subcuadrantes" checked onchange="_toggleCapaSubcuadrantes(this.checked)"> Subcuadrantes</label>
+            <label><input type="checkbox" id="gt-solo" onchange="_toggleSoloSeleccion(this.checked)"> Solo selección</label>
+            <label><input type="checkbox" id="gt-conflictos" onchange="_toggleMostrarConflictos(this.checked)"> Conflictos</label>
+          </div>
+
+          <!-- ── Estadísticas ── -->
+          <div class="geotepic-panel-titulo" style="margin-top:4px">Estadísticas</div>
+          <div class="geotepic-stats">
+            <div class="geotepic-stat-fila">
+              <span>Colonias totales</span><strong id="gs-colonias-total">—</strong>
+            </div>
+            <div class="geotepic-stat-fila">
+              <span>Cuadrantes N1</span><strong id="gs-cuadrantes-n1">—</strong>
+            </div>
+            <div class="geotepic-stat-fila">
+              <span>Subcuadrantes</span><strong id="gs-subcuadrantes">—</strong>
+            </div>
+            <div class="geotepic-stat-fila">
+              <span>Asignadas</span><strong id="gs-asignadas">—</strong>
+            </div>
+            <div class="geotepic-stat-fila" id="gs-sin-fila">
+              <span>Sin cuadrante</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <strong id="gs-sin-asignar">—</strong>
+                <button class="btn btn-secondary btn-xs" onclick="_verColoniasSinCuadrante()">Ver</button>
+              </div>
+            </div>
+            <div class="geotepic-stat-fila" id="gs-conflictos-fila">
+              <span>Conflictos</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <strong id="gs-conflictos">—</strong>
+                <button class="btn btn-secondary btn-xs" onclick="_togglePanelConflictos()">Ver</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Sin cuadrante (colapsable) ── -->
+          <div id="gc-panel-sin-cuadrante" class="geotepic-panel-colapso" style="display:none">
+            <div class="geotepic-panel-titulo">Sin cuadrante</div>
+            <div id="gc-lista-sin-cuadrante" class="geotepic-colonias-lista"></div>
+          </div>
+
+          <!-- ── Conflictos (colapsable) ── -->
+          <div id="gc-panel-conflictos" class="geotepic-panel-colapso" style="display:none">
+            <div class="geotepic-panel-titulo">Conflictos detectados</div>
+            <div id="gc-solapamientos-poligonos"></div>
+            <div id="gc-conflictos-colonias"></div>
+            <div id="gc-conflictos-vacio" class="geotepic-panel-vacio" style="display:none;padding:8px 0;font-size:12px">
+              Sin conflictos detectados.
+            </div>
+          </div>
+
+          <!-- ── Cuadrantes ── -->
+          <div class="geotepic-panel-titulo" style="margin-top:4px">Cuadrantes</div>
+          <div id="geotepic-lista-cuadrantes" class="geotepic-lista"></div>
+          <div id="geotepic-panel-vacio" class="geotepic-panel-vacio">
+            Sin cuadrantes.<br>Dibuja uno con las herramientas del mapa.
+          </div>
+
+          <!-- ── Zona seleccionada ── -->
+          <div id="geotepic-detalle" class="geotepic-detalle" style="display:none">
+            <div class="geotepic-detalle-fila">
+              <span class="geotepic-detalle-label">Código</span>
+              <span id="gc-id" class="geotepic-detalle-valor"></span>
+            </div>
+            <div class="geotepic-detalle-fila">
+              <span class="geotepic-detalle-label">Nivel</span>
+              <span id="gc-nivel" class="geotepic-detalle-valor">1</span>
+            </div>
+            <div class="geotepic-detalle-fila">
+              <span class="geotepic-detalle-label">Padre</span>
+              <span id="gc-padre-val" class="geotepic-detalle-valor geotepic-muted">—</span>
+            </div>
+            <div id="gc-ruta" class="geotepic-ruta" style="display:none"></div>
+            <div class="geotepic-detalle-fila">
+              <span class="geotepic-detalle-label">Estado</span>
+              <span id="gc-estado" class="geotepic-estado-badge geotepic-estado-normal">NORMAL</span>
+            </div>
+            <div class="geotepic-detalle-fila">
+              <span class="geotepic-detalle-label">Colonias</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <span id="gc-colonias-count" class="geotepic-detalle-valor">0</span>
+                <button class="btn btn-secondary btn-xs" onclick="_toggleVerColonias()">Ver</button>
+              </div>
+            </div>
+            <div id="gc-colonias-lista" class="geotepic-colonias-lista" style="display:none"></div>
+            <div class="form-group" style="margin-top:10px">
+              <label>Nombre</label>
+              <input type="text" id="gc-nombre-input" placeholder="Nombre del cuadrante"
+                onkeydown="if(event.key==='Enter')_guardarNombreCuadrante()">
+            </div>
+            <div id="geotepic-detalle-acciones" class="geotepic-detalle-acciones">
+              <button class="btn btn-secondary btn-sm" onclick="_centrarEnCuadranteSeleccionado()">📍 Centrar</button>
+              <button class="btn btn-primary btn-sm" onclick="_guardarNombreCuadrante()">💾 Guardar nombre</button>
+              <button id="gc-btn-editar" class="btn btn-secondary btn-sm" onclick="_iniciarEdicionSeleccionado()">✏️ Editar geometría</button>
+              <button id="gc-btn-terminar" class="btn btn-primary btn-sm" onclick="_terminarEdicionSeleccionado()" style="display:none">✅ Terminar edición</button>
+              <button id="gc-btn-cancelar-edicion" class="btn btn-secondary btn-sm" onclick="_cancelarEdicionSeleccionado()" style="display:none">✖ Cancelar edición</button>
+              <button id="gc-btn-subcuadrante" class="btn btn-secondary btn-sm" onclick="_iniciarCreacionSubcuadranteSeleccionado()">＋ Subcuadrante</button>
+              <button id="gc-btn-cancelar-subcuadrante" class="btn btn-secondary btn-sm" onclick="_cancelarCreacionSubcuadranteSeleccionado()" style="display:none">✖ Cancelar creación</button>
+              <button id="gc-btn-eliminar" class="btn btn-danger btn-sm" onclick="_pedirConfirmacionEliminar()">🗑️ Eliminar</button>
+            </div>
+            <div id="gc-crear-hint" class="geotepic-crear-hint" style="display:none">
+              Dibuja el subcuadrante en el mapa. Debe estar completamente dentro del cuadrante padre.
+            </div>
+            <div id="gc-error-edicion" class="geotepic-error-msg" style="display:none"></div>
+            <div id="gc-error-subcuadrante" class="geotepic-error-msg" style="display:none"></div>
+            <div id="gc-confirm-eliminar" class="geotepic-confirm-eliminar" style="display:none">
+              <p class="geotepic-confirm-texto">¿Eliminar el cuadrante <strong id="gc-confirm-nombre"></strong>?</p>
+              <p class="geotepic-confirm-aviso">Su geometría será eliminada. Las colonias NO se eliminarán.</p>
+              <div class="geotepic-confirm-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="_cancelarEliminar()">Cancelar</button>
+                <button class="btn btn-danger btn-sm" onclick="_confirmarEliminar()">Eliminar</button>
+              </div>
+            </div>
+            <div id="gc-confirm-bloqueado" class="geotepic-confirm-eliminar geotepic-confirm-bloqueado" style="display:none">
+              <p class="geotepic-confirm-texto">No se puede eliminar: tiene <strong id="gc-bloqueado-count"></strong> subcuadrante(s).</p>
+              <p class="geotepic-confirm-aviso">Elimina primero los subcuadrantes hijos.</p>
+              <div class="geotepic-confirm-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="_cancelarBloqueadoEliminar()">Cerrar</button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -709,6 +878,14 @@
 
 <div id="toast"></div>
 
+<script src="/geo/geotepic/geotepic-mapa.js"></script>
+<script src="/geo/geotepic/geotepic-colonias.js"></script>
+<script src="/geo/geotepic/geotepic-cuadrantes.js"></script>
+<script src="/geo/geotepic/geotepic-turf.js"></script>
+<script src="/geo/geotepic/geotepic-jerarquia.js"></script>
+<script src="/geo/geotepic/geotepic-busqueda.js"></script>
+<script src="/geo/geotepic/geotepic-conflictos.js"></script>
+<script src="/geo/geotepic/geotepic.js"></script>
 <script src="superadmin-geo.js"></script>
 <script src="superadmin-mandaditos.js"></script>
 <script src="superadmin-config.js"></script>
