@@ -366,6 +366,9 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
         tipo:        infoPedido.tipo || "mostrador",
         orden:       (pendiente.texto || "").substring(0, 500),
         total, metodo_pago: "transferencia", estado: "pendiente", hora_entrega,
+        cotizacion_envio_id: camposCliente._cotizacionEnvio?.id,
+        tarifa_envio: camposCliente._cotizacionEnvio?.tarifa,
+        tarifa_envio_detalle: camposCliente._cotizacionEnvio,
       });
       if (pedidoMpId) trazabilidad.vincularPedido(clienteNumero, pedidoMpId);
       if (infoPedido.telefono) {
@@ -459,6 +462,9 @@ async function handleConfirmacionFinal(msg, client, textoOriginal, clienteNumero
       tipo:       infoPedido.tipo || "mostrador",
       orden:      (pendiente.texto || "").substring(0, 500),
       total, metodo_pago, estado: "pendiente", hora_entrega,
+      cotizacion_envio_id: camposCliente._cotizacionEnvio?.id,
+      tarifa_envio: camposCliente._cotizacionEnvio?.tarifa,
+      tarifa_envio_detalle: camposCliente._cotizacionEnvio,
     });
     if (pedidoId) trazabilidad.vincularPedido(clienteNumero, pedidoId);
     console.log(`BD: Pedido #${pedidoId} registrado para ${telefonoLimpio}`);

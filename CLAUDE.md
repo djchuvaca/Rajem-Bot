@@ -1,6 +1,6 @@
 # Rajem's Technology — Bot SaaS de WhatsApp para negocios de comida
 
-> Estado de referencia: 2026-08-19. Este documento describe el código actual; los pendientes se identifican explícitamente.
+> Estado de referencia: 2026-08-21. Este documento describe el código actual; los pendientes se identifican explícitamente.
 
 ## Descripción del sistema
 
@@ -201,6 +201,7 @@ El superadmin llama a `POST /api/tenants/:id/eliminar` → proxea a `webhook-dep
 - **`src/config.js`** — helpers de configuración del negocio.
 - **`src/pedido/precios.js`** — API legacy de precios (`getPrecios()`, `calcularPrecioItem()`). Ambas funciones registran telemetría via `legacy-tracker`. Soporta flags de interruptor: `PRECIOS_GIRO_UNICO=true` lanza error explícito en ambas (fuerza migración a `calcularPrecioPartida()`); `LEGACY_READ_FALLBACK=false` hace lo mismo. La ruta migrada es `getContratoGiroActivo().calcularPrecioPartida(partida)`.
 - **`src/nlu/core.js`** — utilidades NLU genéricas reutilizables por todos los giros.
+- **`src/logistica/`** — motor tarifario central administrado exclusivamente desde el Superadmin. Usa una política global para Tepic, aplicada automáticamente a todos sus negocios, con reglas, versiones, condiciones temporales, simulador y cotizaciones inmutables. No existen perfiles ni asignaciones por tenant.
 
 ---
 
@@ -331,6 +332,23 @@ Map: key = String(db_id), value = { id, codigo, nombre, tipo, parentId, nivel, l
 | 7 | Persistencia: tabla BD, CRUD backend, load/save frontend | ✅ |
 | 8 | Herramientas administrativas: búsqueda, stats, conflictos, toggles capas | ✅ |
 | 9 | Servicio espacial reutilizable + API de consultas para otros módulos | ✅ |
+
+---
+
+## Motor logístico central
+
+El Superadmin incluye la sección **Logística**. GeoTepic determina colonia, coordenadas y cuadrantes; `src/logistica/cotizador.js` aplica automáticamente la política global publicada. El orden estructural es distancia → cuadrante → clima → calendario/festivo → horario → demanda → extraordinario. Las reglas de horario se activan automáticamente todos los días dentro de una franja de inicio y fin usando la zona `America/Mexico_City`; admiten franjas que cruzan medianoche. La distancia siempre crea la base y no puede ser reemplazada por categorías posteriores.
+
+Los cambios se preparan en un borrador y solo afectan al bot después de publicar una versión. Cada publicación abre un nuevo borrador y conserva moneda, redondeo, tarifa mínima y tarifa máxima opcionales. Después de calcular y redondear, la tarifa máxima limita efectivamente el costo final del envío.
+
+Si todavía no existe una política global publicada, `src/geo/index.js` conserva temporalmente el cálculo histórico mediante `tarifas_zonas`. Este fallback existe para despliegue gradual y no concede control sobre las reglas centrales al panel tenant.
+
+Responsabilidades:
+
+- GeoTepic: territorio y pertenencia espacial, nunca precios.
+- Superadmin: empresas, perfiles, reglas, condiciones, asignaciones, publicación y simulación.
+- Tenant: consumidor de la cotización; su panel no fue ampliado con controles tarifarios.
+- Mandaditos: ejecución y seguimiento del reparto una vez aceptado el pedido.
 
 ---
 

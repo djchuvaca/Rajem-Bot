@@ -1,6 +1,6 @@
 # Contexto Técnico del Sistema — Rajem's Technology SaaS Bot WhatsApp
 
-> Estado verificado contra el código: **2026-08-17**. Rama: `main`.  
+> Estado verificado contra el código: **2026-08-21**. Rama: `main`.
 > Documento de referencia para IA, desarrolladores y generación de pruebas automáticas.  
 > Si existe contradicción: código ejecutado > este documento > CLAUDE.md.
 
@@ -937,6 +937,18 @@ Cuando el admin cambia estado de un pedido via la API REST, el panel usa `whatsa
 ### Wizard de Onboarding
 Se abre automáticamente al primer login si `nombre_negocio === "Mi Negocio"` Y `localStorage.setup_done` no existe.
 5 pasos: negocio → horarios → banco → menú → contraseña.
+
+---
+
+## 10.1 Motor tarifario central (`src/logistica/`)
+
+La administración de tarifas de envío pertenece exclusivamente al Superadmin. El panel del tenant no puede modificar distancia, cuadrantes, clima, festivos, demanda ni el precio final.
+
+Flujo: `tenant + origen + colonia` → GeoTepic resuelve coordenadas/cuadrantes → política global publicada de Tepic → distancia base → cuadrante → clima → festivo → horario → cotización versionada → resumen del bot → pedido conserva `cotizacion_envio_id`, `tarifa_envio` y `tarifa_envio_detalle`.
+
+Tablas centrales vigentes en `admin.db`: `logistica_empresas`, `logistica_politicas_globales`, `logistica_versiones_globales`, `logistica_reglas_globales`, `logistica_condiciones_globales` y `logistica_cotizaciones_globales`. La entidad empresa se conserva para que posteriormente un panel externo consuma el mismo dominio sin trasladar la lógica fuera del Superadmin. No existen convenios ni asignaciones individuales.
+
+Una versión borrador puede editarse; al publicarla queda inmutable y se abre un nuevo borrador. Se aplica automáticamente a todos los negocios de Tepic. Si no existe política publicada, el bot utiliza temporalmente `tarifas_zonas` como compatibilidad de despliegue.
 
 ---
 

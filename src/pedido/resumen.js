@@ -159,6 +159,14 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
 
   const negocio    = getNombreNegocio();
   const tarifaInfo = esDomicilio ? calcularTarifaDomicilio(c.colonia) : null;
+  if (esDomicilio && tarifaInfo?.cotizacionCentral) {
+    c._cotizacionEnvio = {
+      id: tarifaInfo.cotizacionId || null,
+      tarifa: tarifaInfo.tarifa,
+      version: tarifaInfo.perfilVersion || null,
+      desglose: tarifaInfo.desglose || [],
+    };
+  } else if (!esDomicilio) delete c._cotizacionEnvio;
   const domCosto   = tarifaInfo ? tarifaInfo.tarifa : getDomCosto();
   const horaConf   = esPreventa ? (c.hora || horaEntregaPreventa.get(clienteNumero)) : null;
   const esTransf   = /transferencia/i.test(c.metodo || "");
@@ -191,6 +199,9 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
     if (tarifaInfo?.fueraDeCobertura) {
       resumen += `⚠️ _Tu colonia supera nuestra zona de cobertura habitual — te confirmaremos si aplica la entrega_\n`;
     }
+    if (tarifaInfo?.cotizacionCentral && tarifaInfo?.servicioDisponible !== false) {
+      resumen += `ℹ️ _Tarifa calculada por zona y condiciones operativas vigentes_\n`;
+    }
   }
 
   resumen += `💰 *TOTAL: $${total}*\n`;
@@ -206,7 +217,7 @@ function generarResumen(clienteNumero, ordenTexto, esDomicilio, esPreventa) {
   resumen += "━━━━━━━━━━━━━━━━━━\n";
   resumen += "*¿Confirmas tu pedido?*";
 
-  return { texto: resumen, esTransferencia: esTransf, total };
+  return { texto: resumen, esTransferencia: esTransf, total, cotizacionEnvio: c._cotizacionEnvio || null };
 }
 
 module.exports = {

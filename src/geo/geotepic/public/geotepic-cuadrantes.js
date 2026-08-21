@@ -184,6 +184,7 @@ function actualizarNombreCuadrante(id, nombre) {
     permanent: true, direction: 'center', className: 'geotepic-cuadrante-label',
   });
   renderListaCuadrantes();
+  window.dispatchEvent(new CustomEvent('geotepic:cuadrantes-cambiaron'));
 }
 
 async function _guardarNombreCuadrante() {
@@ -418,6 +419,7 @@ async function eliminarCuadrante(id) {
     _restaurarEstiloColonias();
     actualizarConflictos();
     renderListaCuadrantes();
+    window.dispatchEvent(new CustomEvent('geotepic:cuadrantes-cambiaron'));
   } catch (err) {
     // Restaurar panel de acciones si falló
     const acc = document.getElementById('geotepic-detalle-acciones');
@@ -474,6 +476,7 @@ async function _cargarCuadrantesGeoTepic() {
 
     for (const [id] of cuadrantesMap) analizarCuadrante(id);
     renderListaCuadrantes();
+    window.dispatchEvent(new CustomEvent('geotepic:cuadrantes-cambiaron'));
 
     if (zonas.length > 0) console.log(`[GeoTepic] ${zonas.length} cuadrante(s) cargados`);
   } catch (err) {
@@ -559,6 +562,7 @@ function initCuadrantesGeoTepic() {
       _actualizarEstadoPanel();
       renderListaCuadrantes();
       seleccionarCuadrante(id);
+      window.dispatchEvent(new CustomEvent('geotepic:cuadrantes-cambiaron'));
 
       console.log('[GeoTepic] Zona guardada:', { id, codigo: zona.codigo, nivel: zona.nivel, parentId });
     } catch (err) {

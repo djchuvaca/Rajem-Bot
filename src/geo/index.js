@@ -204,6 +204,37 @@ function calcularTarifaDomicilio(nombreColonia) {
     return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };
   }
 
+  // La cotización central tiene prioridad cuando el Superadmin asignó y
+  // publicó un perfil. La tarifa histórica del tenant permanece como respaldo
+  // para permitir una activación gradual sin interrumpir negocios existentes.
+  try {
+    const central = require('../logistica').cotizarEntrega({
+      tenantId: process.env.TENANT_ID || 'tacos_javier',
+      colonia: nombreColonia,
+      origenLat: negocioLat,
+      origenLon: negocioLon,
+      persistir: true,
+    });
+    if (central.configurada) {
+      const zona = central.zonas?.map(z => z.nombre).join(' / ') || null;
+      if (!central.disponible) return {
+        tarifa: fallback, zona, distancia: central.distanciaKm ?? null,
+        encontrada: true, fueraDeCobertura: true,
+        coloniaNombre: central.colonia || nombreColonia,
+        servicioDisponible: false, motivoNoDisponible: central.motivo,
+        cotizacionCentral: true,
+      };
+      return {
+        tarifa: central.tarifa, zona, distancia: central.distanciaKm,
+        encontrada: true, fueraDeCobertura: false, coloniaNombre: central.colonia,
+        cotizacionId: central.cotizacionId, perfilVersion: central.perfilVersion,
+        desglose: central.desglose, cotizacionCentral: true, servicioDisponible: true,
+      };
+    }
+  } catch (error) {
+    console.warn(`[LOGISTICA] Cotizador central no disponible; se usa tarifa tenant: ${error.message}`);
+  }
+
   const colonia = buscarColonia(nombreColonia);
   if (!colonia) {
     return { tarifa: fallback, zona: null, distancia: null, encontrada: false, fueraDeCobertura: false, coloniaNombre: null };

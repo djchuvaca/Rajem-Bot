@@ -59,15 +59,23 @@ function registrarPedido(datos) {
   const db = getDB();
   if (!db) return null;
   db.run(
-    `INSERT INTO pedidos (cliente_id, tipo, orden, total, metodo_pago, estado, hora_entrega)
-     VALUES (?,?,?,?,?,?,?)`,
-    [datos.cliente_id, datos.tipo, datos.orden, datos.total, datos.metodo_pago, datos.estado || "pendiente", datos.hora_entrega]
+    `INSERT INTO pedidos (cliente_id, tipo, orden, total, metodo_pago, estado, hora_entrega,
+      cotizacion_envio_id, tarifa_envio, tarifa_envio_detalle)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [datos.cliente_id, datos.tipo, datos.orden, datos.total, datos.metodo_pago,
+      datos.estado || "pendiente", datos.hora_entrega, datos.cotizacion_envio_id || null,
+      datos.tarifa_envio ?? null, datos.tarifa_envio_detalle ? JSON.stringify(datos.tarifa_envio_detalle) : null]
   );
   if (datos.cliente_id)
     db.run("UPDATE clientes SET total_pedidos = total_pedidos + 1 WHERE id = ?", [datos.cliente_id]);
   const resultado = db.exec("SELECT last_insert_rowid() as id");
   guardarDB();
-  return resultado[0]?.values[0][0] || null;
+  const id = resultado[0]?.values[0][0] || null;
+  if (id && datos.cotizacion_envio_id) {
+    try { require('../logistica').vincularCotizacion(datos.cotizacion_envio_id, id); }
+    catch (error) { console.warn(`[LOGISTICA] No se pudo vincular la cotización: ${error.message}`); }
+  }
+  return id;
 }
 
 function actualizarEstadoPorId(pedidoId, estado) {

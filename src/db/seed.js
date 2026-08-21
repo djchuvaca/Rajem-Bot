@@ -88,6 +88,9 @@ async function seedDB() {
       metodo_pago  TEXT,
       estado       TEXT    DEFAULT 'pendiente',
       hora_entrega TEXT,
+      cotizacion_envio_id TEXT,
+      tarifa_envio REAL,
+      tarifa_envio_detalle TEXT,
       fecha        TEXT    DEFAULT (datetime('now', 'localtime'))
     );
     CREATE TABLE IF NOT EXISTS configuracion (
@@ -220,6 +223,9 @@ async function seedDB() {
   try { db.run("ALTER TABLE item_types ADD COLUMN disponible INTEGER DEFAULT 1"); } catch (_) {}
   try { db.run("ALTER TABLE cortes ADD COLUMN seccion TEXT DEFAULT 'carnitas'"); } catch (_) {}
   try { db.run("ALTER TABLE menu_items ADD COLUMN disponible INTEGER DEFAULT 1"); } catch (_) {}
+  try { db.run("ALTER TABLE pedidos ADD COLUMN cotizacion_envio_id TEXT"); } catch (_) {}
+  try { db.run("ALTER TABLE pedidos ADD COLUMN tarifa_envio REAL"); } catch (_) {}
+  try { db.run("ALTER TABLE pedidos ADD COLUMN tarifa_envio_detalle TEXT"); } catch (_) {}
 
   // Migración: renombrar slug 'maciza' → 'carne' (v1.5 compat)
   try { db.run("UPDATE cortes SET slug='carne', nombre='Carne/Maciza', aliases_json='[\"carnitas\",\"carnita\",\"carne\",\"maciza\",\"masiza\",\"maciza de puerco\"]' WHERE slug='maciza'"); } catch (_) {}

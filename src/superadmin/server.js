@@ -16,6 +16,7 @@ const {
 const SqliteSessionStore = require('../db/session-store');
 const geoTepic = require('../geo/geotepic');
 const crearRouterGeoTepic = require('../geo/geotepic/routes');
+const crearRouterLogistica = require('../logistica/routes');
 
 const {
   getTenants, getTenant, upsertTenant, deleteTenant,
@@ -347,6 +348,13 @@ app.get('/api/auditoria', requireAuth, (req, res) => res.json(listarAuditoriaAdm
 app.use('/api/geo/tepic', requireAuth, crearRouterGeoTepic({ getTenants }));
 // Alias estable para consumidores del servicio; conserva la ruta histórica del editor.
 app.use('/api/geotepic', requireAuth, crearRouterGeoTepic({ getTenants }));
+
+// ── LOGÍSTICA CENTRAL — administración exclusiva del superadmin ──────────────
+// El router depende de interfaces, no del panel. Una futura empresa logística
+// podrá consumir el mismo dominio con su propio control de acceso.
+app.use('/api/logistica', requireAuth, crearRouterLogistica({
+  getTenants, getTenant, getTenantConfig, auditar: registrarAuditoria,
+}));
 
 // Vista de soporte: definición maestra + activación particular del tenant Tepic.
 app.get('/api/tenants/:id/colonias', requireAuth, (req, res) => {

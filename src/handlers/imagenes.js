@@ -170,6 +170,9 @@ async function handleImagen(msg, client) {
           tipo:        infoPedido.tipo || "mostrador",
           orden:       (datos.resumen || "").substring(0, 500),
           total, metodo_pago: "transferencia", estado: "pendiente", hora_entrega,
+          cotizacion_envio_id: camposCliente._cotizacionEnvio?.id,
+          tarifa_envio: camposCliente._cotizacionEnvio?.tarifa,
+          tarifa_envio_detalle: camposCliente._cotizacionEnvio,
         });
         if (telefonoLimpio) {
           telefonosReales.set(clienteNumero, telefonoLimpio);

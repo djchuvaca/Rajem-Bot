@@ -42,6 +42,7 @@
     <div class="nav-item" onclick="showSection('tenant-config')" data-s="tenant-config"><span class="icon">⚙️</span> Config Tenant</div>
     <div class="nav-item" onclick="showSection('catalogo-giros');loadCatalogoGiros()" data-s="catalogo-giros"><span class="icon">📦</span> Catálogo Giros</div>
     <div class="nav-item" onclick="showSection('pasarelas')" data-s="pasarelas"><span class="icon">💳</span> Pasarelas Pago</div>
+    <div class="nav-item" onclick="showSection('logistica');loadLogistica()" data-s="logistica"><span class="icon">🧮</span> Logística</div>
     <div class="nav-item" onclick="showSection('mandaditos')" data-s="mandaditos"><span class="icon">🛵</span> Mandaditos</div>
     <div class="nav-item" onclick="showSection('atencion');loadAtencion()" data-s="atencion"><span class="icon">🚨</span> Atención <span id="nav-badge-alertas-sa" style="display:none;background:var(--red);color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px"></span></div>
     <div class="nav-item" onclick="showSection('auditoria');loadAuditoria()" data-s="auditoria"><span class="icon">🧾</span> Auditoría</div>
@@ -524,6 +525,74 @@
       </div>
     </div>
 
+    <!-- ── LOGÍSTICA CENTRAL ── -->
+    <div id="sec-logistica" class="section">
+      <h1>Logística — Motor tarifario</h1>
+      <p class="subtitle">Administración central de tarifas. Los tenants únicamente consumen las cotizaciones publicadas.</p>
+
+      <div id="log-alerta" class="alert alert-error" style="display:none"></div>
+      <div class="cards" id="log-resumen"></div>
+
+      <div class="log-grid">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📐 Política global de Tepic</div><span id="log-version" class="badge badge-gray">Sin publicar</span></div>
+          <p class="subtitle">Se aplica automáticamente a todos los negocios de Tepic. No requiere asignaciones.</p>
+          <div class="grid2">
+            <div class="form-group"><label>Redondear a</label><input id="log-redondeo" type="number" min="1" value="5"></div>
+            <div class="form-group"><label>Tarifa mínima (opcional)</label><input id="log-minimo" type="number" min="0"></div>
+            <div class="form-group"><label>Tarifa máxima</label><input id="log-maximo" type="number" min="0" placeholder="Costo máximo de envío"></div>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary btn-sm" onclick="guardarPoliticaLogistica()">Guardar configuración</button>
+            <button class="btn btn-secondary btn-sm" onclick="publicarPoliticaLogistica()">Publicar borrador</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2 log-grid log-pricing-sections" style="margin-top:16px">
+        <div class="card"><div class="card-header"><div class="card-title">📏 Precio por distancia</div></div>
+          <p class="subtitle">Define la tarifa base mediante rangos continuos.</p><div class="log-mini-form">
+            <div class="form-group"><label>Nombre</label><input id="log-dist-nombre" placeholder="De 0 a 3 km"></div><div class="form-group"><label>Desde km</label><input id="log-dist-desde" type="number" min="0" step="0.1" value="0"></div><div class="form-group"><label>Hasta km</label><input id="log-dist-hasta" type="number" min="0" step="0.1"></div><div class="form-group"><label>Precio base</label><input id="log-dist-valor" type="number" min="0" step="0.01"></div><button class="btn btn-primary btn-sm" onclick="guardarReglaSeccion('distancia')">Agregar rango</button>
+          </div><div id="log-lista-distancia" class="log-lista"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">🗺️ Incremento por cuadrante</div></div>
+          <p class="subtitle">Añade un incremento por acceso o condiciones de la zona.</p><div class="log-mini-form">
+            <div class="form-group"><label>Nombre</label><input id="log-ter-nombre" placeholder="Acceso complicado"></div><div class="form-group"><label>Cuadrante</label><select id="log-ter-cuadrante" onfocus="refrescarCuadrantesLogistica()"></select></div><div class="form-group"><label>Tipo</label><select id="log-ter-ajuste"><option value="fijo">Importe fijo</option><option value="porcentaje">Porcentaje</option><option value="multiplicador">Multiplicador</option></select></div><div class="form-group"><label>Valor</label><input id="log-ter-valor" type="number" min="0" step="0.01"></div><button class="btn btn-primary btn-sm" onclick="guardarReglaSeccion('territorio')">Asignar incremento</button>
+          </div><div id="log-lista-territorio" class="log-lista"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">🌧️ Filtros por clima</div></div>
+          <p class="subtitle">Crea niveles reutilizables, por ejemplo lluvia leve, media o fuerte.</p><div class="log-mini-form">
+            <div class="form-group"><label>Nombre</label><input id="log-cli-nombre" placeholder="Lluvia media" oninput="generarClaveFiltro('cli')"></div><div class="form-group"><label>Clave automática</label><input id="log-cli-nivel" placeholder="lluvia_media" readonly></div><div class="form-group"><label>Tipo</label><select id="log-cli-ajuste"><option value="fijo">Importe fijo</option><option value="porcentaje">Porcentaje</option><option value="multiplicador">Multiplicador</option></select></div><div class="form-group"><label>Valor</label><input id="log-cli-valor" type="number" min="0" step="0.01"></div><button class="btn btn-primary btn-sm" onclick="guardarReglaSeccion('clima')">Crear filtro</button>
+          </div><div id="log-lista-clima" class="log-lista"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">🎉 Días festivos</div></div>
+          <p class="subtitle">Define el ajuste que corresponde a cada tipo de día festivo.</p><div class="log-mini-form">
+            <div class="form-group"><label>Nombre</label><input id="log-cal-nombre" placeholder="Navidad" oninput="generarClaveFiltro('cal')"></div><div class="form-group"><label>Clave automática</label><input id="log-cal-nivel" placeholder="navidad" readonly></div><div class="form-group"><label>Fecha</label><input id="log-cal-fecha" type="date"></div><div class="form-group"><label>Tipo</label><select id="log-cal-ajuste"><option value="fijo">Importe fijo</option><option value="porcentaje">Porcentaje</option><option value="multiplicador">Multiplicador</option></select></div><div class="form-group"><label>Valor</label><input id="log-cal-valor" type="number" min="0" step="0.01"></div><button class="btn btn-primary btn-sm" onclick="guardarReglaSeccion('calendario')">Agregar al calendario</button>
+          </div><div id="log-lista-calendario" class="log-lista"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">🌙 Aumento por horario</div></div>
+          <p class="subtitle">Aplica automáticamente el aumento todos los días dentro de la franja indicada.</p><div class="log-mini-form">
+            <div class="form-group"><label>Nombre</label><input id="log-hor-nombre" placeholder="Servicio nocturno"></div><div class="form-group"><label>Hora de inicio</label><input id="log-hor-desde" type="time" value="22:00"></div><div class="form-group"><label>Hora de fin</label><input id="log-hor-hasta" type="time" value="06:00"></div><div class="form-group"><label>Tipo</label><select id="log-hor-ajuste"><option value="fijo">Importe fijo</option><option value="porcentaje">Porcentaje</option><option value="multiplicador">Multiplicador</option></select></div><div class="form-group"><label>Valor</label><input id="log-hor-valor" type="number" min="0" step="0.01"></div><button class="btn btn-primary btn-sm" onclick="guardarReglaSeccion('horario')">Crear aumento diario</button>
+          </div><div id="log-lista-horario" class="log-lista"></div></div>
+      </div>
+
+      <div class="grid2 log-grid" style="margin-top:16px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🌧️ Activar condición climática</div></div>
+          <p class="subtitle">Solo puede existir un filtro activo. Seleccionar otro reemplaza automáticamente el anterior.</p>
+          <div id="log-clima-botones" class="log-clima-botones"><div class="empty">Primero crea un filtro climático.</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">🧪 Simulador de tarifa</div></div>
+          <div class="form-group"><label>Negocio</label><select id="log-sim-tenant"></select></div>
+          <div class="form-group"><label>Colonia GeoTepic</label><input id="log-sim-colonia" placeholder="Villas de Matatipac"></div>
+          <div class="form-group"><label>Clima para la simulación</label><select id="log-sim-clima"><option value="actual">Usar condición activa</option><option value="ninguno">Sin ajuste climático</option></select></div>
+          <div class="form-group"><label>Día festivo</label><select id="log-sim-festivo" onchange="seleccionarFestivoSimulador()"><option value="">Fecha normal</option></select></div>
+          <div class="form-group"><label>Fecha y hora</label><input id="log-sim-momento" type="datetime-local"></div>
+          <div id="log-sim-criterios" class="log-lista"></div>
+          <button class="btn btn-primary" onclick="simularLogistica()">Calcular tarifa</button>
+          <div id="log-simulacion" class="log-simulacion empty">Publica la política global y realiza una simulación.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── MANDADITOS ── -->
     <div id="sec-mandaditos" class="section">
       <h1>Mandaditos — Repartidores</h1>
@@ -887,6 +956,7 @@
 <script src="/geo/geotepic/geotepic-conflictos.js"></script>
 <script src="/geo/geotepic/geotepic.js"></script>
 <script src="superadmin-geo.js"></script>
+<script src="superadmin-logistica.js"></script>
 <script src="superadmin-mandaditos.js"></script>
 <script src="superadmin-config.js"></script>
 <script src="superadmin-atencion.js"></script>
