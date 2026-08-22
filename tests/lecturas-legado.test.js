@@ -12,7 +12,7 @@
  *     no consultas a la tabla SQL.
  *
  * Ratchet: la cantidad de lecturas legacy puede disminuir pero no crecer.
- * Especificaciones: describen el estado final (test.todo).
+ * Especificaciones: describen el estado final verificable.
  */
 
 process.env.BOT_TEST_MODE = "1";

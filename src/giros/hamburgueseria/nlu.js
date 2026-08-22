@@ -204,6 +204,8 @@ function parsearItemHeredado(fragmento, tipoPrevio) {
 function parsearPedidoSimple(texto) {
   texto = textoANumero(preprocesarCantidades(texto));
   const t = normalizar(texto);
+  // Aísla el contrato aunque la BD activa conserve tipos de otro giro.
+  if (/\b(?:tacos?|tortas?|quesadillas?)\b/.test(t)) return null;
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 

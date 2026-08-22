@@ -16,8 +16,7 @@
  *   - El archivo de migración está en src/migration/ (ubicación esperada).
  *   - El ecosistema PM2 no registra tenants (solo superadmin + webhook).
  *
- * Pasos que requieren entorno real (test.todo):
- *   Los 12 pasos del despliegue gradual según acople.txt.
+ * Los pasos que requieren entorno real están en docs/VALIDACION_STAGING.md.
  */
 
 const { test, describe } = require("node:test");
@@ -159,62 +158,14 @@ describe("Reversibilidad — el deploy puede deshacerse", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SECCIÓN 4 — Los 12 pasos del despliegue gradual (test.todo)
+// SECCIÓN 4 — El despliegue operativo está en docs/VALIDACION_STAGING.md
 // ═══════════════════════════════════════════════════════════════════════════════
-
-describe("Plan de despliegue gradual — 12 pasos (validación manual)", () => {
-  test.todo(
-    "Paso 1: Copiar una BD real anonimizada al entorno de pruebas y ejecutar migrar() sin errores"
-  );
-  test.todo(
-    "Paso 2: Ejecutar la suite completa (npm test) sobre la BD migrada — 0 fallos"
-  );
-  test.todo(
-    "Paso 3: Desplegar el código con las variables de compatibilidad desactivadas " +
-    "(GIRO_CATALOGO_UNICO, PEDIDO_NEUTRAL_UNICO, PRECIOS_GIRO_UNICO, COMANDOS_MODULARES = false)"
-  );
-  test.todo(
-    "Paso 4: Activar GIRO_CATALOGO_UNICO=true solo en pruebas — verificar menú correcto en WhatsApp y panel"
-  );
-  test.todo(
-    "Paso 5: Observar logs durante 24h — confirmar que no aparecen markers [LEGACY] ni errores de catálogo"
-  );
-  test.todo(
-    "Paso 6: Activar PEDIDO_NEUTRAL_UNICO=true — verificar que pedidos nuevos usan formato neutral " +
-    "y pedidos históricos siguen siendo legibles"
-  );
-  test.todo(
-    "Paso 7: Activar PRECIOS_GIRO_UNICO=true — verificar que totales en resumen, panel y comprobantes coinciden"
-  );
-  test.todo(
-    "Paso 8: Activar COMANDOS_MODULARES=true — verificar que !confirmar, !listo, !cancelar funcionan " +
-    "y que los grupos de mandaditos no reciben comandos de pedido"
-  );
-  test.todo(
-    "Paso 9: Probar un tenant piloto en producción real con 2-3 pedidos completos de WhatsApp a domicilio"
-  );
-  test.todo(
-    "Paso 10: Ampliar a todos los tenants activos — monitorear alertas y pedidos sin confirmar durante 48h"
-  );
-  test.todo(
-    "Paso 11: Verificar que los respaldos anteriores al despliegue existen y son restaurables " +
-    "(backup-db.js sobre copia de datos/tenants.json)"
-  );
-  test.todo(
-    "Paso 12: Retirar las variables de compatibilidad y el código de fallback solo después de " +
-    "confirmar estabilidad durante al menos 7 días — ejecutar suite completa como verificación final"
-  );
-});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECCIÓN 5 — Criterios de finalización de la Fase 8
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Criterios de finalización de la Fase 8", () => {
-  test.todo(
-    "No hay catálogos operativos fuera del módulo Giro — src/giros/taqueria/ es la única fuente"
-  );
-
   test("el núcleo no contiene vocabulario taquería-específico — pTaco/pTorta/p100g en 0", () => {
     const n = contarEnArchivos(CODIGO_OPERATIVO, /\b(pTaco|pTorta|p100g)\b/);
     assert.equal(n, 0,
@@ -237,10 +188,6 @@ describe("Criterios de finalización de la Fase 8", () => {
     );
   });
 
-  test.todo(
-    "WhatsApp y ambos paneles (tenant + superadmin) muestran la misma lista de productos y precios"
-  );
-
   test("migrar-bd.js no contiene operaciones destructivas — pedidos históricos seguros", () => {
     const lineas = leerLineas(p("src/migration/migrar-bd.js"));
     const nDrop = contarPatron(lineas, /\bDROP\s+TABLE\b/i);
@@ -249,7 +196,4 @@ describe("Criterios de finalización de la Fase 8", () => {
     assert.equal(nDeletePedidos, 0, "migrar-bd.js no debe borrar pedidos — historial intacto");
   });
 
-  test.todo(
-    "La documentación técnica (CLAUDE.md) refleja la arquitectura definitiva sin referencias a tablas legacy"
-  );
 });

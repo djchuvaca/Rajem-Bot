@@ -15,7 +15,7 @@
  *   5. Scripts administrativos
  *   6. Tests y utilidades
  *
- * Tests de especificación (test.todo) describen el estado objetivo que se alcanzará
+ * Las verificaciones describen el estado objetivo que debe conservarse
  * cuando las fases 5-7 estén completas.
  */
 

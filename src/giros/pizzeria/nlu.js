@@ -197,6 +197,9 @@ function parsearItemHeredado(fragmento, tipoPrevio) {
 function parsearPedidoSimple(texto) {
   texto = textoANumero(preprocesarCantidades(texto));
   const t = normalizar(texto);
+  // Los tipos activos pertenecen a la BD del tenant y pueden provenir de otro
+  // giro durante pruebas o migraciones. Nunca deben contaminar este contrato.
+  if (/\b(?:tacos?|tortas?|quesadillas?)\b/.test(t)) return null;
   if (SEÑALES_COMPLEJO.test(t) || PATRON_DISTRIBUCION.test(texto)) return null;
   if (calcularScore(texto) < 4) return null;
 

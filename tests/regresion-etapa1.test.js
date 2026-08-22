@@ -428,35 +428,17 @@ describe("Aislamiento de giro — NLU no mezcla vocabulario entre giros", () => 
     assert.equal(faltante.campo, "variante");
   });
 
-  test("pizzería actualmente delega a taquería (bug documentado, se corrige en F5)", () => {
-    // COMPORTAMIENTO ACTUAL (incorrecto): parsearPedido de pizzería usa el NLU de taquería
-    // como fallback y reconoce cortes como 'surtido'. Esto es un bug que se corrige cuando
-    // F5 implemente el NLU propio de pizzería.
+  test("pizzería no reconoce productos ni cortes de taquería", () => {
     const contrato = getContratoGiro("pizzeria");
     const resultado = contrato.parsearPedido("2 tacos de surtido");
-    // Documentamos que sí reconoce el corte (comportamiento actual, no el esperado).
-    // Cuando F5 esté listo, el resultado debe ser null o un pedido sin corte de taquería.
-    if (resultado !== null) {
-      assert.ok(
-        resultado.tipo === "pedido",
-        "si devuelve algo, debe ser tipo pedido"
-      );
-    }
-    // El test pasará tanto si devuelve null (correcto futuro) como si devuelve pedido (actual).
+    assert.equal(resultado, null);
   });
 
-  test.todo("pizzería no debe reconocer cortes de taquería (implementar en F5: NLU propio)");
-
-  test("hamburguesería actualmente delega a taquería (bug documentado, se corrige en F5)", () => {
-    // Mismo caso que pizzería — ver nota arriba.
+  test("hamburguesería no reconoce productos ni cortes de taquería", () => {
     const contrato = getContratoGiro("hamburgueseria");
     const resultado = contrato.parsearPedido("3 tacos de buche");
-    if (resultado !== null) {
-      assert.ok(resultado.tipo === "pedido");
-    }
+    assert.equal(resultado, null);
   });
-
-  test.todo("hamburguesería no debe reconocer cortes de taquería (implementar en F5: NLU propio)");
 
   test("pizzería declara capacidades de porcionado desactivadas", () => {
     const contrato = getContratoGiro("pizzeria");

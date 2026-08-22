@@ -309,25 +309,9 @@ describe("schema_migrations — historial de retiro", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Estado objetivo — Versión A y Versión B del retiro", () => {
-  test.todo(
-    "Versión A: db/seed.js no debe insertar en productos tras catalogo_giro_migrado_v2=1 " +
-    "(ya cumplido — verificar que no se revierte)"
-  );
-  test.todo(
-    "Versión A: /api/cortes (GET/POST/PUT) debe marcarse como deprecated con header Deprecation"
-  );
-  test.todo(
-    "Versión A: cortes.precio_base debe dejar de leerse en db/cortes.js — reemplazar por menu_items.precio"
-  );
-  test.todo(
-    "Versión B: productos.precio_taco, precio_torta, precio_100g pueden eliminarse tras exportar respaldo"
-  );
   test("Versión B: /api/cortes eliminado — frontend usa solo /api/menu-items", () => {
     const lineas = leerLineas(p("src/panel/server.js"));
     const n = contarPatron(lineas, /app\.\w+\s*\(\s*["']\/api\/cortes/);
     assert.strictEqual(n, 0, `/api/cortes debe ser 0 en server.js — encontrados: ${n}`);
   });
-  test.todo(
-    "Versión B: tabla `productos` puede renombrarse a `productos_v1_historial` tras confirmar cero accesos"
-  );
 });

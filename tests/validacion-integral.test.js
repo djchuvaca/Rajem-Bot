@@ -10,9 +10,7 @@
  *   4. Mismo giro, configuraciones distintas: precios y disponibilidad independientes
  *   5. Fallo durante migración: la BD queda en estado consistente
  *
- * Tests marcados como test.todo son los que requieren entorno real (WhatsApp,
- * panel web, webhook deploy, varios procesos PM2) y se documentan aquí como
- * especificaciones a verificar manualmente antes del deploy gradual.
+ * Las verificaciones externas viven en docs/VALIDACION_STAGING.md.
  *
  * Prueba crítica (obligatoria):
  *   "Un tenant no puede leer ni modificar el catálogo particular de otro"
@@ -161,6 +159,7 @@ function sembrar_pizzeria(bsdb) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Fin de las validaciones automatizables; las externas viven en la documentación de staging.
 // PRUEBA CRÍTICA — Aislamiento de tenants
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -473,38 +472,5 @@ describe("Verificaciones de código: el módulo real implementa el contrato del 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ESPECIFICACIONES — Tests que requieren entorno real (test.todo)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Validación manual requerida — entorno real", () => {
-  test.todo(
-    "PANEL: wizard de onboarding completa 5 pasos y marca setup_done en localStorage"
-  );
-  test.todo(
-    "PANEL: cambiar precio de un corte se refleja en el mensaje de WhatsApp en < 5 segundos"
-  );
-  test.todo(
-    "PANEL: marcar corte como agotado lo oculta del menú de WhatsApp sin eliminar el item"
-  );
-  test.todo(
-    "WHATSAPP: cliente completa un pedido de principio a fin (3 tacos de surtido a domicilio)"
-  );
-  test.todo(
-    "WHATSAPP: el bot se recupera de una desconexión de WhatsApp y atiende el siguiente mensaje"
-  );
-  test.todo(
-    "PM2: reiniciar el proceso del tenant no duplica tareas de timeout ni backup"
-  );
-  test.todo(
-    "MULTI-TENANT: dos tenants distintos del mismo servidor atienden mensajes sin interferir"
-  );
-  test.todo(
-    "WEBHOOK: push a main dispara git pull, npm install y pm2 restart de todos los tenants"
-  );
-  test.todo(
-    "BACKUP: restaurar desde backup reproduce exactamente el mismo catálogo y configuración"
-  );
-  test.todo(
-    "MIGRACIÓN REAL: aplicar migrar() a una BD de producción antigua no borra ni corrupta pedidos"
-  );
-});
