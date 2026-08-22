@@ -341,6 +341,8 @@ El Superadmin incluye la sección **Logística**. GeoTepic determina colonia, co
 
 Los cambios se preparan en un borrador y solo afectan al bot después de publicar una versión. Cada publicación abre un nuevo borrador y conserva moneda, redondeo, tarifa mínima y tarifa máxima opcionales. Después de calcular y redondear, la tarifa máxima limita efectivamente el costo final del envío.
 
+Validación automatizada: `npm run test:logistica` ejecuta la regresión aislada del motor sin tocar bases reales. `npm run check:logistica:staging` inspecciona en modo solo lectura la política publicada, continuidad de rangos, GeoTepic y coordenadas de tenants del entorno desplegado.
+
 Si todavía no existe una política global publicada, `src/geo/index.js` conserva temporalmente el cálculo histórico mediante `tarifas_zonas`. Este fallback existe para despliegue gradual y no concede control sobre las reglas centrales al panel tenant.
 
 Responsabilidades:

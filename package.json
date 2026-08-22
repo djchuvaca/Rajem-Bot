@@ -8,6 +8,8 @@
     "dev": "nodemon index.js",
     "test": "node --require ./tests/setup.js --test tests/*.test.js",
     "test:mandaditos": "node --require ./tests/setup.js --test tests/mandaditos.test.js tests/config-validacion.test.js",
+    "test:logistica": "node --require ./tests/setup.js --test tests/logistica.test.js tests/logistica-regresion.test.js",
+    "check:logistica:staging": "node scripts/verificar-logistica-staging.js",
     "backup": "node scripts/backup-db.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop ${TENANT_ID:-tacos-javier-tepic}",
